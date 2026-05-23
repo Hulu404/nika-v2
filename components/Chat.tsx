@@ -7,7 +7,7 @@ import { TypingIndicator } from "@/components/TypingIndicator";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { SCENARIO_META } from "@/lib/scenarios";
 import { cn } from "@/lib/utils";
-import type { Message, Scenario } from "@/types/conversation";
+import type { ChatMessage, Scenario } from "@/types/conversation";
 
 export function Chat({
   scenario,
@@ -16,7 +16,7 @@ export function Chat({
   scenario: Scenario;
   className?: string;
 }) {
-  const [messages, setMessages] = useState<Message[]>(() => [
+  const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: crypto.randomUUID(),
       role: "assistant",
@@ -24,30 +24,37 @@ export function Chat({
       createdAt: new Date().toISOString(),
     },
   ]);
-  const [isLoading, setIsLoading] = useState(false);
+  const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const scrollRef = useChatScroll(`${messages.length}-${isLoading}`);
+  const last = messages[messages.length - 1];
+  // Скроллим вниз и при добавлении сообщений, и по мере дописывания ответа.
+  const scrollRef = useChatScroll(
+    `${messages.length}-${last?.content.length ?? 0}-${pending}`,
+  );
+
+  // Пока ждём первый токен, последнее сообщение — реплика пользователя.
+  const showTyping = pending && last?.role === "user";
 
   async function send(text: string) {
-    if (isLoading) return;
+    if (pending) return;
     setError(null);
 
-    const userMessage: Message = {
+    const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
       role: "user",
       content: text,
       createdAt: new Date().toISOString(),
     };
-    const next = [...messages, userMessage];
-    setMessages(next);
-    setIsLoading(true);
+    const history = [...messages, userMessage];
+    setMessages(history);
+    setPending(true);
 
     try {
-      // API ждёт историю, начинающуюся с реплики пользователя — открывающую
-      // реплику НИКИ (assistant) отбрасываем.
-      const firstUser = next.findIndex((m) => m.role === "user");
-      const payload = next
+      // API ждёт историю, начинающуюся с реплики пользователя —
+      // открывающую реплику НИКИ (assistant) отбрасываем.
+      const firstUser = history.findIndex((m) => m.role === "user");
+      const payload = history
         .slice(firstUser)
         .map((m) => ({ role: m.role, content: m.content }));
 
@@ -56,25 +63,46 @@ export function Chat({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scenario, messages: payload }),
       });
-      if (!res.ok) throw new Error(`status ${res.status}`);
+      if (!res.ok || !res.body) throw new Error(`status ${res.status}`);
 
-      const data = (await res.json()) as { message?: string };
-      if (!data.message) throw new Error("empty response");
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let assistantId: string | null = null;
+      let acc = "";
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: crypto.randomUUID(),
-          role: "assistant",
-          content: data.message!,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
+      // Читаем поток токенов и дописываем ответ НИКИ по мере прихода.
+      for (;;) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        acc += decoder.decode(value, { stream: true });
+        if (!acc) continue;
+
+        if (assistantId === null) {
+          const id = crypto.randomUUID();
+          assistantId = id;
+          setMessages((prev) => [
+            ...prev,
+            {
+              id,
+              role: "assistant",
+              content: acc,
+              createdAt: new Date().toISOString(),
+            },
+          ]);
+        } else {
+          const id = assistantId;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === id ? { ...m, content: acc } : m)),
+          );
+        }
+      }
+
+      if (assistantId === null) throw new Error("empty stream");
     } catch (err) {
       console.error("[Chat] send failed:", err);
       setError("Не получилось получить ответ. Попробуй ещё раз.");
     } finally {
-      setIsLoading(false);
+      setPending(false);
     }
   }
 
@@ -87,13 +115,13 @@ export function Chat({
               {m.content}
             </MessageBubble>
           ))}
-          {isLoading && <TypingIndicator />}
+          {showTyping && <TypingIndicator />}
           {error && (
             <p className="px-1 text-center text-sm text-ink-muted">{error}</p>
           )}
         </div>
       </div>
-      <ChatInput onSend={send} disabled={isLoading} />
+      <ChatInput onSend={send} disabled={pending} />
     </div>
   );
 }

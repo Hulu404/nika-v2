@@ -1,21 +1,46 @@
-import { createClient } from "@supabase/supabase-js";
+import { cookies } from "next/headers";
+import { createBrowserClient, createServerClient } from "@supabase/ssr";
+import type { Database } from "@/types/database";
 
-const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-
-/**
- * Публичный клиент (anon key) — для использования в браузере и в RLS-контексте
- * пользователя.
- */
-export const supabase = createClient(url, anonKey);
+const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
 /**
- * Серверный клиент с service-ролью. Обходит RLS — использовать ТОЛЬКО на сервере
- * (route handlers, server actions), никогда не отдавать в браузер.
+ * Клиент для браузера (Client Components). Использует anon-ключ и работает
+ * в контексте RLS текущего пользователя.
+ *
+ * Внимание: этот модуль также инициализирует серверный клиент через
+ * next/headers, поэтому импортировать его в Client Component можно только если
+ * сборка не тянет серверную часть. Если понадобится использовать браузерный
+ * клиент в "use client"-компоненте и Next пожалуется на next/headers — вынести
+ * createClientComponentClient в отдельный файл lib/supabase-client.ts.
  */
-export function createServiceClient() {
-  const serviceKey = process.env.SUPABASE_SERVICE_KEY ?? "";
-  return createClient(url, serviceKey, {
-    auth: { persistSession: false, autoRefreshToken: false },
+export function createClientComponentClient() {
+  return createBrowserClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY);
+}
+
+/**
+ * Клиент для серверных компонентов/route handlers. Читает и обновляет сессию
+ * через cookies. Работает в контексте RLS текущего пользователя.
+ */
+export function createServerComponentClient() {
+  const cookieStore = cookies();
+
+  return createServerClient<Database>(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
+      },
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options);
+          });
+        } catch {
+          // Вызвано из Server Component, где запись cookies запрещена —
+          // обновление сессии берёт на себя middleware.
+        }
+      },
+    },
   });
 }

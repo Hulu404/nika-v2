@@ -28,29 +28,47 @@ export async function POST(req: Request) {
     return Response.json({ error: "messages is required" }, { status: 400 });
   }
 
-  try {
-    const response = await anthropic.messages.create({
-      model: NIKA_MODEL,
-      max_tokens: 1024,
-      // Системный промпт стабилен между запросами одного сценария — кэшируем его.
-      system: [
-        {
-          type: "text",
-          text: buildSystemPrompt(scenario),
-          cache_control: { type: "ephemeral" },
-        },
-      ],
-      messages,
-    });
+  const encoder = new TextEncoder();
 
-    const text = response.content
-      .filter((block): block is Anthropic.TextBlock => block.type === "text")
-      .map((block) => block.text)
-      .join("");
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      try {
+        const anthropicStream = anthropic.messages.stream({
+          model: NIKA_MODEL,
+          max_tokens: 1024,
+          // Системный промпт стабилен в рамках сценария — кэшируем его.
+          system: [
+            {
+              type: "text",
+              text: buildSystemPrompt(scenario),
+              cache_control: { type: "ephemeral" },
+            },
+          ],
+          messages,
+        });
 
-    return Response.json({ message: text });
-  } catch (err) {
-    console.error("[api/chat] Anthropic error:", err);
-    return Response.json({ error: "Internal error" }, { status: 500 });
-  }
+        for await (const event of anthropicStream) {
+          if (
+            event.type === "content_block_delta" &&
+            event.delta.type === "text_delta"
+          ) {
+            controller.enqueue(encoder.encode(event.delta.text));
+          }
+        }
+        controller.close();
+      } catch (err) {
+        console.error("[api/chat] stream error:", err);
+        controller.error(err);
+      }
+    },
+  });
+
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/plain; charset=utf-8",
+      "Cache-Control": "no-store",
+      // Отключаем буферизацию у прокси (например, nginx), чтобы токены шли сразу.
+      "X-Accel-Buffering": "no",
+    },
+  });
 }

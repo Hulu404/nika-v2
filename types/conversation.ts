@@ -1,25 +1,18 @@
-/** Пять сценариев общения с НИКОЙ. */
-export type Scenario =
-  | "morning"
-  | "after_run"
-  | "after_skip"
-  | "pre_race"
-  | "after_failure";
+import type { MessageRole, ScenarioType } from "./app";
 
-export type Role = "user" | "assistant";
+/** Сценарий диалога. Единый источник истины — ScenarioType в app.ts. */
+export type Scenario = ScenarioType;
 
-export interface Message {
+/** Роль автора реплики. */
+export type Role = MessageRole;
+
+/**
+ * Сообщение в состоянии UI: с локальным id (для React-ключей) и временем
+ * создания. Для хранения и передачи в API используется Message из app.ts.
+ */
+export interface ChatMessage {
   id: string;
   role: Role;
   content: string;
   createdAt: string;
-}
-
-export interface Conversation {
-  id: string;
-  userId: string;
-  scenario: Scenario;
-  messages: Message[];
-  createdAt: string;
-  updatedAt: string;
 }
