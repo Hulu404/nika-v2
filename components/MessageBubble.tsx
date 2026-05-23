@@ -14,7 +14,7 @@ export function MessageBubble({
     <div className={cn("flex", isNika ? "justify-start" : "justify-end")}>
       <div
         className={cn(
-          "max-w-[80%] rounded-bubble px-4 py-3 text-[15px] leading-relaxed",
+          "max-w-[80%] whitespace-pre-wrap break-words rounded-bubble px-4 py-3 text-[15px] leading-relaxed",
           isNika
             ? "bg-surface-nika text-ink-primary"
             : "bg-accent text-canvas",
