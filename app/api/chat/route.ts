@@ -1,6 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { anthropic, NIKA_MODEL } from "@/lib/anthropic";
 import { createConversation, updateConversation } from "@/lib/conversations";
+import { FREE_DAILY_LIMIT, isLimitReached } from "@/lib/limits";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { SCENARIO_ORDER } from "@/lib/scenarios";
 import { createServerComponentClient } from "@/lib/supabase";
@@ -38,6 +39,14 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const limited = await isLimitReached(supabase, user.id);
+  if (limited) {
+    return Response.json(
+      { error: "limit_reached", limit: FREE_DAILY_LIMIT },
+      { status: 402 },
+    );
   }
 
   // Определяем диалог: при отсутствии id создаём новый (так «Новый разговор»

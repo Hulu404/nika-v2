@@ -1,11 +1,13 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageBubble } from "@/components/MessageBubble";
 import { TypingIndicator } from "@/components/TypingIndicator";
 import { QuickReplies } from "@/components/QuickReplies";
 import { useChatScroll } from "@/hooks/useChatScroll";
+import { FREE_DAILY_LIMIT } from "@/lib/limits";
 import { SCENARIO_META } from "@/lib/scenarios";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, Scenario } from "@/types/conversation";
@@ -64,6 +66,10 @@ export function Chat({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scenario, messages: payload, conversationId }),
       });
+      if (res.status === 402) {
+        setError("limit_reached");
+        return;
+      }
       if (!res.ok || !res.body) throw new Error(`status ${res.status}`);
 
       // Запоминаем id диалога (важно для только что созданного нового диалога).
@@ -117,9 +123,21 @@ export function Chat({
             </MessageBubble>
           ))}
           {showTyping && <TypingIndicator />}
-          {error && (
+          {error === "limit_reached" ? (
+            <div className="mx-auto mt-2 max-w-md rounded-card border border-accent/20 bg-surface-warm px-5 py-4 text-center">
+              <p className="font-serif text-[15px] text-ink-primary">
+                Ты использовал все {FREE_DAILY_LIMIT} бесплатных сообщений сегодня.
+              </p>
+              <Link
+                href="/upgrade"
+                className="mt-3 inline-block rounded-pill bg-accent px-5 py-2.5 text-[13px] font-medium text-canvas transition-colors hover:bg-accent-deep"
+              >
+                Перейти на НИКА Pro
+              </Link>
+            </div>
+          ) : error ? (
             <p className="px-1 text-center text-sm text-ink-muted">{error}</p>
-          )}
+          ) : null}
         </div>
 
         {/* Быстрые ответы — показываются под сообщениями в прокручиваемой зоне */}
@@ -134,7 +152,7 @@ export function Chat({
         )}
       </div>
 
-      <ChatInput onSend={send} disabled={pending} />
+      <ChatInput onSend={send} disabled={pending || error === "limit_reached"} />
     </div>
   );
 }
