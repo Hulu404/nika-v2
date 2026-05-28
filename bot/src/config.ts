@@ -10,5 +10,5 @@ export const config = {
   botToken: required("BOT_TOKEN"),
   anthropicApiKey: required("ANTHROPIC_API_KEY"),
   supabaseUrl: required("SUPABASE_URL"),
-  supabaseServiceKey: required("SUPABASE_SERVICE_KEY"),
+  supabaseServiceKey: required("SUPABASE_SERVICE_ROLE_KEY"),
 } as const;
