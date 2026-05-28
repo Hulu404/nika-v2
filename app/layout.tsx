@@ -5,6 +5,7 @@ import { Cormorant_Garamond } from "next/font/google";
 // которые мы связываем с дизайн-токенами --font-sans / --font-mono в globals.css.
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { UserMenu } from "@/components/UserMenu";
 import "./globals.css";
 
 // Серифный заголовочный шрифт.
@@ -30,6 +31,7 @@ export default function RootLayout({
       className={`${serif.variable} ${GeistSans.variable} ${GeistMono.variable}`}
     >
       <body className="min-h-screen bg-canvas text-ink-primary antialiased">
+        <UserMenu />
         {children}
       </body>
     </html>
