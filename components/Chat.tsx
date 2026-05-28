@@ -107,9 +107,9 @@ export function Chat({
   }
 
   return (
-    <div className={cn("flex flex-col", className)}>
+    <div className={cn("flex flex-col bg-canvas", className)}>
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-2xl flex-col gap-3 px-4 py-6">
+        <div className="mx-auto flex max-w-2xl flex-col gap-2 px-4 py-5">
           {messages.map((m) => (
             <MessageBubble key={m.id} role={m.role}>
               {m.content}

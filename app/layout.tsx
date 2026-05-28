@@ -1,16 +1,13 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond } from "next/font/google";
-// Geist отсутствует в next/font/google для Next.js 14 — используем
-// официальный пакет Vercel. Он экспортирует --font-geist-sans / --font-geist-mono,
-// которые мы связываем с дизайн-токенами --font-sans / --font-mono в globals.css.
+import { Fraunces } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 
-// Серифный заголовочный шрифт.
-const serif = Cormorant_Garamond({
+const serif = Fraunces({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["300", "400", "500", "600"],
+  style: ["normal", "italic"],
   variable: "--font-serif",
   display: "swap",
 });
@@ -29,7 +26,7 @@ export default function RootLayout({
       lang="ru"
       className={`${serif.variable} ${GeistSans.variable} ${GeistMono.variable}`}
     >
-      <body className="min-h-screen bg-canvas text-ink-primary antialiased">
+      <body className="min-h-screen text-ink-primary antialiased">
         {children}
       </body>
     </html>

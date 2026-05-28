@@ -2,35 +2,106 @@
 @tailwind components;
 @tailwind utilities;
 
-/*
- * CSS-переменные дизайн-системы НИКИ.
- * Значения цветов/радиусов должны совпадать с tailwind.config.ts.
- * Шрифтовые переменные (--font-*) инжектит next/font в <html> (см. app/layout.tsx).
- */
 :root {
-  --bg-canvas: #faf7f1;
-  --ink-primary: #1a1a1a;
-  --ink-secondary: #6b6560;
-  --ink-muted: #9a928a;
-  --accent: #c8553d;
-  --accent-deep: #9b3d28;
-  --surface-warm: #f3ede3;
-  --surface-nika: #f5e4dc;
+  /* Фоны */
+  --bg-canvas: #EFE7D7;
+  --bg-primary: #FAF7F1;
+  --bg-elevated: #FFFCF6;
 
-  --radius-card: 16px;
-  --radius-bubble: 18px;
-  --radius-pill: 999px;
+  /* Поверхности */
+  --surface-nika: #F4EFE6;
+  --surface-warm: #F4E4D6;
+  --surface-deep: #E9DFCB;
 
-  /* Связываем дизайн-токены с переменными пакета geist (см. app/layout.tsx). */
+  /* Текст */
+  --ink-primary: #1F1B16;
+  --ink-secondary: #5C534A;
+  --ink-muted: #9A9085;
+  --ink-faint: #C2B7A6;
+
+  /* Рамки */
+  --border-subtle: #EFE9DD;
+  --border-default: #E5DDD0;
+  --border-strong: #D4C9B5;
+
+  /* Акцент */
+  --accent: #C8553D;
+  --accent-deep: #B0392A;
+  --accent-soft: #E8B7A8;
+
+  /* Шрифты */
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Радиусы */
+  --radius-pill: 999px;
+  --radius-bubble: 18px;
+  --radius-card: 16px;
+  --radius-input: 14px;
+
+  /* Пузыри пользователя */
+  --user-bubble-bg: #1F1B16;
+  --user-bubble-fg: #FAF7F1;
+
+  /* Тени */
+  --shadow-card: 0 1px 2px rgba(31,27,22,0.04), 0 8px 24px rgba(31,27,22,0.06);
+
+  /* Размытие */
+  --bg-blur: rgba(250,247,241,0.85);
+  --bg-blur-strong: rgba(250,247,241,0.95);
+  --topbar-blur: rgba(250,247,241,0.7);
+}
+
+/* Тёмная тема */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg-canvas: #14110E;
+    --bg-primary: #1B1814;
+    --bg-elevated: #221E19;
+    --surface-nika: #2A241D;
+    --surface-warm: #3A2920;
+    --surface-deep: #2F2820;
+    --ink-primary: #F5EFE3;
+    --ink-secondary: #B5A998;
+    --ink-muted: #7A6F62;
+    --ink-faint: #4F4639;
+    --border-subtle: #2A241D;
+    --border-default: #34291F;
+    --border-strong: #4A3D2E;
+    --accent: #E07A5F;
+    --accent-deep: #C8553D;
+    --accent-soft: #5A3A2E;
+    --user-bubble-bg: #E8DFD0;
+    --user-bubble-fg: #1B1814;
+    --bg-blur: rgba(20,17,14,0.85);
+    --bg-blur-strong: rgba(20,17,14,0.95);
+    --topbar-blur: rgba(20,17,14,0.7);
+  }
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
 }
 
 body {
-  background-color: var(--bg-canvas);
+  background-color: var(--bg-primary);
+  background-image:
+    radial-gradient(circle at 20% 0%, rgba(200,85,61,0.05), transparent 40%),
+    radial-gradient(circle at 80% 100%, rgba(31,27,22,0.04), transparent 40%);
   color: var(--ink-primary);
-  font-family: var(--font-sans), "Inter", -apple-system, sans-serif;
+  font-family: var(--font-sans), "Geist", "Inter", -apple-system, sans-serif;
+  font-feature-settings: "ss01", "ss02", "cv11";
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+  min-height: 100vh;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input, textarea {
+  font-family: inherit;
 }
