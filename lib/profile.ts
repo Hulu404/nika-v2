@@ -36,7 +36,7 @@ export async function getOrCreateProfile(
   return data ?? null;
 }
 
-/** Онбординг считается пройденным, когда выбран уровень бега. */
+/** Онбординг считается пройденным, когда выбрана цель бега. */
 export function isProfileComplete(profile: Profile | null): boolean {
-  return profile?.level != null;
+  return profile?.goal != null;
 }

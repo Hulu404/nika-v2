@@ -74,6 +74,9 @@ const config: Config = {
       animation: {
         "fade-in": "fade-in 0.3s ease-out",
       },
+      spacing: {
+        safe: "env(safe-area-inset-bottom, 0px)",
+      },
     },
   },
   plugins: [],

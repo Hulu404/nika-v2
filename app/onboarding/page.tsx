@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { OnboardingFlow } from "@/components/OnboardingFlow";
+import { OnboardingWizard } from "@/components/OnboardingWizard";
 import { getOrCreateProfile, isProfileComplete } from "@/lib/profile";
 import { createServerComponentClient } from "@/lib/supabase";
 
@@ -19,5 +19,5 @@ export default async function OnboardingPage() {
     redirect("/");
   }
 
-  return <OnboardingFlow userId={user.id} />;
+  return <OnboardingWizard userId={user.id} />;
 }

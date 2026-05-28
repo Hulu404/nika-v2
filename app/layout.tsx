@@ -15,18 +15,22 @@ const serif = Fraunces({
 
 export const metadata: Metadata = {
   title: "НИКА — ментальный ассистент для бегунов",
-  description:
-    "НИКА помогает бегунам-любителям не бросить бег. Тёплый собеседник, а не тренер.",
+  description: "НИКА помогает бегунам-любителям не бросить бег. Тёплый собеседник, а не тренер.",
 };
 
-export default function RootLayout({
-  children,
-}: Readonly<{ children: React.ReactNode }>) {
+// Скрипт запускается до рендера — предотвращает мигание при смене темы.
+const darkModeScript = `(function(){
+  var t = localStorage.getItem('nika-theme');
+  var p = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if (t === 'dark' || (!t && p)) document.documentElement.classList.add('dark');
+})();`;
+
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html
-      lang="ru"
-      className={`${serif.variable} ${GeistSans.variable} ${GeistMono.variable}`}
-    >
+    <html lang="ru" className={`${serif.variable} ${GeistSans.variable} ${GeistMono.variable}`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: darkModeScript }} />
+      </head>
       <body className="min-h-screen text-ink-primary antialiased">
         <UserMenu />
         {children}

@@ -1,31 +1,25 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageBubble } from "@/components/MessageBubble";
 import { TypingIndicator } from "@/components/TypingIndicator";
+import { QuickReplies } from "@/components/QuickReplies";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { SCENARIO_META } from "@/lib/scenarios";
+import { cn } from "@/lib/utils";
 import type { ChatMessage, Scenario } from "@/types/conversation";
-
-function makeOpener(scenario: Scenario): ChatMessage {
-  return {
-    id: crypto.randomUUID(),
-    role: "assistant",
-    content: SCENARIO_META[scenario].opener,
-    createdAt: new Date().toISOString(),
-  };
-}
 
 export function Chat({
   scenario,
   initialMessages,
   conversationId: initialConversationId,
+  className,
 }: {
   scenario: Scenario;
   initialMessages: ChatMessage[];
   conversationId: string | null;
+  className?: string;
 }) {
   const meta = SCENARIO_META[scenario];
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
@@ -36,20 +30,13 @@ export function Chat({
   const [error, setError] = useState<string | null>(null);
 
   const last = messages[messages.length - 1];
-  // Скроллим вниз и при добавлении сообщений, и по мере дописывания ответа.
   const scrollRef = useChatScroll(
     `${messages.length}-${last?.content.length ?? 0}-${pending}`,
   );
 
-  // Пока ждём первый токен, последнее сообщение — реплика пользователя.
   const showTyping = pending && last?.role === "user";
-
-  function startNewConversation() {
-    if (pending) return;
-    setError(null);
-    setConversationId(null);
-    setMessages([makeOpener(scenario)]);
-  }
+  // Быстрые ответы показываем только когда последнее сообщение — от НИКИ и не идёт запрос
+  const showSuggestions = !pending && last?.role === "assistant" && messages.length <= 2;
 
   async function send(text: string) {
     if (pending) return;
@@ -101,12 +88,7 @@ export function Chat({
           assistantId = id;
           setMessages((prev) => [
             ...prev,
-            {
-              id,
-              role: "assistant",
-              content: acc,
-              createdAt: new Date().toISOString(),
-            },
+            { id, role: "assistant", content: acc, createdAt: new Date().toISOString() },
           ]);
         } else {
           const id = assistantId;
@@ -126,55 +108,9 @@ export function Chat({
   }
 
   return (
-    <div className="flex h-dvh flex-col bg-canvas">
-      {/* Nika header — sticky, как в прототипе */}
-      <header className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-line-subtle bg-[var(--bg-blur)] px-4 py-3 backdrop-blur-[16px]">
-        <Link
-          href="/"
-          aria-label="На главную"
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-ink-secondary transition-colors hover:bg-surface-nika hover:text-ink-primary"
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className="h-5 w-5"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={2}
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            aria-hidden
-          >
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </Link>
-
-        {/* Аватар НИКИ с зелёной точкой онлайн */}
-        <div className="relative h-9 w-9 flex-shrink-0 rounded-full bg-nika-avatar shadow-[0_0_0_3px_rgba(200,85,61,0.06)]">
-          <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-canvas bg-[#7BA968]" />
-        </div>
-
-        {/* Имя и статус */}
-        <div className="flex min-w-0 flex-1 flex-col leading-none">
-          <span className="font-serif text-[17px] font-medium tracking-[-0.01em] text-ink-primary">
-            НИКА
-          </span>
-          <span className="mt-[3px] truncate text-[11px] tracking-[0.02em] text-ink-muted">
-            {meta.subtitle}
-          </span>
-        </div>
-
-        <button
-          type="button"
-          onClick={startNewConversation}
-          disabled={pending}
-          className="shrink-0 rounded-pill border border-ink-muted/30 px-3 py-1.5 text-sm text-ink-primary transition-colors hover:bg-surface-warm disabled:opacity-50"
-        >
-          Новый разговор
-        </button>
-      </header>
-
-      <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-2xl flex-col gap-2 px-4 py-5">
+    <div className={cn("flex flex-col bg-[var(--bg-primary)]", className)}>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <div className="mx-auto flex max-w-2xl flex-col gap-2 px-4 pb-2 pt-5">
           {messages.map((m) => (
             <MessageBubble key={m.id} role={m.role}>
               {m.content}
@@ -185,6 +121,17 @@ export function Chat({
             <p className="px-1 text-center text-sm text-ink-muted">{error}</p>
           )}
         </div>
+
+        {/* Быстрые ответы — показываются под сообщениями в прокручиваемой зоне */}
+        {showSuggestions && (
+          <div className="mx-auto max-w-2xl">
+            <QuickReplies
+              suggestions={meta.suggestions}
+              onSelect={send}
+              disabled={pending}
+            />
+          </div>
+        )}
       </div>
 
       <ChatInput onSend={send} disabled={pending} />
