@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { AppLayout } from "@/components/AppLayout";
+import { SidebarData } from "@/components/SidebarData";
+import { createServerComponentClient } from "@/lib/supabase";
 
 // Карточки 2×2
 const CARDS = [
@@ -52,9 +54,26 @@ const CARDS = [
   },
 ];
 
-export default function Day1Page() {
+export default async function Day1Page() {
+  const supabase = await createServerComponentClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  let name = "друг";
+  if (user) {
+    const { data } = await supabase
+      .from("users")
+      .select("display_name")
+      .eq("id", user.id)
+      .maybeSingle();
+    if (data?.display_name?.trim()) {
+      name = data.display_name.trim();
+    }
+  }
+
   return (
-    <AppLayout>
+    <AppLayout sidebarSlot={<SidebarData />}>
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
         <div className="mx-auto max-w-lg px-5 pt-10 lg:pt-12">
 
@@ -68,7 +87,7 @@ export default function Day1Page() {
 
           {/* Заголовок */}
           <h1 className="font-serif text-[30px] font-normal leading-[1.2] tracking-[-0.02em] text-ink-primary mb-3">
-            Привет, Аня.<br />
+            Привет, {name}.<br />
             <em className="italic text-accent">Я тут.</em>
           </h1>
           <p className="text-[14.5px] leading-[1.55] text-ink-secondary mb-8">

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Chat } from "@/components/Chat";
 import { AppLayout } from "@/components/AppLayout";
+import { SidebarData } from "@/components/SidebarData";
 import { getLastConversation } from "@/lib/conversations";
 import { SCENARIO_META, SCENARIO_ORDER } from "@/lib/scenarios";
 import { createServerComponentClient } from "@/lib/supabase";
@@ -99,7 +100,7 @@ export default async function ChatPage({
     : [opener];
 
   return (
-    <AppLayout hideBottomNav>
+    <AppLayout hideBottomNav sidebarSlot={<SidebarData />}>
       {/* Шапка чата */}
       <header className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-blur)] px-4 py-3 backdrop-blur-[16px]">
         <Link

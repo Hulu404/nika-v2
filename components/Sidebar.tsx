@@ -115,15 +115,15 @@ const NAV = [
   { href: "#",          label: "Пуши",                icon: <IcBell />,     implemented: false },
 ];
 
-const RECENT_CONVOS = [
-  { label: "После пропуска", time: "сегодня",   href: "/chat/after_skip" },
-  { label: "Утро перед бегом", time: "вчера",   href: "/chat/morning" },
-  { label: "После пробежки",  time: "12 мая",   href: "/chat/after_run" },
-];
+export interface RecentConvo {
+  label: string;
+  time: string;
+  href: string;
+}
 
 // ──────────────────────────────── компонент ──────────────────────────────────
 
-export function Sidebar() {
+export function Sidebar({ recentConvos }: { recentConvos: RecentConvo[] }) {
   const pathname = usePathname();
   const [dark, setDark] = useState(false);
 
@@ -228,21 +228,27 @@ export function Sidebar() {
           Сегодня — диалоги
         </div>
         <div className="flex flex-col gap-0.5">
-          {RECENT_CONVOS.map((c) => (
-            <Link
-              key={c.href}
-              href={c.href}
-              className={cn(
-                "flex items-center justify-between px-3 py-2 rounded-[8px] text-[13px] transition-colors",
-                pathname === c.href
-                  ? "bg-[var(--surface-deep)] text-ink-primary"
-                  : "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary",
-              )}
-            >
-              <span className="truncate">{c.label}</span>
-              <span className="text-[11px] text-ink-muted ml-2 flex-shrink-0">{c.time}</span>
-            </Link>
-          ))}
+          {recentConvos.length === 0 ? (
+            <span className="px-3 py-2 text-[13px] text-ink-muted italic font-serif">
+              Нет диалогов
+            </span>
+          ) : (
+            recentConvos.map((c) => (
+              <Link
+                key={c.href}
+                href={c.href}
+                className={cn(
+                  "flex items-center justify-between px-3 py-2 rounded-[8px] text-[13px] transition-colors",
+                  pathname === c.href
+                    ? "bg-[var(--surface-deep)] text-ink-primary"
+                    : "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary",
+                )}
+              >
+                <span className="truncate">{c.label}</span>
+                <span className="text-[11px] text-ink-muted ml-2 flex-shrink-0">{c.time}</span>
+              </Link>
+            ))
+          )}
         </div>
       </div>
     </aside>
