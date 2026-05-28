@@ -1,18 +1,15 @@
-import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { Chat } from "@/components/Chat";
+import { getLastConversation } from "@/lib/conversations";
 import { SCENARIO_META, SCENARIO_ORDER } from "@/lib/scenarios";
-import type { Scenario } from "@/types/conversation";
-
-export function generateStaticParams() {
-  return SCENARIO_ORDER.map((scenario) => ({ scenario }));
-}
+import { createServerComponentClient } from "@/lib/supabase";
+import type { ChatMessage, Scenario } from "@/types/conversation";
 
 function isScenario(value: string): value is Scenario {
   return (SCENARIO_ORDER as string[]).includes(value);
 }
 
-export default function ChatPage({
+export default async function ChatPage({
   params,
 }: {
   params: { scenario: string };
@@ -20,42 +17,43 @@ export default function ChatPage({
   if (!isScenario(params.scenario)) {
     notFound();
   }
-
   const scenario = params.scenario;
-  const meta = SCENARIO_META[scenario];
+
+  const supabase = await createServerComponentClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    redirect(`/auth?next=/chat/${scenario}`);
+  }
+
+  const conversation = await getLastConversation(supabase, user.id, scenario);
+
+  // Опенер НИКИ всегда из SCENARIO_META; в БД он не хранится.
+  const opener: ChatMessage = {
+    id: "opener",
+    role: "assistant",
+    content: SCENARIO_META[scenario].opener,
+    createdAt: new Date().toISOString(),
+  };
+
+  const initialMessages: ChatMessage[] = conversation
+    ? [
+        opener,
+        ...conversation.messages.map((m, i) => ({
+          id: `${conversation.id}-${i}`,
+          role: m.role,
+          content: m.content,
+          createdAt: m.timestamp,
+        })),
+      ]
+    : [opener];
 
   return (
-    <div className="flex h-dvh flex-col">
-      <header className="shrink-0 border-b border-ink-muted/10 bg-canvas/80 backdrop-blur">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-3">
-          <Link
-            href="/"
-            aria-label="На главную"
-            className="text-ink-muted transition-colors hover:text-ink-primary"
-          >
-            <svg
-              viewBox="0 0 24 24"
-              className="h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden
-            >
-              <path d="M15 18l-6-6 6-6" />
-            </svg>
-          </Link>
-          <div>
-            <h1 className="font-serif text-2xl leading-tight text-ink-primary">
-              {meta.title}
-            </h1>
-            <p className="text-sm text-ink-secondary">{meta.subtitle}</p>
-          </div>
-        </div>
-      </header>
-
-      <Chat scenario={scenario} className="min-h-0 flex-1" />
-    </div>
+    <Chat
+      scenario={scenario}
+      initialMessages={initialMessages}
+      conversationId={conversation?.id ?? null}
+    />
   );
 }

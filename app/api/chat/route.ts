@@ -1,14 +1,18 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { anthropic, NIKA_MODEL } from "@/lib/anthropic";
+import { createConversation, updateConversation } from "@/lib/conversations";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { SCENARIO_ORDER } from "@/lib/scenarios";
+import { createServerComponentClient } from "@/lib/supabase";
+import type { Message } from "@/types/app";
 import type { Scenario } from "@/types/conversation";
 
 export const runtime = "nodejs";
 
 interface ChatRequest {
   scenario: Scenario;
-  messages: Anthropic.MessageParam[];
+  messages: { role: "user" | "assistant"; content: string }[];
+  conversationId?: string | null;
 }
 
 export async function POST(req: Request) {
@@ -19,7 +23,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { scenario, messages } = body;
+  const { scenario, messages, conversationId } = body;
 
   if (!SCENARIO_ORDER.includes(scenario)) {
     return Response.json({ error: "Unknown scenario" }, { status: 400 });
@@ -28,15 +32,40 @@ export async function POST(req: Request) {
     return Response.json({ error: "messages is required" }, { status: 400 });
   }
 
+  const supabase = await createServerComponentClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) {
+    return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Определяем диалог: при отсутствии id создаём новый (так «Новый разговор»
+  // даёт свежий диалог, а не дописывает в последний).
+  let convId: string;
+  try {
+    convId = conversationId
+      ? conversationId
+      : (await createConversation(supabase, user.id, scenario)).id;
+  } catch (err) {
+    console.error("[api/chat] conversation resolve failed:", err);
+    return Response.json({ error: "Conversation error" }, { status: 500 });
+  }
+
+  const anthropicMessages: Anthropic.MessageParam[] = messages.map((m) => ({
+    role: m.role,
+    content: m.content,
+  }));
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
+      let assistantText = "";
       try {
         const anthropicStream = anthropic.messages.stream({
           model: NIKA_MODEL,
           max_tokens: 1024,
-          // Системный промпт стабилен в рамках сценария — кэшируем его.
           system: [
             {
               type: "text",
@@ -44,7 +73,7 @@ export async function POST(req: Request) {
               cache_control: { type: "ephemeral" },
             },
           ],
-          messages,
+          messages: anthropicMessages,
         });
 
         for await (const event of anthropicStream) {
@@ -52,9 +81,29 @@ export async function POST(req: Request) {
             event.type === "content_block_delta" &&
             event.delta.type === "text_delta"
           ) {
+            assistantText += event.delta.text;
             controller.enqueue(encoder.encode(event.delta.text));
           }
         }
+
+        // Сохраняем полный ход (обмен + ответ НИКИ). Опенер не храним — он
+        // подставляется из SCENARIO_META при загрузке. Ошибка сохранения не
+        // должна рвать уже доставленный ответ — логируем и продолжаем.
+        const now = new Date().toISOString();
+        const toStore: Message[] = [
+          ...messages.map((m) => ({
+            role: m.role,
+            content: m.content,
+            timestamp: now,
+          })),
+          { role: "assistant" as const, content: assistantText, timestamp: now },
+        ];
+        try {
+          await updateConversation(supabase, convId, toStore);
+        } catch (saveErr) {
+          console.error("[api/chat] save failed:", saveErr);
+        }
+
         controller.close();
       } catch (err) {
         console.error("[api/chat] stream error:", err);
@@ -67,7 +116,8 @@ export async function POST(req: Request) {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
       "Cache-Control": "no-store",
-      // Отключаем буферизацию у прокси (например, nginx), чтобы токены шли сразу.
+      "X-Conversation-Id": convId,
+      // Отключаем буферизацию у прокси, чтобы токены шли сразу.
       "X-Accel-Buffering": "no",
     },
   });
