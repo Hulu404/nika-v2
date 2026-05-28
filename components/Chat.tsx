@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageBubble } from "@/components/MessageBubble";
 import { TypingIndicator } from "@/components/TypingIndicator";
+import { QuickReplies } from "@/components/QuickReplies";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { SCENARIO_META } from "@/lib/scenarios";
 import { cn } from "@/lib/utils";
@@ -16,11 +17,13 @@ export function Chat({
   scenario: Scenario;
   className?: string;
 }) {
+  const meta = SCENARIO_META[scenario];
+
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
     {
       id: crypto.randomUUID(),
       role: "assistant",
-      content: SCENARIO_META[scenario].opener,
+      content: meta.opener,
       createdAt: new Date().toISOString(),
     },
   ]);
@@ -28,13 +31,13 @@ export function Chat({
   const [error, setError] = useState<string | null>(null);
 
   const last = messages[messages.length - 1];
-  // Скроллим вниз и при добавлении сообщений, и по мере дописывания ответа.
   const scrollRef = useChatScroll(
     `${messages.length}-${last?.content.length ?? 0}-${pending}`,
   );
 
-  // Пока ждём первый токен, последнее сообщение — реплика пользователя.
   const showTyping = pending && last?.role === "user";
+  // Быстрые ответы показываем только когда последнее сообщение — от НИКИ и не идёт запрос
+  const showSuggestions = !pending && last?.role === "assistant" && messages.length <= 2;
 
   async function send(text: string) {
     if (pending) return;
@@ -51,8 +54,6 @@ export function Chat({
     setPending(true);
 
     try {
-      // API ждёт историю, начинающуюся с реплики пользователя —
-      // открывающую реплику НИКИ (assistant) отбрасываем.
       const firstUser = history.findIndex((m) => m.role === "user");
       const payload = history
         .slice(firstUser)
@@ -70,7 +71,6 @@ export function Chat({
       let assistantId: string | null = null;
       let acc = "";
 
-      // Читаем поток токенов и дописываем ответ НИКИ по мере прихода.
       for (;;) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -82,12 +82,7 @@ export function Chat({
           assistantId = id;
           setMessages((prev) => [
             ...prev,
-            {
-              id,
-              role: "assistant",
-              content: acc,
-              createdAt: new Date().toISOString(),
-            },
+            { id, role: "assistant", content: acc, createdAt: new Date().toISOString() },
           ]);
         } else {
           const id = assistantId;
@@ -107,9 +102,9 @@ export function Chat({
   }
 
   return (
-    <div className={cn("flex flex-col bg-canvas", className)}>
+    <div className={cn("flex flex-col bg-[var(--bg-primary)]", className)}>
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
-        <div className="mx-auto flex max-w-2xl flex-col gap-2 px-4 py-5">
+        <div className="mx-auto flex max-w-2xl flex-col gap-2 px-4 pb-2 pt-5">
           {messages.map((m) => (
             <MessageBubble key={m.id} role={m.role}>
               {m.content}
@@ -120,7 +115,19 @@ export function Chat({
             <p className="px-1 text-center text-sm text-ink-muted">{error}</p>
           )}
         </div>
+
+        {/* Быстрые ответы — показываются под сообщениями в прокручиваемой зоне */}
+        {showSuggestions && (
+          <div className="mx-auto max-w-2xl">
+            <QuickReplies
+              suggestions={meta.suggestions}
+              onSelect={send}
+              disabled={pending}
+            />
+          </div>
+        )}
       </div>
+
       <ChatInput onSend={send} disabled={pending} />
     </div>
   );

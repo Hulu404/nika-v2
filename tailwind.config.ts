@@ -65,6 +65,9 @@ const config: Config = {
         "nika-avatar":
           "linear-gradient(135deg, #F4E4D6 0%, #E8B7A8 60%, #C8553D 130%)",
       },
+      spacing: {
+        safe: "env(safe-area-inset-bottom, 0px)",
+      },
     },
   },
   plugins: [],
