@@ -46,6 +46,15 @@ const config: Config = {
         card: "0 1px 2px rgba(26, 26, 26, 0.04), 0 8px 24px rgba(26, 26, 26, 0.05)",
         soft: "0 1px 3px rgba(26, 26, 26, 0.06)",
       },
+      keyframes: {
+        "fade-in": {
+          "0%": { opacity: "0", transform: "translateY(4px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "fade-in": "fade-in 0.3s ease-out",
+      },
     },
   },
   plugins: [],
