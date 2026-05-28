@@ -1,12 +1,5 @@
 import type { Config } from "tailwindcss";
 
-/**
- * Дизайн-система НИКИ.
- * Hex-значения здесь должны совпадать с CSS-переменными в app/globals.css.
- * Имена ключей подобраны так, чтобы утилиты читались естественно:
- *   bg-canvas, text-ink-primary, text-ink-secondary, text-ink-muted,
- *   bg-accent, bg-accent-deep, bg-surface-warm, bg-surface-nika.
- */
 const config: Config = {
   content: [
     "./app/**/*.{ts,tsx}",
@@ -17,34 +10,60 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Основной фон (страница / iPhone-экран в прототипе)
         canvas: "#FAF7F1",
+        // Фон канваса прототипа — используется для боковой панели на десктопе
+        "canvas-outer": "#EFE7D7",
+        // Поднятые поверхности (инпуты, карточки)
+        elevated: "#FFFCF6",
         ink: {
-          primary: "#1A1A1A",
-          secondary: "#6B6560",
-          muted: "#9A928A",
+          primary: "#1F1B16",
+          secondary: "#5C534A",
+          muted: "#9A9085",
+          faint: "#C2B7A6",
         },
         accent: {
           DEFAULT: "#C8553D",
-          deep: "#9B3D28",
+          deep: "#B0392A",
+          soft: "#E8B7A8",
         },
         surface: {
-          warm: "#F3EDE3",
-          nika: "#F5E4DC",
+          warm: "#F4E4D6",
+          nika: "#F4EFE6",
+          deep: "#E9DFCB",
+        },
+        // Цвета рамок (border-*)
+        line: {
+          subtle: "#EFE9DD",
+          default: "#E5DDD0",
+          strong: "#D4C9B5",
+        },
+        // Пузыри пользователя
+        bubble: {
+          bg: "#1F1B16",
+          fg: "#FAF7F1",
         },
       },
       fontFamily: {
-        serif: ["var(--font-serif)", "Tiempos", "Georgia", "serif"],
-        sans: ["var(--font-sans)", "Inter", "-apple-system", "sans-serif"],
-        mono: ["var(--font-mono)", "SF Mono", "monospace"],
+        serif: ["var(--font-serif)", "Fraunces", "Georgia", "serif"],
+        sans: ["var(--font-sans)", "Geist", "Inter", "-apple-system", "sans-serif"],
+        mono: ["var(--font-mono)", "Geist Mono", "SF Mono", "monospace"],
       },
       borderRadius: {
-        card: "var(--radius-card)",
-        bubble: "var(--radius-bubble)",
-        pill: "var(--radius-pill)",
+        card: "16px",
+        bubble: "18px",
+        pill: "999px",
+        input: "14px",
       },
       boxShadow: {
-        card: "0 1px 2px rgba(26, 26, 26, 0.04), 0 8px 24px rgba(26, 26, 26, 0.05)",
-        soft: "0 1px 3px rgba(26, 26, 26, 0.06)",
+        card: "0 1px 2px rgba(31,27,22,0.04), 0 8px 24px rgba(31,27,22,0.06)",
+        soft: "0 1px 3px rgba(31,27,22,0.06)",
+      },
+      backgroundImage: {
+        "canvas-gradient":
+          "radial-gradient(circle at 20% 0%, rgba(200,85,61,0.05), transparent 40%), radial-gradient(circle at 80% 100%, rgba(31,27,22,0.04), transparent 40%)",
+        "nika-avatar":
+          "linear-gradient(135deg, #F4E4D6 0%, #E8B7A8 60%, #C8553D 130%)",
       },
       keyframes: {
         "fade-in": {

@@ -14,10 +14,12 @@ export function MessageBubble({
     <div className={cn("flex", isNika ? "justify-start" : "justify-end")}>
       <div
         className={cn(
-          "max-w-[80%] whitespace-pre-wrap break-words rounded-bubble px-4 py-3 text-[15px] leading-relaxed",
+          "max-w-[78%] whitespace-pre-wrap break-words px-4 py-3 text-[15.5px] leading-relaxed",
           isNika
-            ? "bg-surface-nika text-ink-primary"
-            : "bg-accent text-canvas",
+            ? // НИКА: тёплый фон, серифный шрифт, скруглён снизу-слева меньше
+              "rounded-bubble rounded-bl-[6px] bg-surface-nika font-serif text-[16px] tracking-[-0.005em] text-ink-primary"
+            : // Пользователь: тёмный фон, санс, скруглён снизу-справа меньше
+              "rounded-bubble rounded-br-[6px] bg-bubble-bg text-bubble-fg",
         )}
       >
         {children}
