@@ -27,7 +27,11 @@ const darkModeScript = `(function(){
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru" className={`${serif.variable} ${GeistSans.variable} ${GeistMono.variable}`}>
+    <html
+      lang="ru"
+      className={`${serif.variable} ${GeistSans.variable} ${GeistMono.variable}`}
+      suppressHydrationWarning
+    >
       <head>
         <script dangerouslySetInnerHTML={{ __html: darkModeScript }} />
       </head>

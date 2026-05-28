@@ -37,7 +37,11 @@ export async function middleware(request: NextRequest) {
 
   // Гость: защищённые маршруты — на вход; "/" и "/auth" доступны.
   if (!user) {
-    if (pathname.startsWith("/chat") || pathname === "/onboarding") {
+    if (
+      pathname.startsWith("/chat") ||
+      pathname.startsWith("/day1") ||
+      pathname === "/onboarding"
+    ) {
       const url = request.nextUrl.clone();
       url.pathname = "/auth";
       url.search = "";
@@ -75,5 +79,5 @@ export async function middleware(request: NextRequest) {
 export const config = {
   // "/" и "/onboarding" добавлены, чтобы заворачивать на онбординг сразу
   // после входа. /auth/callback намеренно вне матчера и не блокируется.
-  matcher: ["/", "/chat/:path*", "/auth", "/onboarding"],
+  matcher: ["/", "/day1", "/day1/:path*", "/chat/:path*", "/auth", "/onboarding"],
 };
