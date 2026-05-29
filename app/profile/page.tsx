@@ -15,7 +15,7 @@ export default async function ProfilePage() {
   const [{ data: userData }, { data: profileData }] = await Promise.all([
     supabase
       .from("users")
-      .select("display_name, email, is_pro")
+      .select("display_name, email, is_pro, created_at")
       .eq("id", user.id)
       .maybeSingle(),
     supabase
@@ -33,6 +33,7 @@ export default async function ProfilePage() {
         email={userData?.email ?? user.email ?? ""}
         isPro={userData?.is_pro ?? false}
         reminderEnabled={profileData?.reminder_enabled ?? false}
+        createdAt={userData?.created_at ?? user.created_at ?? new Date().toISOString()}
       />
     </AppLayout>
   );
