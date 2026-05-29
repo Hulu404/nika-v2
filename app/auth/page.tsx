@@ -21,7 +21,6 @@ export default function AuthPage() {
 
     setLoading(false);
     if (err) {
-      console.log("[signIn] error:", err.message);
       setError("Неверный email или пароль.");
       return;
     }
@@ -34,34 +33,28 @@ export default function AuthPage() {
     setLoading(true);
     setError(null);
 
-    // Создаём через admin API — пользователь сразу подтверждён, писем нет.
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
-
-    const json = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      setLoading(false);
-      console.log("[signUp] error:", json);
-      setError(json.error ?? `Ошибка ${res.status}`);
-      return;
-    }
-
-    // Входим с созданными данными.
-    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error: err } = await supabase.auth.signUp({ email, password });
 
     setLoading(false);
-    if (signInErr) {
-      console.log("[signUp] signIn after register error:", signInErr.message);
-      setError("Аккаунт создан — попробуй войти.");
+
+    if (err) {
+      setError(err.message);
       return;
     }
 
-    router.push("/onboarding");
-    router.refresh();
+    if (data.session) {
+      // Email-подтверждение выключено — сессия есть сразу.
+      router.push("/onboarding");
+      router.refresh();
+      return;
+    }
+
+    // Нет сессии = email-подтверждение ещё включено в Supabase.
+    setError(
+      "Нужно выключить «Confirm email» в Supabase Dashboard: " +
+      "Authentication → Providers → Email → Confirm email → OFF → Save. " +
+      "Затем попробуй снова."
+    );
   }
 
   return (
@@ -92,7 +85,7 @@ export default function AuthPage() {
         />
 
         {error && (
-          <p className="text-center text-sm text-accent">{error}</p>
+          <p className="text-center text-sm text-accent leading-relaxed">{error}</p>
         )}
 
         <button
