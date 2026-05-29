@@ -20,7 +20,11 @@ export default function AuthPage() {
     const { error: err } = await supabase.auth.signInWithPassword({ email, password });
 
     setLoading(false);
-    if (err) { setError("Неверный email или пароль."); return; }
+    if (err) {
+      console.log("[signIn] error:", err);
+      setError("Неверный email или пароль.");
+      return;
+    }
 
     router.push("/day1");
     router.refresh();
@@ -30,39 +34,28 @@ export default function AuthPage() {
     setLoading(true);
     setError(null);
 
-    // Регистрируем через серверный роут с admin API —
-    // пользователь создаётся сразу подтверждённым, письма не отправляются.
-    let res: Response;
-    try {
-      res = await fetch("/api/auth/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-    } catch (fetchErr) {
-      console.log("[signUp] fetch failed:", fetchErr);
-      setLoading(false);
-      setError("Не удалось подключиться к серверу. Перезапусти страницу.");
-      return;
-    }
+    const { data, error: err } = await supabase.auth.signUp({ email, password });
 
-    const json = await res.json().catch(() => ({}));
-    console.log("[signUp] status:", res.status, "body:", json);
-
-    if (!res.ok) {
-      setLoading(false);
-      setError(json.error ?? `Ошибка сервера (${res.status})`);
-      return;
-    }
-
-    // Сразу входим с только что созданными данными.
-    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
+    console.log("[signUp] data:", data, "error:", err);
 
     setLoading(false);
-    if (signInErr) { setError("Аккаунт создан — попробуй войти."); return; }
 
-    router.push("/onboarding");
-    router.refresh();
+    if (err) {
+      setError(err.message);
+      return;
+    }
+
+    // Если сессия есть — email-подтверждение выключено, сразу на онбординг.
+    if (data.session) {
+      router.push("/onboarding");
+      router.refresh();
+      return;
+    }
+
+    // Сессии нет — Supabase ждёт подтверждения email.
+    // Нужно выключить "Confirm email" в Supabase Dashboard:
+    // Authentication → Providers → Email → Confirm email → OFF
+    setError("⚠️ Зайди в Supabase Dashboard → Authentication → Providers → Email → выключи «Confirm email» → сохрани.");
   }
 
   return (
@@ -92,7 +85,9 @@ export default function AuthPage() {
           className="w-full rounded-card bg-surface-warm px-4 py-3 text-ink-primary outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
         />
 
-        {error && <p className="text-center text-sm text-accent">{error}</p>}
+        {error && (
+          <p className="text-center text-sm text-accent leading-relaxed">{error}</p>
+        )}
 
         <button
           onClick={signIn}
