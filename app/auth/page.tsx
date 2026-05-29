@@ -32,17 +32,26 @@ export default function AuthPage() {
 
     // Регистрируем через серверный роут с admin API —
     // пользователь создаётся сразу подтверждённым, письма не отправляются.
-    const res = await fetch("/api/auth/register", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password }),
-    });
+    let res: Response;
+    try {
+      res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+    } catch (fetchErr) {
+      console.log("[signUp] fetch failed:", fetchErr);
+      setLoading(false);
+      setError("Не удалось подключиться к серверу. Перезапусти страницу.");
+      return;
+    }
+
+    const json = await res.json().catch(() => ({}));
+    console.log("[signUp] status:", res.status, "body:", json);
 
     if (!res.ok) {
-      const json = await res.json().catch(() => ({}));
-      console.log("[signUp] error:", json);
       setLoading(false);
-      setError(json.error ?? "Неизвестная ошибка");
+      setError(json.error ?? `Ошибка сервера (${res.status})`);
       return;
     }
 
