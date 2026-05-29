@@ -35,7 +35,7 @@ const TABS = [
     ),
   },
   {
-    href: "#",
+    href: "/profile",
     label: "Профиль",
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
