@@ -109,7 +109,7 @@ const NAV = [
   { href: "/day1",      label: "Сегодня",            icon: <IcChat />,     implemented: true },
   { href: "/day1",      label: "День 1",              icon: <IcStar />,     implemented: true },
   { href: "#",          label: "Трекинг",             icon: <IcTimer />,    implemented: false },
-  { href: "#",          label: "Журнал пробежек",     icon: <IcList />,     implemented: false },
+  { href: "/journal",   label: "Журнал пробежек",     icon: <IcList />,     implemented: true },
   { href: "#",          label: "Аналитика",           icon: <IcChart />,    implemented: false },
   { href: "#",          label: "Манифест",            icon: <IcBookmark />, implemented: false },
   { href: "#",          label: "Пуши",                icon: <IcBell />,     implemented: false },
