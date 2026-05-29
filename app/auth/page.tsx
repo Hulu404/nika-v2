@@ -40,15 +40,9 @@ export default function AuthPage() {
 
     if (!res.ok) {
       const json = await res.json().catch(() => ({}));
+      console.log("[signUp] error:", json);
       setLoading(false);
-      const msg: string = json.error ?? "";
-      if (msg.includes("already registered") || msg.includes("already been registered")) {
-        setError("Этот email уже зарегистрирован — попробуй войти.");
-      } else if (msg.includes("least 6")) {
-        setError("Пароль — минимум 6 символов.");
-      } else {
-        setError("Не получилось зарегистрироваться. Попробуй ещё раз.");
-      }
+      setError(json.error ?? "Неизвестная ошибка");
       return;
     }
 
