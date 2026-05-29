@@ -21,7 +21,7 @@ export default function AuthPage() {
 
     setLoading(false);
     if (err) {
-      console.log("[signIn] error:", err);
+      console.log("[signIn] error:", err.message);
       setError("Неверный email или пароль.");
       return;
     }
@@ -34,28 +34,34 @@ export default function AuthPage() {
     setLoading(true);
     setError(null);
 
-    const { data, error: err } = await supabase.auth.signUp({ email, password });
+    // Создаём через admin API — пользователь сразу подтверждён, писем нет.
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
 
-    console.log("[signUp] data:", data, "error:", err);
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      setLoading(false);
+      console.log("[signUp] error:", json);
+      setError(json.error ?? `Ошибка ${res.status}`);
+      return;
+    }
+
+    // Входим с созданными данными.
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
 
     setLoading(false);
-
-    if (err) {
-      setError(err.message);
+    if (signInErr) {
+      console.log("[signUp] signIn after register error:", signInErr.message);
+      setError("Аккаунт создан — попробуй войти.");
       return;
     }
 
-    // Если сессия есть — email-подтверждение выключено, сразу на онбординг.
-    if (data.session) {
-      router.push("/onboarding");
-      router.refresh();
-      return;
-    }
-
-    // Сессии нет — Supabase ждёт подтверждения email.
-    // Нужно выключить "Confirm email" в Supabase Dashboard:
-    // Authentication → Providers → Email → Confirm email → OFF
-    setError("⚠️ Зайди в Supabase Dashboard → Authentication → Providers → Email → выключи «Confirm email» → сохрани.");
+    router.push("/onboarding");
+    router.refresh();
   }
 
   return (
@@ -86,7 +92,7 @@ export default function AuthPage() {
         />
 
         {error && (
-          <p className="text-center text-sm text-accent leading-relaxed">{error}</p>
+          <p className="text-center text-sm text-accent">{error}</p>
         )}
 
         <button
