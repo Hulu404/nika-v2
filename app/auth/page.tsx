@@ -30,10 +30,33 @@ export default function AuthPage() {
     setLoading(true);
     setError(null);
 
-    const { error: err } = await supabase.auth.signUp({ email, password });
+    // Регистрируем через серверный роут с admin API —
+    // пользователь создаётся сразу подтверждённым, письма не отправляются.
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      setLoading(false);
+      const msg: string = json.error ?? "";
+      if (msg.includes("already registered") || msg.includes("already been registered")) {
+        setError("Этот email уже зарегистрирован — попробуй войти.");
+      } else if (msg.includes("least 6")) {
+        setError("Пароль — минимум 6 символов.");
+      } else {
+        setError("Не получилось зарегистрироваться. Попробуй ещё раз.");
+      }
+      return;
+    }
+
+    // Сразу входим с только что созданными данными.
+    const { error: signInErr } = await supabase.auth.signInWithPassword({ email, password });
 
     setLoading(false);
-    if (err) { setError(err.message); return; }
+    if (signInErr) { setError("Аккаунт создан — попробуй войти."); return; }
 
     router.push("/onboarding");
     router.refresh();
