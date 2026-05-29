@@ -12,9 +12,8 @@ export default function AuthPage() {
 
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading]   = useState(false);
-  const [error, setError]       = useState<string | null>(null);
-  const [info, setInfo]         = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState<string | null>(null);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -48,7 +47,6 @@ export default function AuthPage() {
 
     setLoading(true);
     setError(null);
-    setInfo(null);
 
     const { error: authError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
@@ -69,26 +67,38 @@ export default function AuthPage() {
 
     setLoading(true);
     setError(null);
-    setInfo(null);
 
-    const { data, error: authError } = await supabase.auth.signUp({
+    // Создаём пользователя через серверный admin API (email_confirm: true).
+    // Никаких писем — пользователь сразу подтверждён.
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email.trim(), password }),
+    });
+
+    const json = await res.json();
+
+    if (!res.ok) {
+      setLoading(false);
+      setError(mapError(json.error ?? ""));
+      return;
+    }
+
+    // Входим с только что созданными учётными данными.
+    const { error: signInError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
 
     setLoading(false);
 
-    if (authError) { setError(mapError(authError.message)); return; }
-
-    // Supabase вернул сессию сразу (email-подтверждение выключено в проекте).
-    if (data.session) {
-      router.push("/onboarding");
-      router.refresh();
+    if (signInError) {
+      setError("Аккаунт создан — попробуй войти.");
       return;
     }
 
-    // Supabase требует подтверждения email — сессии ещё нет.
-    setInfo("Письмо отправлено! Перейди по ссылке в письме, чтобы войти.");
+    router.push("/onboarding");
+    router.refresh();
   }
 
   return (
@@ -128,7 +138,6 @@ export default function AuthPage() {
         />
 
         {error && <p className="text-center text-sm text-accent">{error}</p>}
-        {info  && <p className="text-center text-sm text-ink-secondary">{info}</p>}
 
         <Button
           type="submit"
