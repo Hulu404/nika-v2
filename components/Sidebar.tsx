@@ -46,13 +46,6 @@ function IcChart() {
     </svg>
   );
 }
-function IcBookmark() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-      <path d="M4 3h10v13l-5-3-5 3V3Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-    </svg>
-  );
-}
 function IcBell() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -111,7 +104,6 @@ const NAV = [
   { href: "#",          label: "Трекинг",             icon: <IcTimer />,    implemented: false },
   { href: "/journal",   label: "Журнал пробежек",     icon: <IcList />,     implemented: true },
   { href: "/analytics", label: "Аналитика",           icon: <IcChart />,    implemented: true },
-  { href: "#",          label: "Манифест",            icon: <IcBookmark />, implemented: false },
   { href: "#",          label: "Пуши",                icon: <IcBell />,     implemented: false },
 ];
 
