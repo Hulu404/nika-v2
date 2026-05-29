@@ -224,8 +224,8 @@ function Toggle({ on, onChange }: { on: boolean; onChange: (v: boolean) => void 
       )}
     >
       <span className={cn(
-        "absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow-soft transition-transform duration-200",
-        on ? "translate-x-[26px]" : "translate-x-[3px]",
+        "absolute left-0 top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow-soft transition-transform duration-200",
+        on ? "translate-x-[25px]" : "translate-x-[3px]",
       )} />
     </button>
   );

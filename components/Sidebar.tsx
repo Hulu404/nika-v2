@@ -55,12 +55,11 @@ function IcBell() {
     </svg>
   );
 }
-function IcSettings() {
+function IcUser() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-      <circle cx="9" cy="9" r="2.5" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M9 2v1.5M9 14.5V16M2 9h1.5M14.5 9H16M4.1 4.1l1.1 1.1M12.8 12.8l1.1 1.1M4.1 13.9l1.1-1.1M12.8 5.2l1.1-1.1"
-        stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <circle cx="9" cy="6.5" r="3" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M3.5 15.5c.5-2.8 2.9-4 5.5-4s5 1.2 5.5 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }
@@ -194,12 +193,20 @@ export function Sidebar({ recentConvos }: { recentConvos: RecentConvo[] }) {
           </button>
         </div>
 
-        {/* Настройки */}
-        <button className="flex items-center gap-2.5 w-full px-3 py-2 rounded-[8px] text-[13px] text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary transition-colors text-left">
-          <IcSettings />
-          Настройки
+        {/* Профиль */}
+        <Link
+          href="/profile"
+          className={cn(
+            "flex w-full items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13px] transition-colors",
+            pathname === "/profile"
+              ? "bg-[var(--surface-deep)] text-ink-primary"
+              : "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary",
+          )}
+        >
+          <IcUser />
+          Профиль
           <IcChev />
-        </button>
+        </Link>
 
         {/* Тёмная тема */}
         <button
