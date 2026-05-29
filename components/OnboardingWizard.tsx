@@ -4,69 +4,162 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-import type { RunnerGoal } from "@/types/app";
+import type { RunnerLevel, RunnerGoal, RunnerFear } from "@/types/app";
 
-// ──────────────────────────────── шаги ──────────────────────────────────────
+// ─── данные шагов ────────────────────────────────────────────────────────────
 
-const WHY_OPTIONS = [
-  { v: "health",    l: "Здоровье",           d: "Хочу чувствовать себя лучше" },
-  { v: "routine",   l: "Привычка",            d: "Стабильная практика" },
-  { v: "race",      l: "Соревнование",        d: "Пробежать дистанцию" },
-  { v: "stress",    l: "Снять стресс",        d: "Спорт как выход" },
-] as const;
+const LEVEL_OPTIONS: { v: RunnerLevel; l: string; d: string }[] = [
+  { v: "beginner",  l: "Только начинаю",             d: "Первые шаги в беге" },
+  { v: "irregular", l: "Бегаю нерегулярно",           d: "Иногда выхожу, но без системы" },
+  { v: "returning", l: "Возвращаюсь после перерыва",  d: "Был опыт, но выпал из ритма" },
+];
 
-type Why = (typeof WHY_OPTIONS)[number]["v"];
+const GOAL_OPTIONS: { v: RunnerGoal; l: string; d: string }[] = [
+  { v: "habit",    l: "Войти в привычку",         d: "Бегать стабильно и регулярно" },
+  { v: "not_quit", l: "Не бросить",               d: "Удержаться и не сдаться" },
+  { v: "race",     l: "Подготовиться к забегу",   d: "Есть конкретная дистанция" },
+  { v: "anxiety",  l: "Справиться с тревогой",    d: "Бег как поддержка" },
+];
 
-// Поля нового онбординга маппятся на существующий profiles.goal.
-// when/тон пока не сохраняем — для них нет колонок в схеме.
-const WHY_TO_GOAL: Record<Why, RunnerGoal> = {
-  routine: "habit",
-  race: "race",
-  stress: "anxiety",
-  health: "not_quit",
-};
+const WHEN_OPTIONS = ["Утром", "Вечером", "По-разному"] as const;
+type When = (typeof WHEN_OPTIONS)[number];
 
-const WHEN_CHIPS = ["Утром", "Днём", "Вечером", "Когда получится"];
+const FEAR_OPTIONS: { v: RunnerFear; l: string }[] = [
+  { v: "shame",   l: "Стыд после пропуска" },
+  { v: "tired",   l: "Нет сил" },
+  { v: "slow",    l: "Боюсь выглядеть медленным" },
+  { v: "doubt",   l: "Не верю что смогу" },
+  { v: "injury",  l: "Травма или боль" },
+];
 
-// ──────────────────────────────── компонент ──────────────────────────────────
+const TOTAL_STEPS = 5; // шаги 1–5 (0 = приветствие)
+
+// ─── вспомогательные компоненты ──────────────────────────────────────────────
+
+function BackButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex h-9 w-9 items-center justify-center rounded-full text-ink-secondary transition-colors hover:bg-[var(--surface-nika)] hover:text-ink-primary"
+      aria-label="Назад"
+    >
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+        <path
+          d="M13 4L7 10L13 16"
+          stroke="currentColor"
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    </button>
+  );
+}
+
+function ProgressDots({ total, current }: { total: number; current: number }) {
+  return (
+    <div className="flex items-center gap-[5px]">
+      {Array.from({ length: total }).map((_, i) => (
+        <div
+          key={i}
+          className={cn(
+            "rounded-full transition-all duration-300",
+            i < current
+              ? "h-2 w-2 bg-ink-primary"
+              : i === current
+                ? "h-2.5 w-2.5 bg-accent"
+                : "h-1.5 w-1.5 bg-[var(--border-strong)]",
+          )}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ─── карточки-варианты ────────────────────────────────────────────────────────
+
+function OptionCard({
+  label,
+  desc,
+  selected,
+  onClick,
+}: {
+  label: string;
+  desc?: string;
+  selected: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={cn(
+        "w-full rounded-card border-[1.5px] px-5 py-[18px] text-left transition-all duration-150",
+        selected
+          ? "border-ink-primary bg-ink-primary"
+          : "border-[var(--border-subtle)] bg-[var(--bg-elevated)] hover:border-[var(--border-strong)]",
+      )}
+    >
+      <div className={cn("text-[16px] font-medium", selected ? "text-canvas" : "text-ink-primary")}>
+        {label}
+      </div>
+      {desc && (
+        <div className={cn("mt-0.5 text-[13px]", selected ? "text-canvas/70" : "text-ink-muted")}>
+          {desc}
+        </div>
+      )}
+    </button>
+  );
+}
+
+// ─── основной компонент ───────────────────────────────────────────────────────
 
 export function OnboardingWizard({ userId }: { userId: string }) {
   const router = useRouter();
   const [supabase] = useState(() => createClientComponentClient());
 
-  const [step, setStep] = useState(0); // 0..5
-  const [name, setName] = useState("");
-  const [why, setWhy] = useState<Why | null>(null);
-  const [when, setWhen] = useState<string[]>([]);
+  const [step, setStep]   = useState(0);
+  const [name, setName]   = useState("");
+  const [level, setLevel] = useState<RunnerLevel | null>(null);
+  const [goal, setGoal]   = useState<RunnerGoal | null>(null);
+  const [when, setWhen]   = useState<When | null>(null);
+  const [fears, setFears] = useState<RunnerFear[]>([]);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const TOTAL = 4; // шаги 1-4 (без финала)
+  const [error, setError]   = useState<string | null>(null);
 
   function next() { setStep((s) => s + 1); }
   function back() { setStep((s) => Math.max(0, s - 1)); }
 
+  function toggleFear(f: RunnerFear) {
+    setFears((prev) =>
+      prev.includes(f) ? prev.filter((x) => x !== f) : [...prev, f],
+    );
+  }
+
   async function finish() {
-    if (!why || saving) return;
+    if (saving) return;
     setSaving(true);
     setError(null);
 
-    // Гейтинг завязан на profiles.goal — его обязательно сохраняем.
-    const { error: saveError } = await supabase
+    const { error: profileError } = await supabase
       .from("profiles")
       .upsert(
-        { user_id: userId, goal: WHY_TO_GOAL[why] },
+        {
+          user_id: userId,
+          ...(level && { level }),
+          ...(goal  && { goal }),
+          fears,
+        },
         { onConflict: "user_id" },
       );
 
-    if (saveError) {
-      console.error("[onboarding] save failed:", saveError);
+    if (profileError) {
+      console.error("[onboarding] profile save failed:", profileError);
       setSaving(false);
       setError("Не получилось сохранить. Попробуй ещё раз.");
       return;
     }
 
-    // Имя сохраняем best-effort: ошибка не должна блокировать вход.
+    // display_name — best-effort, не блокируем вход при ошибке
     const trimmed = name.trim();
     if (trimmed) {
       const { error: nameError } = await supabase
@@ -82,37 +175,38 @@ export function OnboardingWizard({ userId }: { userId: string }) {
     router.refresh();
   }
 
-  // ──────── Экран 0: Welcome ────────
+  // ── Шаг 0: Welcome ───────────────────────────────────────────────────────────
   if (step === 0) {
     return (
-      <div className="min-h-dvh flex flex-col bg-[var(--bg-primary)] relative overflow-hidden">
-        {/* Фоновый градиент */}
-        <div className="absolute top-[-40%] right-[-30%] w-full h-[80%] bg-[radial-gradient(circle,rgba(200,85,61,0.10),transparent_60%)] pointer-events-none" />
-        <div className="absolute bottom-[-30%] left-[-20%] w-[80%] h-[60%] bg-[radial-gradient(circle,rgba(31,27,22,0.06),transparent_60%)] pointer-events-none" />
+      <div className="relative flex min-h-dvh flex-col overflow-hidden bg-[var(--bg-primary)]">
+        {/* Фоновые градиенты */}
+        <div className="pointer-events-none absolute right-[-30%] top-[-40%] h-[80%] w-full bg-[radial-gradient(circle,rgba(200,85,61,0.10),transparent_60%)]" />
+        <div className="pointer-events-none absolute bottom-[-30%] left-[-20%] h-[60%] w-[80%] bg-[radial-gradient(circle,rgba(31,27,22,0.06),transparent_60%)]" />
 
-        <div className="flex flex-col flex-1 px-7 pt-[60px] pb-8 relative">
+        <div className="relative flex flex-1 flex-col px-7 pb-10 pt-16 animate-fade-in">
           {/* Аватар */}
-          <div className="w-14 h-14 rounded-full bg-nika-avatar mb-6" />
+          <div className="mb-8 h-[72px] w-[72px] rounded-full bg-nika-avatar shadow-card" />
 
-          <div className="font-serif text-[36px] font-normal tracking-[-0.025em] text-ink-primary mb-4">
+          <h1 className="mb-6 font-serif text-[42px] font-normal leading-none tracking-[-0.03em] text-ink-primary">
             НИКА
-          </div>
-          <div className="font-serif text-[24px] leading-[1.32] tracking-[-0.015em] text-ink-primary max-w-[90%]">
+          </h1>
+
+          <p className="font-serif text-[24px] leading-[1.38] tracking-[-0.015em] text-ink-primary">
             Я не тренер.<br />
-            Я рядом, чтобы ты{" "}
-            <em className="italic text-accent">не бросил бег.</em>
-          </div>
+            Не план.<br />
+            Я рядом —{" "}
+            <em className="italic text-accent">чтобы ты не бросил.</em>
+          </p>
 
           <div className="mt-auto">
-            <p className="text-[12.5px] text-ink-muted leading-[1.5] mb-5">
-              Пара вопросов — и я буду знать, как быть рядом именно для тебя.
-              Это займёт минуту.
+            <p className="mb-6 text-[13px] leading-[1.55] text-ink-muted">
+              Пара вопросов — и я буду знать, как быть рядом именно для тебя. Займёт минуту.
             </p>
             <button
               onClick={next}
-              className="w-full h-[54px] bg-ink-primary text-canvas rounded-pill text-[15px] font-medium hover:bg-accent transition-colors"
+              className="h-[54px] w-full rounded-pill bg-ink-primary text-[15px] font-medium text-canvas transition-colors hover:bg-accent"
             >
-              Начать
+              Познакомиться
             </button>
           </div>
         </div>
@@ -120,168 +214,133 @@ export function OnboardingWizard({ userId }: { userId: string }) {
     );
   }
 
-  // ──────── Финальный экран ────────
-  if (step > TOTAL) {
-    return (
-      <div className="min-h-dvh flex flex-col items-center justify-center bg-[var(--bg-primary)] px-7 text-center">
-        {/* Пульсирующий аватар */}
-        <div
-          className="w-24 h-24 rounded-full bg-nika-avatar mb-8"
-          style={{ animation: "pulse 2.4s ease-in-out infinite" }}
-        />
-        <style>{`@keyframes pulse {
-          0%, 100% { box-shadow: 0 0 0 0 rgba(200,85,61,0.3), 0 0 0 0 rgba(200,85,61,0.2); }
-          50% { box-shadow: 0 0 0 12px rgba(200,85,61,0.05), 0 0 0 24px rgba(200,85,61,0.03); }
-        }`}</style>
+  // ── Шаги 1–5 ─────────────────────────────────────────────────────────────────
 
-        <h1 className="font-serif text-[32px] tracking-[-0.02em] text-ink-primary mb-3">
-          {name ? `Привет, ${name}.` : "Привет."}<br />
-          <em className="italic text-accent">Я тут.</em>
-        </h1>
-        <p className="text-[15px] text-ink-secondary leading-[1.45] max-w-[280px] mb-10">
-          Теперь я знаю о тебе чуть больше. Напиши когда будешь готов — я здесь.
-        </p>
-        {error && (
-          <p className="mb-3 text-[13px] text-accent">{error}</p>
-        )}
-        <button
-          onClick={finish}
-          disabled={saving}
-          className="w-full max-w-xs h-[54px] bg-ink-primary text-canvas rounded-pill text-[15px] font-medium hover:bg-accent transition-colors disabled:opacity-50 disabled:pointer-events-none"
-        >
-          {saving ? "Сохраняем…" : "Начать с НИКОЙ"}
-        </button>
-      </div>
-    );
-  }
+  const nextDisabled =
+    (step === 1 && !name.trim()) ||
+    (step === 2 && !level)       ||
+    (step === 3 && !goal)        ||
+    (step === 4 && !when);
 
-  // ──────── Шаги 1–4 ────────
   return (
-    <div className="min-h-dvh flex flex-col bg-[var(--bg-primary)]">
-      {/* Progress bars */}
-      <div className="flex gap-1 px-6 pt-[72px]">
-        {Array.from({ length: TOTAL }).map((_, i) => (
-          <div
-            key={i}
-            className="flex-1 h-[2px] rounded-full transition-colors"
-            style={{ background: i < step ? "var(--ink-primary)" : "var(--border-default)" }}
-          />
-        ))}
+    <div className="flex min-h-dvh flex-col bg-[var(--bg-primary)]">
+
+      {/* Шапка: кнопка назад + точки прогресса */}
+      <div className="flex items-center justify-between px-5 pt-[52px]">
+        <BackButton onClick={back} />
+        <ProgressDots total={TOTAL_STEPS} current={step - 1} />
+        <div className="w-9" /> {/* балансировочный спейсер */}
       </div>
 
-      {/* Back button */}
-      {step > 1 && (
-        <button
-          onClick={back}
-          className="absolute top-[64px] left-3 w-10 h-10 flex items-center justify-center text-ink-secondary"
-          aria-label="Назад"
-        >
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
-            <path d="M13 4L7 10L13 16" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-      )}
+      {/* Контент шага — ключ вызывает re-mount → анимация fade-in на каждом шаге */}
+      <div key={step} className="flex flex-1 flex-col px-6 pb-4 pt-8 animate-fade-in">
 
-      {/* Контент */}
-      <div className="flex-1 px-6 pt-9 pb-4">
-
-        {/* Вопрос в пузыре НИКИ */}
-        <div className="bg-[var(--surface-nika)] px-[22px] py-5 rounded-bubble rounded-bl-[6px] font-serif text-[22px] leading-[1.35] tracking-[-0.01em] text-ink-primary max-w-[92%] mb-7">
+        {/* Вопрос НИКИ в пузыре */}
+        <div className="mb-7 max-w-[92%] rounded-bubble rounded-bl-[6px] bg-[var(--surface-nika)] px-[22px] py-5 font-serif text-[22px] leading-[1.35] tracking-[-0.01em] text-ink-primary">
           {step === 1 && "Как тебя зовут?"}
-          {step === 2 && "Зачем ты бегаешь?"}
-          {step === 3 && "Когда обычно бегаешь?"}
-          {step === 4 && "Как тебе удобнее, чтобы я писала?"}
+          {step === 2 && "Как ты себя описываешь?"}
+          {step === 3 && "Зачем ты здесь?"}
+          {step === 4 && "Когда обычно бегаешь?"}
+          {step === 5 && "Что мешает больше всего?"}
         </div>
 
-        {/* Шаг 1: имя */}
+        {/* Шаг 1: Имя */}
         {step === 1 && (
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && name.trim() && next()}
             placeholder="Твоё имя"
             autoFocus
-            className="w-full border-b-[1.5px] border-[var(--border-default)] bg-transparent pb-3 pt-2 text-[19px] font-serif text-ink-primary outline-none placeholder:text-ink-faint focus:border-ink-primary transition-colors"
+            className="w-full border-b-[1.5px] border-[var(--border-default)] bg-transparent pb-3 pt-2 font-serif text-[22px] text-ink-primary outline-none placeholder:text-ink-faint focus:border-ink-primary transition-colors"
           />
         )}
 
-        {/* Шаг 2: зачем бегаешь (карточки) */}
+        {/* Шаг 2: Уровень */}
         {step === 2 && (
           <div className="flex flex-col gap-2.5">
-            {WHY_OPTIONS.map((o) => (
-              <button
+            {LEVEL_OPTIONS.map((o) => (
+              <OptionCard
                 key={o.v}
-                onClick={() => setWhy(o.v)}
-                className={cn(
-                  "w-full text-left px-5 py-[18px] rounded-card border-[1.5px] transition-all",
-                  why === o.v
-                    ? "bg-ink-primary border-ink-primary text-canvas"
-                    : "bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-ink-primary hover:border-[var(--border-strong)]",
-                )}
-              >
-                <div className={cn("text-[16px] font-medium mb-1", why === o.v ? "text-canvas" : "")}>{o.l}</div>
-                <div className={cn("text-[13px]", why === o.v ? "text-canvas/70" : "text-ink-muted")}>{o.d}</div>
-              </button>
+                label={o.l}
+                desc={o.d}
+                selected={level === o.v}
+                onClick={() => setLevel(o.v)}
+              />
             ))}
           </div>
         )}
 
-        {/* Шаг 3: когда бегаешь (чипы, multiple) */}
+        {/* Шаг 3: Цель */}
         {step === 3 && (
-          <div className="flex flex-wrap gap-2">
-            {WHEN_CHIPS.map((chip) => (
-              <button
-                key={chip}
-                onClick={() =>
-                  setWhen((prev) =>
-                    prev.includes(chip) ? prev.filter((c) => c !== chip) : [...prev, chip],
-                  )
-                }
-                className={cn(
-                  "px-4 py-[9px] rounded-pill border-[1.5px] text-[13.5px] transition-all",
-                  when.includes(chip)
-                    ? "bg-ink-primary border-ink-primary text-canvas"
-                    : "bg-transparent border-[var(--border-default)] text-ink-primary hover:border-ink-primary",
-                )}
-              >
-                {chip}
-              </button>
+          <div className="flex flex-col gap-2.5">
+            {GOAL_OPTIONS.map((o) => (
+              <OptionCard
+                key={o.v}
+                label={o.l}
+                desc={o.d}
+                selected={goal === o.v}
+                onClick={() => setGoal(o.v)}
+              />
             ))}
           </div>
         )}
 
-        {/* Шаг 4: тон (карточки) */}
+        {/* Шаг 4: Время */}
         {step === 4 && (
           <div className="flex flex-col gap-2.5">
-            {[
-              { l: "Тепло и поддерживающе",    d: "Как разговор с другом" },
-              { l: "Прямо и без лишнего",       d: "Коротко, по делу" },
-              { l: "Как получится",             d: "Подстраивайся под настроение" },
-            ].map((o) => (
+            {WHEN_OPTIONS.map((w) => (
+              <OptionCard
+                key={w}
+                label={w}
+                selected={when === w}
+                onClick={() => setWhen(w)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Шаг 5: Страхи (мультиселект — чипы) */}
+        {step === 5 && (
+          <div className="flex flex-wrap gap-2">
+            {FEAR_OPTIONS.map((f) => (
               <button
-                key={o.l}
-                onClick={next}
-                className="w-full text-left px-5 py-[18px] rounded-card border-[1.5px] border-[var(--border-subtle)] bg-[var(--bg-elevated)] text-ink-primary hover:border-[var(--border-strong)] transition-all"
+                key={f.v}
+                onClick={() => toggleFear(f.v)}
+                className={cn(
+                  "rounded-pill border-[1.5px] px-4 py-[10px] text-[13.5px] font-medium transition-all duration-150",
+                  fears.includes(f.v)
+                    ? "border-ink-primary bg-ink-primary text-canvas"
+                    : "border-[var(--border-default)] bg-transparent text-ink-primary hover:border-ink-primary",
+                )}
               >
-                <div className="text-[16px] font-medium mb-1">{o.l}</div>
-                <div className="text-[13px] text-ink-muted">{o.d}</div>
+                {f.l}
               </button>
             ))}
           </div>
         )}
       </div>
 
-      {/* Кнопки внизу */}
-      <div className="px-6 pb-10 pt-4">
-        {step < 4 && (
+      {/* Кнопки снизу */}
+      <div className="px-6 pb-10 pt-2">
+        {error && (
+          <p className="mb-3 text-center text-[13px] text-accent">{error}</p>
+        )}
+
+        {step === 5 ? (
+          <button
+            onClick={finish}
+            disabled={saving}
+            className="h-[54px] w-full rounded-pill bg-ink-primary text-[15px] font-medium text-canvas transition-colors hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+          >
+            {saving ? "Сохраняем…" : "Готово"}
+          </button>
+        ) : (
           <button
             onClick={next}
-            disabled={
-              (step === 1 && !name.trim()) ||
-              (step === 2 && !why) ||
-              (step === 3 && when.length === 0)
-            }
-            className="w-full h-[54px] bg-ink-primary text-canvas rounded-pill text-[15px] font-medium transition-all hover:bg-accent disabled:bg-ink-faint disabled:pointer-events-none"
+            disabled={nextDisabled}
+            className="h-[54px] w-full rounded-pill bg-ink-primary text-[15px] font-medium text-canvas transition-all hover:bg-accent disabled:pointer-events-none disabled:bg-ink-faint"
           >
             Дальше
           </button>
