@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@/lib/supabase";
 
 /** Человекочитаемые сообщения по кодам/тексту ошибок Supabase Auth. */
@@ -22,7 +21,6 @@ function authErrorMessage(err: { code?: string; message?: string }): string {
 }
 
 export default function AuthPage() {
-  const router = useRouter();
   const [supabase] = useState(() => createClientComponentClient());
 
   const [email, setEmail]       = useState("");
@@ -45,14 +43,15 @@ export default function AuthPage() {
 
     const { error: err } = await supabase.auth.signInWithPassword({ email, password });
 
-    setLoading(false);
     if (err) {
+      setLoading(false);
       setError(authErrorMessage(err));
       return;
     }
 
-    router.push("/day1");
-    router.refresh();
+    // Жёсткий переход: полная перезагрузка гарантирует, что сервер увидит
+    // свежий cookie сессии. Мягкая навигация ловит гонку и кидает назад на /auth.
+    window.location.assign("/day1");
   }
 
   async function signUp() {
@@ -66,21 +65,21 @@ export default function AuthPage() {
 
     const { data, error: err } = await supabase.auth.signUp({ email, password });
 
-    setLoading(false);
-
     if (err) {
+      setLoading(false);
       setError(authErrorMessage(err));
       return;
     }
 
     if (data.session) {
-      // Email-подтверждение выключено — сессия есть сразу.
-      router.push("/onboarding");
-      router.refresh();
+      // Сессия есть сразу (Confirm email выключен). Жёсткий переход —
+      // чтобы сервер увидел свежий cookie и не отбросил назад на /auth.
+      window.location.assign("/onboarding");
       return;
     }
 
     // Нет сессии = в Supabase включён «Confirm email» — письмо ушло на почту.
+    setLoading(false);
     setError(
       "Мы отправили письмо для подтверждения — проверь почту и перейди по ссылке.",
     );
@@ -89,9 +88,9 @@ export default function AuthPage() {
   return (
     <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-16">
       <div className="text-center">
-        <p className="font-mono text-xs uppercase tracking-[0.2em] text-ink-muted">НИКА</p>
-        <h1 className="mt-4 font-serif text-5xl leading-tight text-ink-primary">Вход</h1>
-        <p className="mt-3 text-ink-secondary">Войди или создай аккаунт, чтобы начать.</p>
+        <p className="font-mono text-xs uppercase tracking-[0.2em] text-[var(--ink-muted)]">НИКА</p>
+        <h1 className="mt-4 font-serif text-5xl leading-tight text-[var(--ink-primary)]">Вход</h1>
+        <p className="mt-3 text-[var(--ink-secondary)]">Войди или создай аккаунт, чтобы начать.</p>
       </div>
 
       <div className="mt-8 flex flex-col gap-3">
@@ -102,7 +101,7 @@ export default function AuthPage() {
           value={email}
           onChange={(e) => { setEmail(e.target.value); setError(null); }}
           disabled={loading}
-          className="w-full rounded-card bg-surface-warm px-4 py-3 text-ink-primary outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
+          className="w-full rounded-card border border-[var(--border-default)] bg-[var(--bg-elevated)] px-4 py-3 text-[var(--ink-primary)] outline-none placeholder:text-[var(--ink-muted)] focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
         />
         <input
           type="password"
@@ -110,7 +109,7 @@ export default function AuthPage() {
           value={password}
           onChange={(e) => { setPassword(e.target.value); setError(null); }}
           disabled={loading}
-          className="w-full rounded-card bg-surface-warm px-4 py-3 text-ink-primary outline-none placeholder:text-ink-muted focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
+          className="w-full rounded-card border border-[var(--border-default)] bg-[var(--bg-elevated)] px-4 py-3 text-[var(--ink-primary)] outline-none placeholder:text-[var(--ink-muted)] focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
         />
 
         {error && (
@@ -128,7 +127,7 @@ export default function AuthPage() {
         <button
           onClick={signUp}
           disabled={loading}
-          className="h-[50px] w-full rounded-pill border border-line-default text-[15px] font-medium text-ink-primary transition-colors hover:bg-surface-nika disabled:opacity-50"
+          className="h-[50px] w-full rounded-pill border border-[var(--border-strong)] text-[15px] font-medium text-[var(--ink-primary)] transition-colors hover:bg-[var(--surface-nika)] disabled:opacity-50"
         >
           Зарегистрироваться
         </button>
