@@ -14,23 +14,38 @@ function isScenario(value: string): value is Scenario {
 
 // Контекст-панель — правая колонка на десктопе
 function ContextPanel({ scenario }: { scenario: Scenario }) {
+  const STATS = [
+    { v: "3",       l: "эта неделя" },
+    { v: "47",      l: "дней с НИКОЙ" },
+    { v: "12.4 км", l: "пробежал" },
+  ];
+
+  const RUNS = [
+    { date: "12 мая", dist: "4.2 км", time: "28 мин", note: "было тяжело первые 10 минут" },
+    { date: "10 мая", dist: "3.5 км", time: "24 мин", note: "первый раз без остановок!" },
+    { date: "08 мая", dist: "4.7 км", time: "31 мин", note: "дождь, но было даже хорошо" },
+  ];
+
+  const SAVED_QUOTE =
+    "Тяжесть в начале — не значит что ты не в форме. Это значит что тело ещё не верит что ты правда вышел.";
+
   return (
     <aside className="hidden xl:flex w-[340px] flex-shrink-0 flex-col border-l border-[var(--border-default)] bg-[var(--bg-canvas)] overflow-y-auto">
+
+      {/* Статистика */}
       <div className="px-6 py-5 border-b border-[var(--border-default)]">
         <div className="text-[10.5px] font-mono uppercase tracking-[0.14em] text-ink-muted font-semibold mb-4">
           Контекст
         </div>
-
-        {/* Статистика */}
-        <div className="grid grid-cols-3 gap-3 mb-1">
-          {[
-            { v: "0", l: "эта неделя" },
-            { v: "0", l: "дней с НИКОЙ" },
-            { v: "0 км", l: "пробежал" },
-          ].map(({ v, l }) => (
+        <div className="grid grid-cols-3 gap-3">
+          {STATS.map(({ v, l }) => (
             <div key={l} className="text-center">
-              <div className="font-serif text-[22px] font-medium tracking-[-0.02em] text-ink-primary leading-none">{v}</div>
-              <div className="text-[10px] text-ink-muted mt-1 uppercase tracking-[0.08em] font-medium">{l}</div>
+              <div className="font-serif text-[22px] font-medium tracking-[-0.02em] text-ink-primary leading-none">
+                {v}
+              </div>
+              <div className="text-[10px] text-ink-muted mt-1 uppercase tracking-[0.08em] font-medium">
+                {l}
+              </div>
             </div>
           ))}
         </div>
@@ -41,8 +56,22 @@ function ContextPanel({ scenario }: { scenario: Scenario }) {
         <div className="text-[10.5px] font-mono uppercase tracking-[0.14em] text-ink-muted font-semibold mb-3">
           Последние пробежки
         </div>
-        <div className="text-[13px] text-ink-muted italic font-serif">
-          Пока нет пробежек с НИКОЙ
+        <div className="flex flex-col gap-3">
+          {RUNS.map((r) => (
+            <div key={r.date} className="flex flex-col gap-0.5">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-mono text-ink-muted uppercase tracking-[0.06em]">
+                  {r.date}
+                </span>
+                <span className="text-[12px] font-medium text-ink-secondary">
+                  {r.dist} · {r.time}
+                </span>
+              </div>
+              <p className="text-[12.5px] text-ink-secondary font-serif italic leading-[1.4]">
+                «{r.note}»
+              </p>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -51,9 +80,9 @@ function ContextPanel({ scenario }: { scenario: Scenario }) {
         <div className="text-[10.5px] font-mono uppercase tracking-[0.14em] text-ink-muted font-semibold mb-3">
           Сохранено НИКОЙ
         </div>
-        <div className="text-[13px] text-ink-muted italic font-serif">
-          Важные моменты из разговоров появятся здесь
-        </div>
+        <blockquote className="border-l-2 border-accent/40 pl-3 font-serif text-[13.5px] leading-[1.55] text-ink-secondary italic">
+          {SAVED_QUOTE}
+        </blockquote>
       </div>
     </aside>
   );
