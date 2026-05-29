@@ -17,6 +17,9 @@ export type RunnerGoal = "habit" | "not_quit" | "race" | "anxiety";
 /** Чего человек боится в беге. */
 export type RunnerFear = "shame" | "tired" | "slow" | "doubt" | "injury";
 
+/** Интенсивность пробежки (журнал). */
+export type RunIntensity = "easy" | "medium" | "hard";
+
 /** План подписки. */
 export type SubscriptionPlan = "free" | "monthly" | "yearly";
 

@@ -1,17 +1,20 @@
-const STATS = [
-  { value: "3", label: "пробежки" },
-  { value: "12.4", label: "км" },
-  { value: "1ч 18м", label: "время" },
-];
-
-/**
- * Статистика недели. Адаптив: на мобильном — единый скруглённый блок с тремя
- * колонками; на десктопе — три статы в строку без фона.
- */
-export function WeekStats() {
+export function WeekStats({
+  count,
+  km,
+  duration,
+}: {
+  count: number;
+  km: string;
+  duration: string;
+}) {
+  const stats = [
+    { value: String(count), label: "пробежки" },
+    { value: km, label: "км" },
+    { value: duration, label: "время" },
+  ];
   return (
     <div className="grid grid-cols-3 gap-3 rounded-2xl bg-surface-deep p-4 lg:flex lg:gap-8 lg:rounded-none lg:bg-transparent lg:p-0">
-      {STATS.map((s) => (
+      {stats.map((s) => (
         <div key={s.label} className="text-center lg:text-left">
           <div className="text-[28px] font-bold leading-none text-ink-primary lg:text-4xl">
             {s.value}

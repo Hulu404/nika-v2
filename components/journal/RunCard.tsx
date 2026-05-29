@@ -1,17 +1,6 @@
-export interface Run {
-  id: string;
-  date: number;
-  month: string;
-  distance: string;
-  duration: string;
-  intensity: string;
-  quote: string;
-  pace: string;
-  /** Если задано — перед карточкой рисуется разделитель «N дней перерыв». */
-  gapBefore?: string;
-}
+import type { RunView } from "@/lib/runs";
 
-export function RunCard({ run }: { run: Run }) {
+export function RunCard({ run }: { run: RunView }) {
   return (
     <div className="group flex cursor-pointer items-center gap-4 rounded-xl border border-line-default bg-elevated px-4 py-3.5 shadow-soft transition-colors hover:border-line-strong">
       {/* Дата */}
@@ -25,7 +14,9 @@ export function RunCard({ run }: { run: Run }) {
         <div className="text-sm font-medium text-ink-primary">
           {run.distance} км · {run.duration} · {run.intensity}
         </div>
-        <div className="mt-0.5 truncate text-xs italic text-ink-secondary">«{run.quote}»</div>
+        {run.quote && (
+          <div className="mt-0.5 truncate text-xs italic text-ink-secondary">«{run.quote}»</div>
+        )}
       </div>
 
       {/* Темп */}

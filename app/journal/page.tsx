@@ -1,23 +1,38 @@
 import { Fragment } from "react";
+import { redirect } from "next/navigation";
+import { createServerComponentClient } from "@/lib/supabase";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
 import { MobileHeader } from "@/components/journal/MobileHeader";
 import { WeekStats } from "@/components/journal/WeekStats";
 import { WeekDayBar } from "@/components/journal/WeekDayBar";
-import { RunCard, type Run } from "@/components/journal/RunCard";
+import { RunCard } from "@/components/journal/RunCard";
+import { AddRunSheet } from "@/components/journal/AddRunSheet";
+import { getRuns, weekSummary, buildRunViews } from "@/lib/runs";
 
-// Пока mock — модели пробежек в БД ещё нет.
-const runs: Run[] = [
-  { id: "1", date: 12, month: "МАЙ", distance: "4.2", duration: "28 мин", intensity: "легко", quote: "сегодня было тяжело первые 10 минут", pace: "6:40" },
-  { id: "2", date: 10, month: "МАЙ", distance: "3.5", duration: "24 мин", intensity: "средне", quote: "первый раз без остановок!", pace: "6:51" },
-  { id: "3", date: 8, month: "МАЙ", distance: "4.7", duration: "31 мин", intensity: "легко", quote: "дождь, но было даже хорошо", pace: "6:36" },
-  { id: "4", date: 3, month: "МАЙ", distance: "2.8", duration: "22 мин", intensity: "тяжело", quote: "колено побаливало, остановился пораньше", pace: "7:51", gapBefore: "4 дня перерыв" },
-];
+const MONTHS = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
 
-export default function JournalPage() {
+export default async function JournalPage() {
+  const supabase = await createServerComponentClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/auth?next=/journal");
+
+  const rows = await getRuns(supabase, user.id);
+  const week = weekSummary(rows);
+  const views = buildRunViews(rows);
+  const totalKm = rows.reduce((s, r) => s + Number(r.distance_km), 0).toFixed(1);
+
+  let monthLabel = "";
+  if (rows.length) {
+    const [y, m] = rows[0].date.split("-").map(Number);
+    monthLabel = `${MONTHS[m - 1]} · ${y}`;
+  }
+
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
-      <MobileHeader title="Журнал" right="14 дней" />
+      <MobileHeader title="Журнал" right={`${totalKm} км`} />
 
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
         <div className="mx-auto max-w-2xl px-5 pt-6 lg:pt-10">
@@ -32,31 +47,51 @@ export default function JournalPage() {
           <section className="mt-6">
             <h2 className="text-lg font-bold text-ink-primary">Эта неделя</h2>
             <p className="mt-1 text-sm text-ink-secondary">
-              Три пробежки. <span className="italic text-accent">Хороший ритм.</span>
+              {week.count > 0 ? (
+                <>Пробежек: {week.count}. <span className="italic text-accent">Так держать.</span></>
+              ) : (
+                "На этой неделе пока пусто."
+              )}
             </p>
             <div className="mt-4">
-              <WeekStats />
+              <WeekStats count={week.count} km={week.km} duration={week.duration} />
             </div>
             <div className="mt-4">
-              <WeekDayBar />
+              <WeekDayBar activeWeekdays={week.activeWeekdays} today={week.today} />
             </div>
           </section>
 
-          {/* Список пробежек */}
+          {/* Добавить пробежку */}
+          <div className="mt-6">
+            <AddRunSheet userId={user.id} />
+          </div>
+
+          {/* Список пробежек / пустое состояние */}
           <section className="mt-6">
-            <p className="mb-2 text-xs uppercase tracking-wider text-ink-secondary">Май · 2026</p>
-            <div className="flex flex-col gap-2.5">
-              {runs.map((run) => (
-                <Fragment key={run.id}>
-                  {run.gapBefore && (
-                    <div className="rounded-lg bg-surface-deep py-2 text-center text-xs text-ink-secondary">
-                      — {run.gapBefore} —
-                    </div>
-                  )}
-                  <RunCard run={run} />
-                </Fragment>
-              ))}
-            </div>
+            {views.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-line-default px-5 py-10 text-center">
+                <p className="font-serif text-[17px] text-ink-primary">Пока нет пробежек</p>
+                <p className="mt-1 text-sm text-ink-secondary">
+                  Добавь первую — и она появится здесь.
+                </p>
+              </div>
+            ) : (
+              <>
+                <p className="mb-2 text-xs uppercase tracking-wider text-ink-secondary">{monthLabel}</p>
+                <div className="flex flex-col gap-2.5">
+                  {views.map((run) => (
+                    <Fragment key={run.id}>
+                      {run.gapBefore && (
+                        <div className="rounded-lg bg-surface-deep py-2 text-center text-xs text-ink-secondary">
+                          — {run.gapBefore} —
+                        </div>
+                      )}
+                      <RunCard run={run} />
+                    </Fragment>
+                  ))}
+                </div>
+              </>
+            )}
           </section>
 
         </div>

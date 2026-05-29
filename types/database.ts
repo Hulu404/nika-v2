@@ -1,5 +1,6 @@
 import type {
   Message,
+  RunIntensity,
   RunnerFear,
   RunnerGoal,
   RunnerLevel,
@@ -111,6 +112,42 @@ export interface Database {
         };
         Relationships: [];
       };
+      runs: {
+        Row: {
+          id: string;
+          user_id: string;
+          date: string;
+          distance_km: number;
+          duration_min: number;
+          intensity: RunIntensity;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          date: string;
+          distance_km: number;
+          duration_min: number;
+          intensity?: RunIntensity;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          date?: string;
+          distance_km?: number;
+          duration_min?: number;
+          intensity?: RunIntensity;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       subscriptions: {
         Row: {
           id: string;
@@ -151,6 +188,7 @@ export interface Database {
       runner_level: RunnerLevel;
       runner_goal: RunnerGoal;
       runner_fear: RunnerFear;
+      run_intensity: RunIntensity;
       scenario_type: ScenarioType;
       subscription_plan: SubscriptionPlan;
       subscription_status: SubscriptionStatus;
@@ -165,12 +203,14 @@ type Tables = Database["public"]["Tables"];
 export type User = Tables["users"]["Row"];
 export type Profile = Tables["profiles"]["Row"];
 export type Conversation = Tables["conversations"]["Row"];
+export type RunRow = Tables["runs"]["Row"];
 export type Subscription = Tables["subscriptions"]["Row"];
 
 /** Типы для вставки. */
 export type UserInsert = Tables["users"]["Insert"];
 export type ProfileInsert = Tables["profiles"]["Insert"];
 export type ConversationInsert = Tables["conversations"]["Insert"];
+export type RunInsert = Tables["runs"]["Insert"];
 export type SubscriptionInsert = Tables["subscriptions"]["Insert"];
 
 /** Типы для обновления. */
