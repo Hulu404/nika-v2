@@ -4,6 +4,23 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@/lib/supabase";
 
+/** Человекочитаемые сообщения по кодам/тексту ошибок Supabase Auth. */
+function authErrorMessage(err: { code?: string; message?: string }): string {
+  const code = err.code ?? "";
+  const msg = err.message ?? "";
+  if (code === "user_already_exists" || /already registered/i.test(msg))
+    return "Этот email уже зарегистрирован — войди вместо регистрации.";
+  if (code === "weak_password" || /at least 6/i.test(msg))
+    return "Пароль слишком короткий — нужно минимум 6 символов.";
+  if (code === "invalid_credentials" || /invalid login/i.test(msg))
+    return "Неверный email или пароль.";
+  if (code === "email_address_invalid" || code === "validation_failed")
+    return "Проверь, правильно ли введён email.";
+  if (code === "over_email_send_rate_limit" || /rate limit/i.test(msg))
+    return "Слишком много попыток. Подожди минуту и попробуй снова.";
+  return "Что-то пошло не так. Попробуй ещё раз.";
+}
+
 export default function AuthPage() {
   const router = useRouter();
   const [supabase] = useState(() => createClientComponentClient());
@@ -13,7 +30,16 @@ export default function AuthPage() {
   const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
 
+  function validate(): boolean {
+    if (!email.trim() || !password) {
+      setError("Введи email и пароль.");
+      return false;
+    }
+    return true;
+  }
+
   async function signIn() {
+    if (!validate()) return;
     setLoading(true);
     setError(null);
 
@@ -21,7 +47,7 @@ export default function AuthPage() {
 
     setLoading(false);
     if (err) {
-      setError("Неверный email или пароль.");
+      setError(authErrorMessage(err));
       return;
     }
 
@@ -30,6 +56,11 @@ export default function AuthPage() {
   }
 
   async function signUp() {
+    if (!validate()) return;
+    if (password.length < 6) {
+      setError("Пароль слишком короткий — нужно минимум 6 символов.");
+      return;
+    }
     setLoading(true);
     setError(null);
 
@@ -38,7 +69,7 @@ export default function AuthPage() {
     setLoading(false);
 
     if (err) {
-      setError(err.message);
+      setError(authErrorMessage(err));
       return;
     }
 
@@ -49,11 +80,9 @@ export default function AuthPage() {
       return;
     }
 
-    // Нет сессии = email-подтверждение ещё включено в Supabase.
+    // Нет сессии = в Supabase включён «Confirm email» — письмо ушло на почту.
     setError(
-      "Нужно выключить «Confirm email» в Supabase Dashboard: " +
-      "Authentication → Providers → Email → Confirm email → OFF → Save. " +
-      "Затем попробуй снова."
+      "Мы отправили письмо для подтверждения — проверь почту и перейди по ссылке.",
     );
   }
 
