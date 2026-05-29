@@ -80,7 +80,7 @@ function ContextPanel({ scenario }: { scenario: Scenario }) {
         <div className="text-[10.5px] font-mono uppercase tracking-[0.14em] text-ink-muted font-semibold mb-3">
           Сохранено НИКОЙ
         </div>
-        <blockquote className="border-l-2 border-accent/40 pl-3 font-serif text-[13.5px] leading-[1.55] text-ink-secondary italic">
+        <blockquote className="border-l-2 border-[#C8553D]/40 pl-3 font-serif text-[13.5px] leading-[1.55] text-ink-secondary italic">
           {SAVED_QUOTE}
         </blockquote>
       </div>

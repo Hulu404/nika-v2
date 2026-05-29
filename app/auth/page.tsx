@@ -101,7 +101,7 @@ export default function AuthPage() {
           value={email}
           onChange={(e) => { setEmail(e.target.value); setError(null); }}
           disabled={loading}
-          className="w-full rounded-card border border-[var(--border-default)] bg-[var(--bg-elevated)] px-4 py-3 text-[var(--ink-primary)] outline-none placeholder:text-[var(--ink-muted)] focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
+          className="w-full rounded-card border border-[var(--border-default)] bg-[var(--bg-elevated)] px-4 py-3 text-[var(--ink-primary)] outline-none placeholder:text-[var(--ink-muted)] focus:ring-2 focus:ring-[#C8553D]/40 disabled:opacity-60"
         />
         <input
           type="password"
@@ -109,7 +109,7 @@ export default function AuthPage() {
           value={password}
           onChange={(e) => { setPassword(e.target.value); setError(null); }}
           disabled={loading}
-          className="w-full rounded-card border border-[var(--border-default)] bg-[var(--bg-elevated)] px-4 py-3 text-[var(--ink-primary)] outline-none placeholder:text-[var(--ink-muted)] focus:ring-2 focus:ring-accent/40 disabled:opacity-60"
+          className="w-full rounded-card border border-[var(--border-default)] bg-[var(--bg-elevated)] px-4 py-3 text-[var(--ink-primary)] outline-none placeholder:text-[var(--ink-muted)] focus:ring-2 focus:ring-[#C8553D]/40 disabled:opacity-60"
         />
 
         {error && (

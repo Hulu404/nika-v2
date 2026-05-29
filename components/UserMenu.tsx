@@ -50,7 +50,7 @@ export function UserMenu() {
       <button
         type="button"
         onClick={signOut}
-        className="rounded-pill border border-ink-muted/30 bg-canvas/80 px-3 py-1.5 text-sm text-ink-primary backdrop-blur transition-colors hover:bg-surface-warm"
+        className="rounded-pill border border-line-default bg-elevated px-3 py-1.5 text-sm text-ink-primary backdrop-blur transition-colors hover:bg-surface-warm"
       >
         Выйти
       </button>

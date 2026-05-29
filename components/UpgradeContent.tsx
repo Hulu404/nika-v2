@@ -52,7 +52,7 @@ export function UpgradeContent() {
             <button
               key={plan.id}
               onClick={handlePay}
-              className="group flex flex-col items-start rounded-card border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-5 text-left transition-all hover:border-accent/40"
+              className="group flex flex-col items-start rounded-card border border-[var(--border-subtle)] bg-[var(--bg-elevated)] p-5 text-left transition-all hover:border-[#C8553D]/40"
             >
               <span className="font-mono text-[11px] uppercase tracking-[0.12em] text-ink-muted">
                 {plan.title}

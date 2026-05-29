@@ -124,7 +124,7 @@ export function Chat({
           ))}
           {showTyping && <TypingIndicator />}
           {error === "limit_reached" ? (
-            <div className="mx-auto mt-2 max-w-md rounded-card border border-accent/20 bg-surface-warm px-5 py-4 text-center">
+            <div className="mx-auto mt-2 max-w-md rounded-card border border-[#C8553D]/20 bg-surface-warm px-5 py-4 text-center">
               <p className="font-serif text-[15px] text-ink-primary">
                 Ты использовал все {FREE_DAILY_LIMIT} бесплатных сообщений сегодня.
               </p>
@@ -174,13 +174,13 @@ export function ChatSkeleton() {
       <div className="min-h-0 flex-1 overflow-hidden">
         <div className="mx-auto flex max-w-2xl flex-col gap-2 px-4 py-5">
           <div className="h-16 w-3/4 self-start rounded-bubble bg-surface-nika" />
-          <div className="h-10 w-1/2 self-end rounded-bubble bg-accent/20" />
+          <div className="h-10 w-1/2 self-end rounded-bubble bg-[#C8553D]/20" />
           <div className="h-24 w-4/5 self-start rounded-bubble bg-surface-nika" />
-          <div className="h-10 w-2/5 self-end rounded-bubble bg-accent/20" />
+          <div className="h-10 w-2/5 self-end rounded-bubble bg-[#C8553D]/20" />
         </div>
       </div>
 
-      <div className="shrink-0 border-t border-ink-muted/10">
+      <div className="shrink-0 border-t border-line-subtle">
         <div className="mx-auto flex max-w-2xl items-center gap-2 px-4 py-3">
           <div className="h-12 flex-1 rounded-bubble bg-surface-warm" />
           <div className="h-11 w-11 shrink-0 rounded-pill bg-surface-warm" />

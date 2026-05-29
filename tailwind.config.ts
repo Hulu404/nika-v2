@@ -10,38 +10,38 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        // Основной фон (страница / iPhone-экран в прототипе)
-        canvas: "#FAF7F1",
-        // Фон канваса прототипа — используется для боковой панели на десктопе
-        "canvas-outer": "#EFE7D7",
-        // Поднятые поверхности (инпуты, карточки)
-        elevated: "#FFFCF6",
+        // Все токены ссылаются на CSS-переменные из globals.css, которые
+        // переключаются классом html.dark — поэтому text-ink-primary,
+        // bg-surface-warm и т.п. автоматически theme-aware.
+        canvas: "var(--bg-primary)",
+        "canvas-outer": "var(--bg-canvas)",
+        elevated: "var(--bg-elevated)",
         ink: {
-          primary: "#1F1B16",
-          secondary: "#5C534A",
-          muted: "#9A9085",
-          faint: "#C2B7A6",
+          primary: "var(--ink-primary)",
+          secondary: "var(--ink-secondary)",
+          muted: "var(--ink-muted)",
+          faint: "var(--ink-faint)",
         },
         accent: {
-          DEFAULT: "#C8553D",
-          deep: "#B0392A",
-          soft: "#E8B7A8",
+          DEFAULT: "var(--accent)",
+          deep: "var(--accent-deep)",
+          soft: "var(--accent-soft)",
         },
         surface: {
-          warm: "#F4E4D6",
-          nika: "#F4EFE6",
-          deep: "#E9DFCB",
+          warm: "var(--surface-warm)",
+          nika: "var(--surface-nika)",
+          deep: "var(--surface-deep)",
         },
         // Цвета рамок (border-*)
         line: {
-          subtle: "#EFE9DD",
-          default: "#E5DDD0",
-          strong: "#D4C9B5",
+          subtle: "var(--border-subtle)",
+          default: "var(--border-default)",
+          strong: "var(--border-strong)",
         },
         // Пузыри пользователя
         bubble: {
-          bg: "#1F1B16",
-          fg: "#FAF7F1",
+          bg: "var(--user-bubble-bg)",
+          fg: "var(--user-bubble-fg)",
         },
       },
       fontFamily: {

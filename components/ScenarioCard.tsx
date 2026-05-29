@@ -14,7 +14,7 @@ export function ScenarioCard({ scenario }: { scenario: Scenario }) {
       <Card
         className={cn(
           "flex h-full flex-col justify-between transition-shadow group-hover:shadow-card",
-          meta.featured && "ring-1 ring-accent/30",
+          meta.featured && "ring-1 ring-[#C8553D]/30",
         )}
       >
         <div>

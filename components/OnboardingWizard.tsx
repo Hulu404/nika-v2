@@ -103,7 +103,7 @@ function OptionCard({
         {label}
       </div>
       {desc && (
-        <div className={cn("mt-0.5 text-[13px]", selected ? "text-canvas/70" : "text-ink-muted")}>
+        <div className={cn("mt-0.5 text-[13px]", selected ? "text-canvas opacity-70" : "text-ink-muted")}>
           {desc}
         </div>
       )}
