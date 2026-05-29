@@ -6,50 +6,57 @@ import { Button } from "@/components/ui/Button";
 import { Input } from "@/components/ui/Input";
 import { createClientComponentClient } from "@/lib/supabase";
 
-type Mode = "idle" | "loading";
-
 export default function AuthPage() {
   const router = useRouter();
   const [supabase] = useState(() => createClientComponentClient());
 
   const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [mode, setMode]         = useState<Mode>("idle");
+  const [loading, setLoading]   = useState(false);
   const [error, setError]       = useState<string | null>(null);
+  const [info, setInfo]         = useState<string | null>(null);
 
-  // Ошибка из callback (просроченная ссылка и т.п.)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    if (params.get("error")) {
-      setError("Не удалось войти. Попробуй снова.");
-    }
+    if (params.get("error")) setError("Не удалось войти. Попробуй снова.");
   }, []);
 
-  function disabled() {
-    return mode === "loading" || !email.trim() || !password.trim();
+  /** Клиентская валидация до запроса к Supabase. */
+  function validate(): string | null {
+    if (!email.trim()) return "Введи email.";
+    if (password.length < 6) return "Пароль — минимум 6 символов.";
+    return null;
   }
+
+  /** Человекочитаемые сообщения об ошибках Supabase. */
+  function mapError(msg: string): string {
+    if (msg.includes("Invalid login credentials"))     return "Неверный email или пароль.";
+    if (msg.includes("already registered") ||
+        msg.includes("User already registered"))       return "Этот email уже зарегистрирован — попробуй войти.";
+    if (msg.includes("Password should be at least"))   return "Пароль — минимум 6 символов.";
+    if (msg.includes("Unable to validate email"))      return "Неверный формат email.";
+    if (msg.includes("Email not confirmed"))           return "Подтверди email — письмо уже у тебя в почте.";
+    return "Что-то пошло не так. Попробуй ещё раз.";
+  }
+
+  const isDisabled = loading || !email.trim() || password.length < 6;
 
   async function signIn(e: FormEvent) {
     e.preventDefault();
-    if (disabled()) return;
+    const ve = validate();
+    if (ve) { setError(ve); return; }
 
-    setMode("loading");
+    setLoading(true);
     setError(null);
+    setInfo(null);
 
     const { error: authError } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
     });
 
-    if (authError) {
-      setMode("idle");
-      setError(
-        authError.message.includes("Invalid login credentials")
-          ? "Неверный email или пароль."
-          : "Не получилось войти. Попробуй ещё раз.",
-      );
-      return;
-    }
+    setLoading(false);
+    if (authError) { setError(mapError(authError.message)); return; }
 
     router.push("/day1");
     router.refresh();
@@ -57,28 +64,31 @@ export default function AuthPage() {
 
   async function signUp(e: FormEvent) {
     e.preventDefault();
-    if (disabled()) return;
+    const ve = validate();
+    if (ve) { setError(ve); return; }
 
-    setMode("loading");
+    setLoading(true);
     setError(null);
+    setInfo(null);
 
-    const { error: authError } = await supabase.auth.signUp({
+    const { data, error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
     });
 
-    if (authError) {
-      setMode("idle");
-      setError(
-        authError.message.includes("already registered")
-          ? "Этот email уже зарегистрирован. Попробуй войти."
-          : "Не получилось зарегистрироваться. Попробуй ещё раз.",
-      );
+    setLoading(false);
+
+    if (authError) { setError(mapError(authError.message)); return; }
+
+    // Supabase вернул сессию сразу (email-подтверждение выключено в проекте).
+    if (data.session) {
+      router.push("/onboarding");
+      router.refresh();
       return;
     }
 
-    router.push("/onboarding");
-    router.refresh();
+    // Supabase требует подтверждения email — сессии ещё нет.
+    setInfo("Письмо отправлено! Перейди по ссылке в письме, чтобы войти.");
   }
 
   return (
@@ -95,7 +105,7 @@ export default function AuthPage() {
         </p>
       </div>
 
-      <form className="mt-8 flex flex-col gap-3">
+      <form className="mt-8 flex flex-col gap-3" onSubmit={signIn}>
         <Input
           type="email"
           required
@@ -104,38 +114,36 @@ export default function AuthPage() {
           autoComplete="email"
           placeholder="ты@почта.ру"
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={mode === "loading"}
+          onChange={(e) => { setEmail(e.target.value); setError(null); }}
+          disabled={loading}
         />
         <Input
           type="password"
           required
           autoComplete="current-password"
-          placeholder="Пароль"
+          placeholder="Пароль — минимум 6 символов"
           value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={mode === "loading"}
+          onChange={(e) => { setPassword(e.target.value); setError(null); }}
+          disabled={loading}
         />
 
-        {error && (
-          <p className="text-center text-sm text-accent">{error}</p>
-        )}
+        {error && <p className="text-center text-sm text-accent">{error}</p>}
+        {info  && <p className="text-center text-sm text-ink-secondary">{info}</p>}
 
         <Button
           type="submit"
           pill
-          disabled={disabled()}
-          onClick={signIn}
+          disabled={isDisabled}
           className="mt-1 h-[50px] w-full text-[15px]"
         >
-          {mode === "loading" ? "Входим…" : "Войти"}
+          {loading ? "Входим…" : "Войти"}
         </Button>
 
         <Button
           type="button"
           variant="outline"
           pill
-          disabled={disabled()}
+          disabled={isDisabled}
           onClick={signUp}
           className="h-[50px] w-full text-[15px]"
         >
