@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { ScenarioSheet } from "@/components/ScenarioSheet";
 
 // ──────────────────────────────── иконки ────────────────────────────────────
 
@@ -95,16 +96,7 @@ function IcChev() {
   );
 }
 
-// ──────────────────────────────── данные nav ─────────────────────────────────
-
-const NAV = [
-  { href: "/day1",      label: "Сегодня",            icon: <IcChat />,     implemented: true },
-  { href: "/day1",      label: "День 1",              icon: <IcStar />,     implemented: true },
-  { href: "#",          label: "Трекинг",             icon: <IcTimer />,    implemented: false },
-  { href: "/journal",   label: "Журнал пробежек",     icon: <IcList />,     implemented: true },
-  { href: "/analytics", label: "Аналитика",           icon: <IcChart />,    implemented: true },
-  { href: "#",          label: "Пуши",                icon: <IcBell />,     implemented: false },
-];
+// ──────────────────────────────── типы ──────────────────────────────────────
 
 export interface RecentConvo {
   label: string;
@@ -114,9 +106,16 @@ export interface RecentConvo {
 
 // ──────────────────────────────── компонент ──────────────────────────────────
 
-export function Sidebar({ recentConvos }: { recentConvos: RecentConvo[] }) {
+interface SidebarProps {
+  recentConvos: RecentConvo[];
+  /** Показывать пункт «День 1» только в первые 24 ч */
+  isDay1: boolean;
+}
+
+export function Sidebar({ recentConvos, isDay1 }: SidebarProps) {
   const pathname = usePathname();
   const [dark, setDark] = useState(false);
+  const [showScenarioSheet, setShowScenarioSheet] = useState(false);
 
   useEffect(() => {
     setDark(document.documentElement.classList.contains("dark"));
@@ -129,127 +128,144 @@ export function Sidebar({ recentConvos }: { recentConvos: RecentConvo[] }) {
     localStorage.setItem("nika-theme", next ? "dark" : "light");
   }
 
+  const NAV = [
+    { href: "/day1",      label: "Сегодня",        icon: <IcChat />,  implemented: true, showAlways: true },
+    { href: "/day1",      label: "День 1",          icon: <IcStar />,  implemented: true, showAlways: false },
+    { href: "#",          label: "Трекинг",         icon: <IcTimer />, implemented: false, showAlways: true },
+    { href: "/journal",   label: "Журнал пробежек", icon: <IcList />,  implemented: true, showAlways: true },
+    { href: "/analytics", label: "Аналитика",       icon: <IcChart />, implemented: true, showAlways: true },
+    { href: "#",          label: "Пуши",            icon: <IcBell />,  implemented: false, showAlways: true },
+  ].filter(item => item.showAlways || isDay1);
+
   return (
-    <aside className="hidden lg:flex w-[280px] flex-shrink-0 flex-col h-full border-r border-[var(--border-default)] bg-[var(--bg-canvas)] overflow-y-auto">
+    <>
+      <aside className="hidden lg:flex w-[280px] flex-shrink-0 flex-col h-full border-r border-[var(--border-default)] bg-[var(--bg-canvas)] overflow-y-auto">
 
-      {/* Хедер — аватар + имя */}
-      <div className="flex items-center gap-3 px-[22px] py-6 border-b border-[var(--border-default)]">
-        <div className="relative w-9 h-9 rounded-full bg-nika-avatar flex-shrink-0">
-          <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[var(--bg-canvas)] bg-[#7BA968]" />
+        {/* Хедер */}
+        <div className="flex items-center gap-3 px-[22px] py-6 border-b border-[var(--border-default)]">
+          <div className="relative w-9 h-9 rounded-full bg-nika-avatar flex-shrink-0">
+            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[var(--bg-canvas)] bg-[#7BA968]" />
+          </div>
+          <span className="font-serif text-[22px] font-medium tracking-[-0.02em] text-ink-primary">НИКА</span>
         </div>
-        <span className="font-serif text-[22px] font-medium tracking-[-0.02em] text-ink-primary">НИКА</span>
-      </div>
 
-      {/* Кнопка нового разговора */}
-      <div className="px-[14px] pt-4 pb-2">
-        <Link
-          href="/chat/morning"
-          className="flex items-center gap-2 w-full bg-ink-primary text-canvas rounded-[10px] px-[14px] py-[11px] text-[13px] font-medium transition-colors hover:bg-accent"
-        >
-          <IcPlus />
-          Новый разговор
-        </Link>
-      </div>
-
-      {/* Навигация */}
-      <nav className="px-2 pt-2 pb-1 flex flex-col gap-px border-b border-[var(--border-default)]">
-        {NAV.map(({ href, label, icon, implemented }) => {
-          const active = implemented && pathname === href;
-          return (
-            <Link
-              key={label}
-              href={href}
-              className={cn(
-                "flex items-center gap-2.5 px-3 py-[8px] rounded-[8px] text-[13px] transition-colors",
-                active
-                  ? "bg-[var(--surface-deep)] text-ink-primary font-medium"
-                  : implemented
-                    ? "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary"
-                    : "text-ink-muted cursor-default opacity-60",
-              )}
-              tabIndex={implemented ? undefined : -1}
-              aria-disabled={!implemented}
-            >
-              <span className={cn(active ? "text-accent" : "text-ink-muted")}>{icon}</span>
-              {label}
-              {!implemented && (
-                <span className="ml-auto font-mono text-[9px] tracking-widest text-ink-faint uppercase">soon</span>
-              )}
-            </Link>
-          );
-        })}
-      </nav>
-
-      {/* Нижний блок */}
-      <div className="mt-auto px-3 py-3 space-y-1 border-t border-[var(--border-default)]">
-
-        {/* PRO-блок */}
-        <div className="mb-3 px-3 py-3 rounded-[10px] bg-[var(--surface-warm)] border border-[rgba(200,85,61,0.18)] relative overflow-hidden">
-          <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-accent font-semibold mb-1">PRO</div>
-          <div className="text-[14px] font-serif font-medium text-ink-primary">Free + 7 дней пробного</div>
-          <div className="text-[12px] text-ink-secondary mt-0.5">Попробуй все функции</div>
-          <button className="mt-2.5 w-full bg-ink-primary text-canvas rounded-pill py-[9px] text-[12px] font-medium hover:bg-accent transition-colors">
-            Подключить PRO
+        {/* Кнопка нового разговора */}
+        <div className="px-[14px] pt-4 pb-2">
+          <button
+            onClick={() => setShowScenarioSheet(true)}
+            className="flex items-center gap-2 w-full bg-ink-primary text-canvas rounded-[10px] px-[14px] py-[11px] text-[13px] font-medium transition-colors hover:bg-accent"
+          >
+            <IcPlus />
+            Новый разговор
           </button>
         </div>
 
-        {/* Профиль */}
-        <Link
-          href="/profile"
-          className={cn(
-            "flex w-full items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13px] transition-colors",
-            pathname === "/profile"
-              ? "bg-[var(--surface-deep)] text-ink-primary"
-              : "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary",
-          )}
-        >
-          <IcUser />
-          Профиль
-          <IcChev />
-        </Link>
-
-        {/* Тёмная тема */}
-        <button
-          onClick={toggleDark}
-          className="flex items-center gap-2.5 w-full px-3 py-[9px] rounded-[10px] text-[13px] text-ink-secondary border border-[var(--border-default)] hover:text-ink-primary hover:border-ink-primary transition-all"
-        >
-          {dark ? <IcSun /> : <IcMoon />}
-          <span className="flex-1 text-left">Тёмная тема</span>
-          <span className="font-mono text-[10px] text-ink-muted bg-[var(--surface-deep)] px-[7px] py-[3px] rounded uppercase tracking-[0.08em]">
-            {dark ? "ON" : "OFF"}
-          </span>
-        </button>
-      </div>
-
-      {/* Список диалогов */}
-      <div className="px-4 pb-6">
-        <div className="text-[10.5px] font-mono uppercase tracking-[0.1em] text-ink-muted font-medium py-3">
-          Сегодня — диалоги
-        </div>
-        <div className="flex flex-col gap-0.5">
-          {recentConvos.length === 0 ? (
-            <span className="px-3 py-2 text-[13px] text-ink-muted italic font-serif">
-              Нет диалогов
-            </span>
-          ) : (
-            recentConvos.map((c) => (
+        {/* Навигация */}
+        <nav className="px-2 pt-2 pb-1 flex flex-col gap-px border-b border-[var(--border-default)]">
+          {NAV.map(({ href, label, icon, implemented }) => {
+            const active = implemented && pathname === href;
+            return (
               <Link
-                key={c.href}
-                href={c.href}
+                key={label}
+                href={href}
                 className={cn(
-                  "flex items-center justify-between px-3 py-2 rounded-[8px] text-[13px] transition-colors",
-                  pathname === c.href
-                    ? "bg-[var(--surface-deep)] text-ink-primary"
-                    : "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary",
+                  "flex items-center gap-2.5 px-3 py-[8px] rounded-[8px] text-[13px] transition-colors",
+                  active
+                    ? "bg-[var(--surface-deep)] text-ink-primary font-medium"
+                    : implemented
+                      ? "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary"
+                      : "text-ink-muted cursor-default opacity-60",
                 )}
+                tabIndex={implemented ? undefined : -1}
+                aria-disabled={!implemented}
               >
-                <span className="truncate">{c.label}</span>
-                <span className="text-[11px] text-ink-muted ml-2 flex-shrink-0">{c.time}</span>
+                <span className={cn(active ? "text-accent" : "text-ink-muted")}>{icon}</span>
+                {label}
+                {!implemented && (
+                  <span className="ml-auto font-mono text-[9px] tracking-widest text-ink-faint uppercase">soon</span>
+                )}
               </Link>
-            ))
-          )}
+            );
+          })}
+        </nav>
+
+        {/* Нижний блок */}
+        <div className="mt-auto px-3 py-3 space-y-1 border-t border-[var(--border-default)]">
+
+          {/* PRO-блок */}
+          <div className="mb-3 px-3 py-3 rounded-[10px] bg-[var(--surface-warm)] border border-[rgba(200,85,61,0.18)] relative overflow-hidden">
+            <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-accent font-semibold mb-1">PRO</div>
+            <div className="text-[14px] font-serif font-medium text-ink-primary">Free + 7 дней пробного</div>
+            <div className="text-[12px] text-ink-secondary mt-0.5">Попробуй все функции</div>
+            <Link
+              href="/upgrade"
+              className="mt-2.5 block w-full bg-ink-primary text-canvas rounded-pill py-[9px] text-center text-[12px] font-medium hover:bg-accent transition-colors"
+            >
+              Подключить PRO
+            </Link>
+          </div>
+
+          {/* Профиль */}
+          <Link
+            href="/profile"
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13px] transition-colors",
+              pathname === "/profile"
+                ? "bg-[var(--surface-deep)] text-ink-primary"
+                : "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary",
+            )}
+          >
+            <IcUser />
+            Профиль
+            <IcChev />
+          </Link>
+
+          {/* Тёмная тема */}
+          <button
+            onClick={toggleDark}
+            className="flex items-center gap-2.5 w-full px-3 py-[9px] rounded-[10px] text-[13px] text-ink-secondary border border-[var(--border-default)] hover:text-ink-primary hover:border-ink-primary transition-all"
+          >
+            {dark ? <IcSun /> : <IcMoon />}
+            <span className="flex-1 text-left">Тёмная тема</span>
+            <span className="font-mono text-[10px] text-ink-muted bg-[var(--surface-deep)] px-[7px] py-[3px] rounded uppercase tracking-[0.08em]">
+              {dark ? "ON" : "OFF"}
+            </span>
+          </button>
         </div>
-      </div>
-    </aside>
+
+        {/* Список диалогов */}
+        <div className="px-4 pb-6">
+          <div className="text-[10.5px] font-mono uppercase tracking-[0.1em] text-ink-muted font-medium py-3">
+            Сегодня — диалоги
+          </div>
+          <div className="flex flex-col gap-0.5">
+            {recentConvos.length === 0 ? (
+              <span className="px-3 py-2 text-[13px] text-ink-muted italic font-serif">
+                Нет диалогов
+              </span>
+            ) : (
+              recentConvos.map((c) => (
+                <Link
+                  key={c.href}
+                  href={c.href}
+                  className={cn(
+                    "flex items-center justify-between px-3 py-2 rounded-[8px] text-[13px] transition-colors",
+                    pathname === c.href
+                      ? "bg-[var(--surface-deep)] text-ink-primary"
+                      : "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary",
+                  )}
+                >
+                  <span className="truncate">{c.label}</span>
+                  <span className="text-[11px] text-ink-muted ml-2 flex-shrink-0">{c.time}</span>
+                </Link>
+              ))
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* Sheet выбора сценария */}
+      <ScenarioSheet isOpen={showScenarioSheet} onClose={() => setShowScenarioSheet(false)} />
+    </>
   );
 }

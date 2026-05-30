@@ -3,56 +3,41 @@ import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
 import { createServerComponentClient } from "@/lib/supabase";
 
-// Карточки 2×2
-const CARDS = [
-  {
-    href: "/chat/morning",
-    title: "Начать разговор",
-    body: "Просто напиши — о чём угодно. Я отвечу.",
-    warm: true,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
-        <path d="M3 17V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-5 3v-3Z"
-          stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    href: "#",
-    title: "Первая пробежка",
-    body: "Я останусь рядом — буду писать в нужный момент.",
-    warm: false,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
-        <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M11 7v4l2.5 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    href: "#",
-    title: "Что НИКА не делает",
-    body: "Чтобы не было ложных ожиданий. Это важно.",
-    warm: false,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
-        <path d="M5 4h12v14l-6-3-6 3V4Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    href: "#",
-    title: "Настройки",
-    body: "Тон, когда писать первой, тёмная тема.",
-    warm: false,
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
-        <circle cx="11" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M4 19c.6-3.5 3.7-5 7-5s6.4 1.5 7 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-];
+// ── Иконки карточек ───────────────────────────────────────────────────────────
+
+function IcChat() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M3 18V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-5 4v-5Z"
+        stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function IcJournal() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M4 4h16v16H4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+function IcManifesto() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M5 4h14v16l-7-3.5L5 20V4Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  );
+}
+function IcProfile() {
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M4 20c.8-4 4.4-6 8-6s7.2 2 8 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+// ── Страница ─────────────────────────────────────────────────────────────────
 
 export default async function Day1Page() {
   const supabase = await createServerComponentClient();
@@ -61,56 +46,106 @@ export default async function Day1Page() {
   } = await supabase.auth.getUser();
 
   let name = "друг";
+  let isDay1 = true;
+  let hasConversations = false;
+
   if (user) {
-    const { data } = await supabase
-      .from("users")
-      .select("display_name")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (data?.display_name?.trim()) {
-      name = data.display_name.trim();
+    const [{ data: userData }, { data: convData }] = await Promise.all([
+      supabase
+        .from("users")
+        .select("display_name, created_at")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("conversations")
+        .select("id")
+        .eq("user_id", user.id)
+        .limit(1),
+    ]);
+
+    if (userData?.display_name?.trim()) name = userData.display_name.trim();
+
+    if (userData?.created_at) {
+      const hoursSince = (Date.now() - new Date(userData.created_at).getTime()) / (1000 * 60 * 60);
+      isDay1 = hoursSince < 24;
     }
+
+    hasConversations = (convData?.length ?? 0) > 0;
   }
+
+  // Карточки 2×2
+  const CARDS = [
+    {
+      href: "/chat/morning",
+      title: "Начать разговор",
+      body: "Просто напиши — о чём угодно. Я отвечу.",
+      warm: true,
+      icon: <IcChat />,
+    },
+    {
+      href: "/journal",
+      title: "Журнал пробежек",
+      body: "Записывай пробежки и следи за прогрессом.",
+      warm: false,
+      icon: <IcJournal />,
+    },
+    {
+      href: "/manifesto",
+      title: "Что НИКА не делает",
+      body: "Чтобы не было ложных ожиданий. Это важно.",
+      warm: false,
+      icon: <IcManifesto />,
+    },
+    {
+      href: "/profile",
+      title: "Профиль",
+      body: "Тон, когда писать первой, тёмная тема.",
+      warm: false,
+      icon: <IcProfile />,
+    },
+  ];
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
-        <div className="mx-auto max-w-lg px-5 pt-10 lg:pt-12">
+        <div className="mx-auto max-w-lg px-5 pt-10 lg:pt-14">
 
-          {/* Бейдж */}
-          <div className="flex items-center gap-2 mb-4">
-            <span className="h-[18px] w-[18px] flex-shrink-0 rounded-full bg-nika-avatar" />
-            <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.15em] text-accent">
-              День 1 · мы только познакомились
-            </span>
-          </div>
+          {/* Бейдж (только день 1) */}
+          {isDay1 && (
+            <div className="flex items-center gap-2 mb-5">
+              <span className="h-[18px] w-[18px] flex-shrink-0 rounded-full bg-nika-avatar" />
+              <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.15em] text-accent">
+                День 1 · мы только познакомились
+              </span>
+            </div>
+          )}
 
           {/* Заголовок */}
-          <h1 className="font-serif text-[30px] font-normal leading-[1.2] tracking-[-0.02em] text-ink-primary mb-3">
+          <h1 className="font-serif text-[44px] font-normal leading-[1.1] tracking-[-0.03em] text-ink-primary mb-4">
             Привет, {name}.<br />
             <em className="italic text-accent">Я тут.</em>
           </h1>
-          <p className="text-[14.5px] leading-[1.55] text-ink-secondary mb-8">
-            Сегодня ничего не нужно делать. Ни бежать, ни планировать.
-            Просто посмотри как я устроена — и приходи когда захочется.
+          <p className="text-[15px] leading-[1.6] text-ink-secondary mb-8">
+            {isDay1 && !hasConversations
+              ? "Сегодня ничего не нужно делать. Ни бежать, ни планировать. Просто посмотри как я устроена — и приходи когда захочется."
+              : "Выбери момент — я рядом."}
           </p>
 
           {/* Сетка 2×2 */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-3 sm:gap-4">
             {CARDS.map((card) => (
               <Link
                 key={card.title}
                 href={card.href}
-                className="group flex flex-col gap-3 rounded-card border p-4 transition-all"
+                className="group flex flex-col gap-4 rounded-[18px] border p-5 transition-all hover:shadow-card"
                 style={
                   card.warm
                     ? { background: "var(--surface-warm)", borderColor: "rgba(200,85,61,0.18)" }
                     : { background: "var(--bg-elevated)", borderColor: "var(--border-subtle)" }
                 }
               >
-                {/* Иконка */}
                 <div
-                  className="flex h-10 w-10 items-center justify-center rounded-[12px] text-accent transition-colors"
+                  className="flex h-12 w-12 items-center justify-center rounded-[13px] text-accent transition-colors"
                   style={
                     card.warm
                       ? { background: "rgba(255,255,255,0.5)" }
@@ -119,13 +154,11 @@ export default async function Day1Page() {
                 >
                   {card.icon}
                 </div>
-
-                {/* Текст */}
                 <div>
-                  <div className="font-serif text-[15px] font-medium leading-tight text-ink-primary mb-1">
+                  <div className="font-serif text-[16px] font-medium leading-tight text-ink-primary mb-1.5">
                     {card.title}
                   </div>
-                  <div className="text-[12px] leading-[1.4] text-ink-secondary">
+                  <div className="text-[12.5px] leading-[1.45] text-ink-secondary">
                     {card.body}
                   </div>
                 </div>
@@ -134,27 +167,27 @@ export default async function Day1Page() {
           </div>
 
           {/* Доп. сценарии */}
-          <div className="mt-8 mb-2">
-            <p className="font-serif text-[16px] font-medium text-ink-primary mb-0.5">
+          <div className="mt-10 mb-3">
+            <p className="font-serif text-[18px] font-medium text-ink-primary mb-1">
               Или выбери момент
             </p>
-            <p className="text-[12px] text-ink-muted">С чем хочешь поговорить прямо сейчас?</p>
+            <p className="text-[13px] text-ink-muted">С чем хочешь поговорить прямо сейчас?</p>
           </div>
 
           <div className="flex flex-col gap-2.5 pb-4">
             {[
-              { href: "/chat/after_skip",   label: "После пропуска",   sub: "Когда сорвался с плана" },
-              { href: "/chat/after_run",    label: "После пробежки",   sub: "Прожить и закрепить" },
-              { href: "/chat/pre_race",     label: "Перед стартом",    sub: "Когда волнуешься" },
-              { href: "/chat/after_failure",label: "После неудачи",    sub: "Травма или провал" },
+              { href: "/chat/after_skip",    label: "После пропуска",  sub: "Когда сорвался с плана" },
+              { href: "/chat/after_run",     label: "После пробежки",  sub: "Прожить и закрепить" },
+              { href: "/chat/pre_race",      label: "Перед стартом",   sub: "Когда волнуешься" },
+              { href: "/chat/after_failure", label: "После неудачи",   sub: "Травма или провал" },
             ].map(({ href, label, sub }) => (
               <Link
                 key={href}
                 href={href}
-                className="group flex items-center gap-3 rounded-card border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-4 py-3.5 transition-all hover:border-[var(--border-default)]"
+                className="group flex items-center gap-3 rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-4 py-4 transition-all hover:border-[var(--border-default)] hover:shadow-soft"
               >
                 <div className="flex-1 min-w-0">
-                  <div className="font-serif text-[14px] font-medium text-ink-primary">{label}</div>
+                  <div className="font-serif text-[15px] font-medium text-ink-primary">{label}</div>
                   <div className="text-[12px] text-ink-secondary">{sub}</div>
                 </div>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-ink-faint flex-shrink-0 transition-transform group-hover:translate-x-0.5" aria-hidden>

@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { createClientComponentClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { SCENARIO_META, SCENARIO_ORDER } from "@/lib/scenarios";
+import { BottomSheet } from "@/components/BottomSheet";
 
 // ─── типы ────────────────────────────────────────────────────────────────────
 
@@ -13,6 +14,7 @@ type WhenWrite = "morning" | "evening" | "never";
 type SheetId =
   | "tone" | "when" | "scenarios" | "name"
   | "export" | "delete" | "how" | "manifesto" | "support" | "terms"
+  | "privacy" | "oferta"
   | null;
 
 // ─── константы ───────────────────────────────────────────────────────────────
@@ -31,115 +33,6 @@ const WHEN_OPTIONS: { v: WhenWrite; short: string; full: string }[] = [
 
 // Первые N сценариев доступны на Free
 const FREE_SCENARIOS = 2;
-
-// ─── BottomSheet ─────────────────────────────────────────────────────────────
-
-interface SheetProps {
-  isOpen: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-}
-
-function BottomSheet({ isOpen, onClose, title, children }: SheetProps) {
-  const [mounted, setMounted] = useState(false);
-  const [shown, setShown] = useState(false);
-  const [dragY, setDragY] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const touchStartY = useRef(0);
-
-  // Mount/unmount with animation
-  useEffect(() => {
-    if (isOpen) {
-      setMounted(true);
-      const t = setTimeout(() => setShown(true), 12);
-      return () => clearTimeout(t);
-    } else {
-      setShown(false);
-      const t = setTimeout(() => { setMounted(false); setDragY(0); }, 340);
-      return () => clearTimeout(t);
-    }
-  }, [isOpen]);
-
-  // Body scroll lock
-  useEffect(() => {
-    if (isOpen) document.body.style.overflow = "hidden";
-    return () => { document.body.style.overflow = ""; };
-  }, [isOpen]);
-
-  // ESC to close
-  useEffect(() => {
-    if (!isOpen) return;
-    const h = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-    document.addEventListener("keydown", h);
-    return () => document.removeEventListener("keydown", h);
-  }, [isOpen, onClose]);
-
-  if (!mounted) return null;
-
-  const getTransform = () => {
-    if (dragY > 0) return `translateY(${dragY}px)`;
-    return shown ? "translateY(0)" : "translateY(100%)";
-  };
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-end lg:items-center lg:justify-center">
-      {/* Overlay */}
-      <div
-        className={cn(
-          "absolute inset-0 bg-black/50 transition-opacity duration-300",
-          shown ? "opacity-100" : "opacity-0",
-        )}
-        onClick={onClose}
-      />
-
-      {/* Panel */}
-      <div
-        style={{ transform: getTransform() }}
-        className={cn(
-          "relative w-full lg:max-w-md bg-elevated rounded-t-[24px] lg:rounded-[24px] max-h-[90vh] flex flex-col",
-          !dragging && "transition-transform duration-300 ease-out",
-        )}
-        onTouchStart={(e) => {
-          touchStartY.current = e.touches[0].clientY;
-          setDragging(true);
-        }}
-        onTouchMove={(e) => {
-          const delta = e.touches[0].clientY - touchStartY.current;
-          if (delta > 0) setDragY(delta);
-        }}
-        onTouchEnd={() => {
-          setDragging(false);
-          if (dragY > 100) { setDragY(0); onClose(); }
-          else setDragY(0);
-        }}
-      >
-        {/* Drag handle */}
-        <div className="flex flex-shrink-0 justify-center pt-3 pb-1">
-          <div className="h-[5px] w-10 rounded-full bg-line-strong" />
-        </div>
-
-        {/* Header */}
-        <div className="flex flex-shrink-0 items-center justify-between px-5 pb-2 pt-3">
-          <h3 className="text-[17px] font-semibold text-ink-primary">{title}</h3>
-          <button
-            onClick={onClose}
-            className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-deep text-ink-muted transition-colors hover:text-ink-primary"
-          >
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
-              <path d="M1.5 1.5l10 10M11.5 1.5l-10 10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-
-        {/* Scrollable content */}
-        <div className="overflow-y-auto px-5 pb-8 pt-3">
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // ─── Skeleton UI ──────────────────────────────────────────────────────────────
 
@@ -452,7 +345,9 @@ export function ProfileContent({
               <Row label="Как НИКА работает"   onClick={() => setActiveSheet("how")} />
               <Row label="Что НИКА не делает"  onClick={() => setActiveSheet("manifesto")} />
               <Row label="Поддержка"           onClick={() => setActiveSheet("support")} />
-              <Row label="Условия и приватность" onClick={() => setActiveSheet("terms")} />
+              <Row label="Условия и приватность"        onClick={() => setActiveSheet("terms")} />
+              <Row label="Политика конфиденциальности" onClick={() => setActiveSheet("privacy")} />
+              <Row label="Публичная оферта"            onClick={() => setActiveSheet("oferta")} />
             </Card>
           </div>
 
@@ -695,6 +590,25 @@ export function ProfileContent({
           <p>Ты можешь удалить все свои данные в любой момент в разделе «Данные».</p>
           <p>Оплата обрабатывается через ЮKassa. Отмена подписки — в любой момент из личного кабинета.</p>
         </div>
+      </BottomSheet>
+
+      {/* Политика конфиденциальности */}
+      <BottomSheet isOpen={activeSheet === "privacy"} onClose={closeSheet} title="Политика конфиденциальности">
+        <p className="mb-4 text-[13px] font-mono text-ink-faint">Документ в разработке</p>
+        <p className="text-[14px] leading-[1.65] text-ink-secondary">
+          Актуальная политика конфиденциальности появится до запуска.
+          Мы обязуемся не передавать твои данные третьим лицам и использовать
+          их только для работы сервиса.
+        </p>
+      </BottomSheet>
+
+      {/* Публичная оферта */}
+      <BottomSheet isOpen={activeSheet === "oferta"} onClose={closeSheet} title="Публичная оферта">
+        <p className="mb-4 text-[13px] font-mono text-ink-faint">Документ в разработке</p>
+        <p className="text-[14px] leading-[1.65] text-ink-secondary">
+          Актуальная версия публичной оферты появится до запуска.
+          Оферта будет регулировать условия предоставления платной подписки PRO.
+        </p>
       </BottomSheet>
     </>
   );

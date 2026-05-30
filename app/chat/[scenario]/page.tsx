@@ -3,34 +3,41 @@ import { notFound, redirect } from "next/navigation";
 import { Chat } from "@/components/Chat";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
-import { getLastConversation } from "@/lib/conversations";
+import { createConversation, getLastConversation } from "@/lib/conversations";
 import { SCENARIO_META, SCENARIO_ORDER } from "@/lib/scenarios";
 import { createServerComponentClient } from "@/lib/supabase";
 import type { ChatMessage, Scenario } from "@/types/conversation";
+import type { Message } from "@/types/app";
 
 function isScenario(value: string): value is Scenario {
   return (SCENARIO_ORDER as string[]).includes(value);
 }
 
-// Контекст-панель — правая колонка на десктопе
-function ContextPanel({ scenario }: { scenario: Scenario }) {
+function pluralDays(n: number): string {
+  const m10 = n % 10; const m100 = n % 100;
+  if (m100 >= 11 && m100 <= 14) return "дней";
+  if (m10 === 1) return "день";
+  if (m10 >= 2 && m10 <= 4) return "дня";
+  return "дней";
+}
+
+// ── Контекст-панель (десктоп) ─────────────────────────────────────────────────
+
+interface ContextPanelProps {
+  weekConvCount: number;
+  daysWithNika: number;
+  savedQuote: string | null;
+}
+
+function ContextPanel({ weekConvCount, daysWithNika, savedQuote }: ContextPanelProps) {
   const STATS = [
-    { v: "3",       l: "эта неделя" },
-    { v: "47",      l: "дней с НИКОЙ" },
-    { v: "12.4 км", l: "пробежал" },
+    { v: String(weekConvCount),                          l: "эта неделя" },
+    { v: String(daysWithNika),                           l: `${pluralDays(daysWithNika)} с НИКОЙ` },
+    { v: "0 км",                                         l: "пробежал" },
   ];
-
-  const RUNS = [
-    { date: "12 мая", dist: "4.2 км", time: "28 мин", note: "было тяжело первые 10 минут" },
-    { date: "10 мая", dist: "3.5 км", time: "24 мин", note: "первый раз без остановок!" },
-    { date: "08 мая", dist: "4.7 км", time: "31 мин", note: "дождь, но было даже хорошо" },
-  ];
-
-  const SAVED_QUOTE =
-    "Тяжесть в начале — не значит что ты не в форме. Это значит что тело ещё не верит что ты правда вышел.";
 
   return (
-    <aside className="hidden xl:flex w-[340px] flex-shrink-0 flex-col border-l border-[var(--border-default)] bg-[var(--bg-canvas)] overflow-y-auto">
+    <aside className="hidden xl:flex w-[320px] flex-shrink-0 flex-col border-l border-[var(--border-default)] bg-[var(--bg-canvas)] overflow-y-auto">
 
       {/* Статистика */}
       <div className="px-6 py-5 border-b border-[var(--border-default)]">
@@ -43,7 +50,7 @@ function ContextPanel({ scenario }: { scenario: Scenario }) {
               <div className="font-serif text-[22px] font-medium tracking-[-0.02em] text-ink-primary leading-none">
                 {v}
               </div>
-              <div className="text-[10px] text-ink-muted mt-1 uppercase tracking-[0.08em] font-medium">
+              <div className="text-[10px] text-ink-muted mt-1 uppercase tracking-[0.08em] font-medium leading-tight">
                 {l}
               </div>
             </div>
@@ -51,64 +58,85 @@ function ContextPanel({ scenario }: { scenario: Scenario }) {
         </div>
       </div>
 
-      {/* Последние пробежки */}
+      {/* Последние пробежки — заглушка */}
       <div className="px-6 py-5 border-b border-[var(--border-default)]">
         <div className="text-[10.5px] font-mono uppercase tracking-[0.14em] text-ink-muted font-semibold mb-3">
           Последние пробежки
         </div>
-        <div className="flex flex-col gap-3">
-          {RUNS.map((r) => (
-            <div key={r.date} className="flex flex-col gap-0.5">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-mono text-ink-muted uppercase tracking-[0.06em]">
-                  {r.date}
-                </span>
-                <span className="text-[12px] font-medium text-ink-secondary">
-                  {r.dist} · {r.time}
-                </span>
-              </div>
-              <p className="text-[12.5px] text-ink-secondary font-serif italic leading-[1.4]">
-                «{r.note}»
-              </p>
-            </div>
-          ))}
-        </div>
+        <p className="font-serif text-[13px] italic text-ink-muted leading-[1.5]">
+          Пока нет пробежек. Добавь первую в журнале.
+        </p>
+        <Link href="/journal" className="mt-2 inline-block text-[12px] text-accent hover:underline">
+          Открыть журнал →
+        </Link>
       </div>
 
       {/* Сохранено НИКОЙ */}
-      <div className="px-6 py-5">
-        <div className="text-[10.5px] font-mono uppercase tracking-[0.14em] text-ink-muted font-semibold mb-3">
-          Сохранено НИКОЙ
+      {savedQuote && (
+        <div className="px-6 py-5">
+          <div className="text-[10.5px] font-mono uppercase tracking-[0.14em] text-ink-muted font-semibold mb-3">
+            Сохранено НИКОЙ
+          </div>
+          <blockquote className="border-l-2 border-[#C8553D]/40 pl-3 font-serif text-[13.5px] leading-[1.55] text-ink-secondary italic">
+            {savedQuote.length > 200 ? savedQuote.slice(0, 200) + "…" : savedQuote}
+          </blockquote>
         </div>
-        <blockquote className="border-l-2 border-[#C8553D]/40 pl-3 font-serif text-[13.5px] leading-[1.55] text-ink-secondary italic">
-          {SAVED_QUOTE}
-        </blockquote>
-      </div>
+      )}
     </aside>
   );
 }
 
+// ── Страница ─────────────────────────────────────────────────────────────────
+
 export default async function ChatPage({
   params,
+  searchParams,
 }: {
   params: { scenario: string };
+  searchParams: { new?: string };
 }) {
   if (!isScenario(params.scenario)) notFound();
 
   const scenario = params.scenario;
   const meta = SCENARIO_META[scenario];
+  const forceNew = searchParams.new === "1";
 
   const supabase = await createServerComponentClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) {
-    redirect(`/auth?next=/chat/${scenario}`);
-  }
+  if (!user) redirect(`/auth?next=/chat/${scenario}`);
 
-  const conversation = await getLastConversation(supabase, user.id, scenario);
+  // Загружаем (или создаём) диалог
+  const conversation = forceNew
+    ? await createConversation(supabase, user.id, scenario)
+    : await getLastConversation(supabase, user.id, scenario);
 
-  // Опенер НИКИ всегда из SCENARIO_META; в БД он не хранится.
+  // Данные для контекст-панели
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+  const [{ data: userData }, { data: weekConvs }] = await Promise.all([
+    supabase.from("users").select("created_at").eq("id", user.id).maybeSingle(),
+    supabase
+      .from("conversations")
+      .select("id")
+      .eq("user_id", user.id)
+      .gte("created_at", sevenDaysAgo.toISOString()),
+  ]);
+
+  const weekConvCount = weekConvs?.length ?? 0;
+  const daysWithNika = userData?.created_at
+    ? Math.max(1, Math.floor((Date.now() - new Date(userData.created_at).getTime()) / (1000 * 60 * 60 * 24)))
+    : 1;
+
+  // Последняя длинная реплика НИКИ из текущего диалога
+  const savedQuote =
+    (conversation?.messages as Message[] | undefined)
+      ?.filter((m) => m.role === "assistant" && m.content.length > 100)
+      .at(-1)?.content ?? null;
+
+  // Опенер НИКИ
   const opener: ChatMessage = {
     id: "opener",
     role: "assistant",
@@ -119,7 +147,7 @@ export default async function ChatPage({
   const initialMessages: ChatMessage[] = conversation
     ? [
         opener,
-        ...conversation.messages.map((m, i) => ({
+        ...(conversation.messages as Message[]).map((m, i) => ({
           id: `${conversation.id}-${i}`,
           role: m.role,
           content: m.content,
@@ -141,26 +169,14 @@ export default async function ChatPage({
             <path d="M15 18l-6-6 6-6" />
           </svg>
         </Link>
-
-        {/* Аватар НИКИ */}
         <div className="relative h-9 w-9 flex-shrink-0 rounded-full bg-nika-avatar shadow-[0_0_0_3px_rgba(200,85,61,0.06)]">
           <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--bg-primary)] bg-[#7BA968]" />
         </div>
-
         <div className="flex flex-1 flex-col leading-none">
-          <span className="font-serif text-[17px] font-medium tracking-[-0.01em] text-ink-primary">
-            НИКА
-          </span>
-          <span className="mt-[3px] text-[11px] tracking-[0.02em] text-ink-muted">
-            {meta.subtitle}
-          </span>
+          <span className="font-serif text-[17px] font-medium tracking-[-0.01em] text-ink-primary">НИКА</span>
+          <span className="mt-[3px] text-[11px] tracking-[0.02em] text-ink-muted">{meta.subtitle}</span>
         </div>
-
-        {/* Кнопка "···" */}
-        <button
-          aria-label="Ещё"
-          className="flex h-9 w-9 items-center justify-center rounded-full text-ink-secondary hover:bg-[var(--surface-nika)] transition-colors"
-        >
+        <button aria-label="Ещё" className="flex h-9 w-9 items-center justify-center rounded-full text-ink-secondary hover:bg-[var(--surface-nika)] transition-colors">
           <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
             <circle cx="4" cy="10" r="1.6" />
             <circle cx="10" cy="10" r="1.6" />
@@ -169,7 +185,7 @@ export default async function ChatPage({
         </button>
       </header>
 
-      {/* Основная область: чат + контекст-панель */}
+      {/* Чат + контекст */}
       <div className="flex flex-1 min-h-0">
         <Chat
           scenario={scenario}
@@ -177,7 +193,11 @@ export default async function ChatPage({
           conversationId={conversation?.id ?? null}
           className="flex-1 min-w-0 min-h-0"
         />
-        <ContextPanel scenario={scenario} />
+        <ContextPanel
+          weekConvCount={weekConvCount}
+          daysWithNika={daysWithNika}
+          savedQuote={savedQuote}
+        />
       </div>
     </AppLayout>
   );

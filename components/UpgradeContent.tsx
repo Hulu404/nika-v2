@@ -1,16 +1,35 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 // ─── данные ──────────────────────────────────────────────────────────────────
 
 const FEATURES = [
-  { text: "Долгая память диалогов",          soon: false },
-  { text: "Все 5 сценариев",                 soon: false },
-  { text: "Аналитика по словам",             soon: false },
-  { text: "Strava и Garmin",                 soon: true  },
-  { text: "Без ограничений на сообщения",    soon: false },
+  { text: "Долгая память диалогов",       soon: false },
+  { text: "Все 5 сценариев",              soon: false },
+  { text: "Аналитика по словам",          soon: false },
+  { text: "Strava и Garmin",             soon: true  },
+  { text: "Без ограничений на сообщения", soon: false },
 ];
+
+type Plan = "monthly" | "6months";
+
+const PLANS: Record<Plan, { label: string; price: string; crossed?: string; sub: string; badge?: string }> = {
+  monthly: {
+    label: "Месяц",
+    price: "299 ₽",
+    sub: "в месяц",
+  },
+  "6months": {
+    label: "6 месяцев",
+    price: "1 490 ₽",
+    crossed: "1 794 ₽",
+    sub: "за 6 месяцев · ≈ 248 ₽/мес",
+    badge: "−17%",
+  },
+};
 
 // ─── иконка ──────────────────────────────────────────────────────────────────
 
@@ -27,6 +46,9 @@ function Check() {
 // ─── компонент ───────────────────────────────────────────────────────────────
 
 export function UpgradeContent() {
+  const [plan, setPlan] = useState<Plan>("6months");
+  const current = PLANS[plan];
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto max-w-md px-5 pb-20 pt-10">
@@ -47,9 +69,7 @@ export function UpgradeContent() {
         <div className="mt-8 mb-8">
           <div className="mb-4 inline-flex items-center gap-2 rounded-pill border border-accent/25 bg-surface-warm px-3 py-1.5">
             <div className="h-3.5 w-3.5 flex-shrink-0 rounded-full bg-nika-avatar" />
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-accent">
-              PRO
-            </span>
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-accent">PRO</span>
           </div>
 
           <h1 className="font-serif text-[38px] font-normal leading-[1.1] tracking-[-0.025em] text-ink-primary">
@@ -62,47 +82,46 @@ export function UpgradeContent() {
           </p>
         </div>
 
-        {/* Тарифы */}
-        <div className="mb-8 grid grid-cols-2 gap-3">
+        {/* Переключатель тарифов */}
+        <div className="mb-6 flex rounded-pill border border-line-default bg-elevated p-1">
+          {(["monthly", "6months"] as Plan[]).map((p) => (
+            <button
+              key={p}
+              onClick={() => setPlan(p)}
+              className={cn(
+                "flex-1 rounded-pill py-2.5 text-[13px] font-medium transition-all duration-200",
+                plan === p
+                  ? "bg-ink-primary text-canvas shadow-soft"
+                  : "text-ink-secondary hover:text-ink-primary",
+              )}
+            >
+              {PLANS[p].label}
+            </button>
+          ))}
+        </div>
 
-          {/* Базовый */}
-          <Link
-            href="/upgrade?plan=monthly"
-            className="flex flex-col rounded-card border border-line-default bg-elevated p-5 transition-all hover:border-accent/30"
-          >
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-muted">
-              Базовый
-            </span>
-            <div className="mt-4">
-              <div className="font-serif text-[32px] font-medium leading-none tracking-[-0.02em] text-ink-primary">
-                299 ₽
-              </div>
-              <div className="mt-1 text-[12px] text-ink-muted">в месяц</div>
+        {/* Карточка цены */}
+        <div className="mb-6 rounded-card border border-accent/30 bg-surface-nika p-6">
+          <div className="flex items-end gap-3">
+            <div className="font-serif text-[44px] font-medium leading-none tracking-[-0.02em] text-ink-primary">
+              {current.price}
             </div>
-          </Link>
+            {current.crossed && (
+              <div className="mb-1 text-[18px] text-ink-faint line-through">{current.crossed}</div>
+            )}
+            {current.badge && (
+              <div className="mb-1 rounded-pill bg-accent/15 px-2.5 py-1 text-[12px] font-semibold text-accent">
+                {current.badge}
+              </div>
+            )}
+          </div>
+          <p className="mt-1.5 text-[13px] text-ink-muted">{current.sub}</p>
 
-          {/* Популярный */}
           <Link
-            href="/upgrade?plan=6months"
-            className="relative flex flex-col rounded-card border border-accent/35 bg-surface-nika p-5 transition-all hover:border-accent/60"
+            href={`/upgrade?plan=${plan}`}
+            className="mt-5 block w-full rounded-pill bg-ink-primary py-[13px] text-center text-[14px] font-medium text-canvas transition-colors hover:bg-accent"
           >
-            {/* Бейдж */}
-            <span className="absolute -top-[13px] left-1/2 -translate-x-1/2 whitespace-nowrap rounded-pill bg-accent px-3 py-[3px] font-mono text-[9.5px] font-bold uppercase tracking-[0.12em] text-canvas shadow-soft">
-              Популярно
-            </span>
-
-            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">
-              6 месяцев
-            </span>
-            <div className="mt-4">
-              <div className="font-serif text-[32px] font-medium leading-none tracking-[-0.02em] text-ink-primary">
-                1490 ₽
-              </div>
-              <div className="mt-1 text-[12px] text-ink-muted">за 6 месяцев</div>
-              <div className="mt-2.5 inline-block rounded-pill bg-accent/10 px-2 py-[3px] text-[11px] font-medium text-accent">
-                ≈ 248 ₽/мес
-              </div>
-            </div>
+            {plan === "monthly" ? "Попробовать 7 дней бесплатно" : "Подключить PRO на 6 месяцев"}
           </Link>
         </div>
 
@@ -117,9 +136,7 @@ export function UpgradeContent() {
                 <Check />
                 <span className="flex-1 text-[14px] text-ink-secondary">{f.text}</span>
                 {f.soon && (
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-ink-faint">
-                    скоро
-                  </span>
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-ink-faint">скоро</span>
                 )}
               </li>
             ))}
