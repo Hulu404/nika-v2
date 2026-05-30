@@ -9,8 +9,9 @@ import { createServerComponentClient } from "@/lib/supabase";
 function IcChat() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M3 18V7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H8l-5 4v-5Z"
+      <path d="M4 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H10l-4 4v-4H5a1 1 0 0 1-1-1V5Z"
         stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M8 9h8M8 13h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }

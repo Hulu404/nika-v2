@@ -11,6 +11,7 @@ export default async function TodayPage() {
   } = await supabase.auth.getUser();
 
   let name = "друг";
+  let daysSince = 0;
 
   if (user) {
     const { data: userData } = await supabase
@@ -19,7 +20,10 @@ export default async function TodayPage() {
       .eq("id", user.id)
       .maybeSingle();
     if (userData?.display_name?.trim()) name = userData.display_name.trim();
+    daysSince = Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86_400_000);
   }
+
+  const scenariosHeading = daysSince > 1 ? "О чём поговорим?" : "С чем поговорим?";
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
@@ -36,7 +40,7 @@ export default async function TodayPage() {
 
           {/* Сценарии */}
           <p className="mb-3 font-mono text-[10.5px] font-semibold uppercase tracking-[0.15em] text-ink-muted">
-            С чем поговорим?
+            {scenariosHeading}
           </p>
 
           <div className="flex flex-col gap-2">

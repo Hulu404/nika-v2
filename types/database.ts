@@ -193,6 +193,7 @@ export interface Database {
       runner_goal: RunnerGoal;
       runner_fear: RunnerFear;
       run_intensity: RunIntensity;
+      gender: Gender;
       scenario_type: ScenarioType;
       subscription_plan: SubscriptionPlan;
       subscription_status: SubscriptionStatus;
