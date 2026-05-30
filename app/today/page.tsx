@@ -11,7 +11,7 @@ export default async function TodayPage() {
   } = await supabase.auth.getUser();
 
   let name = "друг";
-  let daysSince = 0;
+  let isFirstDay = true;
 
   if (user) {
     const { data: userData } = await supabase
@@ -20,10 +20,13 @@ export default async function TodayPage() {
       .eq("id", user.id)
       .maybeSingle();
     if (userData?.display_name?.trim()) name = userData.display_name.trim();
-    daysSince = Math.floor((Date.now() - new Date(user.created_at).getTime()) / 86_400_000);
+    // «Первый день» — календарный день регистрации совпадает с сегодняшним.
+    const signupDay = new Date(user.created_at).toLocaleDateString("en-CA");
+    const todayDay = new Date().toLocaleDateString("en-CA");
+    isFirstDay = signupDay === todayDay;
   }
 
-  const scenariosHeading = daysSince > 1 ? "О чём поговорим?" : "С чем поговорим?";
+  const scenariosHeading = isFirstDay ? "С чем поговорим?" : "О чём поговорим?";
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
