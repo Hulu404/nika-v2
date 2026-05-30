@@ -6,7 +6,11 @@ export type ScenarioType =
   | "after_run"
   | "after_skip"
   | "pre_race"
-  | "after_failure";
+  | "after_failure"
+  | "general";
+
+/** Грамматический род для обращения (из онбординга). */
+export type Gender = "male" | "female";
 
 /** Где человек в своём беговом пути. */
 export type RunnerLevel = "beginner" | "irregular" | "returning";

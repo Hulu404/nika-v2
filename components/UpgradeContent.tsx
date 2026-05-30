@@ -51,7 +51,7 @@ export function UpgradeContent() {
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="mx-auto max-w-md px-5 pb-20 pt-10">
+      <div className="mx-auto w-full max-w-[720px] px-6 pb-20 pt-10">
 
         {/* Назад */}
         <Link

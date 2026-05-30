@@ -9,8 +9,7 @@ import { PatternCard } from "@/components/analytics/PatternCard";
 import { InfoNote } from "@/components/analytics/InfoNote";
 import { getRuns } from "@/lib/runs";
 import { buildMoodChart, buildWordCloud } from "@/lib/analytics";
-
-const CARD = "rounded-2xl border border-line-default bg-elevated p-5";
+import type { Gender } from "@/types/app";
 
 export default async function AnalyticsPage() {
   const supabase = await createServerComponentClient();
@@ -22,73 +21,81 @@ export default async function AnalyticsPage() {
   const since = new Date();
   since.setDate(since.getDate() - 14);
 
-  const [runs, { data: convs }] = await Promise.all([
+  const [runs, { data: convs }, { data: profileData }] = await Promise.all([
     getRuns(supabase, user.id),
     supabase
       .from("conversations")
       .select("messages, updated_at")
       .eq("user_id", user.id)
       .gte("updated_at", since.toISOString()),
+    supabase
+      .from("profiles")
+      .select("gender")
+      .eq("user_id", user.id)
+      .maybeSingle(),
   ]);
 
   const days = buildMoodChart(runs);
   const words = buildWordCloud(convs ?? []);
   const convCount = convs?.length ?? 0;
+  const gender = (profileData?.gender ?? null) as Gender | null;
+
+  const verb =
+    gender === "male" ? "говорил" :
+    gender === "female" ? "говорила" :
+    "писал/а";
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
       <MobileHeader title="Аналитика" right="14 дней" />
 
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
-        <div className="mx-auto max-w-3xl px-5 pt-6 lg:pt-10">
+        <div className="mx-auto w-full max-w-[720px] px-6 pt-6 lg:pt-10">
 
-          {/* Заголовок (десктоп) */}
-          <div className="hidden lg:block">
-            <p className="mb-3 text-xs uppercase tracking-widest text-accent">14 дней · наблюдения</p>
-            <h1 className="text-5xl font-bold leading-tight text-ink-primary">
-              Что ты говорила.<br />Без оценки.
+          {/* Заголовок */}
+          <div className="mb-8">
+            <p className="mb-2 font-mono text-[10.5px] font-semibold uppercase tracking-[0.15em] text-ink-muted">
+              14 дней · наблюдения
+            </p>
+            <h1 className="font-serif text-[36px] lg:text-[44px] font-normal leading-[1.1] tracking-[-0.025em] text-ink-primary">
+              Что ты {verb}.<br />
+              <em className="italic text-accent">Без оценки.</em>
             </h1>
-            <p className="mt-4 max-w-xl text-base text-ink-secondary">
+            <p className="mt-3 text-[14px] leading-[1.6] text-ink-secondary">
               Я не диагностирую и не сужу состояние. Просто показываю что чаще встречалось —
               на случай если хочешь это увидеть со стороны.
             </p>
           </div>
 
-          {/* Заголовок (мобиль) */}
-          <div className="lg:hidden">
-            <h1 className="text-3xl font-bold leading-snug text-ink-primary">
-              Что ты говорила в эти 14 дней
-            </h1>
-            <p className="mt-1 text-sm text-ink-secondary">Не оценка. Просто наблюдения за словами.</p>
-          </div>
-
-          {/* Инфо-блок (мобиль) */}
-          <div className="mt-5 lg:hidden">
-            <InfoNote />
-          </div>
-
           {/* Как давались пробежки */}
-          <section className="mt-8">
-            <p className="mb-3 text-xs uppercase tracking-widest text-ink-secondary">
+          <section className="mb-4">
+            <p className="mb-3 font-mono text-[10.5px] font-semibold uppercase tracking-[0.15em] text-ink-muted">
               Как давались пробежки
             </p>
-            <div className={CARD}>
+            <div className="rounded-[16px] border border-[var(--border-default)] bg-[var(--bg-elevated)] p-5">
               <MoodBarChart days={days} />
             </div>
           </section>
 
           {/* Слова + паттерны */}
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
-            <div className={CARD}>
-              <p className="mb-4 text-xs uppercase tracking-widest text-ink-secondary">
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className="rounded-[16px] border border-[var(--border-default)] bg-[var(--bg-elevated)] p-5">
+              <p className="mb-4 font-mono text-[10.5px] font-semibold uppercase tracking-[0.15em] text-ink-muted">
                 Слова которые звучали чаще всего
               </p>
               <WordCloud words={words} />
             </div>
-            <div className={CARD}>
-              <p className="mb-3 text-xs uppercase tracking-widest text-ink-secondary">Паттерны</p>
+            <div className="rounded-[16px] border border-[var(--border-default)] bg-[var(--bg-elevated)] p-5">
+              <p className="mb-3 font-mono text-[10.5px] font-semibold uppercase tracking-[0.15em] text-ink-muted">
+                Паттерны
+              </p>
               <PatternCard count={convCount} topWord={words[0]?.text} />
             </div>
+          </div>
+
+          {/* Инфо-блок */}
+          <div className="mt-4">
+            <InfoNote />
           </div>
 
         </div>

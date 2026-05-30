@@ -1,5 +1,6 @@
 import type { Scenario } from "@/types/conversation";
 
+/** Основные 5 сценариев (показываются в навигации/аналитике). */
 export const SCENARIO_ORDER: Scenario[] = [
   "morning",
   "after_run",
@@ -7,6 +8,9 @@ export const SCENARIO_ORDER: Scenario[] = [
   "pre_race",
   "after_failure",
 ];
+
+/** Все допустимые сценарии (включая general). */
+export const ALL_SCENARIOS: Scenario[] = [...SCENARIO_ORDER, "general"];
 
 interface ScenarioMeta {
   title: string;
@@ -18,6 +22,17 @@ interface ScenarioMeta {
 }
 
 export const SCENARIO_META: Record<Scenario, ScenarioMeta> = {
+  general: {
+    title: "Просто поговорить",
+    subtitle: "Без темы — просто написать",
+    opener: "Привет. Я здесь. Как ты?",
+    suggestions: [
+      "Просто хочу поговорить",
+      "Как дела с бегом",
+      "Есть кое-что на душе",
+      "Ничего особенного",
+    ],
+  },
   morning: {
     title: "Утро перед бегом",
     subtitle: "Когда тяжело выйти",

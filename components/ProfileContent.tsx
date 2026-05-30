@@ -253,7 +253,7 @@ export function ProfileContent({
     <>
       {/* ── Scrollable page ── */}
       <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-md px-4 pb-32 pt-5">
+        <div className="mx-auto w-full max-w-[720px] px-6 pb-32 pt-5">
 
           {/* Шапка */}
           <div className="mb-7 flex items-center gap-3">

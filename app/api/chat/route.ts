@@ -3,7 +3,7 @@ import { anthropic, NIKA_MODEL } from "@/lib/anthropic";
 import { createConversation, updateConversation } from "@/lib/conversations";
 import { FREE_DAILY_LIMIT, isLimitReached } from "@/lib/limits";
 import { buildSystemPrompt } from "@/lib/prompts";
-import { SCENARIO_ORDER } from "@/lib/scenarios";
+import { ALL_SCENARIOS } from "@/lib/scenarios";
 import { createServerComponentClient } from "@/lib/supabase";
 import type { Message } from "@/types/app";
 import type { Scenario } from "@/types/conversation";
@@ -26,7 +26,7 @@ export async function POST(req: Request) {
 
   const { scenario, messages, conversationId } = body;
 
-  if (!SCENARIO_ORDER.includes(scenario)) {
+  if (!ALL_SCENARIOS.includes(scenario)) {
     return Response.json({ error: "Unknown scenario" }, { status: 400 });
   }
   if (!Array.isArray(messages) || messages.length === 0) {

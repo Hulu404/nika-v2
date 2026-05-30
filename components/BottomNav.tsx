@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 const TABS = [
   {
-    href: "/day1",
+    href: "/today",
     label: "Главная",
     icon: (
       <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
@@ -53,7 +53,9 @@ export function BottomNav() {
     <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-[var(--bg-blur-strong)] backdrop-blur-[20px] border-t border-[var(--border-subtle)] pb-safe">
       <div className="flex items-center justify-around px-2 pt-2 pb-3">
         {TABS.map(({ href, label, icon }) => {
-          const active = pathname === href;
+          const active =
+            pathname === href ||
+            (href === "/today" && pathname === "/day1");
           return (
             <Link
               key={label}

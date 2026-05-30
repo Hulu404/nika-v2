@@ -4,13 +4,13 @@ import { Chat } from "@/components/Chat";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
 import { createConversation, getLastConversation } from "@/lib/conversations";
-import { SCENARIO_META, SCENARIO_ORDER } from "@/lib/scenarios";
+import { ALL_SCENARIOS, SCENARIO_META } from "@/lib/scenarios";
 import { createServerComponentClient } from "@/lib/supabase";
 import type { ChatMessage, Scenario } from "@/types/conversation";
 import type { Message } from "@/types/app";
 
 function isScenario(value: string): value is Scenario {
-  return (SCENARIO_ORDER as string[]).includes(value);
+  return (ALL_SCENARIOS as string[]).includes(value);
 }
 
 function pluralDays(n: number): string {

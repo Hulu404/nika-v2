@@ -1,4 +1,5 @@
 import type {
+  Gender,
   Message,
   RunIntensity,
   RunnerFear,
@@ -60,6 +61,7 @@ export interface Database {
           goal: RunnerGoal | null;
           fears: RunnerFear[];
           reminder_enabled: boolean;
+          gender: Gender | null;
           created_at: string;
           updated_at: string;
         };
@@ -70,6 +72,7 @@ export interface Database {
           goal?: RunnerGoal | null;
           fears?: RunnerFear[];
           reminder_enabled?: boolean;
+          gender?: Gender | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -80,6 +83,7 @@ export interface Database {
           goal?: RunnerGoal | null;
           fears?: RunnerFear[];
           reminder_enabled?: boolean;
+          gender?: Gender | null;
           created_at?: string;
           updated_at?: string;
         };

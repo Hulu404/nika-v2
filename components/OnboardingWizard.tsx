@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-import type { RunnerLevel, RunnerGoal, RunnerFear } from "@/types/app";
+import type { RunnerLevel, RunnerGoal, RunnerFear, Gender } from "@/types/app";
 
 // ─── данные шагов ────────────────────────────────────────────────────────────
 
@@ -32,7 +32,12 @@ const FEAR_OPTIONS: { v: RunnerFear; l: string }[] = [
   { v: "injury",  l: "Травма или боль" },
 ];
 
-const TOTAL_STEPS = 5; // шаги 1–5 (0 = приветствие)
+const GENDER_OPTIONS: { v: Gender; l: string; d: string }[] = [
+  { v: "male",   l: "Он / его",  d: "Буду обращаться к тебе в мужском роде" },
+  { v: "female", l: "Она / её",  d: "Буду обращаться к тебе в женском роде" },
+];
+
+const TOTAL_STEPS = 6; // шаги 1–6 (0 = приветствие)
 
 // ─── вспомогательные компоненты ──────────────────────────────────────────────
 
@@ -117,12 +122,13 @@ export function OnboardingWizard({ userId }: { userId: string }) {
   const router = useRouter();
   const [supabase] = useState(() => createClientComponentClient());
 
-  const [step, setStep]   = useState(0);
-  const [name, setName]   = useState("");
-  const [level, setLevel] = useState<RunnerLevel | null>(null);
-  const [goal, setGoal]   = useState<RunnerGoal | null>(null);
-  const [when, setWhen]   = useState<When | null>(null);
-  const [fears, setFears] = useState<RunnerFear[]>([]);
+  const [step, setStep]     = useState(0);
+  const [name, setName]     = useState("");
+  const [gender, setGender] = useState<Gender | null>(null);
+  const [level, setLevel]   = useState<RunnerLevel | null>(null);
+  const [goal, setGoal]     = useState<RunnerGoal | null>(null);
+  const [when, setWhen]     = useState<When | null>(null);
+  const [fears, setFears]   = useState<RunnerFear[]>([]);
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState<string | null>(null);
 
@@ -145,8 +151,9 @@ export function OnboardingWizard({ userId }: { userId: string }) {
       .upsert(
         {
           user_id: userId,
-          ...(level && { level }),
-          ...(goal  && { goal }),
+          ...(gender && { gender }),
+          ...(level  && { level }),
+          ...(goal   && { goal }),
           fears,
         },
         { onConflict: "user_id" },
@@ -218,9 +225,10 @@ export function OnboardingWizard({ userId }: { userId: string }) {
 
   const nextDisabled =
     (step === 1 && !name.trim()) ||
-    (step === 2 && !level)       ||
-    (step === 3 && !goal)        ||
-    (step === 4 && !when);
+    (step === 2 && !gender)      ||
+    (step === 3 && !level)       ||
+    (step === 4 && !goal)        ||
+    (step === 5 && !when);
 
   return (
     <div className="flex min-h-dvh flex-col bg-[var(--bg-primary)]">
@@ -238,10 +246,11 @@ export function OnboardingWizard({ userId }: { userId: string }) {
         {/* Вопрос НИКИ в пузыре */}
         <div className="mb-7 max-w-[92%] rounded-bubble rounded-bl-[6px] bg-[var(--surface-nika)] px-[22px] py-5 font-serif text-[22px] leading-[1.35] tracking-[-0.01em] text-ink-primary">
           {step === 1 && "Как тебя зовут?"}
-          {step === 2 && "Как ты себя описываешь?"}
-          {step === 3 && "Зачем ты здесь?"}
-          {step === 4 && "Когда обычно бегаешь?"}
-          {step === 5 && "Что мешает больше всего?"}
+          {step === 2 && "Как к тебе обращаться?"}
+          {step === 3 && "Как ты себя описываешь?"}
+          {step === 4 && "Зачем ты здесь?"}
+          {step === 5 && "Когда обычно бегаешь?"}
+          {step === 6 && "Что мешает больше всего?"}
         </div>
 
         {/* Шаг 1: Имя */}
@@ -257,8 +266,23 @@ export function OnboardingWizard({ userId }: { userId: string }) {
           />
         )}
 
-        {/* Шаг 2: Уровень */}
+        {/* Шаг 2: Гендер */}
         {step === 2 && (
+          <div className="flex flex-col gap-2.5">
+            {GENDER_OPTIONS.map((o) => (
+              <OptionCard
+                key={o.v}
+                label={o.l}
+                desc={o.d}
+                selected={gender === o.v}
+                onClick={() => setGender(o.v)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Шаг 3: Уровень */}
+        {step === 3 && (
           <div className="flex flex-col gap-2.5">
             {LEVEL_OPTIONS.map((o) => (
               <OptionCard
@@ -272,8 +296,8 @@ export function OnboardingWizard({ userId }: { userId: string }) {
           </div>
         )}
 
-        {/* Шаг 3: Цель */}
-        {step === 3 && (
+        {/* Шаг 4: Цель */}
+        {step === 4 && (
           <div className="flex flex-col gap-2.5">
             {GOAL_OPTIONS.map((o) => (
               <OptionCard
@@ -287,8 +311,8 @@ export function OnboardingWizard({ userId }: { userId: string }) {
           </div>
         )}
 
-        {/* Шаг 4: Время */}
-        {step === 4 && (
+        {/* Шаг 5: Время */}
+        {step === 5 && (
           <div className="flex flex-col gap-2.5">
             {WHEN_OPTIONS.map((w) => (
               <OptionCard
@@ -301,8 +325,8 @@ export function OnboardingWizard({ userId }: { userId: string }) {
           </div>
         )}
 
-        {/* Шаг 5: Страхи (мультиселект — чипы) */}
-        {step === 5 && (
+        {/* Шаг 6: Страхи (мультиселект — чипы) */}
+        {step === 6 && (
           <div className="flex flex-wrap gap-2">
             {FEAR_OPTIONS.map((f) => (
               <button
@@ -328,7 +352,7 @@ export function OnboardingWizard({ userId }: { userId: string }) {
           <p className="mb-3 text-center text-[13px] text-accent">{error}</p>
         )}
 
-        {step === 5 ? (
+        {step === 6 ? (
           <button
             onClick={finish}
             disabled={saving}

@@ -24,35 +24,21 @@ export async function SidebarData() {
   } = await supabase.auth.getUser();
 
   let recentConvos: RecentConvo[] = [];
-  let isDay1 = true;
 
   if (user) {
-    const [{ data: convData }, { data: userData }] = await Promise.all([
-      supabase
-        .from("conversations")
-        .select("id, scenario, updated_at")
-        .eq("user_id", user.id)
-        .order("updated_at", { ascending: false })
-        .limit(5),
-      supabase
-        .from("users")
-        .select("created_at")
-        .eq("id", user.id)
-        .maybeSingle(),
-    ]);
+    const { data: convData } = await supabase
+      .from("conversations")
+      .select("id, scenario, updated_at")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(5);
 
     recentConvos = (convData ?? []).map((c) => ({
       label: SCENARIO_META[c.scenario as keyof typeof SCENARIO_META]?.title ?? c.scenario,
       time: formatTime(c.updated_at),
       href: `/chat/${c.scenario}`,
     }));
-
-    if (userData?.created_at) {
-      const hoursSince =
-        (Date.now() - new Date(userData.created_at).getTime()) / (1000 * 60 * 60);
-      isDay1 = hoursSince < 24;
-    }
   }
 
-  return <Sidebar recentConvos={recentConvos} isDay1={isDay1} />;
+  return <Sidebar recentConvos={recentConvos} />;
 }

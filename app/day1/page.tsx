@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
 import { createServerComponentClient } from "@/lib/supabase";
@@ -73,6 +74,9 @@ export default async function Day1Page() {
     hasConversations = (convData?.length ?? 0) > 0;
   }
 
+  // Пользователь уже общался — ведём на /today
+  if (hasConversations) redirect("/today");
+
   // Карточки 2×2
   const CARDS = [
     {
@@ -108,7 +112,7 @@ export default async function Day1Page() {
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
-        <div className="mx-auto max-w-lg px-5 pt-10 lg:pt-14">
+        <div className="mx-auto w-full max-w-[680px] px-5 pt-10 lg:pt-14">
 
           {/* Бейдж (только день 1) */}
           {isDay1 && (
@@ -121,7 +125,7 @@ export default async function Day1Page() {
           )}
 
           {/* Заголовок */}
-          <h1 className="font-serif text-[44px] font-normal leading-[1.1] tracking-[-0.03em] text-ink-primary mb-4">
+          <h1 className="font-serif text-[44px] lg:text-[52px] font-normal leading-[1.1] tracking-[-0.03em] text-ink-primary mb-4">
             Привет, {name}.<br />
             <em className="italic text-accent">Я тут.</em>
           </h1>
@@ -137,7 +141,7 @@ export default async function Day1Page() {
               <Link
                 key={card.title}
                 href={card.href}
-                className="group flex flex-col gap-4 rounded-[18px] border p-5 transition-all hover:shadow-card"
+                className="group flex flex-col gap-4 rounded-[18px] border p-5 transition-all hover:shadow-card lg:min-h-[280px]"
                 style={
                   card.warm
                     ? { background: "var(--surface-warm)", borderColor: "rgba(200,85,61,0.18)" }
@@ -155,7 +159,7 @@ export default async function Day1Page() {
                   {card.icon}
                 </div>
                 <div>
-                  <div className="font-serif text-[16px] font-medium leading-tight text-ink-primary mb-1.5">
+                  <div className="font-serif text-[16px] lg:text-[20px] font-medium leading-tight text-ink-primary mb-1.5">
                     {card.title}
                   </div>
                   <div className="text-[12.5px] leading-[1.45] text-ink-secondary">

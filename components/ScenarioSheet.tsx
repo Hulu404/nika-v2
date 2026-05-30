@@ -3,10 +3,16 @@
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { BottomSheet } from "@/components/BottomSheet";
-import { SCENARIO_META, SCENARIO_ORDER } from "@/lib/scenarios";
+import { ALL_SCENARIOS, SCENARIO_META } from "@/lib/scenarios";
 import { cn } from "@/lib/utils";
 
 const ICONS: Record<string, React.ReactNode> = {
+  general: (
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
+      <path d="M3 13V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H6l-3 3v-5Z"
+        stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+    </svg>
+  ),
   morning: (
     <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden>
       <circle cx="10" cy="10" r="4" stroke="currentColor" strokeWidth="1.4" />
@@ -55,7 +61,7 @@ export function ScenarioSheet({ isOpen, onClose }: Props) {
   return (
     <BottomSheet isOpen={isOpen} onClose={onClose} title="Новый разговор">
       <div className="flex flex-col gap-2.5">
-        {SCENARIO_ORDER.map((key) => {
+        {ALL_SCENARIOS.map((key) => {
           const meta = SCENARIO_META[key];
           return (
             <button

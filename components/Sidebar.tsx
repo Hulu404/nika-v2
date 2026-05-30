@@ -108,11 +108,9 @@ export interface RecentConvo {
 
 interface SidebarProps {
   recentConvos: RecentConvo[];
-  /** Показывать пункт «День 1» только в первые 24 ч */
-  isDay1: boolean;
 }
 
-export function Sidebar({ recentConvos, isDay1 }: SidebarProps) {
+export function Sidebar({ recentConvos }: SidebarProps) {
   const pathname = usePathname();
   const [dark, setDark] = useState(false);
   const [showScenarioSheet, setShowScenarioSheet] = useState(false);
@@ -129,13 +127,12 @@ export function Sidebar({ recentConvos, isDay1 }: SidebarProps) {
   }
 
   const NAV = [
-    { href: "/day1",      label: "Сегодня",        icon: <IcChat />,  implemented: true, showAlways: true },
-    { href: "/day1",      label: "День 1",          icon: <IcStar />,  implemented: true, showAlways: false },
-    { href: "#",          label: "Трекинг",         icon: <IcTimer />, implemented: false, showAlways: true },
-    { href: "/journal",   label: "Журнал пробежек", icon: <IcList />,  implemented: true, showAlways: true },
-    { href: "/analytics", label: "Аналитика",       icon: <IcChart />, implemented: true, showAlways: true },
-    { href: "#",          label: "Пуши",            icon: <IcBell />,  implemented: false, showAlways: true },
-  ].filter(item => item.showAlways || isDay1);
+    { href: "/today",     label: "Сегодня",        icon: <IcChat />,  implemented: true },
+    { href: "#",          label: "Трекинг",         icon: <IcTimer />, implemented: false },
+    { href: "/journal",   label: "Журнал пробежек", icon: <IcList />,  implemented: true },
+    { href: "/analytics", label: "Аналитика",       icon: <IcChart />, implemented: true },
+    { href: "#",          label: "Пуши",            icon: <IcBell />,  implemented: false },
+  ];
 
   return (
     <>

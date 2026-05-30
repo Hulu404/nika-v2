@@ -35,7 +35,7 @@ export default async function JournalPage() {
       <MobileHeader title="Журнал" right={`${totalKm} км`} />
 
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
-        <div className="mx-auto max-w-2xl px-5 pt-6 lg:pt-10">
+        <div className="mx-auto w-full max-w-[720px] px-6 pt-6 lg:pt-10">
 
           {/* Заголовок (десктоп) */}
           <div className="hidden border-b border-line-default pb-4 lg:block">
