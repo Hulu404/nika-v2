@@ -11,15 +11,14 @@ function IcChat() {
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M4 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H10l-4 4v-4H5a1 1 0 0 1-1-1V5Z"
         stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      <path d="M8 9h8M8 13h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
-function IcJournal() {
+function IcClock() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M4 4h16v16H4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      <path d="M8 8h8M8 12h8M8 16h5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M12 8v4l3 2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -89,10 +88,10 @@ export default async function Day1Page() {
     },
     {
       href: "/journal",
-      title: "Журнал пробежек",
-      body: "Записывай пробежки и следи за прогрессом.",
+      title: "Первая пробежка",
+      body: "Я останусь рядом. Не буду подгонять.",
       warm: false,
-      icon: <IcJournal />,
+      icon: <IcClock />,
     },
     {
       href: "/manifesto",
@@ -103,7 +102,7 @@ export default async function Day1Page() {
     },
     {
       href: "/profile",
-      title: "Профиль",
+      title: "Настройки",
       body: "Тон, когда писать первой, тёмная тема.",
       warm: false,
       icon: <IcProfile />,
@@ -136,13 +135,13 @@ export default async function Day1Page() {
               : "Выбери момент — я рядом."}
           </p>
 
-          {/* Сетка 2×2 */}
-          <div className="grid grid-cols-2 gap-3 sm:gap-4">
+          {/* Карточки 2×2 — иконка слева + текст слева от неё, выровнен по краю */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
             {CARDS.map((card) => (
               <Link
                 key={card.title}
                 href={card.href}
-                className="group flex flex-col gap-4 rounded-[18px] border p-5 transition-all hover:shadow-card lg:min-h-[280px]"
+                className="group flex items-center gap-4 rounded-[18px] border px-5 py-4 text-left transition-all hover:shadow-card"
                 style={
                   card.warm
                     ? { background: "var(--surface-warm)", borderColor: "rgba(200,85,61,0.18)" }
@@ -150,7 +149,7 @@ export default async function Day1Page() {
                 }
               >
                 <div
-                  className="flex h-12 w-12 items-center justify-center rounded-[13px] text-accent transition-colors"
+                  className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-[13px] text-accent transition-colors"
                   style={
                     card.warm
                       ? { background: "rgba(255,255,255,0.5)" }
@@ -159,11 +158,11 @@ export default async function Day1Page() {
                 >
                   {card.icon}
                 </div>
-                <div>
-                  <div className="font-serif text-[16px] lg:text-[20px] font-medium leading-tight text-ink-primary mb-1.5">
+                <div className="min-w-0 flex-1">
+                  <div className="font-serif text-[16px] lg:text-[18px] font-medium leading-tight text-ink-primary">
                     {card.title}
                   </div>
-                  <div className="text-[12.5px] leading-[1.45] text-ink-secondary">
+                  <div className="mt-1 text-[12.5px] leading-[1.45] text-ink-secondary">
                     {card.body}
                   </div>
                 </div>
