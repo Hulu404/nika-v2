@@ -1,18 +1,28 @@
 import { cn } from "@/lib/utils";
 import type { WordFreq } from "@/lib/analytics";
 
-// Размер, шрифт и цвет слова выводятся из относительной частоты.
-function wordStyles(ratio: number): string {
-  if (ratio >= 0.7) {
-    // Самые частые: крупный serif, ink-primary
-    return cn("font-serif font-medium text-ink-primary leading-none", "text-[30px]");
+// Стиль слова — по его рангу в облаке (а не по абсолютной частоте),
+// чтобы при любом размере датасета был визуальный разброс, как на прототипе:
+// топ — крупный serif/каплс/акцент, середина — смесь sans/serif/italic,
+// низ — мелкий моноширинный приглушённый.
+const MID_VARIANTS = [
+  "text-ink-secondary text-[19px]",
+  "font-serif italic text-ink-secondary text-[22px]",
+  "font-serif font-medium text-accent text-[18px]",
+  "italic text-accent text-[18px]",
+];
+
+function wordStyles(rank: number): string {
+  if (rank === 0) {
+    return "leading-none font-serif font-medium uppercase tracking-wide text-accent text-[36px]";
   }
-  if (ratio >= 0.4) {
-    // Средние: sans, ink-secondary
-    return cn("text-ink-secondary leading-none", "text-[19px]");
+  if (rank <= 2) {
+    return "leading-none font-serif font-medium text-ink-primary text-[28px]";
   }
-  // Редкие: mono, ink-muted, маленький
-  return cn("font-mono text-ink-muted leading-none", "text-[13px]");
+  if (rank <= 6) {
+    return cn("leading-none", MID_VARIANTS[(rank - 3) % MID_VARIANTS.length]);
+  }
+  return "leading-none font-mono text-ink-muted text-[13px]";
 }
 
 export function WordCloud({ words }: { words: WordFreq[] }) {
@@ -23,11 +33,10 @@ export function WordCloud({ words }: { words: WordFreq[] }) {
       </p>
     );
   }
-  const max = words[0].freq;
   return (
     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-3">
-      {words.map((w) => (
-        <span key={w.text} className={wordStyles(w.freq / max)}>
+      {words.map((w, i) => (
+        <span key={w.text} className={wordStyles(i)}>
           {w.text}
         </span>
       ))}
