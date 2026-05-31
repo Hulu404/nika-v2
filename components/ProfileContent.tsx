@@ -6,6 +6,8 @@ import { createClientComponentClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { SCENARIO_META, SCENARIO_ORDER } from "@/lib/scenarios";
 import { BottomSheet } from "@/components/BottomSheet";
+import { PrivacyContent } from "@/components/legal/PrivacyContent";
+import { OfertaContent } from "@/components/legal/OfertaContent";
 
 // ─── типы ────────────────────────────────────────────────────────────────────
 
@@ -594,21 +596,12 @@ export function ProfileContent({
 
       {/* Политика конфиденциальности */}
       <BottomSheet isOpen={activeSheet === "privacy"} onClose={closeSheet} title="Политика конфиденциальности">
-        <p className="mb-4 text-[13px] font-mono text-ink-faint">Документ в разработке</p>
-        <p className="text-[14px] leading-[1.65] text-ink-secondary">
-          Актуальная политика конфиденциальности появится до запуска.
-          Мы обязуемся не передавать твои данные третьим лицам и использовать
-          их только для работы сервиса.
-        </p>
+        <PrivacyContent onClose={closeSheet} />
       </BottomSheet>
 
       {/* Публичная оферта */}
       <BottomSheet isOpen={activeSheet === "oferta"} onClose={closeSheet} title="Публичная оферта">
-        <p className="mb-4 text-[13px] font-mono text-ink-faint">Документ в разработке</p>
-        <p className="text-[14px] leading-[1.65] text-ink-secondary">
-          Актуальная версия публичной оферты появится до запуска.
-          Оферта будет регулировать условия предоставления платной подписки PRO.
-        </p>
+        <OfertaContent onClose={closeSheet} />
       </BottomSheet>
     </>
   );
