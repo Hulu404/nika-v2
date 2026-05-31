@@ -1,14 +1,16 @@
 import { redirect } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
-import { PlanCard } from "@/components/today/PlanCard";
+import { QuoteCard } from "@/components/today/QuoteCard";
 import { StreakCard } from "@/components/today/StreakCard";
 import { WeekCard } from "@/components/today/WeekCard";
 import { LastRunCard } from "@/components/today/LastRunCard";
 import { SuggestionChips } from "@/components/today/SuggestionChips";
+import { SignOutButton } from "@/components/today/SignOutButton";
 import { createServerComponentClient } from "@/lib/supabase";
 import { getRuns, weekSummary } from "@/lib/runs";
 import { computeStreak, weekRibbon, humanDate, greeting, weekMessage } from "@/lib/today";
+import { getDailyQuote } from "@/lib/quotes";
 
 const CHIPS = ["Не хочется бежать сегодня", "Расскажу как прошло", "Перенести на вечер"];
 
@@ -42,18 +44,14 @@ export default async function TodayPage() {
   const streak = computeStreak(convs ?? []);
   const lastRun = runs[0] ?? null;
   const now = new Date();
+  const quote = getDailyQuote(now);
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
       {/* Шапка страницы */}
-      <header className="flex shrink-0 items-center gap-3.5 border-b border-line-default px-5 py-4 lg:px-8">
-        <NikaAvatar size={32} />
-        <div className="flex-1">
-          <div className="font-serif text-[17px] font-medium tracking-[-0.01em] text-ink-primary">
-            Сегодня
-          </div>
-          <span className="mt-0.5 block text-[11.5px] text-ink-muted">{humanDate(now)}</span>
-        </div>
+      <header className="flex shrink-0 items-center justify-end gap-3 border-b border-line-default px-5 py-3 lg:px-8">
+        <span className="text-[14px] text-ink-secondary">{humanDate(now)}</span>
+        <SignOutButton />
       </header>
 
       {/* Дашборд */}
@@ -77,7 +75,7 @@ export default async function TodayPage() {
 
           {/* Сетка карточек */}
           <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
-            <PlanCard title="Лёгкая пробежка · 4 км" subtitle="Без темпа. Только если захочется." />
+            <QuoteCard quote={quote} />
             <StreakCard days={streak} />
             <WeekCard km={week.km} days={ribbon} />
             <LastRunCard run={lastRun} />
