@@ -43,7 +43,7 @@ export function UserMenu() {
   }
 
   return (
-    <div className="fixed right-4 top-4 z-50 flex items-center gap-2">
+    <div className="fixed right-4 top-2 z-50 flex items-center gap-2">
       <span className="hidden max-w-[12rem] truncate text-sm text-ink-secondary sm:inline">
         {email}
       </span>
