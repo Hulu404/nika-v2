@@ -185,7 +185,7 @@ export function Sidebar({ recentConvos }: SidebarProps) {
         {/* ── Хедер ─────────────────────────────────────────────────────── */}
         <div
           className={cn(
-            "relative flex flex-shrink-0 items-center border-b border-[var(--border-default)]",
+            "flex flex-shrink-0 items-center border-b border-[var(--border-default)]",
             collapsed ? "justify-center px-0 py-5" : "gap-3 px-[22px] py-6",
           )}
         >
@@ -200,18 +200,6 @@ export function Sidebar({ recentConvos }: SidebarProps) {
               НИКА
             </span>
           )}
-
-          {/* Кнопка сворачивания */}
-          <button
-            onClick={toggleCollapsed}
-            aria-label={collapsed ? "Развернуть сайдбар" : "Свернуть сайдбар"}
-            className={cn(
-              "absolute flex h-6 w-6 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-[var(--surface-deep)] hover:text-ink-primary",
-              collapsed ? "right-1 top-1/2 -translate-y-1/2" : "right-3 top-1/2 -translate-y-1/2",
-            )}
-          >
-            {collapsed ? <IcChevRight /> : <IcChevLeft />}
-          </button>
         </div>
 
         {/* ── Кнопка «Новый разговор» ──────────────────────────────────── */}
@@ -327,6 +315,21 @@ export function Sidebar({ recentConvos }: SidebarProps) {
                   </span>
                 </>
               )}
+            </button>
+          </Tip>
+
+          {/* Свернуть / Развернуть */}
+          <Tip label="Развернуть" show={collapsed}>
+            <button
+              onClick={toggleCollapsed}
+              aria-label={collapsed ? "Развернуть сайдбар" : "Свернуть сайдбар"}
+              className={cn(
+                "flex items-center rounded-[8px] text-[13px] text-ink-muted transition-colors hover:bg-[var(--surface-deep)] hover:text-ink-primary",
+                collapsed ? "w-full justify-center p-[10px]" : "w-full gap-2.5 px-3 py-2",
+              )}
+            >
+              {collapsed ? <IcChevRight /> : <IcChevLeft />}
+              {!collapsed && <span className="whitespace-nowrap">Свернуть</span>}
             </button>
           </Tip>
         </div>
