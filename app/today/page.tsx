@@ -38,7 +38,7 @@ export default async function TodayPage() {
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
       {/* Шапка страницы */}
-      <header className="flex shrink-0 items-center justify-end gap-4 border-b border-line-default px-5 py-3 lg:px-8">
+      <header className="flex shrink-0 items-center justify-between border-b border-line-default px-5 py-3 lg:px-8">
         <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">
           Сегодня · {humanDate(now)}
         </span>
