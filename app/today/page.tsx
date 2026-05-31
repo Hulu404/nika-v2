@@ -1,119 +1,95 @@
-import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
+import { PlanCard } from "@/components/today/PlanCard";
+import { StreakCard } from "@/components/today/StreakCard";
+import { WeekCard } from "@/components/today/WeekCard";
+import { LastRunCard } from "@/components/today/LastRunCard";
+import { SuggestionChips } from "@/components/today/SuggestionChips";
 import { createServerComponentClient } from "@/lib/supabase";
-import { SCENARIO_META, SCENARIO_ORDER } from "@/lib/scenarios";
+import { getRuns, weekSummary } from "@/lib/runs";
+import { computeStreak, weekRibbon, humanDate, greeting, weekMessage } from "@/lib/today";
+
+const CHIPS = ["Не хочется бежать сегодня", "Расскажу как прошло", "Перенести на вечер"];
+
+function NikaAvatar({ size = 36 }: { size?: number }) {
+  return (
+    <div
+      className="relative flex-shrink-0 rounded-full bg-nika-avatar"
+      style={{ width: size, height: size }}
+    >
+      <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-canvas bg-[#7BA968]" />
+    </div>
+  );
+}
 
 export default async function TodayPage() {
   const supabase = await createServerComponentClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
+  if (!user) redirect("/auth?next=/today");
 
-  let name = "друг";
-  let isFirstDay = true;
+  const [{ data: userData }, runs, { data: convs }] = await Promise.all([
+    supabase.from("users").select("display_name").eq("id", user.id).maybeSingle(),
+    getRuns(supabase, user.id),
+    supabase.from("conversations").select("updated_at").eq("user_id", user.id),
+  ]);
 
-  if (user) {
-    const { data: userData } = await supabase
-      .from("users")
-      .select("display_name")
-      .eq("id", user.id)
-      .maybeSingle();
-    if (userData?.display_name?.trim()) name = userData.display_name.trim();
-    // «Первый день» — календарный день регистрации совпадает с сегодняшним.
-    const signupDay = new Date(user.created_at).toLocaleDateString("en-CA");
-    const todayDay = new Date().toLocaleDateString("en-CA");
-    isFirstDay = signupDay === todayDay;
-  }
-
-  const scenariosHeading = isFirstDay ? "С чем поговорим?" : "О чём поговорим?";
+  const name = userData?.display_name?.trim() || "друг";
+  const week = weekSummary(runs);
+  const ribbon = weekRibbon(runs);
+  const streak = computeStreak(convs ?? []);
+  const lastRun = runs[0] ?? null;
+  const now = new Date();
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
+      {/* Шапка страницы */}
+      <header className="flex shrink-0 items-center gap-3.5 border-b border-line-default px-5 py-4 lg:px-8">
+        <NikaAvatar size={32} />
+        <div className="flex-1">
+          <div className="font-serif text-[17px] font-medium tracking-[-0.01em] text-ink-primary">
+            Сегодня
+          </div>
+          <span className="mt-0.5 block text-[11.5px] text-ink-muted">{humanDate(now)}</span>
+        </div>
+      </header>
+
+      {/* Дашборд */}
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
-        <div className="mx-auto w-full max-w-[680px] px-5 pt-10 lg:pt-14">
+        <div className="mx-auto w-full max-w-[760px] px-5 pt-8 lg:px-8 lg:pt-10 xl:max-w-[920px] 2xl:max-w-[1080px]">
 
-          {/* Заголовок */}
-          <h1 className="font-serif text-[40px] lg:text-[52px] font-normal leading-[1.1] tracking-[-0.03em] text-ink-primary mb-2">
-            Привет, {name}.
-          </h1>
-          <p className="mb-10 text-[15px] leading-[1.6] text-ink-secondary">
-            Выбери момент — я рядом.
-          </p>
-
-          {/* Сценарии */}
-          <p className="mb-3 font-mono text-[10.5px] font-semibold uppercase tracking-[0.15em] text-ink-muted">
-            {scenariosHeading}
-          </p>
-
-          <div className="flex flex-col gap-2">
-            {SCENARIO_ORDER.map((key) => {
-              const meta = SCENARIO_META[key];
-              return (
-                <Link
-                  key={key}
-                  href={`/chat/${key}`}
-                  className="group flex items-center gap-3 rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] px-5 py-4 transition-all hover:border-[var(--border-default)] hover:shadow-soft"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="font-serif text-[15px] font-medium text-ink-primary">
-                      {meta.title}
-                    </div>
-                    <div className="text-[12px] text-ink-secondary mt-0.5">
-                      {meta.subtitle}
-                    </div>
-                  </div>
-                  <svg
-                    width="14" height="14" viewBox="0 0 14 14" fill="none"
-                    className="text-ink-faint flex-shrink-0 transition-transform group-hover:translate-x-0.5"
-                    aria-hidden
-                  >
-                    <path d="M5 3L9 7L5 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                </Link>
-              );
-            })}
-
-            {/* Просто поговорить */}
-            <Link
-              href="/chat/general"
-              className="group flex items-center gap-3 rounded-[14px] border border-dashed border-[var(--border-default)] bg-[var(--bg-elevated)] px-5 py-4 transition-all hover:border-solid hover:border-[var(--border-strong)]"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="font-serif text-[15px] font-medium text-ink-muted">
-                  Просто поговорить
-                </div>
-                <div className="text-[12px] text-ink-faint mt-0.5">
-                  Без темы — просто написать
-                </div>
+          {/* Hero */}
+          <section className="mb-6 flex items-start gap-4">
+            <NikaAvatar size={46} />
+            <div className="flex-1">
+              <div className="mb-2.5 font-mono text-[11px] font-semibold uppercase tracking-[0.16em] text-accent">
+                Сегодня · {humanDate(now).toLowerCase()}
               </div>
-              <svg
-                width="14" height="14" viewBox="0 0 14 14" fill="none"
-                className="text-ink-faint flex-shrink-0 transition-transform group-hover:translate-x-0.5"
-                aria-hidden
-              >
-                <path d="M5 3L9 7L5 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </Link>
+              <h1 className="m-0 font-serif text-[24px] font-normal leading-[1.25] tracking-[-0.02em] text-ink-primary lg:text-[29px]">
+                {greeting(now)}, <em className="italic text-accent">{name}</em>.
+                <br />
+                {weekMessage(now)}
+              </h1>
+            </div>
+          </section>
+
+          {/* Сетка карточек */}
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+            <PlanCard title="Лёгкая пробежка · 4 км" subtitle="Без темпа. Только если захочется." />
+            <StreakCard days={streak} />
+            <WeekCard km={week.km} days={ribbon} />
+            <LastRunCard run={lastRun} />
           </div>
 
-          {/* Быстрые ссылки — только мобайл (на десктопе есть сайдбар) */}
-          <div className="mt-8 grid grid-cols-3 gap-2.5 lg:hidden">
-            {[
-              { href: "/journal",   label: "Журнал",    icon: "📋" },
-              { href: "/analytics", label: "Аналитика", icon: "📊" },
-              { href: "/profile",   label: "Настройки", icon: "⚙️" },
-            ].map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="flex flex-col items-center gap-1.5 rounded-[14px] border border-[var(--border-subtle)] bg-[var(--bg-elevated)] py-4 text-center transition-all hover:border-[var(--border-default)]"
-              >
-                <span className="text-[20px]">{item.icon}</span>
-                <span className="text-[12px] text-ink-secondary">{item.label}</span>
-              </Link>
-            ))}
-          </div>
+          {/* Ответить НИКЕ */}
+          <section className="mt-6 flex flex-col gap-3.5">
+            <div className="text-[10.5px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
+              Ответить НИКЕ
+            </div>
+            <SuggestionChips chips={CHIPS} />
+          </section>
 
         </div>
       </div>
