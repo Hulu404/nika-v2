@@ -53,20 +53,8 @@ export function UpgradeContent() {
     <div className="flex-1 overflow-y-auto">
       <div className="mx-auto w-full max-w-[720px] px-6 pb-20 pt-10">
 
-        {/* Назад */}
-        <Link
-          href="/day1"
-          className="inline-flex items-center gap-1.5 text-[13px] text-ink-secondary transition-colors hover:text-ink-primary"
-        >
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden>
-            <path d="M10 3L6 8L10 13" stroke="currentColor" strokeWidth="1.4"
-              strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-          Назад
-        </Link>
-
         {/* Шапка */}
-        <div className="mt-8 mb-8">
+        <div className="mb-8">
           <div className="mb-4 inline-flex items-center gap-2 rounded-pill border border-accent/25 bg-surface-warm px-3 py-1.5">
             <div className="h-3.5 w-3.5 flex-shrink-0 rounded-full bg-nika-avatar" />
             <span className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-accent">PRO</span>

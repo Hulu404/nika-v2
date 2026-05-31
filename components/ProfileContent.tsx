@@ -257,19 +257,6 @@ export function ProfileContent({
       <div className="flex-1 overflow-y-auto">
         <div className="mx-auto w-full max-w-[720px] px-6 pb-32 pt-5">
 
-          {/* Шапка */}
-          <div className="mb-7 flex items-center gap-3">
-            <Link
-              href="/day1"
-              className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-line-default bg-elevated text-ink-secondary transition-colors hover:text-ink-primary"
-            >
-              <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden>
-                <path d="M10.5 3.5L6 8.5l4.5 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </Link>
-            <h1 className="text-[22px] font-semibold leading-none text-ink-primary">Настройки</h1>
-          </div>
-
           {/* Блок идентичности */}
           <div className="mb-6">
             <p className="font-serif text-[32px] font-normal leading-tight tracking-[-0.02em] text-ink-primary">
