@@ -6,7 +6,7 @@ import { StreakCard } from "@/components/today/StreakCard";
 import { WeekCard } from "@/components/today/WeekCard";
 import { LastRunCard } from "@/components/today/LastRunCard";
 import { SuggestionChips } from "@/components/today/SuggestionChips";
-
+import { SignOutButton } from "@/components/today/SignOutButton";
 import { createServerComponentClient } from "@/lib/supabase";
 import { getRuns, weekSummary } from "@/lib/runs";
 import { computeStreak, weekRibbon, humanDate, greeting, weekMessage } from "@/lib/today";
@@ -38,10 +38,14 @@ export default async function TodayPage() {
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
       {/* Шапка страницы */}
-      <header className="flex shrink-0 items-center border-b border-line-default px-5 py-3 lg:px-8">
+      <header className="flex shrink-0 items-center justify-between border-b border-line-default px-5 py-3 lg:px-8">
         <span className="font-mono text-[11px] font-semibold uppercase tracking-[0.1em] text-accent">
           Сегодня · {humanDate(now)}
         </span>
+        <div className="flex items-center gap-3">
+          <span className="text-[13px] text-ink-muted">{user.email}</span>
+          <SignOutButton />
+        </div>
       </header>
 
       {/* Дашборд */}
