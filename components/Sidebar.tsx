@@ -8,18 +8,10 @@ import { ScenarioSheet } from "@/components/ScenarioSheet";
 
 // ──────────────────────────────── иконки ────────────────────────────────────
 
-function IcChat() {
+function IcHome() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-      <path d="M3 14V5.5A2.5 2.5 0 0 1 5.5 3h7A2.5 2.5 0 0 1 15 5.5v5A2.5 2.5 0 0 1 12.5 13H7L3 16V14Z"
-        stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-    </svg>
-  );
-}
-function IcStar() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-      <path d="M9 2l1.8 3.6L15 6.3l-3 2.9.7 4.1L9 11.1 5.3 13.3 6 9.2 3 6.3l4.2-.7L9 2Z"
+      <path d="M3 8.5L9 3L15 8.5V15.5H11.5V11.5H6.5V15.5H3V8.5Z"
         stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" strokeLinecap="round" />
     </svg>
   );
@@ -88,11 +80,43 @@ function IcPlus() {
     </svg>
   );
 }
-function IcChev() {
+function IcChevRight() {
   return (
     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
       <path d="M5 3L9 7L5 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
+  );
+}
+function IcChevLeft() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden>
+      <path d="M9 3L5 7L9 11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// ──────────────────────────────── tooltip ───────────────────────────────────
+
+function Tip({
+  label,
+  show,
+  children,
+}: {
+  label: string;
+  show: boolean;
+  children: React.ReactNode;
+}) {
+  if (!show) return <>{children}</>;
+  return (
+    <div className="group/tip relative">
+      {children}
+      <span
+        className="pointer-events-none absolute left-full top-1/2 z-[200] ml-3 -translate-y-1/2 whitespace-nowrap rounded-[6px] bg-ink-primary px-2.5 py-1.5 text-[11px] font-medium text-canvas opacity-0 shadow-md transition-opacity duration-150 group-hover/tip:opacity-100"
+        role="tooltip"
+      >
+        {label}
+      </span>
+    </div>
   );
 }
 
@@ -114,10 +138,21 @@ export function Sidebar({ recentConvos }: SidebarProps) {
   const pathname = usePathname();
   const [dark, setDark] = useState(false);
   const [showScenarioSheet, setShowScenarioSheet] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setDark(document.documentElement.classList.contains("dark"));
+    const stored = localStorage.getItem("sidebar_collapsed");
+    if (stored === "true") setCollapsed(true);
+    setMounted(true);
   }, []);
+
+  function toggleCollapsed() {
+    const next = !collapsed;
+    setCollapsed(next);
+    localStorage.setItem("sidebar_collapsed", next ? "true" : "false");
+  }
 
   function toggleDark() {
     const next = !dark;
@@ -127,138 +162,206 @@ export function Sidebar({ recentConvos }: SidebarProps) {
   }
 
   const NAV = [
-    { href: "/today",     label: "Сегодня",        icon: <IcChat />,  implemented: true },
+    { href: "/today",     label: "Сегодня",        icon: <IcHome />,  implemented: true },
     { href: "#",          label: "Трекинг",         icon: <IcTimer />, implemented: false },
     { href: "/journal",   label: "Журнал пробежек", icon: <IcList />,  implemented: true },
     { href: "/analytics", label: "Аналитика",       icon: <IcChart />, implemented: true },
     { href: "#",          label: "Пуши",            icon: <IcBell />,  implemented: false },
   ];
 
+  // Suppress width transition on first paint to avoid flash
+  const transitionClass = mounted ? "transition-[width] duration-[250ms] ease-in-out" : "";
+  const w = collapsed ? 64 : 280;
+
   return (
     <>
-      <aside className="hidden lg:flex w-[280px] flex-shrink-0 flex-col h-full border-r border-[var(--border-default)] bg-[var(--bg-canvas)] overflow-y-auto">
-
-        {/* Хедер */}
-        <div className="flex items-center gap-3 px-[22px] py-6 border-b border-[var(--border-default)]">
-          <div className="relative w-9 h-9 rounded-full bg-nika-avatar flex-shrink-0">
-            <span className="absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-[var(--bg-canvas)] bg-[#7BA968]" />
+      <aside
+        className={cn(
+          "hidden lg:flex flex-shrink-0 flex-col h-full border-r border-[var(--border-default)] bg-[var(--bg-canvas)] overflow-y-auto overflow-x-hidden",
+          transitionClass,
+        )}
+        style={{ width: w }}
+      >
+        {/* ── Хедер ─────────────────────────────────────────────────────── */}
+        <div
+          className={cn(
+            "relative flex flex-shrink-0 items-center border-b border-[var(--border-default)]",
+            collapsed ? "justify-center px-0 py-5" : "gap-3 px-[22px] py-6",
+          )}
+        >
+          {/* Аватар */}
+          <div className="relative h-9 w-9 flex-shrink-0 rounded-full bg-nika-avatar">
+            <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--bg-canvas)] bg-[#7BA968]" />
           </div>
-          <span className="font-serif text-[22px] font-medium tracking-[-0.02em] text-ink-primary">НИКА</span>
-        </div>
 
-        {/* Кнопка нового разговора */}
-        <div className="px-[14px] pt-4 pb-2">
+          {/* Название — скрыто при свёрнутом */}
+          {!collapsed && (
+            <span className="whitespace-nowrap font-serif text-[22px] font-medium tracking-[-0.02em] text-ink-primary">
+              НИКА
+            </span>
+          )}
+
+          {/* Кнопка сворачивания */}
           <button
-            onClick={() => setShowScenarioSheet(true)}
-            className="flex items-center gap-2 w-full bg-ink-primary text-canvas rounded-[10px] px-[14px] py-[11px] text-[13px] font-medium transition-colors hover:bg-accent"
+            onClick={toggleCollapsed}
+            aria-label={collapsed ? "Развернуть сайдбар" : "Свернуть сайдбар"}
+            className={cn(
+              "absolute flex h-6 w-6 items-center justify-center rounded-full text-ink-muted transition-colors hover:bg-[var(--surface-deep)] hover:text-ink-primary",
+              collapsed ? "right-1 top-1/2 -translate-y-1/2" : "right-3 top-1/2 -translate-y-1/2",
+            )}
           >
-            <IcPlus />
-            Новый разговор
+            {collapsed ? <IcChevRight /> : <IcChevLeft />}
           </button>
         </div>
 
-        {/* Навигация */}
-        <nav className="px-2 pt-2 pb-1 flex flex-col gap-px border-b border-[var(--border-default)]">
+        {/* ── Кнопка «Новый разговор» ──────────────────────────────────── */}
+        <div className={cn("pb-2 pt-4", collapsed ? "px-2" : "px-[14px]")}>
+          <Tip label="Новый разговор" show={collapsed}>
+            <button
+              onClick={() => setShowScenarioSheet(true)}
+              className={cn(
+                "flex w-full items-center bg-ink-primary text-canvas rounded-[10px] text-[13px] font-medium transition-colors hover:bg-accent",
+                collapsed ? "justify-center p-3" : "gap-2 px-[14px] py-[11px]",
+              )}
+            >
+              <IcPlus />
+              {!collapsed && <span className="whitespace-nowrap">Новый разговор</span>}
+            </button>
+          </Tip>
+        </div>
+
+        {/* ── Навигация ─────────────────────────────────────────────────── */}
+        <nav className={cn("flex flex-col gap-px border-b border-[var(--border-default)] pb-1 pt-2", collapsed ? "px-2" : "px-2")}>
           {NAV.map(({ href, label, icon, implemented }) => {
             const active = implemented && pathname === href;
             return (
-              <Link
-                key={label}
-                href={href}
-                className={cn(
-                  "flex items-center gap-2.5 px-3 py-[8px] rounded-[8px] text-[13px] transition-colors",
-                  active
-                    ? "bg-[var(--surface-deep)] text-ink-primary font-medium"
-                    : implemented
-                      ? "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary"
-                      : "text-ink-muted cursor-default opacity-60",
-                )}
-                tabIndex={implemented ? undefined : -1}
-                aria-disabled={!implemented}
-              >
-                <span className={cn(active ? "text-accent" : "text-ink-muted")}>{icon}</span>
-                {label}
-                {!implemented && (
-                  <span className="ml-auto font-mono text-[9px] tracking-widest text-ink-faint uppercase">soon</span>
-                )}
-              </Link>
+              <Tip key={label} label={label} show={collapsed}>
+                <Link
+                  href={href}
+                  className={cn(
+                    "flex items-center rounded-[8px] text-[13px] transition-colors",
+                    collapsed ? "justify-center p-[10px]" : "gap-2.5 px-3 py-[8px]",
+                    active
+                      ? "bg-[var(--surface-deep)] text-ink-primary font-medium"
+                      : implemented
+                        ? "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary"
+                        : "text-ink-muted cursor-default opacity-60",
+                  )}
+                  tabIndex={implemented ? undefined : -1}
+                  aria-disabled={!implemented}
+                >
+                  <span className={cn("flex-shrink-0", active ? "text-accent" : "text-ink-muted")}>
+                    {icon}
+                  </span>
+                  {!collapsed && (
+                    <>
+                      <span className="whitespace-nowrap">{label}</span>
+                      {!implemented && (
+                        <span className="ml-auto font-mono text-[9px] tracking-widest text-ink-faint uppercase">
+                          soon
+                        </span>
+                      )}
+                    </>
+                  )}
+                </Link>
+              </Tip>
             );
           })}
         </nav>
 
-        {/* Нижний блок */}
-        <div className="mt-auto px-3 py-3 space-y-1 border-t border-[var(--border-default)]">
+        {/* ── Нижний блок ───────────────────────────────────────────────── */}
+        <div className={cn("mt-auto space-y-1 border-t border-[var(--border-default)] py-3", collapsed ? "px-2" : "px-3")}>
 
-          {/* PRO-блок */}
-          <div className="mb-3 px-3 py-3 rounded-[10px] bg-[var(--surface-warm)] border border-[rgba(200,85,61,0.18)] relative overflow-hidden">
-            <div className="text-[10px] font-mono uppercase tracking-[0.12em] text-accent font-semibold mb-1">PRO</div>
-            <div className="text-[14px] font-serif font-medium text-ink-primary">Free + 7 дней пробного</div>
-            <div className="text-[12px] text-ink-secondary mt-0.5">Попробуй все функции</div>
-            <Link
-              href="/upgrade"
-              className="mt-2.5 block w-full bg-ink-primary text-canvas rounded-pill py-[9px] text-center text-[12px] font-medium hover:bg-accent transition-colors"
-            >
-              Подключить PRO
-            </Link>
-          </div>
+          {/* PRO-блок — скрыт при свёрнутом */}
+          {!collapsed && (
+            <div className="mb-3 overflow-hidden rounded-[10px] border border-[rgba(200,85,61,0.18)] bg-[var(--surface-warm)] px-3 py-3 relative">
+              <div className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">PRO</div>
+              <div className="font-serif text-[14px] font-medium text-ink-primary">Free + 7 дней пробного</div>
+              <div className="mt-0.5 text-[12px] text-ink-secondary">Попробуй все функции</div>
+              <Link
+                href="/upgrade"
+                className="mt-2.5 block w-full rounded-pill bg-ink-primary py-[9px] text-center text-[12px] font-medium text-canvas transition-colors hover:bg-accent"
+              >
+                Подключить PRO
+              </Link>
+            </div>
+          )}
 
           {/* Профиль */}
-          <Link
-            href="/profile"
-            className={cn(
-              "flex w-full items-center gap-2.5 rounded-[8px] px-3 py-2 text-[13px] transition-colors",
-              pathname === "/profile"
-                ? "bg-[var(--surface-deep)] text-ink-primary"
-                : "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary",
-            )}
-          >
-            <IcUser />
-            Профиль
-            <IcChev />
-          </Link>
+          <Tip label="Профиль" show={collapsed}>
+            <Link
+              href="/profile"
+              className={cn(
+                "flex items-center rounded-[8px] text-[13px] transition-colors",
+                collapsed ? "justify-center p-[10px]" : "w-full gap-2.5 px-3 py-2",
+                pathname === "/profile"
+                  ? "bg-[var(--surface-deep)] text-ink-primary"
+                  : "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary",
+              )}
+            >
+              <IcUser />
+              {!collapsed && (
+                <>
+                  <span className="flex-1 whitespace-nowrap">Профиль</span>
+                  <IcChevRight />
+                </>
+              )}
+            </Link>
+          </Tip>
 
           {/* Тёмная тема */}
-          <button
-            onClick={toggleDark}
-            className="flex items-center gap-2.5 w-full px-3 py-[9px] rounded-[10px] text-[13px] text-ink-secondary border border-[var(--border-default)] hover:text-ink-primary hover:border-ink-primary transition-all"
-          >
-            {dark ? <IcSun /> : <IcMoon />}
-            <span className="flex-1 text-left">Тёмная тема</span>
-            <span className="font-mono text-[10px] text-ink-muted bg-[var(--surface-deep)] px-[7px] py-[3px] rounded uppercase tracking-[0.08em]">
-              {dark ? "ON" : "OFF"}
-            </span>
-          </button>
+          <Tip label={dark ? "Светлая тема" : "Тёмная тема"} show={collapsed}>
+            <button
+              onClick={toggleDark}
+              className={cn(
+                "flex items-center rounded-[10px] border border-[var(--border-default)] text-[13px] text-ink-secondary transition-all hover:border-ink-primary hover:text-ink-primary",
+                collapsed ? "w-full justify-center p-[10px]" : "w-full gap-2.5 px-3 py-[9px]",
+              )}
+            >
+              {dark ? <IcSun /> : <IcMoon />}
+              {!collapsed && (
+                <>
+                  <span className="flex-1 whitespace-nowrap text-left">Тёмная тема</span>
+                  <span className="rounded bg-[var(--surface-deep)] px-[7px] py-[3px] font-mono text-[10px] uppercase tracking-[0.08em] text-ink-muted">
+                    {dark ? "ON" : "OFF"}
+                  </span>
+                </>
+              )}
+            </button>
+          </Tip>
         </div>
 
-        {/* Список диалогов */}
-        <div className="px-4 pb-6">
-          <div className="text-[10.5px] font-mono uppercase tracking-[0.1em] text-ink-muted font-medium py-3">
-            Сегодня — диалоги
+        {/* ── Список диалогов — скрыт при свёрнутом ────────────────────── */}
+        {!collapsed && (
+          <div className="px-4 pb-6">
+            <div className="py-3 font-mono text-[10.5px] font-medium uppercase tracking-[0.1em] text-ink-muted">
+              Сегодня — диалоги
+            </div>
+            <div className="flex flex-col gap-0.5">
+              {recentConvos.length === 0 ? (
+                <span className="px-3 py-2 font-serif text-[13px] italic text-ink-muted">
+                  Нет диалогов
+                </span>
+              ) : (
+                recentConvos.map((c) => (
+                  <Link
+                    key={c.href}
+                    href={c.href}
+                    className={cn(
+                      "flex items-center justify-between rounded-[8px] px-3 py-2 text-[13px] transition-colors",
+                      pathname === c.href
+                        ? "bg-[var(--surface-deep)] text-ink-primary"
+                        : "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary",
+                    )}
+                  >
+                    <span className="truncate">{c.label}</span>
+                    <span className="ml-2 flex-shrink-0 text-[11px] text-ink-muted">{c.time}</span>
+                  </Link>
+                ))
+              )}
+            </div>
           </div>
-          <div className="flex flex-col gap-0.5">
-            {recentConvos.length === 0 ? (
-              <span className="px-3 py-2 text-[13px] text-ink-muted italic font-serif">
-                Нет диалогов
-              </span>
-            ) : (
-              recentConvos.map((c) => (
-                <Link
-                  key={c.href}
-                  href={c.href}
-                  className={cn(
-                    "flex items-center justify-between px-3 py-2 rounded-[8px] text-[13px] transition-colors",
-                    pathname === c.href
-                      ? "bg-[var(--surface-deep)] text-ink-primary"
-                      : "text-ink-secondary hover:bg-[var(--surface-deep)] hover:text-ink-primary",
-                  )}
-                >
-                  <span className="truncate">{c.label}</span>
-                  <span className="text-[11px] text-ink-muted ml-2 flex-shrink-0">{c.time}</span>
-                </Link>
-              ))
-            )}
-          </div>
-        </div>
+        )}
       </aside>
 
       {/* Sheet выбора сценария */}
