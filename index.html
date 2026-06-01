@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>НИКА — регистрация</title>
+
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300..600;1,9..144,300..600&family=Geist:wght@300..600&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+<style>
+/* ─────────────────────────── Дизайн-токены ─────────────────────────── */
+:root {
+  --bg-canvas: #EFE7D7;  --bg-primary: #FAF7F1;  --bg-elevated: #FFFCF6;
+  --surface-nika: #F4EFE6;  --surface-warm: #F4E4D6;  --surface-deep: #E9DFCB;
+  --ink-primary: #1F1B16;  --ink-secondary: #5C534A;  --ink-muted: #9A9085;  --ink-faint: #C2B7A6;
+  --border-subtle: #EFE9DD;  --border-default: #E5DDD0;  --border-strong: #D4C9B5;
+  --accent: #C8553D;  --accent-deep: #B0392A;  --accent-soft: #E8B7A8;  --ok: #7BA968;
+  --serif: 'Fraunces', Georgia, serif;
+  --sans: 'Geist', -apple-system, BlinkMacSystemFont, sans-serif;
+  --mono: 'Geist Mono', 'SF Mono', monospace;
+  --radius-pill: 999px;  --radius-bubble: 18px;  --radius-card: 16px;  --radius-input: 14px;
+  --shadow-card: 0 1px 2px rgba(31,27,22,0.04), 0 8px 24px rgba(31,27,22,0.06);
+}
+.dark {
+  --bg-canvas: #14110E;  --bg-primary: #1B1814;  --bg-elevated: #221E19;
+  --surface-nika: #2A241D;  --surface-warm: #3A2920;  --surface-deep: #2F2820;
+  --ink-primary: #F5EFE3;  --ink-secondary: #B5A998;  --ink-muted: #7A6F62;  --ink-faint: #4F4639;
+  --border-subtle: #2A241D;  --border-default: #34291F;  --border-strong: #4A3D2E;
+  --accent: #E07A5F;  --accent-deep: #C8553D;  --accent-soft: #5A3A2E;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  font-family: var(--sans);
+  color: var(--ink-primary);
+  background-color: var(--bg-canvas);
+  background-image:
+    radial-gradient(circle at 18% -5%, rgba(200,85,61,0.06), transparent 38%),
+    radial-gradient(circle at 85% 105%, rgba(31,27,22,0.05), transparent 42%);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  transition: background-color 320ms ease, color 320ms ease;
+}
+em { font-style: italic; color: var(--accent); }
+
+/* ─────────────────────────── Каркас ─────────────────────────── */
+.shell {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: 20px 16px 28px;
+  gap: 16px;
+  max-width: 460px;
+  margin: 0 auto;
+  justify-content: center;
+}
+
+/* ─────────────────────────── Брендовое полотно ─────────────────────────── */
+.brand {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  padding: 22px 22px 24px;
+  background:
+    radial-gradient(circle at 100% 100%, rgba(200,85,61,0.18), transparent 55%),
+    linear-gradient(160deg, var(--surface-warm), var(--surface-deep));
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  transition: background 320ms ease;
+}
+.brand-top { display: flex; align-items: center; gap: 10px; }
+.mark {
+  width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0;
+  background: linear-gradient(135deg, #F4E4D6 0%, #E8B7A8 55%, #C8553D 130%);
+  box-shadow: inset 0 0 0 1px rgba(31,27,22,0.05);
+}
+.brand-name { font-family: var(--serif); font-size: 26px; font-weight: 500; letter-spacing: -0.01em; }
+.brand-phrase h2 {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 24px;
+  line-height: 1.28;
+  letter-spacing: -0.015em;
+}
+.brand-sub {
+  margin: 12px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-secondary);
+  max-width: 34ch;
+}
+
+/* ─────────────────────────── Карточка-форма ─────────────────────────── */
+.card {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  padding: 24px 22px 26px;
+  transition: background-color 320ms ease, border-color 320ms ease;
+}
+
+/* Сегмент-переключатель режима (мобильный) */
+.seg {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: var(--surface-nika);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  margin-bottom: 22px;
+  transition: background-color 320ms ease;
+}
+.seg .glider {
+  position: absolute;
+  top: 4px; left: 4px; bottom: 4px;
+  width: calc(50% - 4px);
+  border-radius: var(--radius-pill);
+  background: var(--ink-primary);
+  transition: transform 280ms cubic-bezier(.4,0,.2,1), background-color 320ms ease;
+}
+.seg.is-signin .glider { transform: translateX(100%); }
+.seg button {
+  position: relative;
+  z-index: 1;
+  border: 0; background: transparent; cursor: pointer;
+  font-family: var(--sans); font-size: 13.5px; font-weight: 500;
+  padding: 9px 0;
+  color: var(--ink-secondary);
+  transition: color 200ms ease;
+}
+.seg button[aria-pressed="true"] { color: var(--bg-primary); }
+
+.form-title {
+  margin: 0;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 27px;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+.form-lead {
+  margin: 10px 0 22px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink-secondary);
+}
+
+/* ─────────────────────────── Поля ─────────────────────────── */
+form { display: flex; flex-direction: column; gap: 16px; }
+.field-label {
+  display: block;
+  font-size: 12px; font-weight: 500;
+  color: var(--ink-secondary);
+  margin-bottom: 7px;
+}
+.field {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--bg-elevated);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-input);
+  padding: 0 14px;
+  transition: border-color 180ms ease, box-shadow 180ms ease, background-color 320ms ease;
+}
+.field:focus-within { border-color: var(--ink-primary); box-shadow: 0 0 0 3px rgba(31,27,22,0.05); }
+.field.err { border-color: var(--accent); }
+.field .ic { color: var(--ink-muted); flex-shrink: 0; display: flex; }
+.field input {
+  flex: 1; min-width: 0;
+  border: 0; outline: 0; background: transparent;
+  font-family: var(--sans); font-size: 15px;
+  color: var(--ink-primary);
+  padding: 14px 0;
+}
+.field input::placeholder { color: var(--ink-muted); }
+.eye {
+  border: 0; background: transparent; cursor: pointer;
+  color: var(--ink-muted); display: flex; padding: 4px;
+  border-radius: 8px; transition: color 160ms ease;
+}
+.eye:hover { color: var(--ink-secondary); }
+.eye .off-icon { display: none; }
+.eye.off .on-icon { display: none; }
+.eye.off .off-icon { display: block; }
+
+/* Индикатор силы пароля */
+.pw-extra { margin-top: 10px; }
+.strength { display: flex; gap: 6px; }
+.strength i {
+  flex: 1; height: 4px; border-radius: var(--radius-pill);
+  background: var(--border-default);
+  transition: background-color 240ms ease;
+}
+.strength i.on.s1 { background: var(--accent); }
+.strength i.on.s2 { background: #D08A3E; }
+.strength i.on.s3 { background: var(--ok); }
+.hint { margin: 9px 0 0; font-size: 12px; line-height: 1.4; color: var(--ink-muted); transition: color 200ms ease; }
+.hint.warn { color: var(--accent); }
+
+/* Юридическая строка */
+.legal { margin: 2px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--ink-muted); }
+.legal a { color: var(--ink-secondary); text-decoration: underline; text-underline-offset: 2px; }
+
+/* Кнопка сабмита */
+.submit {
+  height: 54px;
+  border: 0; border-radius: var(--radius-pill);
+  background: var(--ink-primary);
+  color: var(--bg-primary);
+  font-family: var(--sans); font-size: 15px; font-weight: 500;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  margin-top: 4px;
+  transition: background-color 200ms ease, opacity 200ms ease;
+}
+.submit:disabled { background: var(--ink-faint); cursor: not-allowed; }
+.submit .arrow { transition: transform 180ms ease; }
+.submit:not(:disabled):hover .arrow { transform: translateX(3px); }
+.submit.done { background: var(--ok); }
+.submit .check { display: none; }
+
+/* Альт-строка (десктоп) */
+.alt {
+  display: none;
+  margin: 20px 0 0;
+  font-size: 13.5px;
+  color: var(--ink-secondary);
+}
+.alt button {
+  border: 0; background: transparent; cursor: pointer;
+  font: inherit; font-weight: 500; color: var(--accent);
+  padding: 0;
+}
+.alt button:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* ─────────────────────────── Переключатель темы ─────────────────────────── */
+.theme-switch {
+  position: fixed; top: 14px; right: 14px; z-index: 20;
+  display: inline-flex;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-pill);
+  padding: 3px;
+  box-shadow: var(--shadow-card);
+  transition: background-color 320ms ease, border-color 320ms ease;
+}
+.theme-switch button {
+  border: 0; background: transparent; cursor: pointer;
+  font-family: var(--sans); font-size: 12px; font-weight: 500;
+  color: var(--ink-muted);
+  padding: 6px 12px; border-radius: var(--radius-pill);
+  transition: background-color 200ms ease, color 200ms ease;
+}
+.theme-switch button[aria-pressed="true"] {
+  background: var(--ink-primary); color: var(--bg-primary);
+}
+
+/* ─────────────────────────── Десктоп (≥ 900px) ─────────────────────────── */
+@media (min-width: 900px) {
+  .shell {
+    flex-direction: row;
+    max-width: none;
+    min-height: 100dvh;
+    padding: 0;
+    gap: 0;
+  }
+  .brand {
+    width: 46%;
+    border-radius: 0;
+    padding: 56px 56px 60px;
+    gap: 0;
+  }
+  .brand-phrase { margin-top: auto; }
+  .brand-phrase h2 { font-size: 34px; }
+  .brand-sub { font-size: 13px; margin-top: 18px; }
+
+  .form-wrap {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+  }
+  .card {
+    width: 100%;
+    max-width: 420px;
+    border: 0;
+    box-shadow: none;
+    background: transparent;
+    padding: 0;
+  }
+  .modeseg { display: none; }      /* на десктопе — ссылка «Войти» */
+  .alt { display: block; }
+  .form-title { font-size: 30px; }
+}
+</style>
+</head>
+
+<body>
+  <!-- Переключатель темы -->
+  <div class="theme-switch" role="group" aria-label="Тема оформления">
+    <button type="button" data-theme="light" aria-pressed="true">Светлая</button>
+    <button type="button" data-theme="dark" aria-pressed="false">Тёмная</button>
+  </div>
+
+  <main class="shell">
+    <!-- Брендовое полотно / шапка -->
+    <aside class="brand">
+      <div class="brand-top">
+        <span class="mark" aria-hidden="true"></span>
+        <span class="brand-name">НИКА</span>
+      </div>
+      <div class="brand-phrase">
+        <h2>Я не тренер. Не план.<br>Я рядом — <em>чтобы ты не бросил</em>.</h2>
+        <p class="brand-sub">Ментальный спутник для бегунов-любителей. Текстовый диалог — никаких таблиц и графиков.</p>
+      </div>
+    </aside>
+
+    <!-- Форма -->
+    <section class="form-wrap">
+      <div class="card">
+        <!-- Переключатель Регистрация / Вход (мобильный) -->
+        <div class="seg modeseg" role="tablist" aria-label="Регистрация или вход">
+          <span class="glider" aria-hidden="true"></span>
+          <button type="button" role="tab" data-mode="signup" aria-pressed="true">Регистрация</button>
+          <button type="button" role="tab" data-mode="signin" aria-pressed="false">Вход</button>
+        </div>
+
+        <h1 class="form-title" id="formTitle">Заведём место <em>для нас двоих</em></h1>
+        <p class="form-lead" id="formLead">Нужны только почта и пароль. Меньше минуты.</p>
+
+        <form id="authForm" novalidate>
+          <!-- Почта -->
+          <div>
+            <label class="field-label" for="email">Почта</label>
+            <div class="field" id="emailField">
+              <span class="ic" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="2.5" y="4.5" width="15" height="11" rx="2.5"/>
+                  <path d="M3 6l7 5 7-5" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </span>
+              <input id="email" name="email" type="email" inputmode="email" autocomplete="email"
+                     placeholder="ты@почта.рф" />
+            </div>
+          </div>
+
+          <!-- Пароль -->
+          <div>
+            <label class="field-label" for="password">Пароль</label>
+            <div class="field" id="pwField">
+              <span class="ic" aria-hidden="true">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <rect x="4" y="9" width="12" height="8" rx="2"/>
+                  <path d="M7 9V7a3 3 0 0 1 6 0v2" stroke-linecap="round"/>
+                </svg>
+              </span>
+              <input id="password" name="password" type="password" autocomplete="new-password"
+                     placeholder="минимум 8 символов" />
+              <button type="button" class="eye" id="eyeBtn" aria-label="Показать пароль">
+                <svg class="on-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M1.5 10S4.5 4.5 10 4.5 18.5 10 18.5 10 15.5 15.5 10 15.5 1.5 10 1.5 10Z" stroke-linecap="round" stroke-linejoin="round"/>
+                  <circle cx="10" cy="10" r="2.5"/>
+                </svg>
+                <svg class="off-icon" width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5">
+                  <path d="M3 3l14 14" stroke-linecap="round"/>
+                  <path d="M8.2 8.2a2.5 2.5 0 0 0 3.5 3.5" stroke-linecap="round"/>
+                  <path d="M6 6.4C3.7 7.8 1.5 10 1.5 10S4.5 15.5 10 15.5c1.3 0 2.5-.3 3.6-.8" stroke-linecap="round" stroke-linejoin="round"/>
+                  <path d="M9 4.6c.33-.07.66-.1 1-.1 5.5 0 8.5 5.5 8.5 5.5s-.8 1.45-2.2 2.9" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+
+            <!-- Сила пароля + подсказка (только регистрация) -->
+            <div class="pw-extra" id="pwExtra">
+              <div class="strength" aria-hidden="true"><i></i><i></i><i></i></div>
+              <p class="hint" id="hint">Надёжный пароль защитит твои разговоры.</p>
+            </div>
+          </div>
+
+          <!-- Юридическая строка (только регистрация) -->
+          <p class="legal" id="legal">
+            Создавая аккаунт, ты соглашаешься с <a href="#">условиями</a> и <a href="#">политикой приватности</a>.
+          </p>
+
+          <!-- Кнопка -->
+          <button type="submit" class="submit" id="submit" disabled>
+            <span class="check" aria-hidden="true">
+              <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M4 10.5l4 4 8-9" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </span>
+            <span class="label" id="submitLabel">Создать аккаунт</span>
+            <span class="arrow" id="submitArrow" aria-hidden="true">→</span>
+          </button>
+        </form>
+
+        <!-- Альт-строка (десктоп) -->
+        <p class="alt">
+          <span id="altPrefix">Уже со мной? </span><button type="button" id="altBtn">Войти</button>
+        </p>
+      </div>
+    </section>
+  </main>
+
+<script>
+(function () {
+  const root = document.documentElement;
+
+  /* ── Тема ── */
+  const themeBtns = document.querySelectorAll('.theme-switch button');
+  function setTheme(t) {
+    root.classList.toggle('dark', t === 'dark');
+    localStorage.setItem('nika_theme', t);
+    themeBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.theme === t)));
+  }
+  setTheme(localStorage.getItem('nika_theme') || 'light');
+  themeBtns.forEach(b => b.addEventListener('click', () => setTheme(b.dataset.theme)));
+
+  /* ── Элементы формы ── */
+  const seg        = document.querySelector('.modeseg');
+  const modeBtns   = document.querySelectorAll('[data-mode]');
+  const titleEl    = document.getElementById('formTitle');
+  const leadEl     = document.getElementById('formLead');
+  const pwExtra    = document.getElementById('pwExtra');
+  const legal      = document.getElementById('legal');
+  const submit     = document.getElementById('submit');
+  const submitLabel= document.getElementById('submitLabel');
+  const altPrefix  = document.getElementById('altPrefix');
+  const altBtn     = document.getElementById('altBtn');
+  const email      = document.getElementById('email');
+  const pw         = document.getElementById('password');
+  const emailField = document.getElementById('emailField');
+  const pwField    = document.getElementById('pwField');
+  const bars       = document.querySelectorAll('.strength i');
+  const hint       = document.getElementById('hint');
+  const eyeBtn     = document.getElementById('eyeBtn');
+
+  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  function pwScore(p){ let s=0; if(p.length>=8)s++; if(/[A-Za-zА-Яа-я]/.test(p)&&/\d/.test(p))s++; if(p.length>=12||/[^A-Za-z0-9]/.test(p))s++; return p.length?s:0; }
+
+  const COPY = {
+    signup: { title: 'Заведём место <em>для нас двоих</em>', lead: 'Нужны только почта и пароль. Меньше минуты.', btn: 'Создать аккаунт', altPrefix: 'Уже со мной? ', altLink: 'Войти' },
+    signin: { title: 'С возвращением.', lead: 'Войди — я помню, на чём мы остановились.', btn: 'Войти', altPrefix: 'Впервые здесь? ', altLink: 'Создать аккаунт' },
+  };
+
+  let mode = 'signup';
+
+  function setMode(m) {
+    mode = m;
+    seg.classList.toggle('is-signin', m === 'signin');
+    modeBtns.forEach(b => b.setAttribute('aria-pressed', String(b.dataset.mode === m)));
+    const c = COPY[m];
+    titleEl.innerHTML   = c.title;
+    leadEl.textContent  = c.lead;
+    submitLabel.textContent = c.btn;
+    altPrefix.textContent   = c.altPrefix;
+    altBtn.textContent      = c.altLink;
+    pwExtra.style.display = m === 'signup' ? '' : 'none';
+    legal.style.display   = m === 'signup' ? '' : 'none';
+    pw.setAttribute('autocomplete', m === 'signup' ? 'new-password' : 'current-password');
+    pwField.classList.remove('err');
+    validate();
+  }
+
+  function validate() {
+    const eOk = emailRe.test(email.value.trim());
+    const pOk = mode === 'signup' ? pw.value.length >= 8 : pw.value.length >= 1;
+    submit.disabled = !(eOk && pOk);
+
+    if (mode === 'signup') {
+      const s = pwScore(pw.value);
+      bars.forEach((bar, i) => { bar.className = i < s ? 'on s' + (i + 1) : ''; });
+      const tooShort = pw.value.length > 0 && pw.value.length < 8;
+      hint.textContent = tooShort ? 'Минимум 8 символов.' : 'Надёжный пароль защитит твои разговоры.';
+      hint.classList.toggle('warn', tooShort);
+    }
+    return eOk && pOk;
+  }
+
+  modeBtns.forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+  altBtn.addEventListener('click', () => setMode(mode === 'signup' ? 'signin' : 'signup'));
+
+  email.addEventListener('input', validate);
+  pw.addEventListener('input', validate);
+  email.addEventListener('blur', () => {
+    emailField.classList.toggle('err', email.value.trim() !== '' && !emailRe.test(email.value.trim()));
+  });
+  pw.addEventListener('blur', () => {
+    pwField.classList.toggle('err', mode === 'signup' && pw.value !== '' && pw.value.length < 8);
+  });
+
+  /* ── Показ/скрытие пароля ── */
+  eyeBtn.addEventListener('click', () => {
+    const hidden = pw.type === 'password';
+    pw.type = hidden ? 'text' : 'password';
+    eyeBtn.classList.toggle('off', hidden);
+    eyeBtn.setAttribute('aria-label', hidden ? 'Скрыть пароль' : 'Показать пароль');
+  });
+
+  /* ── Сабмит ── */
+  const form = document.getElementById('authForm');
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    if (!validate()) return;
+
+    const labelText = submitLabel.textContent;
+    submit.classList.add('done');
+    submit.disabled = true;
+    submit.querySelector('.check').style.display = 'flex';
+    submit.querySelector('.arrow').style.display = 'none';
+    submitLabel.textContent = 'Готово';
+
+    setTimeout(() => {
+      submit.classList.remove('done');
+      submit.querySelector('.check').style.display = 'none';
+      submit.querySelector('.arrow').style.display = '';
+      submitLabel.textContent = labelText;
+      validate();
+    }, 1600);
+  });
+
+  setMode('signup');
+})();
+</script>
+</body>
+</html>
