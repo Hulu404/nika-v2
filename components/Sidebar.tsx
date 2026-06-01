@@ -132,9 +132,10 @@ export interface RecentConvo {
 
 interface SidebarProps {
   recentConvos: RecentConvo[];
+  isPro?: boolean;
 }
 
-export function Sidebar({ recentConvos }: SidebarProps) {
+export function Sidebar({ recentConvos, isPro = false }: SidebarProps) {
   const pathname = usePathname();
   const [dark, setDark] = useState(false);
   const [showScenarioSheet, setShowScenarioSheet] = useState(false);
@@ -260,8 +261,8 @@ export function Sidebar({ recentConvos }: SidebarProps) {
         {/* ── Нижний блок ───────────────────────────────────────────────── */}
         <div className={cn("mt-auto space-y-1 border-t border-[var(--border-default)] py-3", collapsed ? "px-2" : "px-3")}>
 
-          {/* PRO-блок — скрыт при свёрнутом */}
-          {!collapsed && (
+          {/* PRO-блок — скрыт при свёрнутом и для Pro-пользователей */}
+          {!collapsed && !isPro && (
             <div className="mb-3 overflow-hidden rounded-[10px] border border-[rgba(200,85,61,0.18)] bg-[var(--surface-warm)] px-3 py-3 relative">
               <div className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-accent">PRO</div>
               <div className="font-serif text-[14px] font-medium text-ink-primary">Free + 7 дней пробного</div>

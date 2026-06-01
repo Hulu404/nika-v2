@@ -1,6 +1,7 @@
 import { Sidebar, type RecentConvo } from "@/components/Sidebar";
 import { SCENARIO_META } from "@/lib/scenarios";
 import { createServerComponentClient } from "@/lib/supabase";
+import { resolveIsPro } from "@/lib/subscription";
 
 const MONTHS = [
   "янв", "фев", "мар", "апр", "мая", "июн",
@@ -24,21 +25,27 @@ export async function SidebarData() {
   } = await supabase.auth.getUser();
 
   let recentConvos: RecentConvo[] = [];
+  let isPro = resolveIsPro(undefined);
 
   if (user) {
-    const { data: convData } = await supabase
-      .from("conversations")
-      .select("id, scenario, updated_at")
-      .eq("user_id", user.id)
-      .order("updated_at", { ascending: false })
-      .limit(5);
+    const [{ data: convData }, { data: userRow }] = await Promise.all([
+      supabase
+        .from("conversations")
+        .select("id, scenario, updated_at")
+        .eq("user_id", user.id)
+        .order("updated_at", { ascending: false })
+        .limit(5),
+      supabase.from("users").select("is_pro").eq("id", user.id).maybeSingle(),
+    ]);
 
     recentConvos = (convData ?? []).map((c) => ({
       label: SCENARIO_META[c.scenario as keyof typeof SCENARIO_META]?.title ?? c.scenario,
       time: formatTime(c.updated_at),
       href: `/chat/${c.scenario}`,
     }));
+
+    isPro = resolveIsPro(userRow?.is_pro);
   }
 
-  return <Sidebar recentConvos={recentConvos} />;
+  return <Sidebar recentConvos={recentConvos} isPro={isPro} />;
 }

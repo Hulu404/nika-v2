@@ -3,6 +3,7 @@ import { createServerComponentClient } from "@/lib/supabase";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
 import { ProfileContent } from "@/components/ProfileContent";
+import { resolveIsPro } from "@/lib/subscription";
 
 export default async function ProfilePage() {
   const supabase = await createServerComponentClient();
@@ -31,7 +32,7 @@ export default async function ProfilePage() {
         userId={user.id}
         initialName={userData?.display_name ?? ""}
         email={userData?.email ?? user.email ?? ""}
-        isPro={userData?.is_pro ?? false}
+        isPro={resolveIsPro(userData?.is_pro)}
         reminderEnabled={profileData?.reminder_enabled ?? false}
         createdAt={userData?.created_at ?? user.created_at ?? new Date().toISOString()}
       />

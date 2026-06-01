@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/types/database";
+import { FORCE_PRO_FOR_ALL } from "@/lib/subscription";
 
 type Client = SupabaseClient<Database>;
 
@@ -37,6 +38,9 @@ export async function isLimitReached(
   supabase: Client,
   userId: string,
 ): Promise<boolean> {
+  // Временно: Pro у всех — лимиты отключены. См. lib/subscription.ts.
+  if (FORCE_PRO_FOR_ALL) return false;
+
   const { data: user } = await supabase
     .from("users")
     .select("is_pro")
