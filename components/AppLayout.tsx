@@ -1,4 +1,5 @@
 import { BottomNav } from "@/components/BottomNav";
+import { PageTransition } from "@/components/PageTransition";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -18,9 +19,9 @@ export function AppLayout({ children, sidebarSlot, hideBottomNav }: AppLayoutPro
       {sidebarSlot}
 
       {/* Основная область контента */}
-      <div className="flex-1 flex flex-col overflow-hidden animate-fade-in">
+      <PageTransition>
         {children}
-      </div>
+      </PageTransition>
 
       {!hideBottomNav && <BottomNav />}
     </div>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createClientComponentClient } from "@/lib/supabase";
+import { PageTransition } from "@/components/PageTransition";
 
 /** Человекочитаемые сообщения по кодам/тексту ошибок Supabase Auth. */
 function authErrorMessage(err: { code?: string; message?: string }): string {
@@ -86,7 +87,8 @@ export default function AuthPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-16">
+    <PageTransition>
+      <main className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-6 py-16">
       <div className="text-center">
         <p className="font-mono text-xs uppercase tracking-[0.2em] text-[var(--ink-muted)]">НИКА</p>
         <h1 className="mt-4 font-serif text-5xl leading-tight text-[var(--ink-primary)]">Вход</h1>
@@ -133,5 +135,6 @@ export default function AuthPage() {
         </button>
       </div>
     </main>
+    </PageTransition>
   );
 }
