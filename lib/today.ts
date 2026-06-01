@@ -1,6 +1,9 @@
 // Хелперы для главной страницы возвращающегося юзера.
 
 const WEEKDAYS_RU = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+const WEEKDAYS_LONG_RU = [
+  "понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье",
+];
 const MONTHS_RU = [
   "января", "февраля", "марта", "апреля", "мая", "июня",
   "июля", "августа", "сентября", "октября", "ноября", "декабря",
@@ -60,6 +63,11 @@ export function weekRibbon(
 /** «Среда, 15 мая» — для подзаголовков. */
 export function humanDate(now = new Date()): string {
   return `${WEEKDAYS_RU[weekdayMon0(now)]}, ${now.getDate()} ${MONTHS_RU[now.getMonth()]}`;
+}
+
+/** «среда» — полное название дня недели (для eyebrow). */
+export function weekdayLong(now = new Date()): string {
+  return WEEKDAYS_LONG_RU[weekdayMon0(now)];
 }
 
 /** Поддерживающая строка под именем — по дню недели. */

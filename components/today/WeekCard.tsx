@@ -1,6 +1,3 @@
-import { WeekRibbon } from "@/components/today/WeekRibbon";
-import type { WeekDayState } from "@/lib/today";
-
 function Cap({ children }: { children: React.ReactNode }) {
   return (
     <div className="mb-3 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
@@ -12,21 +9,12 @@ function Cap({ children }: { children: React.ReactNode }) {
   );
 }
 
-export function WeekCard({
-  km,
-  days,
-}: {
-  km: string;
-  days: { label: string; state: WeekDayState }[];
-}) {
+export function WeekCard({ km }: { km: string }) {
   return (
     <div className="rounded-2xl border border-line-subtle bg-elevated p-[18px]">
-      <Cap>Эта неделя</Cap>
+      <Cap>Неделя</Cap>
       <div className="font-serif text-[34px] font-medium leading-none tracking-[-0.02em] text-ink-primary">
         {km}<small className="text-[14px] font-normal text-ink-muted"> км</small>
-      </div>
-      <div className="mt-3.5">
-        <WeekRibbon days={days} />
       </div>
     </div>
   );

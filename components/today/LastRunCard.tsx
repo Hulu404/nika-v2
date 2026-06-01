@@ -20,7 +20,7 @@ function Cap({ children }: { children: React.ReactNode }) {
 
 export function LastRunCard({ run }: { run: RunRow | null }) {
   return (
-    <div className="col-span-1 rounded-2xl border border-line-subtle bg-elevated p-[18px] sm:col-span-2">
+    <div className="col-span-2 rounded-2xl border border-line-subtle bg-elevated p-[18px]">
       <Cap>Последняя пробежка</Cap>
 
       {run ? (
