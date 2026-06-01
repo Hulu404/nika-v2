@@ -94,7 +94,8 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
-  min-height: 100vh;
+  min-height: 100vh;       /* запасной вариант для браузеров без поддержки dvh */
+  min-height: 100dvh;      /* динамическая высота вьюпорта — совпадает с h-dvh в AppLayout */
   transition: background-color 300ms ease, color 300ms ease;
 }
 

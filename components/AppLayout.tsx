@@ -1,5 +1,6 @@
 import { BottomNav } from "@/components/BottomNav";
 import { PageTransition } from "@/components/PageTransition";
+import { LockBodyScroll } from "@/components/LockBodyScroll";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -16,6 +17,7 @@ interface AppLayoutProps {
 export function AppLayout({ children, sidebarSlot, hideBottomNav }: AppLayoutProps) {
   return (
     <div className="flex h-dvh overflow-hidden bg-[var(--bg-primary)]">
+      <LockBodyScroll />
       {sidebarSlot}
 
       {/* Основная область контента */}
