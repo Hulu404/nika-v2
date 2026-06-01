@@ -166,7 +166,7 @@ export default function AuthPage() {
               />
               <span className="font-serif text-[26px] font-medium tracking-[-0.01em] text-ink-primary">НИКА</span>
             </div>
-            <div className="lg:mt-auto">
+            <div className="lg:my-auto">
               <h2 className="font-serif text-[24px] font-normal leading-[1.28] tracking-[-0.015em] text-ink-primary lg:text-[34px]">
                 Я не тренер. Не план.
                 <br />
