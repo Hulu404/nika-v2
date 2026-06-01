@@ -34,7 +34,7 @@ export function ChatInput({
 
   return (
     <>
-      <div className="sticky bottom-0 shrink-0 border-t border-line-subtle bg-[var(--bg-blur-strong)] px-[14px] pb-8 pt-3 backdrop-blur-[16px]">
+      <div className="shrink-0 border-t border-line-subtle bg-[var(--bg-blur-strong)] px-[14px] pb-8 pt-3 backdrop-blur-[16px]">
         <div className="flex items-end gap-2.5">
 
           {/* Кнопка нового сценария */}

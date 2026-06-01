@@ -114,7 +114,7 @@ export function Chat({
   }
 
   return (
-    <div className={cn("flex flex-col bg-[var(--bg-primary)]", className)}>
+    <div className={cn("flex flex-col overflow-hidden bg-[var(--bg-primary)]", className)}>
       <div ref={scrollRef} className="flex-1 overflow-y-auto">
         <div className="mx-auto flex max-w-2xl flex-col gap-2 px-4 pb-2 pt-5">
           {messages.map((m) => (
