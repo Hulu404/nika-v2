@@ -53,6 +53,14 @@ export default function AuthPage() {
   const [dark, setDark] = useState(false);
   useEffect(() => {
     setDark(document.documentElement.classList.contains("dark"));
+
+    // Ошибки из /auth/callback (неудачное подтверждение по ссылке из письма).
+    const e = new URLSearchParams(window.location.search).get("error");
+    if (e === "auth") {
+      setError("Ссылка подтверждения недействительна или открыта в другом браузере. Войди по почте и паролю.");
+    } else if (e === "missing_code") {
+      setError("Ссылка подтверждения неполная. Войди по почте и паролю.");
+    }
   }, []);
   function applyTheme(next: "light" | "dark") {
     const d = next === "dark";
@@ -98,7 +106,11 @@ export default function AuthPage() {
       return;
     }
 
-    const { data, error: err } = await supabase.auth.signUp({ email, password });
+    const { data, error: err } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding` },
+    });
     if (err) {
       setLoading(false);
       setError(authErrorMessage(err));
