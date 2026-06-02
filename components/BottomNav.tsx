@@ -35,6 +35,16 @@ const TABS = [
     ),
   },
   {
+    href: "/analytics",
+    label: "Аналитика",
+    icon: (
+      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+        <path d="M4 18h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M6.5 18v-4M11 18V9M15.5 18v-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  {
     href: "/profile",
     label: "Профиль",
     icon: (
@@ -51,7 +61,7 @@ export function BottomNav() {
 
   return (
     <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-[var(--bg-blur-strong)] backdrop-blur-[20px] border-t border-[var(--border-subtle)] pb-safe">
-      <div className="flex items-center justify-around px-2 pt-2 pb-3">
+      <div className="flex items-stretch px-1 pt-2 pb-3">
         {TABS.map(({ href, label, icon }) => {
           const active =
             pathname === href ||
@@ -61,12 +71,12 @@ export function BottomNav() {
               key={label}
               href={href}
               className={cn(
-                "flex flex-col items-center gap-1 px-4 py-1 rounded-[10px] transition-colors min-w-[60px]",
+                "flex flex-1 flex-col items-center gap-1 px-1 py-1 rounded-[10px] transition-colors min-w-0",
                 active ? "text-accent" : "text-ink-muted",
               )}
             >
               {icon}
-              <span className="text-[10px] font-medium">{label}</span>
+              <span className="text-[10px] font-medium whitespace-nowrap">{label}</span>
             </Link>
           );
         })}
