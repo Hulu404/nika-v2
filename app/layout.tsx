@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Fraunces } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
-import { UserMenu } from "@/components/UserMenu";
 import "./globals.css";
 
 const serif = Fraunces({
@@ -36,7 +35,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: darkModeScript }} />
       </head>
       <body className="min-h-screen text-ink-primary antialiased">
-        <UserMenu />
         {children}
       </body>
     </html>
