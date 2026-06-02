@@ -71,7 +71,7 @@ export function BottomNav() {
               key={label}
               href={href}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 px-1 py-1 rounded-[10px] transition-colors min-w-0",
+                "flex flex-1 flex-col items-center gap-1 px-1 py-1 rounded-[10px] transition-all duration-150 min-w-0 active:scale-95 active:text-accent",
                 active ? "text-accent" : "text-ink-muted",
               )}
             >
