@@ -35,6 +35,16 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Редирект с переносом свежих cookies сессии. Без этого ротация
+  // refresh-токена, выполненная getUser() выше, теряется: NextResponse.redirect
+  // создаёт новый ответ без обновлённых Set-Cookie, и следующий запрос падает
+  // с "Invalid Refresh Token: Refresh Token Not Found", выкидывая пользователя.
+  const redirect = (url: URL) => {
+    const res = NextResponse.redirect(url);
+    response.cookies.getAll().forEach((c) => res.cookies.set(c.name, c.value, c));
+    return res;
+  };
+
   // Гость: защищённые маршруты — на вход; "/" и "/auth" доступны.
   if (!user) {
     if (
@@ -49,7 +59,7 @@ export async function middleware(request: NextRequest) {
       url.pathname = "/auth";
       url.search = "";
       url.searchParams.set("next", pathname);
-      return NextResponse.redirect(url);
+      return redirect(url);
     }
     return response;
   }
@@ -63,7 +73,7 @@ export async function middleware(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/onboarding";
       url.search = "";
-      return NextResponse.redirect(url);
+      return redirect(url);
     }
     return response;
   }
@@ -73,7 +83,7 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/";
     url.search = "";
-    return NextResponse.redirect(url);
+    return redirect(url);
   }
 
   return response;
