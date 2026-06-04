@@ -1,0 +1,25 @@
+{
+  "name": "НИКА — твой бег изнутри",
+  "short_name": "НИКА",
+  "description": "Бег начинается в голове.",
+  "theme_color": "#C8553D",
+  "background_color": "#EFE7D7",
+  "display": "standalone",
+  "icons": [
+    {
+      "src": "apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
