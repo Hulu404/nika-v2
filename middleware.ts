@@ -45,8 +45,23 @@ export async function middleware(request: NextRequest) {
     return res;
   };
 
-  // Гость: защищённые маршруты — на вход; "/" и "/auth" доступны.
+  // Rewrite с переносом cookies (по аналогии с redirect выше).
+  const rewrite = (url: URL) => {
+    const res = NextResponse.rewrite(url);
+    response.cookies.getAll().forEach((c) => res.cookies.set(c.name, c.value, c));
+    return res;
+  };
+
+  // Гость: корень отдаёт лендинг; защищённые маршруты — на вход;
+  // "/auth" доступен. Лендинг рендерится через rewrite (URL остаётся "/"),
+  // чтобы вошедший пользователь дошёл до app/page.tsx и попал в приложение.
   if (!user) {
+    if (pathname === "/") {
+      const url = request.nextUrl.clone();
+      url.pathname = "/landing.html";
+      url.search = "";
+      return rewrite(url);
+    }
     if (
       pathname.startsWith("/chat") ||
       pathname.startsWith("/day1") ||
