@@ -35,6 +35,13 @@ export async function middleware(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
+  // Корень "/" отдаёт разный контент в зависимости от авторизации
+  // (гость → лендинг, вошедший → приложение), поэтому его НЕЛЬЗЯ кэшировать:
+  // иначе закэшированный лендинг прилетает вошедшему (и наоборот).
+  if (pathname === "/") {
+    response.headers.set("Cache-Control", "no-store, must-revalidate");
+  }
+
   // Редирект с переносом свежих cookies сессии. Без этого ротация
   // refresh-токена, выполненная getUser() выше, теряется: NextResponse.redirect
   // создаёт новый ответ без обновлённых Set-Cookie, и следующий запрос падает
@@ -49,6 +56,7 @@ export async function middleware(request: NextRequest) {
   const rewrite = (url: URL) => {
     const res = NextResponse.rewrite(url);
     response.cookies.getAll().forEach((c) => res.cookies.set(c.name, c.value, c));
+    res.headers.set("Cache-Control", "no-store, must-revalidate");
     return res;
   };
 
