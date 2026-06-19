@@ -58,16 +58,22 @@ export async function getOrCreateConversation(
   return last ?? createConversation(supabase, userId, scenario);
 }
 
-/** Перезаписывает сообщения диалога и обновляет updated_at. */
+/**
+ * Перезаписывает сообщения диалога и обновляет updated_at.
+ * Фильтр по user_id — defense-in-depth поверх RLS: даже если политика когда-то
+ * ослабнет, чужой диалог по подставленному id обновить нельзя.
+ */
 export async function updateConversation(
   supabase: Client,
   id: string,
+  userId: string,
   messages: Message[],
 ): Promise<void> {
   const { error } = await supabase
     .from("conversations")
     .update({ messages, updated_at: new Date().toISOString() })
-    .eq("id", id);
+    .eq("id", id)
+    .eq("user_id", userId);
   if (error) {
     throw new Error(`updateConversation failed: ${error.message}`);
   }

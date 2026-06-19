@@ -3,12 +3,25 @@ import { anthropic, NIKA_MODEL } from "@/lib/anthropic";
 import { createConversation, updateConversation } from "@/lib/conversations";
 import { FREE_DAILY_LIMIT, isLimitReached } from "@/lib/limits";
 import { buildSystemPrompt } from "@/lib/prompts";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { ALL_SCENARIOS } from "@/lib/scenarios";
 import { createServerComponentClient } from "@/lib/supabase";
 import type { Message } from "@/types/app";
 import type { Scenario } from "@/types/conversation";
 
 export const runtime = "nodejs";
+
+// ── Ограничения payload ───────────────────────────────────────────────────────
+// Защита от раздувания счёта за токены: один запрос не может нести бесконечную
+// историю или гигантские реплики. Клиент шлёт всю историю каждый раз, поэтому
+// без этих cap'ов один запрос способен сжечь огромный контекст.
+const MAX_MESSAGES = 50; // реплик в истории за запрос
+const MAX_MESSAGE_CHARS = 4_000; // символов в одной реплике
+const MAX_TOTAL_CHARS = 24_000; // суммарно по всем репликам
+
+// ── Rate limit на пользователя ────────────────────────────────────────────────
+const CHAT_RATE_LIMIT = 20; // запросов
+const CHAT_RATE_WINDOW_SECONDS = 60; // за окно (1 минута)
 
 interface ChatRequest {
   scenario: Scenario;
@@ -32,6 +45,27 @@ export async function POST(req: Request) {
   if (!Array.isArray(messages) || messages.length === 0) {
     return Response.json({ error: "messages is required" }, { status: 400 });
   }
+  if (messages.length > MAX_MESSAGES) {
+    return Response.json({ error: "Too many messages" }, { status: 400 });
+  }
+
+  // Каждая реплика должна быть валидной парой role/content разумного размера.
+  let totalChars = 0;
+  for (const m of messages) {
+    if (
+      (m.role !== "user" && m.role !== "assistant") ||
+      typeof m.content !== "string"
+    ) {
+      return Response.json({ error: "Invalid message" }, { status: 400 });
+    }
+    if (m.content.length > MAX_MESSAGE_CHARS) {
+      return Response.json({ error: "Message too long" }, { status: 400 });
+    }
+    totalChars += m.content.length;
+  }
+  if (totalChars > MAX_TOTAL_CHARS) {
+    return Response.json({ error: "Conversation too long" }, { status: 400 });
+  }
 
   const supabase = await createServerComponentClient();
   const {
@@ -39,6 +73,19 @@ export async function POST(req: Request) {
   } = await supabase.auth.getUser();
   if (!user) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  // Rate limit по пользователю — backstop против abuse независимо от Pro-статуса.
+  const allowed = await checkRateLimit(
+    `chat:${user.id}`,
+    CHAT_RATE_LIMIT,
+    CHAT_RATE_WINDOW_SECONDS,
+  );
+  if (!allowed) {
+    return Response.json(
+      { error: "rate_limited" },
+      { status: 429, headers: { "Retry-After": String(CHAT_RATE_WINDOW_SECONDS) } },
+    );
   }
 
   const limited = await isLimitReached(supabase, user.id);
@@ -108,7 +155,7 @@ export async function POST(req: Request) {
           { role: "assistant" as const, content: assistantText, timestamp: now },
         ];
         try {
-          await updateConversation(supabase, convId, toStore);
+          await updateConversation(supabase, convId, user.id, toStore);
         } catch (saveErr) {
           console.error("[api/chat] save failed:", saveErr);
         }

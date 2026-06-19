@@ -70,6 +70,10 @@ export function Chat({
         setError("limit_reached");
         return;
       }
+      if (res.status === 429) {
+        setError("Слишком быстро 🙂 Подожди немного и попробуй снова.");
+        return;
+      }
       if (!res.ok || !res.body) throw new Error(`status ${res.status}`);
 
       // Запоминаем id диалога (важно для только что созданного нового диалога).

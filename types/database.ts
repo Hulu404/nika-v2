@@ -185,9 +185,36 @@ export interface Database {
         };
         Relationships: [];
       };
+      rate_limits: {
+        Row: {
+          key: string;
+          window_start: string;
+          count: number;
+        };
+        Insert: {
+          key: string;
+          window_start?: string;
+          count?: number;
+        };
+        Update: {
+          key?: string;
+          window_start?: string;
+          count?: number;
+        };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
-    Functions: { [_ in never]: never };
+    Functions: {
+      check_rate_limit: {
+        Args: {
+          p_key: string;
+          p_limit: number;
+          p_window_seconds: number;
+        };
+        Returns: boolean;
+      };
+    };
     Enums: {
       runner_level: RunnerLevel;
       runner_goal: RunnerGoal;
