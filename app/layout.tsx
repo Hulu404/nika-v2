@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import Script from "next/script";
 import { Fraunces } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
@@ -35,6 +36,10 @@ const yandexMetrikaScript = `(function(m,e,t,r,i,k,a){
 ym(109611856, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // nonce из middleware (CSP). На страницах вне matcher'а middleware его нет —
+  // тогда undefined, и скрипт рендерится без nonce (там и CSP не выставляется).
+  const nonce = headers().get("x-nonce") ?? undefined;
+
   return (
     <html
       lang="ru"
@@ -47,10 +52,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/site.webmanifest" />
         <meta name="theme-color" content="#C8553D" />
-        <script dangerouslySetInnerHTML={{ __html: darkModeScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: darkModeScript }} />
         {/* Yandex.Metrika counter */}
         <Script
           id="yandex-metrika"
+          nonce={nonce}
           strategy="afterInteractive"
           dangerouslySetInnerHTML={{ __html: yandexMetrikaScript }}
         />

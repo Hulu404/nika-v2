@@ -3,9 +3,48 @@ import { NextResponse, type NextRequest } from "next/server";
 import { getProfile, isProfileComplete } from "@/lib/profile";
 import type { Database } from "@/types/database";
 
+/**
+ * Content-Security-Policy с per-request nonce. Пока в режиме **Report-Only**:
+ * браузер только сообщает о нарушениях (в консоль / SecurityPolicyViolationEvent),
+ * ничего не блокирует. Это безопасная фаза наблюдения — собираем реальные
+ * нарушения (в частности от Yandex.Metrika) и тюним политику, прежде чем
+ * переключать на enforcing (заголовок Content-Security-Policy без -Report-Only).
+ *
+ * Заметки по директивам:
+ * - script-src: 'strict-dynamic' даёт право подгрузки скриптов тем, что уже
+ *   доверены через nonce (так Metrika грузит tag.js без перечисления доменов).
+ * - style-src 'unsafe-inline' — намеренно: приложение использует inline
+ *   style-атрибуты (style={{...}}), их nonce'ом не пометить. Инъекция стилей
+ *   куда менее опасна, чем скриптов; главную защиту даёт script-src.
+ * - mc.yandex.ru в img-src/connect-src — пиксель и беконы Metrika/webvisor.
+ */
+function buildCsp(nonce: string): string {
+  return [
+    `default-src 'self'`,
+    `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
+    `style-src 'self' 'unsafe-inline'`,
+    `img-src 'self' data: blob: https://mc.yandex.ru`,
+    `font-src 'self' data:`,
+    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://mc.yandex.ru`,
+    `frame-ancestors 'none'`,
+    `base-uri 'self'`,
+    `form-action 'self'`,
+    `object-src 'none'`,
+  ].join("; ");
+}
+
 export async function middleware(request: NextRequest) {
+  // Per-request nonce + CSP (Report-Only). CSP-RO в request-хедерах нужен,
+  // чтобы Next подставил этот же nonce в свои <script> (см. app-render.js:572).
+  const nonce = btoa(crypto.randomUUID());
+  const csp = buildCsp(nonce);
+
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-nonce", nonce);
+  requestHeaders.set("content-security-policy-report-only", csp);
+
   // Базовый ответ; пересоздаётся, если Supabase обновит cookies сессии.
-  let response = NextResponse.next({ request });
+  let response = NextResponse.next({ request: { headers: requestHeaders } });
 
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -19,7 +58,7 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => {
             request.cookies.set(name, value);
           });
-          response = NextResponse.next({ request });
+          response = NextResponse.next({ request: { headers: requestHeaders } });
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
           });
@@ -27,6 +66,9 @@ export async function middleware(request: NextRequest) {
       },
     },
   );
+
+  // CSP-Report-Only на базовый ответ; redirect/rewrite ниже выставляют свой.
+  response.headers.set("Content-Security-Policy-Report-Only", csp);
 
   // getUser() заодно обновляет сессию (рефреш токена) и пишет cookies.
   const {
@@ -49,6 +91,7 @@ export async function middleware(request: NextRequest) {
   const redirect = (url: URL) => {
     const res = NextResponse.redirect(url);
     response.cookies.getAll().forEach((c) => res.cookies.set(c.name, c.value, c));
+    res.headers.set("Content-Security-Policy-Report-Only", csp);
     return res;
   };
 
@@ -57,6 +100,7 @@ export async function middleware(request: NextRequest) {
     const res = NextResponse.rewrite(url);
     response.cookies.getAll().forEach((c) => res.cookies.set(c.name, c.value, c));
     res.headers.set("Cache-Control", "no-store, must-revalidate");
+    res.headers.set("Content-Security-Policy-Report-Only", csp);
     return res;
   };
 
