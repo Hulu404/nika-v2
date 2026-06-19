@@ -13,7 +13,13 @@ function authErrorMessage(err: { code?: string; message?: string }): string {
   const msg = err.message ?? "";
   if (code === "user_already_exists" || /already registered/i.test(msg))
     return "Этот email уже зарегистрирован — войди вместо регистрации.";
-  if (code === "weak_password" || /at least/i.test(msg))
+  // Пароль найден в утечках (HIBP) или признан слишком простым.
+  if (/breach|pwned|leaked|easy to guess|known to be weak/i.test(msg))
+    return "Этот пароль встречался в утечках или слишком простой — выбери другой.";
+  // Не выполнены требования по составу (буквы/цифры/спецсимволы).
+  if (/each of the following|should contain/i.test(msg))
+    return "Пароль должен содержать буквы и цифры.";
+  if (code === "weak_password" || /at least|too short/i.test(msg))
     return "Пароль слишком короткий — нужно минимум 8 символов.";
   if (code === "invalid_credentials" || /invalid login/i.test(msg))
     return "Неверный email или пароль.";
