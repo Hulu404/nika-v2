@@ -27,8 +27,9 @@
 
 6. **Убрать раскрытие деталей ошибок** в `/api/auth/register`: не возвращать `error.message` от Supabase клиенту напрямую (позволяет user enumeration — узнать, какие e-mail уже зарегистрированы). Замаппить на generic-сообщение, детали — только в `console.error`.
 7. **Политика паролей** при регистрации (минимальная длина, проверка на топ-1000 паролей) — Supabase это умеет на уровне проекта (Auth → Policies), включить там же.
-8. **Проверить `SameSite` у Supabase cookie** (должно быть `Lax` или `Strict`) — это единственная защита `/api/chat` от CSRF, так как явного CSRF-токена нет. Если по какой-то причине стоит `None` — добавить CSRF-токен или кастомный заголовок, который проверяется на сервере.
-9. **CORS.** Явно проверить/задать `Access-Control-Allow-Origin` для API-роутов, чтобы исключить вызовы с посторонних доменов через серверные интеграции (браузерный same-origin fetch это не требует, но лучше зафиксировать явно, а не полагаться на дефолт).
+8. ✅ **`SameSite` cookie — проверено, действий не требуется.** `@supabase/ssr` ставит `sameSite: "lax"` по умолчанию (`DEFAULT_COOKIE_OPTIONS`), в коде не переопределяется. Cross-site POST не приложит cookie → CSRF на `/api/chat` неактуален. ⚠️ Тот же дефолт содержит `httpOnly: false` — cookie сессии читается из JS (требование браузерного SDK Supabase, не меняется без смены подхода). Последствие: XSS = кража сессии, поэтому защита от XSS критична (см. security-заголовки ниже + CSP в backlog).
+9. ✅ **CORS — проверено, действий не требуется.** На API-роутах CORS-заголовки не выставляются, permissive `Access-Control-Allow-Origin: *` нигде нет → браузер блокирует кросс-оригинные чтения по умолчанию.
+9a. ✅ **Security-заголовки добавлены** (`next.config.mjs`, на всех маршрутах): `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (camera/mic/geo off), `Strict-Transport-Security`. Проверено вживую на `/auth`. **CSP отложен** — приложение использует inline-стили, строгий CSP их сломает; вводить отдельно и аккуратно (важно из-за `httpOnly: false`).
 
 ## P2 — Зависимости и конфигурация сборки
 
