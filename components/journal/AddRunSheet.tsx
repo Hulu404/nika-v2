@@ -17,6 +17,38 @@ function todayStr() {
   return new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD в локальном времени
 }
 
+/**
+ * Переводит ввод длительности в минуты (в БД храним duration_min).
+ * Поддерживает:
+ *  - число в выбранных единицах: "28" (мин) или "1,5" (ч);
+ *  - формат с двоеточием: "чч:мм:сс"; двухкомпонентный разбирается по
+ *    выбранной единице — "ч" → "чч:мм", "мин" → "мм:сс" (секунды округляются).
+ * Возвращает NaN, если ввод пустой/некорректный.
+ */
+function durationToMinutes(raw: string, unit: "min" | "h"): number {
+  const s = raw.trim();
+  if (!s) return NaN;
+
+  if (s.includes(":")) {
+    const parts = s.split(":");
+    if (parts.length < 2 || parts.length > 3) return NaN;
+    if (parts.some((p) => p.trim() === "")) return NaN;
+    const nums = parts.map((p) => Number(p));
+    if (nums.some((n) => !Number.isFinite(n) || n < 0)) return NaN;
+    const [h, m, sec] =
+      parts.length === 3
+        ? nums
+        : unit === "h"
+          ? [nums[0], nums[1], 0] // чч:мм
+          : [0, nums[0], nums[1]]; // мм:сс
+    return Math.round(h * 60 + m + sec / 60);
+  }
+
+  const n = parseFloat(s.replace(",", "."));
+  if (!Number.isFinite(n)) return NaN;
+  return unit === "h" ? Math.round(n * 60) : Math.round(n);
+}
+
 export function AddRunSheet({ userId }: { userId: string }) {
   const router = useRouter();
   const [supabase] = useState(() => createClientComponentClient());
@@ -25,19 +57,25 @@ export function AddRunSheet({ userId }: { userId: string }) {
   const [date, setDate] = useState(todayStr);
   const [distance, setDistance] = useState("");
   const [duration, setDuration] = useState("");
+  const [durationUnit, setDurationUnit] = useState<"min" | "h">("min");
   const [intensity, setIntensity] = useState<RunIntensity>("easy");
   const [note, setNote] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Дистанцию принимаем через точку или запятую.
   const km = parseFloat(distance.replace(",", "."));
-  const min = parseInt(duration, 10);
-  const valid = date && km > 0 && min > 0;
+  // Время: число в выбранных единицах либо формат чч:мм:сс / мм:сс. В БД — минуты.
+  const min = durationToMinutes(duration, durationUnit);
+  const valid = Boolean(date) && km > 0 && min > 0;
+  // Показываем живой пересчёт, когда ввод не равен «просто минутам».
+  const showMinConversion = min > 0 && (durationUnit === "h" || duration.includes(":"));
 
   function reset() {
     setDate(todayStr());
     setDistance("");
     setDuration("");
+    setDurationUnit("min");
     setIntensity("easy");
     setNote("");
     setError(null);
@@ -103,15 +141,44 @@ export function AddRunSheet({ userId }: { userId: string }) {
                   <input type="date" value={date} max={todayStr()} onChange={(e) => setDate(e.target.value)} className={fieldCls} />
                 </label>
 
-                <div className="flex gap-3">
-                  <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <span className="text-xs uppercase tracking-wide text-ink-secondary">Дистанция, км</span>
-                    <input type="number" inputMode="decimal" step="0.1" min="0" value={distance} onChange={(e) => setDistance(e.target.value)} placeholder="4.2" className={fieldCls} />
-                  </label>
-                  <label className="flex min-w-0 flex-1 flex-col gap-1.5">
-                    <span className="text-xs uppercase tracking-wide text-ink-secondary">Время, мин</span>
-                    <input type="number" inputMode="numeric" min="0" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="28" className={fieldCls} />
-                  </label>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex gap-3">
+                    <label className="flex min-w-0 flex-1 flex-col gap-1.5">
+                      <span className="flex h-7 items-center text-xs uppercase tracking-wide text-ink-secondary">Дистанция, км</span>
+                      <input type="text" inputMode="decimal" value={distance} onChange={(e) => setDistance(e.target.value)} placeholder="4.2 или 4,2" className={fieldCls} />
+                    </label>
+                    <div className="flex min-w-0 flex-1 flex-col gap-1.5">
+                      <div className="flex h-7 items-center justify-between gap-2">
+                        <span className="text-xs uppercase tracking-wide text-ink-secondary">Время</span>
+                        <div className="flex rounded-pill border border-line-default p-[2px]">
+                          {(["min", "h"] as const).map((u) => (
+                            <button
+                              key={u}
+                              type="button"
+                              onClick={() => setDurationUnit(u)}
+                              className={cn(
+                                "rounded-pill px-2 py-[3px] text-[11px] font-medium transition-colors",
+                                durationUnit === u ? "bg-ink-primary text-canvas" : "text-ink-secondary",
+                              )}
+                            >
+                              {u === "min" ? "мин" : "ч"}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <input
+                        type="text"
+                        value={duration}
+                        onChange={(e) => setDuration(e.target.value)}
+                        placeholder={durationUnit === "min" ? "28 или 28:30" : "1,5 или 1:30"}
+                        className={fieldCls}
+                      />
+                    </div>
+                  </div>
+                  <p className="text-[11px] leading-snug text-ink-faint">
+                    Точка или запятая. Время — минуты, часы (1,5) или чч:мм:сс.
+                    {showMinConversion ? ` Это ${min} мин.` : ""}
+                  </p>
                 </div>
 
                 <div className="flex flex-col gap-1.5">
