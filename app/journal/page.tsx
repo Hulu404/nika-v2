@@ -1,4 +1,3 @@
-import { Fragment } from "react";
 import { redirect } from "next/navigation";
 import { createServerComponentClient } from "@/lib/supabase";
 import { AppLayout } from "@/components/AppLayout";
@@ -6,11 +5,9 @@ import { SidebarData } from "@/components/SidebarData";
 import { MobileHeader } from "@/components/journal/MobileHeader";
 import { WeekStats } from "@/components/journal/WeekStats";
 import { WeekDayBar } from "@/components/journal/WeekDayBar";
-import { RunCard } from "@/components/journal/RunCard";
+import { JournalRunList } from "@/components/journal/JournalRunList";
 import { AddRunSheet } from "@/components/journal/AddRunSheet";
-import { getRuns, weekSummary, buildRunViews } from "@/lib/runs";
-
-const MONTHS = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
+import { getRuns, weekSummary } from "@/lib/runs";
 
 export default async function JournalPage() {
   const supabase = await createServerComponentClient();
@@ -21,14 +18,7 @@ export default async function JournalPage() {
 
   const rows = await getRuns(supabase, user.id);
   const week = weekSummary(rows);
-  const views = buildRunViews(rows);
   const totalKm = rows.reduce((s, r) => s + Number(r.distance_km), 0).toFixed(1);
-
-  let monthLabel = "";
-  if (rows.length) {
-    const [y, m] = rows[0].date.split("-").map(Number);
-    monthLabel = `${MONTHS[m - 1]} · ${y}`;
-  }
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
@@ -68,30 +58,7 @@ export default async function JournalPage() {
 
           {/* Список пробежек / пустое состояние */}
           <section className="mt-6">
-            {views.length === 0 ? (
-              <div className="rounded-xl border border-dashed border-line-default px-5 py-10 text-center">
-                <p className="font-serif text-[17px] text-ink-primary">Пока нет пробежек</p>
-                <p className="mt-1 text-sm text-ink-secondary">
-                  Добавь первую — и она появится здесь.
-                </p>
-              </div>
-            ) : (
-              <>
-                <p className="mb-2 text-xs uppercase tracking-wider text-ink-secondary">{monthLabel}</p>
-                <div className="flex flex-col gap-2.5">
-                  {views.map((run) => (
-                    <Fragment key={run.id}>
-                      {run.gapBefore && (
-                        <div className="rounded-lg bg-surface-deep py-2 text-center text-xs text-ink-secondary">
-                          — {run.gapBefore} —
-                        </div>
-                      )}
-                      <RunCard run={run} />
-                    </Fragment>
-                  ))}
-                </div>
-              </>
-            )}
+            <JournalRunList rows={rows} userId={user.id} />
           </section>
 
         </div>

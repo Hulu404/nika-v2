@@ -67,6 +67,35 @@ export async function createRun(supabase: Client, run: NewRun): Promise<string |
   return error?.message ?? null;
 }
 
+export interface RunPatch {
+  date: string; // YYYY-MM-DD
+  distanceKm: number;
+  durationMin: number;
+  intensity: RunIntensity;
+  note?: string;
+}
+
+/** Обновляет пробежку. RLS ограничивает строки владельцем (auth.uid() = user_id). */
+export async function updateRun(supabase: Client, runId: string, patch: RunPatch): Promise<string | null> {
+  const { error } = await supabase
+    .from("runs")
+    .update({
+      date: patch.date,
+      distance_km: patch.distanceKm,
+      duration_min: patch.durationMin,
+      intensity: patch.intensity,
+      note: patch.note?.trim() || null,
+    })
+    .eq("id", runId);
+  return error?.message ?? null;
+}
+
+/** Удаляет пробежку. RLS ограничивает строки владельцем (auth.uid() = user_id). */
+export async function deleteRun(supabase: Client, runId: string): Promise<string | null> {
+  const { error } = await supabase.from("runs").delete().eq("id", runId);
+  return error?.message ?? null;
+}
+
 // ─── чистые хелперы ──────────────────────────────────────────────────────────
 
 function parseDate(s: string): Date {

@@ -1,8 +1,11 @@
 import type { RunView } from "@/lib/runs";
 
-export function RunCard({ run }: { run: RunView }) {
+export function RunCard({ run, onClick }: { run: RunView; onClick?: () => void }) {
   return (
-    <div className="group flex cursor-pointer items-center gap-4 rounded-xl border border-line-default bg-elevated px-4 py-3.5 shadow-soft transition-colors hover:border-line-strong">
+    <div
+      onClick={onClick}
+      className="group flex cursor-pointer items-center gap-4 rounded-xl border border-line-default bg-elevated px-4 py-3.5 shadow-soft transition-colors hover:border-line-strong"
+    >
       {/* Дата */}
       <div className="w-12 flex-shrink-0 text-center">
         <div className="text-[28px] font-bold leading-none text-ink-primary">{run.date}</div>
