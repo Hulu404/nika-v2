@@ -81,6 +81,9 @@ const config: Config = {
       },
       spacing: {
         safe: "env(safe-area-inset-bottom, 0px)",
+        // Высота мобильного таб-бара (pt-1.5 + 44 + pb-2) + safe-area.
+        // Экраны, у которых контент упирается в низ, резервируют её через pb-tabbar.
+        tabbar: "calc(58px + env(safe-area-inset-bottom, 0px))",
       },
     },
   },

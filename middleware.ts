@@ -121,6 +121,7 @@ export async function middleware(request: NextRequest) {
       pathname.startsWith("/journal") ||
       pathname.startsWith("/analytics") ||
       pathname.startsWith("/rhythm") ||
+      pathname.startsWith("/meditations") ||
       pathname === "/onboarding"
     ) {
       const url = request.nextUrl.clone();
@@ -160,5 +161,5 @@ export async function middleware(request: NextRequest) {
 export const config = {
   // "/" и "/onboarding" добавлены, чтобы заворачивать на онбординг сразу
   // после входа. /auth/callback намеренно вне матчера и не блокируется.
-  matcher: ["/", "/day1", "/day1/:path*", "/today", "/today/:path*", "/journal", "/journal/:path*", "/analytics", "/analytics/:path*", "/rhythm", "/rhythm/:path*", "/chat/:path*", "/auth", "/onboarding", "/profile", "/profile/:path*"],
+  matcher: ["/", "/day1", "/day1/:path*", "/today", "/today/:path*", "/journal", "/journal/:path*", "/analytics", "/analytics/:path*", "/rhythm", "/rhythm/:path*", "/meditations", "/meditations/:path*", "/chat/:path*", "/auth", "/onboarding", "/profile", "/profile/:path*"],
 };

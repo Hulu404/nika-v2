@@ -3,87 +3,132 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { showRhythm } from "@/lib/profile";
+import { HOME_HREF, CHAT_HREF, MEDITATIONS_HREF, JOURNAL_HREF, RHYTHM_HREF } from "@/lib/nav";
 
-const TAB_TODAY = {
-  href: "/today",
-  label: "Главная",
-  icon: (
+// ─── иконки (свой набор, 22×22, stroke 1.5) ──────────────────────────────────
+
+function IcHome() {
+  return (
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
       <path d="M3 11L11 4l8 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
       <path d="M5 9v8a1 1 0 0 0 1 1h4v-4h2v4h4a1 1 0 0 0 1-1V9" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
     </svg>
-  ),
-};
-const TAB_CHAT = {
-  href: "/chat/morning",
-  label: "Чат",
-  icon: (
+  );
+}
+function IcChat() {
+  return (
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
       <path d="M3 17V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-5 3v-3Z"
         stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
     </svg>
-  ),
-};
-const TAB_JOURNAL = {
-  href: "/journal",
-  label: "Журнал",
-  icon: (
+  );
+}
+/** Медитации: лотос (покой / дыхание). */
+function IcLotus() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+      <path d="M11 4c1.9 2.2 2.9 4.2 2.9 6 0 1.6-1.2 2.7-2.9 2.7S8.1 11.6 8.1 10c0-1.8 1-3.8 2.9-6Z"
+        stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M8.3 8.9C6.2 8.6 4.4 9.4 3.4 10.7c1 2.2 3.4 3.5 5.9 3.2"
+        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M13.7 8.9c2.1-.3 3.9.5 4.9 1.8-1 2.2-3.4 3.5-5.9 3.2"
+        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M4.2 16.4c2 1.2 4.3 1.8 6.8 1.8s4.8-.6 6.8-1.8"
+        stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+function IcJournal() {
+  return (
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
       <path d="M5 4h12v14l-6-3-6 3V4Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
     </svg>
-  ),
-};
-// Раздел «Мой ритм» — только для женского рода (вместо «Аналитики» в мобильной панели).
-const TAB_RHYTHM = {
-  href: "/rhythm",
-  label: "Мой ритм",
-  icon: (
+  );
+}
+function IcRhythm() {
+  return (
     <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
       <path d="M2 11h4l2.5-6 4 12 2.5-6H20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
-  ),
+  );
+}
+
+// ─── вкладки ─────────────────────────────────────────────────────────────────
+
+interface Tab {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  isActive: (pathname: string) => boolean;
+}
+
+const TAB_HOME: Tab = {
+  href: HOME_HREF,
+  label: "Главная",
+  icon: <IcHome />,
+  isActive: (p) => p === "/today" || p === "/day1",
 };
-const TAB_PROFILE = {
-  href: "/profile",
-  label: "Профиль",
-  icon: (
-    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
-      <circle cx="11" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M4 19c.6-3.5 3.7-5 7-5s6.4 1.5 7 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
+const TAB_CHAT: Tab = {
+  href: CHAT_HREF,
+  label: "Чат",
+  icon: <IcChat />,
+  isActive: (p) => p.startsWith("/chat"),
+};
+const TAB_MEDITATIONS: Tab = {
+  href: MEDITATIONS_HREF,
+  label: "Медитации",
+  icon: <IcLotus />,
+  isActive: (p) => p.startsWith("/meditations"),
+};
+const TAB_JOURNAL: Tab = {
+  href: JOURNAL_HREF,
+  label: "Журнал",
+  icon: <IcJournal />,
+  isActive: (p) => p.startsWith("/journal"),
+};
+const TAB_RHYTHM: Tab = {
+  href: RHYTHM_HREF,
+  label: "Мой ритм",
+  icon: <IcRhythm />,
+  isActive: (p) => p.startsWith("/rhythm"),
 };
 
-export function BottomNav({ showRhythm = false }: { showRhythm?: boolean }) {
+/**
+ * Набор вкладок из профиля: пятая («Мой ритм») — строго по showRhythm(gender).
+ * «Профиль» переехал в аватар шапки, в баре его нет.
+ */
+function buildTabs(gender?: string | null): Tab[] {
+  const tabs = [TAB_HOME, TAB_CHAT, TAB_MEDITATIONS, TAB_JOURNAL];
+  if (showRhythm(gender)) tabs.push(TAB_RHYTHM);
+  return tabs;
+}
+
+/**
+ * gender приходит пропом с сервера (BottomNavData) и пересчитывается на каждом
+ * серверном рендере, поэтому после router.refresh() бар сам перестраивается 5↔4.
+ */
+export function BottomNav({ gender }: { gender?: string | null }) {
   const pathname = usePathname();
-
-  // «Аналитика» из мобильной панели убрана; для female на её место — «Мой ритм».
-  const TABS = [
-    TAB_TODAY,
-    TAB_CHAT,
-    TAB_JOURNAL,
-    ...(showRhythm ? [TAB_RHYTHM] : []),
-    TAB_PROFILE,
-  ];
+  const tabs = buildTabs(gender);
 
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-[var(--bg-blur-strong)] backdrop-blur-[20px] border-t border-[var(--border-subtle)] pb-safe">
-      <div className="flex items-stretch px-1 pt-2 pb-3">
-        {TABS.map(({ href, label, icon }) => {
-          const active =
-            pathname === href ||
-            (href === "/today" && pathname === "/day1");
+    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-[var(--bg-blur-strong)] backdrop-blur-[20px] border-t border-line-subtle pb-safe">
+      <div className="flex items-stretch px-1 pt-1.5 pb-2">
+        {tabs.map(({ href, label, icon, isActive }) => {
+          const active = isActive(pathname);
           return (
             <Link
-              key={label}
+              key={href}
               href={href}
+              aria-current={active ? "page" : undefined}
               className={cn(
-                "flex flex-1 flex-col items-center gap-1 px-1 py-1 rounded-[10px] transition-all duration-150 min-w-0 active:scale-95 active:text-accent",
+                "flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[10px] px-1 py-1 transition-all duration-150 active:scale-95 active:text-accent",
                 active ? "text-accent" : "text-ink-muted",
               )}
             >
               {icon}
-              <span className="text-[10px] font-medium whitespace-nowrap">{label}</span>
+              <span className="whitespace-nowrap text-[10px] font-medium leading-none">{label}</span>
             </Link>
           );
         })}

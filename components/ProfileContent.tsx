@@ -2,8 +2,10 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
+import type { Gender } from "@/types/app";
 import { SCENARIO_META, SCENARIO_ORDER } from "@/lib/scenarios";
 import { BottomSheet } from "@/components/BottomSheet";
 import { PrivacyContent } from "@/components/legal/PrivacyContent";
@@ -14,7 +16,7 @@ import { OfertaContent } from "@/components/legal/OfertaContent";
 type Tone = "soft" | "direct" | "brief";
 type WhenWrite = "morning" | "evening" | "never";
 type SheetId =
-  | "tone" | "when" | "scenarios" | "name"
+  | "tone" | "when" | "scenarios" | "name" | "gender"
   | "export" | "delete" | "how" | "manifesto" | "support" | "terms"
   | "privacy" | "oferta"
   | null;
@@ -31,6 +33,13 @@ const WHEN_OPTIONS: { v: WhenWrite; short: string; full: string }[] = [
   { v: "morning", short: "Утром",     full: "Утром перед тренировкой" },
   { v: "evening", short: "Вечером",   full: "Вечером" },
   { v: "never",   short: "Не писать", full: "Не писать первой" },
+];
+
+// Род определяет и обращение НИКИ, и видимость раздела «Мой ритм» (showRhythm).
+const GENDER_OPTIONS: { v: Gender; short: string; full: string; desc: string }[] = [
+  { v: "female",  short: "она",       full: "Она / её",  desc: "«молодец, что вышла»" },
+  { v: "male",    short: "он",        full: "Он / его",  desc: "«молодец, что вышел»" },
+  { v: "neutral", short: "без рода",  full: "Без рода",  desc: "Без согласования по роду" },
 ];
 
 // Первые N сценариев доступны на Free
@@ -156,6 +165,7 @@ interface Props {
   email: string;
   isPro: boolean;
   reminderEnabled: boolean;
+  initialGender: Gender | null;
   createdAt: string;
 }
 
@@ -167,13 +177,17 @@ export function ProfileContent({
   email,
   isPro,
   reminderEnabled,
+  initialGender,
   createdAt,
 }: Props) {
+  const router = useRouter();
   const [supabase] = useState(() => createClientComponentClient());
 
   // Preferences
   const [tone, setTone]         = useState<Tone>("soft");
   const [whenWrite, setWhenWrite] = useState<WhenWrite>(reminderEnabled ? "morning" : "never");
+  const [gender, setGender]     = useState<Gender | null>(initialGender);
+  const [genderSaving, setGenderSaving] = useState(false);
   const [dark, setDark]         = useState(false);
 
   // Name editing
@@ -218,6 +232,29 @@ export function ProfileContent({
     closeSheet();
   }
 
+  /**
+   * Смена рода: пишем в профиль и вызываем router.refresh() — серверные
+   * компоненты (шапка, таб-бар, сайдбар) перечитывают gender и бар
+   * перестраивается 5↔4 без перезапуска приложения.
+   */
+  async function handleGenderChange(v: Gender) {
+    if (genderSaving || v === gender) { closeSheet(); return; }
+    setGenderSaving(true);
+    const prev = gender;
+    setGender(v);
+    const { error } = await supabase
+      .from("profiles")
+      .upsert({ user_id: userId, gender: v }, { onConflict: "user_id" });
+    setGenderSaving(false);
+    if (error) {
+      console.error("[profile] gender save failed:", error.message);
+      setGender(prev); // откатываем оптимистичное значение
+      return;
+    }
+    closeSheet();
+    router.refresh();
+  }
+
   function handleDarkToggle(v: boolean) {
     setDark(v);
     document.documentElement.classList.toggle("dark", v);
@@ -247,6 +284,7 @@ export function ProfileContent({
   // Derived labels
   const toneShort       = TONE_OPTIONS.find(o => o.v === tone)?.short ?? "Тёплый";
   const whenShort       = WHEN_OPTIONS.find(o => o.v === whenWrite)?.short ?? "Утром";
+  const genderShort     = GENDER_OPTIONS.find(o => o.v === gender)?.short ?? "—";
   const scenariosLabel  = isPro ? "Все 5" : `${FREE_SCENARIOS} из 5 FREE`;
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -296,6 +334,7 @@ export function ProfileContent({
               <Row label="Тон общения"                     value={toneShort}       onClick={() => setActiveSheet("tone")} />
               <Row label="Сценарии"                        badge={scenariosLabel}  onClick={() => setActiveSheet("scenarios")} />
               <Row label="Когда писать первой"             value={whenShort}       onClick={() => setActiveSheet("when")} />
+              <Row label="Род обращения"                   value={genderShort}     onClick={() => setActiveSheet("gender")} />
               <Row label="Имя — как ко мне обращаться"     value={name || "—"}     onClick={() => { setEditName(name); setActiveSheet("name"); }} />
             </Card>
           </div>
@@ -429,6 +468,45 @@ export function ProfileContent({
             );
           })}
         </div>
+      </BottomSheet>
+
+      {/* Род обращения */}
+      <BottomSheet isOpen={activeSheet === "gender"} onClose={closeSheet} title="Род обращения">
+        <div className="flex flex-col gap-2.5">
+          {GENDER_OPTIONS.map((o) => {
+            const active = gender === o.v;
+            return (
+              <button
+                key={o.v}
+                onClick={() => handleGenderChange(o.v)}
+                disabled={genderSaving}
+                className={cn(
+                  "flex items-center gap-3 rounded-[14px] border px-4 py-4 text-left transition-all disabled:opacity-60",
+                  active
+                    ? "border-ink-primary bg-ink-primary"
+                    : "border-line-default bg-canvas hover:border-line-strong",
+                )}
+              >
+                <div className="flex-1">
+                  <p className={cn("text-[15px] font-medium", active ? "text-canvas" : "text-ink-primary")}>
+                    {o.full}
+                  </p>
+                  <p className={cn("mt-0.5 text-[12px]", active ? "text-canvas/60" : "text-ink-muted")}>
+                    {o.desc}
+                  </p>
+                </div>
+                {active && (
+                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden className="flex-shrink-0 text-canvas">
+                    <path d="M4.5 10.5l3.5 3.5 7.5-7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-4 text-[12px] leading-[1.5] text-ink-muted">
+          От рода зависит, как НИКА к тебе обращается. Раздел «Мой ритм» доступен при женском роде.
+        </p>
       </BottomSheet>
 
       {/* Сценарии */}

@@ -157,7 +157,7 @@ export default async function ChatPage({
     : [opener];
 
   return (
-    <AppLayout hideBottomNav sidebarSlot={<SidebarData />}>
+    <AppLayout sidebarSlot={<SidebarData />}>
       {/* Шапка чата */}
       <header className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-blur)] px-4 py-3 backdrop-blur-[16px]">
         <Link
@@ -185,8 +185,8 @@ export default async function ChatPage({
         </button>
       </header>
 
-      {/* Чат + контекст */}
-      <div className="flex flex-1 min-h-0">
+      {/* Чат + контекст. На мобайле снизу фиксированный таб-бар — резервируем его высоту. */}
+      <div className="flex flex-1 min-h-0 pb-tabbar lg:pb-0">
         <Chat
           scenario={scenario}
           initialMessages={initialMessages}

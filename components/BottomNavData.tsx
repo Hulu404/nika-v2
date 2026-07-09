@@ -1,23 +1,25 @@
 import { BottomNav } from "@/components/BottomNav";
 import { createServerComponentClient } from "@/lib/supabase";
-import { showRhythm } from "@/lib/profile";
 
-/** Серверный враппер: подставляет в мобильную панель раздел «Мой ритм» по роду. */
+/**
+ * Серверный враппер: отдаёт баром текущий род. Читается на каждом серверном
+ * рендере, поэтому router.refresh() после смены рода перестраивает вкладки.
+ */
 export async function BottomNavData() {
   const supabase = await createServerComponentClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  let rhythm = false;
+  let gender: string | null = null;
   if (user) {
     const { data } = await supabase
       .from("profiles")
       .select("gender")
       .eq("user_id", user.id)
       .maybeSingle();
-    rhythm = showRhythm(data?.gender);
+    gender = data?.gender ?? null;
   }
 
-  return <BottomNav showRhythm={rhythm} />;
+  return <BottomNav gender={gender} />;
 }
