@@ -1,6 +1,8 @@
 import type {
+  CyclePref,
   Gender,
   Message,
+  NotifPermission,
   RunIntensity,
   RunnerFear,
   RunnerGoal,
@@ -62,6 +64,9 @@ export interface Database {
           fears: RunnerFear[];
           reminder_enabled: boolean;
           gender: Gender | null;
+          cycle: CyclePref | null;
+          proactive: boolean | null;
+          notif_permission: NotifPermission | null;
           created_at: string;
           updated_at: string;
         };
@@ -73,6 +78,9 @@ export interface Database {
           fears?: RunnerFear[];
           reminder_enabled?: boolean;
           gender?: Gender | null;
+          cycle?: CyclePref | null;
+          proactive?: boolean | null;
+          notif_permission?: NotifPermission | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -84,6 +92,9 @@ export interface Database {
           fears?: RunnerFear[];
           reminder_enabled?: boolean;
           gender?: Gender | null;
+          cycle?: CyclePref | null;
+          proactive?: boolean | null;
+          notif_permission?: NotifPermission | null;
           created_at?: string;
           updated_at?: string;
         };

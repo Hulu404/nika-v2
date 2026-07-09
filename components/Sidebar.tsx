@@ -39,6 +39,13 @@ function IcChart() {
     </svg>
   );
 }
+function IcRhythm() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+      <path d="M2 9h3l2-5 3 10 2-5h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 function IcBell() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -133,9 +140,10 @@ export interface RecentConvo {
 interface SidebarProps {
   recentConvos: RecentConvo[];
   isPro?: boolean;
+  showRhythm?: boolean;
 }
 
-export function Sidebar({ recentConvos, isPro = false }: SidebarProps) {
+export function Sidebar({ recentConvos, isPro = false, showRhythm = false }: SidebarProps) {
   const pathname = usePathname();
   const [dark, setDark] = useState(false);
   const [showScenarioSheet, setShowScenarioSheet] = useState(false);
@@ -166,6 +174,9 @@ export function Sidebar({ recentConvos, isPro = false }: SidebarProps) {
     { href: "/today",     label: "Сегодня",        icon: <IcHome />,  implemented: true },
     { href: "#",          label: "Трекинг",         icon: <IcTimer />, implemented: false },
     { href: "/journal",   label: "Журнал пробежек", icon: <IcList />,  implemented: true },
+    ...(showRhythm
+      ? [{ href: "/rhythm", label: "Мой ритм", icon: <IcRhythm />, implemented: true }]
+      : []),
     { href: "/analytics", label: "Аналитика",       icon: <IcChart />, implemented: true },
     { href: "#",          label: "Пуши",            icon: <IcBell />,  implemented: false },
   ];

@@ -70,9 +70,14 @@ const config: Config = {
           "0%": { opacity: "0", transform: "translateY(6px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
         },
+        blink: {
+          "0%, 60%, 100%": { opacity: "0.3", transform: "translateY(0)" },
+          "30%": { opacity: "1", transform: "translateY(-3px)" },
+        },
       },
       animation: {
         "fade-in": "fade-in 0.25s ease-out",
+        blink: "blink 1.3s infinite",
       },
       spacing: {
         safe: "env(safe-area-inset-bottom, 0px)",

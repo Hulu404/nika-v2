@@ -2,6 +2,7 @@ import { Sidebar, type RecentConvo } from "@/components/Sidebar";
 import { SCENARIO_META } from "@/lib/scenarios";
 import { createServerComponentClient } from "@/lib/supabase";
 import { resolveIsPro } from "@/lib/subscription";
+import { showRhythm } from "@/lib/profile";
 
 const MONTHS = [
   "янв", "фев", "мар", "апр", "мая", "июн",
@@ -26,9 +27,10 @@ export async function SidebarData() {
 
   let recentConvos: RecentConvo[] = [];
   let isPro = resolveIsPro(undefined);
+  let rhythm = false;
 
   if (user) {
-    const [{ data: convData }, { data: userRow }] = await Promise.all([
+    const [{ data: convData }, { data: userRow }, { data: profileRow }] = await Promise.all([
       supabase
         .from("conversations")
         .select("id, scenario, updated_at")
@@ -36,6 +38,7 @@ export async function SidebarData() {
         .order("updated_at", { ascending: false })
         .limit(5),
       supabase.from("users").select("is_pro").eq("id", user.id).maybeSingle(),
+      supabase.from("profiles").select("gender").eq("user_id", user.id).maybeSingle(),
     ]);
 
     recentConvos = (convData ?? []).map((c) => ({
@@ -45,7 +48,8 @@ export async function SidebarData() {
     }));
 
     isPro = resolveIsPro(userRow?.is_pro);
+    rhythm = showRhythm(profileRow?.gender);
   }
 
-  return <Sidebar recentConvos={recentConvos} isPro={isPro} />;
+  return <Sidebar recentConvos={recentConvos} isPro={isPro} showRhythm={rhythm} />;
 }

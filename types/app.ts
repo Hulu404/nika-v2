@@ -10,7 +10,13 @@ export type ScenarioType =
   | "general";
 
 /** Грамматический род для обращения (из онбординга). */
-export type Gender = "male" | "female";
+export type Gender = "male" | "female" | "neutral";
+
+/** Учёт «тяжёлых дней» (онбординг): считать / скажу сама / не считать. */
+export type CyclePref = "on" | "self" | "off";
+
+/** Результат системного запроса разрешения на уведомления. */
+export type NotifPermission = "granted" | "denied" | "default";
 
 /** Где человек в своём беговом пути. */
 export type RunnerLevel = "beginner" | "irregular" | "returning";
