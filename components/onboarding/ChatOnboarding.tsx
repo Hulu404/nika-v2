@@ -270,7 +270,7 @@ export function ChatOnboarding({ userId }: { userId: string }) {
   const genRef = useRef(0); // токен последовательности: инвалидирует устаревшую анимацию
   const msgIdRef = useRef(0);
   const notifPermissionRef = useRef<NotifPermission | null>(null); // уйдёт в профиль
-  const feedEndRef = useRef<HTMLDivElement | null>(null);
+  const feedRef = useRef<HTMLDivElement | null>(null);
   const didInit = useRef(false);
   const bannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -294,10 +294,14 @@ export function ChatOnboarding({ userId }: { userId: string }) {
 
   const nextMsgId = () => ++msgIdRef.current;
 
-  // Автоскролл ленты вниз при изменениях.
+  // Автоскролл ленты вниз: скроллим сам контейнер, иначе нижний паддинг
+  // оставляет последнее сообщение частично за краем. Рекап появляется по
+  // смене stepId/busy — их тоже держим в зависимостях.
   useEffect(() => {
-    feedEndRef.current?.scrollIntoView({ behavior: reduced ? "auto" : "smooth", block: "end" });
-  }, [feed, reduced]);
+    const el = feedRef.current;
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: reduced ? "auto" : "smooth" });
+  }, [feed, stepId, busy, reduced]);
 
   // Сохранение профиля (upsert). Возвращает текст ошибки или null.
   const persist = useCallback(
@@ -515,10 +519,10 @@ export function ChatOnboarding({ userId }: { userId: string }) {
 
   // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex min-h-dvh w-full bg-canvas-outer">
+    <div className="flex h-dvh w-full overflow-hidden bg-canvas-outer">
       {/* Брендпанель (десктоп) */}
       <aside
-        className="hidden w-[42%] max-w-[430px] flex-col gap-6 border-r border-line-default p-12 lg:flex"
+        className="hidden h-full w-[42%] max-w-[430px] flex-col gap-6 overflow-y-auto border-r border-line-default p-12 lg:flex"
         style={{
           backgroundImage: "linear-gradient(158deg, var(--surface-warm), var(--surface-deep))",
         }}
@@ -536,8 +540,8 @@ export function ChatOnboarding({ userId }: { userId: string }) {
       </aside>
 
       {/* Колонка чата */}
-      <div className="flex min-h-dvh flex-1 flex-col bg-canvas">
-        <div className="relative mx-auto flex min-h-dvh w-full max-w-[560px] flex-col">
+      <div className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-canvas">
+        <div className="relative mx-auto flex h-full min-h-0 w-full max-w-[560px] flex-col">
           {/* Баннер-превью уведомления (внутри экрана) */}
           {banner && (
             <div className="pointer-events-none absolute inset-x-3 top-3 z-40 animate-fade-in">
@@ -555,7 +559,7 @@ export function ChatOnboarding({ userId }: { userId: string }) {
           )}
 
           {/* Шапка */}
-          <header className="flex items-center gap-3 border-b border-line-subtle px-5 pb-3.5 pt-6">
+          <header className="flex shrink-0 items-center gap-3 border-b border-line-subtle px-5 pb-3.5 pt-6">
             <button
               type="button"
               onClick={back}
@@ -584,51 +588,52 @@ export function ChatOnboarding({ userId }: { userId: string }) {
             {chromeHidden ? "" : `Шаг ${dotIdx + 1} из 3`}
           </span>
 
-          {/* Лента */}
-          <div className="flex flex-1 flex-col gap-2.5 overflow-y-auto px-5 py-6">
-            {feed.map((m) => {
-              if (m.side === "skip") {
+          {/* Лента: скроллится только она; mt-auto прижимает сообщения к низу,
+              поэтому каждое новое поднимает предыдущие вверх, как в мессенджере. */}
+          <div ref={feedRef} className="flex min-h-0 flex-1 flex-col overflow-y-auto px-5 py-6">
+            <div className="mt-auto flex flex-col gap-2.5">
+              {feed.map((m) => {
+                if (m.side === "skip") {
+                  return (
+                    <div key={m.id} className="flex animate-fade-in justify-end">
+                      <div className="rounded-bubble rounded-br-[6px] border border-dashed border-line-strong px-3.5 py-2.5 text-[13px] text-ink-muted">
+                        пропустить
+                      </div>
+                    </div>
+                  );
+                }
+                if (m.side === "user") {
+                  return (
+                    <div key={m.id} className="flex animate-fade-in justify-end">
+                      <div className="max-w-[82%] rounded-bubble rounded-br-[6px] bg-bubble-bg px-4 py-3 text-[15px] leading-[1.45] text-bubble-fg">
+                        {m.text}
+                      </div>
+                    </div>
+                  );
+                }
                 return (
-                  <div key={m.id} className="flex animate-fade-in justify-end">
-                    <div className="rounded-bubble rounded-br-[6px] border border-dashed border-line-strong px-3.5 py-2.5 text-[13px] text-ink-muted">
-                      пропустить
+                  <div key={m.id} className="flex animate-fade-in justify-start">
+                    <div className="max-w-[82%] rounded-bubble rounded-bl-[6px] border border-line-subtle bg-surface-nika px-4 py-3 text-[15px] leading-[1.45] text-ink-primary">
+                      {m.side === "accent" ? (
+                        <span className="font-serif text-[18px] font-light italic tracking-[-0.01em] text-accent">{m.text}</span>
+                      ) : m.text === TYPING ? (
+                        <TypingDots />
+                      ) : (
+                        m.text
+                      )}
                     </div>
                   </div>
                 );
-              }
-              if (m.side === "user") {
-                return (
-                  <div key={m.id} className="flex animate-fade-in justify-end">
-                    <div className="max-w-[82%] rounded-bubble rounded-br-[6px] bg-bubble-bg px-4 py-3 text-[15px] leading-[1.45] text-bubble-fg">
-                      {m.text}
-                    </div>
-                  </div>
-                );
-              }
-              return (
-                <div key={m.id} className="flex animate-fade-in justify-start">
-                  <div className="max-w-[82%] rounded-bubble rounded-bl-[6px] border border-line-subtle bg-surface-nika px-4 py-3 text-[15px] leading-[1.45] text-ink-primary">
-                    {m.side === "accent" ? (
-                      <span className="font-serif text-[18px] font-light italic tracking-[-0.01em] text-accent">{m.text}</span>
-                    ) : m.text === TYPING ? (
-                      <TypingDots />
-                    ) : (
-                      m.text
-                    )}
-                  </div>
-                </div>
-              );
-            })}
+              })}
 
-            {stepId === "final" && !busy && (
-              <Recap answers={answers} editing={editingField} onEdit={openEdit} />
-            )}
-
-            <div ref={feedEndRef} />
+              {stepId === "final" && !busy && (
+                <Recap answers={answers} editing={editingField} onEdit={openEdit} />
+              )}
+            </div>
           </div>
 
           {/* Док управления */}
-          <div className="min-h-[82px] border-t border-line-subtle px-5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-3.5">
+          <div className="min-h-[82px] shrink-0 border-t border-line-subtle px-5 pb-[calc(1rem+env(safe-area-inset-bottom,0px))] pt-3.5">
             {!busy && (
               <Dock
                 stepId={stepId}
