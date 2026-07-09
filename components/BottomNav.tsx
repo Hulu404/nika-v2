@@ -4,60 +4,67 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 
-const TABS = [
-  {
-    href: "/today",
-    label: "Главная",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
-        <path d="M3 11L11 4l8 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M5 9v8a1 1 0 0 0 1 1h4v-4h2v4h4a1 1 0 0 0 1-1V9" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    href: "/chat/morning",
-    label: "Чат",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
-        <path d="M3 17V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-5 3v-3Z"
-          stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    href: "/journal",
-    label: "Журнал",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
-        <path d="M5 4h12v14l-6-3-6 3V4Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      </svg>
-    ),
-  },
-  {
-    href: "/analytics",
-    label: "Аналитика",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
-        <path d="M4 18h14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M6.5 18v-4M11 18V9M15.5 18v-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-  {
-    href: "/profile",
-    label: "Профиль",
-    icon: (
-      <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
-        <circle cx="11" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M4 19c.6-3.5 3.7-5 7-5s6.4 1.5 7 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
-  },
-];
+const TAB_TODAY = {
+  href: "/today",
+  label: "Главная",
+  icon: (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+      <path d="M3 11L11 4l8 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 9v8a1 1 0 0 0 1 1h4v-4h2v4h4a1 1 0 0 0 1-1V9" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  ),
+};
+const TAB_CHAT = {
+  href: "/chat/morning",
+  label: "Чат",
+  icon: (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+      <path d="M3 17V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H8l-5 3v-3Z"
+        stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  ),
+};
+const TAB_JOURNAL = {
+  href: "/journal",
+  label: "Журнал",
+  icon: (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+      <path d="M5 4h12v14l-6-3-6 3V4Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  ),
+};
+// Раздел «Мой ритм» — только для женского рода (вместо «Аналитики» в мобильной панели).
+const TAB_RHYTHM = {
+  href: "/rhythm",
+  label: "Мой ритм",
+  icon: (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+      <path d="M2 11h4l2.5-6 4 12 2.5-6H20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  ),
+};
+const TAB_PROFILE = {
+  href: "/profile",
+  label: "Профиль",
+  icon: (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+      <circle cx="11" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M4 19c.6-3.5 3.7-5 7-5s6.4 1.5 7 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
+};
 
-export function BottomNav() {
+export function BottomNav({ showRhythm = false }: { showRhythm?: boolean }) {
   const pathname = usePathname();
+
+  // «Аналитика» из мобильной панели убрана; для female на её место — «Мой ритм».
+  const TABS = [
+    TAB_TODAY,
+    TAB_CHAT,
+    TAB_JOURNAL,
+    ...(showRhythm ? [TAB_RHYTHM] : []),
+    TAB_PROFILE,
+  ];
 
   return (
     <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-[var(--bg-blur-strong)] backdrop-blur-[20px] border-t border-[var(--border-subtle)] pb-safe">

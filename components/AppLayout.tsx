@@ -1,4 +1,4 @@
-import { BottomNav } from "@/components/BottomNav";
+import { BottomNavData } from "@/components/BottomNavData";
 import { PageTransition } from "@/components/PageTransition";
 import { LockBodyScroll } from "@/components/LockBodyScroll";
 
@@ -25,7 +25,7 @@ export function AppLayout({ children, sidebarSlot, hideBottomNav }: AppLayoutPro
         {children}
       </PageTransition>
 
-      {!hideBottomNav && <BottomNav />}
+      {!hideBottomNav && <BottomNavData />}
     </div>
   );
 }
