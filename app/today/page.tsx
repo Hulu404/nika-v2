@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
+import { PageHeader } from "@/components/nav/PageHeader";
 import { QuoteCard } from "@/components/today/QuoteCard";
 import { StreakCard } from "@/components/today/StreakCard";
 import { WeekCard } from "@/components/today/WeekCard";
@@ -37,30 +38,7 @@ export default async function TodayPage() {
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
-      {/* Шапка страницы */}
-      <header className="flex shrink-0 items-center gap-3 border-b border-line-default px-5 py-3 lg:px-8">
-        {/* Аватар НИКИ со статусом */}
-        <div className="relative h-9 w-9 flex-shrink-0 rounded-full bg-nika-avatar">
-          <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--bg-primary)] bg-[#7BA968]" />
-        </div>
-        <div className="min-w-0 flex-1 leading-tight">
-          <div className="font-serif text-[17px] font-medium tracking-[-0.01em] text-ink-primary">
-            Сегодня
-          </div>
-          <div className="mt-0.5 text-[11.5px] text-ink-muted">{humanDate(now)}</div>
-        </div>
-        {/* Колокольчик */}
-        <button
-          type="button"
-          aria-label="Уведомления"
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-ink-secondary transition-colors hover:bg-surface-nika hover:text-ink-primary"
-        >
-          <svg width="19" height="19" viewBox="0 0 22 22" fill="none" aria-hidden>
-            <path d="M11 3a5 5 0 0 0-5 5c0 5-2 6-2 6h14s-2-1-2-6a5 5 0 0 0-5-5Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            <path d="M9.5 18a1.8 1.8 0 0 0 3 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </button>
-      </header>
+      <PageHeader title="Сегодня" subtitle={humanDate(now)} />
 
       {/* Дашборд */}
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">

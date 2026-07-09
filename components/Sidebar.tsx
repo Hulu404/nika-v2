@@ -46,6 +46,21 @@ function IcRhythm() {
     </svg>
   );
 }
+/** Медитации: лотос (покой / дыхание). */
+function IcLotus() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+      <path d="M9 3c1.6 1.8 2.4 3.4 2.4 4.9 0 1.3-1 2.2-2.4 2.2s-2.4-.9-2.4-2.2C6.6 6.4 7.4 4.8 9 3Z"
+        stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+      <path d="M6.8 7.3C5 7.1 3.6 7.7 2.8 8.8c.8 1.8 2.8 2.9 4.8 2.6"
+        stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M11.2 7.3c1.8-.2 3.2.4 4 1.5-.8 1.8-2.8 2.9-4.8 2.6"
+        stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M3.4 13.4c1.6 1 3.5 1.5 5.6 1.5s4-.5 5.6-1.5"
+        stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
 function IcBell() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -171,13 +186,14 @@ export function Sidebar({ recentConvos, isPro = false, showRhythm = false }: Sid
   }
 
   const NAV = [
-    { href: "/today",     label: "Сегодня",        icon: <IcHome />,  implemented: true },
-    { href: "#",          label: "Трекинг",         icon: <IcTimer />, implemented: false },
-    { href: "/journal",   label: "Журнал пробежек", icon: <IcList />,  implemented: true },
+    { href: "/today",       label: "Сегодня",        icon: <IcHome />,  implemented: true },
+    { href: "#",            label: "Трекинг",         icon: <IcTimer />, implemented: false },
+    { href: "/meditations", label: "Медитации",       icon: <IcLotus />, implemented: true },
+    { href: "/journal",     label: "Журнал пробежек", icon: <IcList />,  implemented: true },
     ...(showRhythm
       ? [{ href: "/rhythm", label: "Мой ритм", icon: <IcRhythm />, implemented: true }]
       : []),
-    { href: "/analytics", label: "Аналитика",       icon: <IcChart />, implemented: true },
+    { href: "/analytics",   label: "Аналитика",       icon: <IcChart />, implemented: true },
     { href: "#",          label: "Пуши",            icon: <IcBell />,  implemented: false },
   ];
 

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerComponentClient } from "@/lib/supabase";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
-import { MobileHeader } from "@/components/journal/MobileHeader";
+import { PageHeader } from "@/components/nav/PageHeader";
 import { WeekStats } from "@/components/journal/WeekStats";
 import { WeekDayBar } from "@/components/journal/WeekDayBar";
 import { JournalRunList } from "@/components/journal/JournalRunList";
@@ -22,7 +22,7 @@ export default async function JournalPage() {
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
-      <MobileHeader title="Журнал" right={`${totalKm} км`} />
+      <PageHeader title="Журнал" subtitle={`${totalKm} км`} />
 
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
         <div className="mx-auto w-full max-w-[720px] px-6 pt-6 lg:pt-10">

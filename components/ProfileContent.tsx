@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
-import type { Gender } from "@/types/app";
+import { requestNotifPermission } from "@/lib/notifications";
+import type { Gender, NotifPermission } from "@/types/app";
 import { SCENARIO_META, SCENARIO_ORDER } from "@/lib/scenarios";
 import { BottomSheet } from "@/components/BottomSheet";
 import { PrivacyContent } from "@/components/legal/PrivacyContent";
@@ -166,6 +167,7 @@ interface Props {
   isPro: boolean;
   reminderEnabled: boolean;
   initialGender: Gender | null;
+  initialProactive: boolean;
   createdAt: string;
 }
 
@@ -178,6 +180,7 @@ export function ProfileContent({
   isPro,
   reminderEnabled,
   initialGender,
+  initialProactive,
   createdAt,
 }: Props) {
   const router = useRouter();
@@ -188,6 +191,8 @@ export function ProfileContent({
   const [whenWrite, setWhenWrite] = useState<WhenWrite>(reminderEnabled ? "morning" : "never");
   const [gender, setGender]     = useState<Gender | null>(initialGender);
   const [genderSaving, setGenderSaving] = useState(false);
+  const [notifOn, setNotifOn]   = useState(initialProactive);
+  const [notifSaving, setNotifSaving] = useState(false);
   const [dark, setDark]         = useState(false);
 
   // Name editing
@@ -253,6 +258,30 @@ export function ProfileContent({
     }
     closeSheet();
     router.refresh();
+  }
+
+  /**
+   * Единственное место управления уведомлениями (колокольчик из шапки убран).
+   * Включение дёргает системный запрос разрешения и сохраняет его результат.
+   */
+  async function handleNotifToggle(v: boolean) {
+    if (notifSaving) return;
+    setNotifSaving(true);
+    const prev = notifOn;
+    setNotifOn(v);
+
+    const patch: { user_id: string; proactive: boolean; notif_permission?: NotifPermission } = {
+      user_id: userId,
+      proactive: v,
+    };
+    if (v) patch.notif_permission = await requestNotifPermission();
+
+    const { error } = await supabase.from("profiles").upsert(patch, { onConflict: "user_id" });
+    setNotifSaving(false);
+    if (error) {
+      console.error("[profile] notifications save failed:", error.message);
+      setNotifOn(prev); // откатываем оптимистичное значение
+    }
   }
 
   function handleDarkToggle(v: boolean) {
@@ -333,6 +362,10 @@ export function ProfileContent({
             <Card>
               <Row label="Тон общения"                     value={toneShort}       onClick={() => setActiveSheet("tone")} />
               <Row label="Сценарии"                        badge={scenariosLabel}  onClick={() => setActiveSheet("scenarios")} />
+              <Row
+                label="Уведомления"
+                rightEl={<Toggle on={notifOn} onChange={handleNotifToggle} />}
+              />
               <Row label="Когда писать первой"             value={whenShort}       onClick={() => setActiveSheet("when")} />
               <Row label="Род обращения"                   value={genderShort}     onClick={() => setActiveSheet("gender")} />
               <Row label="Имя — как ко мне обращаться"     value={name || "—"}     onClick={() => { setEditName(name); setActiveSheet("name"); }} />

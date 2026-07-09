@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { createClientComponentClient } from "@/lib/supabase";
 import { saveOnboarding } from "@/lib/profile";
+import { requestNotifPermission, tryOsNotification } from "@/lib/notifications";
 import type { NotifPermission } from "@/types/app";
 import {
   STEP,
@@ -19,34 +20,11 @@ import {
 // Текст демо-уведомления (превью в интерфейсе и настоящий OS-пуш при granted).
 const SAMPLE_PUSH = "Завтра твой забег. Сегодня просто выспись.";
 
-/** Системный запрос разрешения на уведомления. Безопасно вне браузера/без API. */
-async function requestNotifPermission(): Promise<NotifPermission> {
-  try {
-    if (typeof window !== "undefined" && "Notification" in window) {
-      return (await Notification.requestPermission()) as NotifPermission;
-    }
-  } catch {
-    /* игнорируем — вернём 'default' */
-  }
-  return "default";
-}
-
 /** Реплика Ники по результату системного запроса (тексты финальные). */
 function permissionAck(res: NotifPermission): string {
   if (res === "granted") return "Спасибо, что впустила. Писать буду редко и по делу, не на ночь глядя.";
   if (res === "denied") return "Поняла. Уведомления пока выключены, включишь в настройках, когда захочешь.";
   return "Хорошо, спрошу в другой раз. Это всегда можно включить в настройках.";
-}
-
-/** Пытается показать настоящее ОС-уведомление (только при granted). */
-function tryOsNotification(body: string) {
-  try {
-    if ("Notification" in window && Notification.permission === "granted") {
-      new Notification("Ника", { body });
-    }
-  } catch {
-    /* уведомление не критично — баннер в интерфейсе показываем всегда */
-  }
 }
 
 // ─── финальные тексты (собираются из состояния) ───────────────────────────────
@@ -432,7 +410,7 @@ export function ChatOnboarding({ userId }: { userId: string }) {
           if (token !== genRef.current) return;
           await nikaType(["Например, вот так это будет выглядеть:"], token);
           if (token !== genRef.current) return;
-          if (res === "granted") tryOsNotification(SAMPLE_PUSH);
+          if (res === "granted") tryOsNotification("Ника", SAMPLE_PUSH);
           showBanner(SAMPLE_PUSH);
         } else {
           const ackText = skip ? "Хорошо, пропустим." : STEP[id as Exclude<StepId, "final">].ack(value);

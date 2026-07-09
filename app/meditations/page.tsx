@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createServerComponentClient } from "@/lib/supabase";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
-import { MobileHeader } from "@/components/journal/MobileHeader";
+import { PageHeader } from "@/components/nav/PageHeader";
 
 export default async function MeditationsPage() {
   const supabase = await createServerComponentClient();
@@ -13,7 +13,7 @@ export default async function MeditationsPage() {
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
-      <MobileHeader title="Медитации" />
+      <PageHeader title="Медитации" />
 
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
         <div className="mx-auto w-full max-w-[640px] px-6 pt-10 lg:pt-16">

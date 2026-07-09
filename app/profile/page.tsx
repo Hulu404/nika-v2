@@ -21,7 +21,7 @@ export default async function ProfilePage() {
       .maybeSingle(),
     supabase
       .from("profiles")
-      .select("reminder_enabled, gender")
+      .select("reminder_enabled, gender, proactive")
       .eq("user_id", user.id)
       .maybeSingle(),
   ]);
@@ -35,6 +35,7 @@ export default async function ProfilePage() {
         isPro={resolveIsPro(userData?.is_pro)}
         reminderEnabled={profileData?.reminder_enabled ?? false}
         initialGender={profileData?.gender ?? null}
+        initialProactive={profileData?.proactive ?? false}
         createdAt={userData?.created_at ?? user.created_at ?? new Date().toISOString()}
       />
     </AppLayout>
