@@ -296,45 +296,88 @@ export function SprintDashboard({ sprint: initialSprint, userId }: Props) {
         </div>
       </section>
 
-      {/* Закрыть спринт */}
-      <section className="mt-2">
-        {!showClose ? (
-          <button
-            onClick={() => setShowClose(true)}
-            className="text-[13px] text-ink-muted underline-offset-2 hover:underline"
-          >
-            Закрыть спринт досрочно
-          </button>
-        ) : (
-          <Card>
-            <p className="mb-3 text-[14px] text-ink-secondary">
-              Хочешь закрыть спринт? Можешь оставить заметку — что было важным.
+      {/* Экран завершения на день 21 */}
+      {day >= TOTAL_DAYS ? (
+        <section>
+          <Card className="border-accent/30 bg-surface-nika">
+            <p className="mb-1 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-accent">
+              Спринт завершён · день 21
+            </p>
+            <h3 className="mb-3 font-serif text-[20px] leading-[1.3] text-ink-primary">
+              Ты дошёл(шла) до конца. Это уже много.
+            </h3>
+            <p className="mb-4 text-[13px] leading-[1.5] text-ink-secondary">
+              Можешь оставить пару слов — что было важным, что изменилось. Или просто закрыть.
             </p>
             <textarea
               value={closingReflection}
               onChange={(e) => setClosingReflection(e.target.value)}
               placeholder="Необязательно..."
               rows={3}
-              className="w-full resize-none rounded-xl border border-line-subtle bg-surface-warm px-3 py-2.5 text-[14px] text-ink-primary placeholder:text-ink-faint focus:border-accent focus:outline-none"
+              className="w-full resize-none rounded-xl border border-line-subtle bg-elevated px-3 py-2.5 text-[14px] text-ink-primary placeholder:text-ink-faint focus:border-accent focus:outline-none"
             />
-            <div className="mt-3 flex gap-2">
+            <div className="mt-4 flex flex-col gap-2">
               <button
                 onClick={handleClose}
                 disabled={closingSaving}
-                className="rounded-full bg-accent px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-40"
+                className="rounded-full bg-accent py-3 text-[14px] font-semibold text-white disabled:opacity-40"
               >
                 Закрыть спринт
               </button>
               <button
-                onClick={() => setShowClose(false)}
-                className="rounded-full border border-line-subtle px-4 py-2 text-[13px] text-ink-secondary"
+                onClick={async () => {
+                  await handleClose();
+                  router.push("/sprint/setup");
+                }}
+                disabled={closingSaving}
+                className="rounded-full border border-accent/40 py-3 text-[14px] font-semibold text-accent disabled:opacity-40"
               >
-                Отмена
+                Закрыть и начать новый
               </button>
             </div>
           </Card>
-        )}
-      </section>
+        </section>
+      ) : (
+        /* Досрочное закрытие */
+        <section className="mt-2">
+          {!showClose ? (
+            <button
+              onClick={() => setShowClose(true)}
+              className="text-[13px] text-ink-muted underline-offset-2 hover:underline"
+            >
+              Закрыть спринт досрочно
+            </button>
+          ) : (
+            <Card>
+              <p className="mb-3 text-[14px] text-ink-secondary">
+                Хочешь закрыть спринт? Можешь оставить заметку — что было важным.
+              </p>
+              <textarea
+                value={closingReflection}
+                onChange={(e) => setClosingReflection(e.target.value)}
+                placeholder="Необязательно..."
+                rows={3}
+                className="w-full resize-none rounded-xl border border-line-subtle bg-surface-warm px-3 py-2.5 text-[14px] text-ink-primary placeholder:text-ink-faint focus:border-accent focus:outline-none"
+              />
+              <div className="mt-3 flex gap-2">
+                <button
+                  onClick={handleClose}
+                  disabled={closingSaving}
+                  className="rounded-full bg-accent px-4 py-2 text-[13px] font-semibold text-white disabled:opacity-40"
+                >
+                  Закрыть спринт
+                </button>
+                <button
+                  onClick={() => setShowClose(false)}
+                  className="rounded-full border border-line-subtle px-4 py-2 text-[13px] text-ink-secondary"
+                >
+                  Отмена
+                </button>
+              </div>
+            </Card>
+          )}
+        </section>
+      )}
 
     </div>
   );
