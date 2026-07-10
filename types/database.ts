@@ -1,15 +1,20 @@
 import type {
+  ArchetypeId,
   CyclePref,
   Gender,
   Message,
+  Milestone,
   NotifPermission,
+  QuizAnswer,
   RunIntensity,
   RunnerFear,
   RunnerGoal,
   RunnerLevel,
   ScenarioType,
+  SprintStatus,
   SubscriptionPlan,
   SubscriptionStatus,
+  WeeklyFocus,
 } from "./app";
 
 /** JSON-совместимое значение для jsonb-колонок. */
@@ -214,6 +219,57 @@ export interface Database {
         };
         Relationships: [];
       };
+      sprints: {
+        Row: {
+          id: string;
+          user_id: string;
+          archetype_id: ArchetypeId;
+          goal_text: string;
+          milestones_enabled: boolean;
+          milestones: Milestone[];
+          weekly_focus: WeeklyFocus[];
+          quiz_answers: QuizAnswer[];
+          closing_reflection: string | null;
+          start_date: string;
+          status: SprintStatus;
+          closed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          archetype_id: ArchetypeId;
+          goal_text: string;
+          milestones_enabled?: boolean;
+          milestones?: Milestone[];
+          weekly_focus?: WeeklyFocus[];
+          quiz_answers?: QuizAnswer[];
+          closing_reflection?: string | null;
+          start_date?: string;
+          status?: SprintStatus;
+          closed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          archetype_id?: ArchetypeId;
+          goal_text?: string;
+          milestones_enabled?: boolean;
+          milestones?: Milestone[];
+          weekly_focus?: WeeklyFocus[];
+          quiz_answers?: QuizAnswer[];
+          closing_reflection?: string | null;
+          start_date?: string;
+          status?: SprintStatus;
+          closed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -235,6 +291,8 @@ export interface Database {
       scenario_type: ScenarioType;
       subscription_plan: SubscriptionPlan;
       subscription_status: SubscriptionStatus;
+      archetype_id: ArchetypeId;
+      sprint_status: SprintStatus;
     };
     CompositeTypes: { [_ in never]: never };
   };
@@ -248,6 +306,7 @@ export type Profile = Tables["profiles"]["Row"];
 export type Conversation = Tables["conversations"]["Row"];
 export type RunRow = Tables["runs"]["Row"];
 export type Subscription = Tables["subscriptions"]["Row"];
+export type SprintRow = Tables["sprints"]["Row"];
 
 /** Типы для вставки. */
 export type UserInsert = Tables["users"]["Insert"];

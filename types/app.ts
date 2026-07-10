@@ -48,3 +48,49 @@ export interface Message {
 
 /** Пользователь вместе с его беговым профилем. */
 export type UserProfile = User & { profile: Profile };
+
+// ─────────────────────────────────────── Спринт ──────────────────────────────
+
+/** Архетип бегуна — определяется квизом. Ключи совпадают с Postgres enum. */
+export type ArchetypeId = "threshold" | "calm" | "builder" | "goal" | "moment";
+
+/** Ориентир (чекпоинт) внутри спринта. */
+export interface Milestone {
+  id: string;
+  label: string;
+  achieved_at: string | null;
+}
+
+/** Фокус недели — результат еженедельного чек-ина. */
+export interface WeeklyFocus {
+  week_number: 1 | 2 | 3;
+  focus_text: string;
+  set_at: string;
+}
+
+/** Ответ на один вопрос квиза. */
+export interface QuizAnswer {
+  question_index: 0 | 1 | 2 | 3;
+  archetype_vote: ArchetypeId;
+}
+
+/** Статус спринта — намеренно без 'failed'. */
+export type SprintStatus = "active" | "closed";
+
+/** Полная запись спринта (зеркалит строку таблицы sprints). */
+export interface Sprint {
+  id: string;
+  user_id: string;
+  archetype_id: ArchetypeId;
+  goal_text: string;
+  milestones_enabled: boolean;
+  milestones: Milestone[];
+  weekly_focus: WeeklyFocus[];
+  quiz_answers: QuizAnswer[];
+  closing_reflection: string | null;
+  start_date: string;
+  status: SprintStatus;
+  closed_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
