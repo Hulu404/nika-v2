@@ -70,6 +70,14 @@ function IcBell() {
     </svg>
   );
 }
+function IcSprint() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+      <path d="M9 2v4M13.5 4.5l-3 2.5M15 9h-4M13.5 13.5l-3-2.5M9 16v-4M4.5 13.5l3-2.5M3 9h4M4.5 4.5l3 2.5"
+        stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  );
+}
 function IcUser() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -186,15 +194,18 @@ export function Sidebar({ recentConvos, isPro = false, showRhythm = false }: Sid
   }
 
   const NAV = [
-    { href: "/today",       label: "Сегодня",        icon: <IcHome />,  implemented: true },
-    { href: "#",            label: "Трекинг",         icon: <IcTimer />, implemented: false },
-    { href: "#",            label: "Медитации",       icon: <IcLotus />, implemented: false },
-    { href: "/journal",     label: "Журнал пробежек", icon: <IcList />,  implemented: true },
+    { href: "/today",       label: "Сегодня",        icon: <IcHome />,   implemented: true },
+    { href: "#",            label: "Трекинг",         icon: <IcTimer />,  implemented: false },
+    { href: "#",            label: "Медитации",       icon: <IcLotus />,  implemented: false },
+    { href: "/journal",     label: "Журнал пробежек", icon: <IcList />,   implemented: true },
     ...(showRhythm
-      ? [{ href: "/rhythm", label: "Мой ритм", icon: <IcRhythm />, implemented: true }]
+      ? [{ href: "/rhythm", label: "Мой ритм",        icon: <IcRhythm />, implemented: true }]
       : []),
-    { href: "/analytics",   label: "Аналитика",       icon: <IcChart />, implemented: true },
-    { href: "#",          label: "Пуши",            icon: <IcBell />,  implemented: false },
+    { href: "/analytics",   label: "Аналитика",       icon: <IcChart />,  implemented: true },
+    ...(isPro
+      ? [{ href: "/sprint", label: "Спринт",          icon: <IcSprint />, implemented: true }]
+      : []),
+    { href: "#",            label: "Пуши",            icon: <IcBell />,   implemented: false },
   ];
 
   // Suppress width transition on first paint to avoid flash
