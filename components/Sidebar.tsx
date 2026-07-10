@@ -188,7 +188,7 @@ export function Sidebar({ recentConvos, isPro = false, showRhythm = false }: Sid
   const NAV = [
     { href: "/today",       label: "Сегодня",        icon: <IcHome />,  implemented: true },
     { href: "#",            label: "Трекинг",         icon: <IcTimer />, implemented: false },
-    { href: "/meditations", label: "Медитации",       icon: <IcLotus />, implemented: true },
+    { href: "#",            label: "Медитации",       icon: <IcLotus />, implemented: false },
     { href: "/journal",     label: "Журнал пробежек", icon: <IcList />,  implemented: true },
     ...(showRhythm
       ? [{ href: "/rhythm", label: "Мой ритм", icon: <IcRhythm />, implemented: true }]
