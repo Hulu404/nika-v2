@@ -155,6 +155,7 @@ export function RhythmScreen({
     setSaving(true);
     const err = await saveRhythmConsent(supabase, userId);
     if (err) {
+      console.error("[rhythm] consent save failed:", err);
       setSaving(false);
       setError("Не получилось сохранить согласие. Попробуй ещё раз.");
       return;

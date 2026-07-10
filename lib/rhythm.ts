@@ -59,13 +59,18 @@ export async function saveRhythmConsent(
   supabase: Client,
   userId: string,
 ): Promise<string | null> {
+  // upsert по user_id (как остальные записи профиля) — надёжнее .update():
+  // не молчит, если строки профиля почему-то нет, и не зависит от её наличия.
   const { error } = await supabase
     .from("profiles")
-    .update({
-      rhythm_consent_at: new Date().toISOString(),
-      rhythm_consent_version: RHYTHM_CONSENT_VERSION,
-    })
-    .eq("user_id", userId);
+    .upsert(
+      {
+        user_id: userId,
+        rhythm_consent_at: new Date().toISOString(),
+        rhythm_consent_version: RHYTHM_CONSENT_VERSION,
+      },
+      { onConflict: "user_id" },
+    );
   return error?.message ?? null;
 }
 
