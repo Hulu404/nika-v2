@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>НИКА — бег начинается в голове</title>
+<meta name="description" content="НИКА — собеседник для бегунов-любителей. Не тренер, не план. Рядом в те моменты, когда хочется всё бросить.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,500;1,9..144,400;1,9..144,500&family=Geist:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-canvas:#EFE7D7; --bg-primary:#FAF7F1; --bg-elevated:#FFFCF6;
+    --surface-nika:#F4EFE6; --surface-warm:#F4E4D6; --surface-deep:#E9DFCB;
+    --ink-primary:#1F1B16; --ink-secondary:#5C534A; --ink-muted:#9A9085; --ink-faint:#C2B7A6;
+    --border-subtle:#EFE9DD; --border-default:#E5DDD0; --border-strong:#D4C9B5;
+    --accent:#C8553D; --accent-deep:#B0392A; --accent-soft:#E8B7A8;
+    --radius-card:16px; --radius-pill:999px;
+    --shadow-card:0 1px 2px rgba(31,27,22,0.04), 0 8px 24px rgba(31,27,22,0.06);
+    --shadow-soft:0 1px 3px rgba(31,27,22,0.06);
+    --font-serif:"Fraunces","Georgia",serif;
+    --font-sans:"Geist","Inter",-apple-system,system-ui,sans-serif;
+    --maxw:1080px;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg-canvas:#14110E; --bg-primary:#1B1814; --bg-elevated:#221E19;
+      --surface-nika:#2A241D; --surface-warm:#3A2920; --surface-deep:#2F2820;
+      --ink-primary:#F5EFE3; --ink-secondary:#B5A998; --ink-muted:#7A6F62; --ink-faint:#4F4639;
+      --border-subtle:#2A241D; --border-default:#34291F; --border-strong:#4A3D2E;
+      --accent:#E07A5F; --accent-deep:#C8553D; --accent-soft:#5A3A2E;
+      --shadow-card:0 1px 2px rgba(0,0,0,0.2), 0 8px 24px rgba(0,0,0,0.28);
+      --shadow-soft:0 1px 3px rgba(0,0,0,0.25);
+    }
+  }
+
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    background-color:var(--bg-primary);
+    background-image:
+      radial-gradient(circle at 18% 0%, rgba(200,85,61,0.06), transparent 42%),
+      radial-gradient(circle at 85% 100%, rgba(31,27,22,0.04), transparent 42%);
+    color:var(--ink-primary);
+    font-family:var(--font-sans);
+    font-feature-settings:"ss01","cv11";
+    -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    line-height:1.5; min-height:100dvh;
+  }
+  a{color:inherit;text-decoration:none;}
+  em{font-style:italic;color:var(--accent);}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px;}
+  .serif{font-family:var(--font-serif);font-weight:400;letter-spacing:-0.02em;line-height:1.12;}
+  .overline{font-size:12px;font-weight:600;letter-spacing:0.14em;text-transform:uppercase;color:var(--ink-muted);}
+  .sub{color:var(--ink-secondary);}
+
+  /* ── Buttons ── */
+  .btn{display:inline-flex;align-items:center;gap:8px;height:54px;padding:0 28px;border-radius:var(--radius-pill);
+    font-size:15px;font-weight:500;transition:background-color .18s ease,color .18s ease,border-color .18s ease,transform .18s ease;}
+  .btn-primary{background:var(--ink-primary);color:var(--bg-primary);}
+  .btn-primary:hover{background:var(--accent);transform:translateY(-1px);}
+  .btn-ghost{background:transparent;color:var(--ink-primary);border:1.5px solid var(--border-strong);}
+  .btn-ghost:hover{border-color:var(--ink-primary);}
+
+  /* ── Nav ── */
+  .nav{position:sticky;top:0;z-index:20;backdrop-filter:blur(10px);
+    background:color-mix(in srgb,var(--bg-primary) 78%, transparent);
+    border-bottom:1px solid var(--border-subtle);}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:64px;}
+  .brand{display:flex;align-items:center;gap:10px;font-weight:600;letter-spacing:.02em;}
+  .dot{width:26px;height:26px;border-radius:999px;background:linear-gradient(135deg,#F4E4D6 0%,#E8B7A8 60%,#C8553D 130%);box-shadow:var(--shadow-soft);}
+  .nav-links{display:flex;align-items:center;gap:26px;font-size:14px;color:var(--ink-secondary);}
+  .nav-links a:hover{color:var(--ink-primary);}
+  .nav-cta{display:inline-flex;align-items:center;height:40px;padding:0 18px;border-radius:var(--radius-pill);background:var(--ink-primary);color:var(--bg-primary);font-size:14px;font-weight:500;}
+  .nav-cta:hover{background:var(--accent);}
+  @media(max-width:680px){.nav-links a:not(.nav-cta){display:none;}}
+
+  /* ── Hero ── */
+  .hero{padding:84px 0 64px;}
+  .hero-avatar{width:76px;height:76px;border-radius:999px;background:linear-gradient(135deg,#F4E4D6 0%,#E8B7A8 60%,#C8553D 130%);box-shadow:var(--shadow-card);margin-bottom:30px;}
+  .hero h1{font-size:clamp(40px,6.4vw,68px);max-width:14ch;}
+  .hero-sub{margin-top:24px;font-size:clamp(16px,2vw,19px);max-width:52ch;color:var(--ink-secondary);line-height:1.6;}
+  .hero-cta{margin-top:36px;display:flex;flex-wrap:wrap;gap:14px;}
+  .hero-tag{margin-top:28px;display:inline-flex;align-items:center;gap:8px;font-size:13px;color:var(--ink-muted);}
+  .hero-tag .pulse{width:7px;height:7px;border-radius:999px;background:var(--accent);}
+
+  /* ── Section scaffolding ── */
+  section{padding:64px 0;}
+  .sec-head{max-width:60ch;margin-bottom:40px;}
+  .sec-head h2{font-size:clamp(30px,4.2vw,46px);margin-top:12px;}
+  .sec-head .sub{margin-top:14px;font-size:16px;line-height:1.6;}
+
+  /* ── Fork ── */
+  .fork-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px;}
+  .fork-card{position:relative;border:1.5px solid var(--border-default);background:var(--bg-elevated);border-radius:var(--radius-card);
+    padding:30px;box-shadow:var(--shadow-soft);transition:border-color .18s ease,transform .18s ease,box-shadow .18s ease;display:flex;flex-direction:column;min-height:228px;}
+  .fork-card:hover{border-color:var(--ink-primary);transform:translateY(-2px);box-shadow:var(--shadow-card);}
+  .fork-card.tone-holistic{background:var(--surface-warm);border-color:transparent;}
+  .fork-card .ttl{font-family:var(--font-serif);font-size:25px;line-height:1.18;letter-spacing:-0.015em;margin:14px 0 10px;}
+  .fork-card .bd{color:var(--ink-secondary);font-size:15px;line-height:1.6;}
+  .fork-card .go{margin-top:auto;padding-top:18px;font-weight:500;color:var(--accent);display:inline-flex;align-items:center;gap:6px;}
+  .fork-card:hover .go{gap:10px;}
+
+  /* ── Feature cards (how it works) ── */
+  .feat-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .feat{border:1.5px solid var(--border-default);background:var(--bg-elevated);border-radius:var(--radius-card);padding:26px;box-shadow:var(--shadow-soft);}
+  .feat .n{width:34px;height:34px;border-radius:999px;background:var(--surface-warm);color:var(--accent-deep);display:flex;align-items:center;justify-content:center;font-weight:600;font-size:15px;margin-bottom:16px;}
+  .feat h3{font-family:var(--font-serif);font-size:20px;font-weight:500;letter-spacing:-0.01em;margin-bottom:10px;}
+  .feat p{color:var(--ink-secondary);font-size:14.5px;line-height:1.62;}
+  .principle{margin-top:22px;border-radius:var(--radius-card);background:var(--ink-primary);color:var(--bg-primary);padding:26px 30px;display:flex;gap:16px;align-items:flex-start;}
+  .principle .star{color:var(--accent-soft);font-size:20px;line-height:1.2;}
+  .principle p{font-size:16px;line-height:1.6;max-width:64ch;}
+  .principle em{color:var(--accent-soft);}
+
+  /* ── Moments (5 scenarios) ── */
+  .moments{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;}
+  .moment{border:1.5px solid var(--border-default);background:var(--bg-elevated);border-radius:var(--radius-card);padding:24px;box-shadow:var(--shadow-soft);display:flex;flex-direction:column;}
+  .moment.feat-moment{background:var(--surface-warm);border-color:transparent;}
+  .moment .tag{font-size:12px;font-weight:600;letter-spacing:.04em;color:var(--ink-muted);}
+  .moment.feat-moment .tag{color:var(--accent-deep);}
+  .moment h3{font-family:var(--font-serif);font-size:21px;font-weight:500;letter-spacing:-0.01em;margin:8px 0 12px;}
+  .moment .quote{font-family:var(--font-serif);font-style:italic;font-size:15px;line-height:1.5;color:var(--ink-secondary);border-left:2px solid var(--accent-soft);padding-left:14px;margin-top:auto;}
+
+  /* ── Manifesto ── */
+  .mani{background:var(--surface-nika);border-radius:24px;padding:48px 40px;}
+  .mani-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px;margin-top:32px;}
+  .mani-item{display:flex;gap:14px;align-items:flex-start;}
+  .mani-item .x{flex:none;width:24px;height:24px;border-radius:999px;border:1.5px solid var(--border-strong);color:var(--ink-muted);display:flex;align-items:center;justify-content:center;font-size:13px;margin-top:2px;}
+  .mani-item h4{font-family:var(--font-serif);font-size:17px;font-weight:500;margin-bottom:4px;}
+  .mani-item p{color:var(--ink-secondary);font-size:14px;line-height:1.55;}
+  .mani-foot{margin-top:34px;padding-top:26px;border-top:1px solid var(--border-default);}
+  .mani-foot .q{font-family:var(--font-serif);font-size:22px;letter-spacing:-0.01em;}
+  .mani-foot .a{margin-top:8px;color:var(--ink-secondary);font-size:15px;max-width:56ch;line-height:1.6;}
+
+  /* ── Goal CTA ── */
+  .goals{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:36px;}
+  .goal{border:1.5px solid var(--border-default);background:var(--bg-elevated);border-radius:var(--radius-card);padding:22px;text-align:left;transition:border-color .18s ease,transform .18s ease,box-shadow .18s ease;box-shadow:var(--shadow-soft);}
+  .goal:hover{border-color:var(--ink-primary);transform:translateY(-2px);box-shadow:var(--shadow-card);}
+  .goal .g-ttl{font-family:var(--font-serif);font-size:19px;font-weight:500;letter-spacing:-0.01em;margin-bottom:6px;}
+  .goal .g-sub{color:var(--ink-muted);font-size:13.5px;line-height:1.5;}
+  .goal .g-arrow{margin-top:16px;color:var(--accent);font-size:18px;}
+  .cta-final{text-align:center;}
+  .cta-final h2{font-size:clamp(30px,4.6vw,48px);}
+  .cta-final .sub{margin:14px auto 36px;max-width:48ch;font-size:16px;line-height:1.6;}
+
+  /* ── Footer ── */
+  footer{border-top:1px solid var(--border-subtle);padding:40px 0 56px;margin-top:24px;}
+  .foot-inner{display:flex;flex-wrap:wrap;gap:20px;justify-content:space-between;align-items:center;}
+  .foot-links{display:flex;gap:22px;font-size:14px;color:var(--ink-secondary);}
+  .foot-links a:hover{color:var(--ink-primary);}
+  .foot-fine{font-size:13px;color:var(--ink-muted);margin-top:18px;}
+
+  /* ── Responsive ── */
+  @media(max-width:880px){
+    .feat-grid,.moments{grid-template-columns:1fr 1fr;}
+    .goals{grid-template-columns:1fr 1fr;}
+  }
+  @media(max-width:620px){
+    .fork-grid,.feat-grid,.moments,.mani-grid,.goals{grid-template-columns:1fr;}
+    .hero{padding:60px 0 48px;}
+    section{padding:52px 0;}
+    .mani{padding:36px 24px;}
+  }
+</style>
+</head>
+<body>
+
+  <!-- ── Nav ── -->
+  <header class="nav">
+    <div class="wrap nav-inner">
+      <a href="#top" class="brand"><span class="dot" aria-hidden="true"></span> НИКА</a>
+      <nav class="nav-links" aria-label="Основная навигация">
+        <a href="#how">Как это работает</a>
+        <a href="#moments">Когда я рядом</a>
+        <a href="#manifesto">Манифест</a>
+        <a href="/" class="nav-cta">Начать</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top">
+
+    <!-- ── Hero ── -->
+    <section class="hero">
+      <div class="wrap">
+        <div class="hero-avatar" aria-hidden="true"></div>
+        <h1 class="serif">Я не тренер. Не план.<br>Я рядом — <em>чтобы ты не бросил.</em></h1>
+        <p class="hero-sub">НИКА — собеседник для бегунов-любителей. Бег начинается в голове, и я помогаю в те моменты, когда хочется всё бросить: после пропуска, перед стартом, когда не выходит.</p>
+        <div class="hero-cta">
+          <a href="/" class="btn btn-primary">Начать</a>
+          <a href="#how" class="btn btn-ghost">Как это работает →</a>
+        </div>
+        <span class="hero-tag"><span class="pulse" aria-hidden="true"></span> твой бег изнутри</span>
+      </div>
+    </section>
+
+    <!-- ── Fork: что тебе ближе ── -->
+    <section aria-labelledby="fork-h">
+      <div class="wrap">
+        <div class="sec-head">
+          <span class="overline">С чего начать</span>
+          <h2 id="fork-h" class="serif">Что тебе <em>ближе?</em></h2>
+          <p class="sub">Два способа узнать НИКУ. Оба ведут в одно — чтобы ты не бросил бег.</p>
+        </div>
+        <div class="fork-grid">
+          <a href="#moments" class="fork-card tone-holistic">
+            <span class="overline">По-человечески</span>
+            <span class="ttl">Мне важно, что я чувствую</span>
+            <span class="bd">Хочу, чтобы меня поняли и поддержали — без оценок, планов и «ты должен был».</span>
+            <span class="go">Моменты, когда я рядом →</span>
+          </a>
+          <a href="#how" class="fork-card">
+            <span class="overline">По делу</span>
+            <span class="ttl">Хочу понять, как это работает</span>
+            <span class="bd">Что под капотом, что я получу и где остаётся мой контроль.</span>
+            <span class="go">Как это работает →</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Как это работает (аналитик) ── -->
+    <section id="how" aria-labelledby="how-h">
+      <div class="wrap">
+        <div class="sec-head">
+          <span class="overline">По делу</span>
+          <h2 id="how-h" class="serif">Как это <em>работает</em></h2>
+          <p class="sub">Без магии. Простой механизм, который помогает не сорваться в самобичевание и вернуться к бегу.</p>
+        </div>
+        <div class="feat-grid">
+          <div class="feat">
+            <div class="n" aria-hidden="true">1</div>
+            <h3>Помнит контекст</h3>
+            <p>НИКА держит в памяти, что у тебя происходит, и не заставляет каждый раз объяснять заново. На PRO память остаётся навсегда.</p>
+          </div>
+          <div class="feat">
+            <div class="n" aria-hidden="true">2</div>
+            <h3>Знает 5 моментов срыва</h3>
+            <p>Утро перед бегом, после пробежки, после пропуска, перед стартом, после неудачи. НИКА распознаёт момент и подбирает тон — а не сыплет универсальными советами.</p>
+          </div>
+          <div class="feat">
+            <div class="n" aria-hidden="true">3</div>
+            <h3>Ты управляешь</h3>
+            <p>НИКА пишет только когда ты сам задал расписание. Работает на основе того, что ты рассказываешь, — никаких данных с внешних устройств без спроса.</p>
+          </div>
+        </div>
+        <div class="principle">
+          <span class="star" aria-hidden="true">★</span>
+          <p>Смысл один: чтобы после пропуска ты <em>вернулся</em>. Это единственная метрика, которая нам важна — всё остальное производно.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Моменты, когда я рядом (холистик / 5 сценариев) ── -->
+    <section id="moments" aria-labelledby="mom-h">
+      <div class="wrap">
+        <div class="sec-head">
+          <span class="overline">По-человечески</span>
+          <h2 id="mom-h" class="serif">Моменты, когда я <em>рядом</em></h2>
+          <p class="sub">Пять разговоров для тех точек, где бегуны чаще всего бросают. Вот как звучит НИКА.</p>
+        </div>
+        <div class="moments">
+          <div class="moment">
+            <span class="tag">Утро перед бегом</span>
+            <h3>Когда тяжело выйти</h3>
+            <p class="quote">«Доброе утро. Не будем торопиться — давай сначала просто поймём, как ты сейчас.»</p>
+          </div>
+          <div class="moment feat-moment">
+            <span class="tag">★ После пропуска</span>
+            <h3>Когда сорвался</h3>
+            <p class="quote">«Ты пропустил — и всё равно пришёл сюда. Это уже бережно по отношению к себе.»</p>
+          </div>
+          <div class="moment">
+            <span class="tag">Перед стартом</span>
+            <h3>Когда волнуешься</h3>
+            <p class="quote">«Скоро старт. Чувствуешь волнение? Давай немного побудем с этим вместе.»</p>
+          </div>
+          <div class="moment">
+            <span class="tag">После пробежки</span>
+            <h3>Прожить и закрепить</h3>
+            <p class="quote">«Ты вернулся. Как ты сейчас — что в теле и в голове?»</p>
+          </div>
+          <div class="moment">
+            <span class="tag">После неудачи</span>
+            <h3>Травма или провал</h3>
+            <p class="quote">«Я рядом. Похоже, было тяжело. Расскажешь, что произошло?»</p>
+          </div>
+          <div class="moment">
+            <span class="tag">Просто поговорить</span>
+            <h3>Без темы</h3>
+            <p class="quote">«Привет. Я здесь. Как ты?»</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Манифест: что НИКА не делает ── -->
+    <section id="manifesto" aria-labelledby="mani-h">
+      <div class="wrap">
+        <div class="mani">
+          <span class="overline">Честно</span>
+          <h2 id="mani-h" class="serif" style="font-size:clamp(28px,3.8vw,40px);margin-top:12px;">Что НИКА <em>не делает</em></h2>
+          <p class="sub" style="margin-top:12px;">Чтобы не было ложных ожиданий. Это важно.</p>
+          <div class="mani-grid">
+            <div class="mani-item"><span class="x" aria-hidden="true">✕</span><div><h4>Не тренер</h4><p>Не составляю планы, не контролирую пульс и темп, не учу технике.</p></div></div>
+            <div class="mani-item"><span class="x" aria-hidden="true">✕</span><div><h4>Не психолог</h4><p>Не ставлю диагнозы и не заменяю специалиста. Серьёзные вещи требуют реальной помощи.</p></div></div>
+            <div class="mani-item"><span class="x" aria-hidden="true">✕</span><div><h4>Не судья</h4><p>Не оцениваю результаты, не сравниваю с другими, не говорю «ты должен был».</p></div></div>
+            <div class="mani-item"><span class="x" aria-hidden="true">✕</span><div><h4>Не спамит</h4><p>Не пишу каждый день. Только тогда, когда ты сам задал расписание.</p></div></div>
+            <div class="mani-item"><span class="x" aria-hidden="true">✕</span><div><h4>Не знает всего о тебе</h4><p>Работаю на основе того, что ты пишешь. Никаких данных с внешних устройств.</p></div></div>
+          </div>
+          <div class="mani-foot">
+            <p class="q serif">Зачем тогда НИКА?</p>
+            <p class="a">Чтобы ты не бросил. Я рядом — слушаю, не осуждаю, помогаю пережить трудный момент и вернуться к бегу.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ── Финальный CTA: развилка по цели ── -->
+    <section aria-labelledby="cta-h">
+      <div class="wrap cta-final">
+        <span class="overline">Поехали</span>
+        <h2 id="cta-h" class="serif">С чего <em>начнёшь?</em></h2>
+        <p class="sub">Выбери, что для тебя сейчас главное — НИКА подстроится под это.</p>
+        <div class="goals">
+          <a href="/?goal=habit" class="goal">
+            <div class="g-ttl">Войти в привычку</div>
+            <div class="g-sub">Бегать стабильно и регулярно</div>
+            <div class="g-arrow" aria-hidden="true">→</div>
+          </a>
+          <a href="/?goal=not_quit" class="goal">
+            <div class="g-ttl">Не бросить</div>
+            <div class="g-sub">Удержаться и не сдаться</div>
+            <div class="g-arrow" aria-hidden="true">→</div>
+          </a>
+          <a href="/?goal=race" class="goal">
+            <div class="g-ttl">Подготовиться к забегу</div>
+            <div class="g-sub">Есть конкретная дистанция</div>
+            <div class="g-arrow" aria-hidden="true">→</div>
+          </a>
+          <a href="/?goal=anxiety" class="goal">
+            <div class="g-ttl">Справиться с тревогой</div>
+            <div class="g-sub">Бег как поддержка</div>
+            <div class="g-arrow" aria-hidden="true">→</div>
+          </a>
+        </div>
+        <a href="/" class="btn btn-primary">Начать с НИКОЙ</a>
+      </div>
+    </section>
+  </main>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <div class="wrap">
+      <div class="foot-inner">
+        <a href="#top" class="brand"><span class="dot" aria-hidden="true"></span> НИКА</a>
+        <nav class="foot-links" aria-label="Ссылки в подвале">
+          <a href="https://t.me/nika_run_bot" target="_blank" rel="noopener">Telegram</a>
+          <a href="#how">Как это работает</a>
+          <a href="#manifesto">Манифест</a>
+          <a href="/">Войти</a>
+        </nav>
+      </div>
+      <p class="foot-fine">НИКА · бег начинается в голове · собеседник для бегунов-любителей</p>
+    </div>
+  </footer>
+
+</body>
+</html>
