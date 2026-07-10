@@ -5,6 +5,7 @@ import { FREE_DAILY_LIMIT, isLimitReached } from "@/lib/limits";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { ALL_SCENARIOS } from "@/lib/scenarios";
+import { buildSprintContext, getActiveSprint } from "@/lib/sprint";
 import { createServerComponentClient } from "@/lib/supabase";
 import type { Message } from "@/types/app";
 import type { Scenario } from "@/types/conversation";
@@ -113,6 +114,19 @@ export async function POST(req: Request) {
     content: m.content,
   }));
 
+  // Активный спринт — добавляем динамический <user_context> в промт.
+  const activeSprint = await getActiveSprint(supabase, user.id);
+  const systemBlocks: Anthropic.TextBlockParam[] = [
+    {
+      type: "text",
+      text: buildSystemPrompt(scenario),
+      cache_control: { type: "ephemeral" },
+    },
+  ];
+  if (activeSprint) {
+    systemBlocks.push({ type: "text", text: buildSprintContext(activeSprint) });
+  }
+
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
@@ -122,13 +136,7 @@ export async function POST(req: Request) {
         const anthropicStream = anthropic.messages.stream({
           model: NIKA_MODEL,
           max_tokens: 1024,
-          system: [
-            {
-              type: "text",
-              text: buildSystemPrompt(scenario),
-              cache_control: { type: "ephemeral" },
-            },
-          ],
+          system: systemBlocks,
           messages: anthropicMessages,
         });
 
