@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
+import { PlanBadge } from "@/components/PlanBadge";
 import { ScenarioSheet } from "@/components/ScenarioSheet";
 
 // ──────────────────────────────── иконки ────────────────────────────────────
@@ -330,6 +331,7 @@ export function Sidebar({ recentConvos, isPro = false, showRhythm = false }: Sid
               {!collapsed && (
                 <>
                   <span className="flex-1 whitespace-nowrap">Профиль</span>
+                  <PlanBadge isPro={isPro} className="px-1.5 py-[2px] text-[9px] tracking-[0.1em]" />
                   <IcChevRight />
                 </>
               )}

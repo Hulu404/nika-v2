@@ -9,6 +9,7 @@ import { requestNotifPermission } from "@/lib/notifications";
 import type { Gender, NotifPermission } from "@/types/app";
 import { SCENARIO_META, SCENARIO_ORDER } from "@/lib/scenarios";
 import { BottomSheet } from "@/components/BottomSheet";
+import { PlanBadge } from "@/components/PlanBadge";
 import { PrivacyContent } from "@/components/legal/PrivacyContent";
 import { OfertaContent } from "@/components/legal/OfertaContent";
 
@@ -326,9 +327,12 @@ export function ProfileContent({
 
           {/* Блок идентичности */}
           <div className="mb-6">
-            <p className="font-serif text-[32px] font-normal leading-tight tracking-[-0.02em] text-ink-primary">
-              {name || email.split("@")[0]}
-            </p>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <p className="font-serif text-[32px] font-normal leading-tight tracking-[-0.02em] text-ink-primary">
+                {name || email.split("@")[0]}
+              </p>
+              <PlanBadge isPro={isPro} />
+            </div>
             <p className="mt-1 text-[14px] text-ink-muted">
               С НИКОЙ {daysWithNika} {pluralDays(daysWithNika)}
             </p>
