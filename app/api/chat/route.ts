@@ -6,6 +6,8 @@ import { buildSystemPrompt } from "@/lib/prompts";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { ALL_SCENARIOS } from "@/lib/scenarios";
 import { buildSprintContext, getActiveSprint } from "@/lib/sprint";
+import { getRecentDailyState, parseYmd, userToday } from "@/lib/rhythm";
+import { buildRhythmContext } from "@/lib/rhythm/chat-context";
 import { createServerComponentClient } from "@/lib/supabase";
 import type { Message } from "@/types/app";
 import type { Scenario } from "@/types/conversation";
@@ -125,6 +127,22 @@ export async function POST(req: Request) {
   ];
   if (activeSprint) {
     systemBlocks.push({ type: "text", text: buildSprintContext(activeSprint) });
+  }
+
+  // Контекст дня из раздела «Мой ритм»: если есть свежая отметка состояния
+  // (сегодня/вчера), передаём её и границы генерации, чтобы «Обсудить в чате»
+  // продолжало тот же голос. Берём последнюю запись — так не зависим от TZ.
+  const [latestState] = await getRecentDailyState(supabase, user.id, 1);
+  if (latestState) {
+    const gapDays = Math.round(
+      (parseYmd(userToday()).getTime() - parseYmd(latestState.date).getTime()) / 86_400_000,
+    );
+    if (gapDays <= 1) {
+      systemBlocks.push({
+        type: "text",
+        text: buildRhythmContext(latestState.moods, latestState.ran),
+      });
+    }
   }
 
   const encoder = new TextEncoder();
