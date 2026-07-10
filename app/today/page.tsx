@@ -8,6 +8,7 @@ import { WeekCard } from "@/components/today/WeekCard";
 import { WeekRibbonCard } from "@/components/today/WeekRibbonCard";
 import { LastRunCard } from "@/components/today/LastRunCard";
 import { SprintPromoCard } from "@/components/today/SprintPromoCard";
+import { SprintActiveCard } from "@/components/today/SprintActiveCard";
 import { SuggestionChips } from "@/components/today/SuggestionChips";
 import { createServerComponentClient } from "@/lib/supabase";
 import { getRuns, weekSummary } from "@/lib/runs";
@@ -66,6 +67,7 @@ export default async function TodayPage() {
           <div className="grid grid-cols-2 gap-3.5">
             <QuoteCard quote={quote} />
             {isPro && !activeSprint && <SprintPromoCard />}
+            {isPro && activeSprint && <SprintActiveCard sprint={activeSprint} />}
             <StreakCard days={streak} />
             <WeekCard km={week.km} />
             <WeekRibbonCard days={ribbon} />
