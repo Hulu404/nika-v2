@@ -325,7 +325,7 @@ export function SetupWizard({ userId }: Props) {
             )}
           >
             <span className={cn(
-              "absolute top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow transition-transform duration-200",
+              "absolute left-0 top-[3px] h-[22px] w-[22px] rounded-full bg-white shadow transition-transform duration-200",
               milestonesEnabled ? "translate-x-[25px]" : "translate-x-[3px]",
             )} />
           </button>
