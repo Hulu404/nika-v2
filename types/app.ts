@@ -30,6 +30,25 @@ export type RunnerFear = "shame" | "tired" | "slow" | "doubt" | "injury";
 /** Интенсивность пробежки (журнал). */
 export type RunIntensity = "easy" | "medium" | "hard";
 
+/**
+ * Канонический ключ чипа состояния в разделе «Мой ритм» (бриф §5, 12 чипов).
+ * Это ключи, не UI-лейблы. Порядок и русские лейблы — MOOD_KEYS в lib/rhythm.ts
+ * и MOOD_LABELS в lib/rhythm-copy.ts. Мультивыбор, тумблер по тапу — не шкала.
+ */
+export type MoodKey =
+  | "energetic" // Энергична
+  | "calm" // Спокойно
+  | "tired" // Устала
+  | "irritable" // Раздражена
+  | "sad" // Грустно
+  | "anxious" // Тревожно
+  | "happy" // Счастлива
+  | "bloating" // Вздутие
+  | "pain" // Боль
+  | "insomnia" // Бессонница
+  | "cravings" // Тяга к сладкому
+  | "tenderness"; // Нежность
+
 /** План подписки. */
 export type SubscriptionPlan = "free" | "monthly" | "yearly";
 

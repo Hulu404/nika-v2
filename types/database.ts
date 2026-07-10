@@ -4,6 +4,7 @@ import type {
   Gender,
   Message,
   Milestone,
+  MoodKey,
   NotifPermission,
   QuizAnswer,
   RunIntensity,
@@ -72,6 +73,8 @@ export interface Database {
           cycle: CyclePref | null;
           proactive: boolean | null;
           notif_permission: NotifPermission | null;
+          rhythm_consent_at: string | null;
+          rhythm_consent_version: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -86,6 +89,8 @@ export interface Database {
           cycle?: CyclePref | null;
           proactive?: boolean | null;
           notif_permission?: NotifPermission | null;
+          rhythm_consent_at?: string | null;
+          rhythm_consent_version?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -100,6 +105,8 @@ export interface Database {
           cycle?: CyclePref | null;
           proactive?: boolean | null;
           notif_permission?: NotifPermission | null;
+          rhythm_consent_at?: string | null;
+          rhythm_consent_version?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -165,6 +172,60 @@ export interface Database {
           note?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      daily_state: {
+        Row: {
+          id: string;
+          user_id: string;
+          date: string;
+          moods: MoodKey[];
+          ran: boolean | null;
+          note: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          date: string;
+          moods?: MoodKey[];
+          ran?: boolean | null;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          date?: string;
+          moods?: MoodKey[];
+          ran?: boolean | null;
+          note?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      period_marks: {
+        Row: {
+          id: string;
+          user_id: string;
+          date: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          date: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          date?: string;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -305,6 +366,8 @@ export type User = Tables["users"]["Row"];
 export type Profile = Tables["profiles"]["Row"];
 export type Conversation = Tables["conversations"]["Row"];
 export type RunRow = Tables["runs"]["Row"];
+export type DailyStateRow = Tables["daily_state"]["Row"];
+export type PeriodMarkRow = Tables["period_marks"]["Row"];
 export type Subscription = Tables["subscriptions"]["Row"];
 export type SprintRow = Tables["sprints"]["Row"];
 

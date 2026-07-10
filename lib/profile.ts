@@ -48,10 +48,15 @@ export function isProfileComplete(profile: Profile | null): boolean {
 }
 
 /**
- * Видимость раздела «Мой ритм» — только для женского рода. Единая точка
- * правила: и навигация, и серверная защита страницы ссылаются сюда.
+ * Видимость раздела «Мой ритм»: женский род И учёт «тяжёлых дней» не выключен.
+ * cycle — существующий флаг онбординга (on | self | off | null); пустое значение
+ * (не спрашивали/пропустил) раздел НЕ скрывает — прячем только явный 'off'.
+ * Единая точка правила: и навигация, и серверная защита страницы ссылаются сюда.
  */
-export const showRhythm = (gender?: string | null): boolean => gender === "female";
+export const showRhythm = (
+  gender?: string | null,
+  cycle?: string | null,
+): boolean => gender === "female" && cycle !== "off";
 
 export interface OnboardingInput {
   name: string;

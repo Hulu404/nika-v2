@@ -38,7 +38,7 @@ export async function SidebarData() {
         .order("updated_at", { ascending: false })
         .limit(5),
       supabase.from("users").select("is_pro").eq("id", user.id).maybeSingle(),
-      supabase.from("profiles").select("gender").eq("user_id", user.id).maybeSingle(),
+      supabase.from("profiles").select("gender, cycle").eq("user_id", user.id).maybeSingle(),
     ]);
 
     recentConvos = (convData ?? []).map((c) => ({
@@ -48,7 +48,7 @@ export async function SidebarData() {
     }));
 
     isPro = resolveIsPro(userRow?.is_pro);
-    rhythm = showRhythm(profileRow?.gender);
+    rhythm = showRhythm(profileRow?.gender, profileRow?.cycle);
   }
 
   return <Sidebar recentConvos={recentConvos} isPro={isPro} showRhythm={rhythm} />;

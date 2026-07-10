@@ -95,22 +95,22 @@ const TAB_RHYTHM: Tab = {
 };
 
 /**
- * Набор вкладок из профиля: пятая («Мой ритм») — строго по showRhythm(gender).
+ * Набор вкладок из профиля: пятая («Мой ритм») — строго по showRhythm(gender, cycle).
  * «Профиль» переехал в аватар шапки, в баре его нет.
  */
-function buildTabs(gender?: string | null): Tab[] {
+function buildTabs(gender?: string | null, cycle?: string | null): Tab[] {
   const tabs = [TAB_HOME, TAB_CHAT, TAB_MEDITATIONS, TAB_JOURNAL];
-  if (showRhythm(gender)) tabs.push(TAB_RHYTHM);
+  if (showRhythm(gender, cycle)) tabs.push(TAB_RHYTHM);
   return tabs;
 }
 
 /**
- * gender приходит пропом с сервера (BottomNavData) и пересчитывается на каждом
- * серверном рендере, поэтому после router.refresh() бар сам перестраивается 5↔4.
+ * gender и cycle приходят пропами с сервера (BottomNavData) и пересчитываются на
+ * каждом серверном рендере, поэтому после router.refresh() бар сам перестраивается 5↔4.
  */
-export function BottomNav({ gender }: { gender?: string | null }) {
+export function BottomNav({ gender, cycle }: { gender?: string | null; cycle?: string | null }) {
   const pathname = usePathname();
-  const tabs = buildTabs(gender);
+  const tabs = buildTabs(gender, cycle);
 
   return (
     <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-[var(--bg-blur-strong)] backdrop-blur-[20px] border-t border-line-subtle pb-safe">
