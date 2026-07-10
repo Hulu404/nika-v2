@@ -10,6 +10,7 @@ import {
   currentWeeklyFocus,
   toggleMilestone,
   updateSprintGoal,
+  saveWeeklyFocus,
   closeSprint,
 } from "@/lib/sprint";
 import { cn } from "@/lib/utils";
@@ -101,6 +102,36 @@ export function SprintDashboard({ sprint: initialSprint, userId }: Props) {
     }));
   }, [supabase, sprint]);
 
+  // ── Еженедельный чек-ин ──────────────────────────────────────────────────────
+
+  // Показываем чек-ин на день 8 (неделя 2) и день 15 (неделя 3), если фокус этой
+  // недели ещё не установлен.
+  const checkinWeek: 2 | 3 | null =
+    day >= 8 && day < 15 && !sprint.weekly_focus.find((f) => f.week_number === 2) ? 2
+    : day >= 15 && !sprint.weekly_focus.find((f) => f.week_number === 3) ? 3
+    : null;
+
+  const [checkinText, setCheckinText] = useState("");
+  const [checkinSaving, setCheckinSaving] = useState(false);
+
+  const handleCheckin = useCallback(async () => {
+    if (!checkinText.trim() || checkinWeek === null) return;
+    setCheckinSaving(true);
+    try {
+      await saveWeeklyFocus(supabase, sprint, checkinText.trim(), checkinWeek);
+      setSprint((s) => ({
+        ...s,
+        weekly_focus: [
+          ...s.weekly_focus.filter((f) => f.week_number !== checkinWeek),
+          { week_number: checkinWeek, focus_text: checkinText.trim(), set_at: new Date().toISOString() },
+        ],
+      }));
+      setCheckinText("");
+    } finally {
+      setCheckinSaving(false);
+    }
+  }, [supabase, sprint, checkinText, checkinWeek]);
+
   // ── Закрытие спринта ─────────────────────────────────────────────────────────
 
   const [showClose, setShowClose] = useState(false);
@@ -133,6 +164,37 @@ export function SprintDashboard({ sprint: initialSprint, userId }: Props) {
           <ProgressDots filled={clampedDay} total={TOTAL_DAYS} />
         </Card>
       </section>
+
+      {/* Еженедельный чек-ин */}
+      {checkinWeek !== null && (
+        <section>
+          <div className="mb-2 flex items-center gap-2">
+            <SectionLabel>Чек-ин · неделя {checkinWeek}</SectionLabel>
+            <span className="mb-2 rounded-full bg-accent/10 px-2 py-0.5 font-mono text-[10px] font-semibold uppercase tracking-wider text-accent">
+              Новое
+            </span>
+          </div>
+          <Card className="border-accent/30 bg-surface-nika">
+            <p className="mb-3 text-[14px] leading-[1.5] text-ink-secondary">
+              Начинается новая неделя спринта. На чём сосредоточишься?
+            </p>
+            <textarea
+              value={checkinText}
+              onChange={(e) => setCheckinText(e.target.value)}
+              placeholder="Мой фокус на эту неделю..."
+              rows={2}
+              className="w-full resize-none rounded-xl border border-line-subtle bg-elevated px-3 py-2.5 text-[14px] text-ink-primary placeholder:text-ink-faint focus:border-accent focus:outline-none"
+            />
+            <button
+              onClick={handleCheckin}
+              disabled={checkinSaving || !checkinText.trim()}
+              className="mt-3 rounded-full bg-accent px-5 py-2.5 text-[13px] font-semibold text-white disabled:opacity-40"
+            >
+              Сохранить фокус
+            </button>
+          </Card>
+        </section>
+      )}
 
       {/* Цель */}
       <section>
