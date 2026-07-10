@@ -7,11 +7,14 @@ import { StreakCard } from "@/components/today/StreakCard";
 import { WeekCard } from "@/components/today/WeekCard";
 import { WeekRibbonCard } from "@/components/today/WeekRibbonCard";
 import { LastRunCard } from "@/components/today/LastRunCard";
+import { SprintPromoCard } from "@/components/today/SprintPromoCard";
 import { SuggestionChips } from "@/components/today/SuggestionChips";
 import { createServerComponentClient } from "@/lib/supabase";
 import { getRuns, weekSummary } from "@/lib/runs";
 import { computeStreak, weekRibbon, humanDate, weekdayLong, greeting, weekMessage } from "@/lib/today";
 import { getDailyQuote } from "@/lib/quotes";
+import { getActiveSprint } from "@/lib/sprint";
+import { resolveIsPro } from "@/lib/subscription";
 
 const CHIPS = ["Не хочется бежать сегодня", "Расскажу как прошло", "Перенести на вечер"];
 
@@ -22,11 +25,14 @@ export default async function TodayPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth?next=/today");
 
-  const [{ data: userData }, runs, { data: convs }] = await Promise.all([
-    supabase.from("users").select("display_name").eq("id", user.id).maybeSingle(),
+  const [{ data: userData }, runs, { data: convs }, activeSprint] = await Promise.all([
+    supabase.from("users").select("display_name, is_pro").eq("id", user.id).maybeSingle(),
     getRuns(supabase, user.id),
     supabase.from("conversations").select("updated_at").eq("user_id", user.id),
+    getActiveSprint(supabase, user.id),
   ]);
+
+  const isPro = resolveIsPro(userData?.is_pro);
 
   const name = userData?.display_name?.trim() || "друг";
   const week = weekSummary(runs);
@@ -59,6 +65,7 @@ export default async function TodayPage() {
           {/* Сетка карточек */}
           <div className="grid grid-cols-2 gap-3.5">
             <QuoteCard quote={quote} />
+            {isPro && !activeSprint && <SprintPromoCard />}
             <StreakCard days={streak} />
             <WeekCard km={week.km} />
             <WeekRibbonCard days={ribbon} />
