@@ -273,6 +273,7 @@ export interface Database {
           status: RobokassaPaymentStatus;
           created_at: string;
           paid_at: string | null;
+          billing_period: string;
         };
         Insert: {
           inv_id?: number;
@@ -282,6 +283,7 @@ export interface Database {
           status?: RobokassaPaymentStatus;
           created_at?: string;
           paid_at?: string | null;
+          billing_period?: string;
         };
         Update: {
           inv_id?: number;
@@ -291,6 +293,7 @@ export interface Database {
           status?: RobokassaPaymentStatus;
           created_at?: string;
           paid_at?: string | null;
+          billing_period?: string;
         };
         Relationships: [];
       };
