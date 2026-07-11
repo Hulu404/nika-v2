@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 // ─── данные ──────────────────────────────────────────────────────────────────
@@ -45,9 +44,37 @@ function Check() {
 
 // ─── компонент ───────────────────────────────────────────────────────────────
 
+/** Соответствие UI-тарифа и тарифа Robokassa (lib/robokassa.ts). */
+const ROBOKASSA_PLAN: Record<Plan, "monthly" | "halfyear"> = {
+  monthly: "monthly",
+  "6months": "halfyear",
+};
+
 export function UpgradeContent() {
   const [plan, setPlan] = useState<Plan>("6months");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const current = PLANS[plan];
+
+  async function handlePay() {
+    setLoading(true);
+    setError(null);
+    try {
+      const res = await fetch("/api/robokassa/create-payment", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan: ROBOKASSA_PLAN[plan] }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.paymentUrl) {
+        throw new Error(data.error ?? "Не удалось перейти к оплате.");
+      }
+      window.location.href = data.paymentUrl;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Ошибка. Попробуй ещё раз.");
+      setLoading(false);
+    }
+  }
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -105,12 +132,22 @@ export function UpgradeContent() {
           </div>
           <p className="mt-1.5 text-[13px] text-ink-muted">{current.sub}</p>
 
-          <Link
-            href={`/upgrade?plan=${plan}`}
-            className="mt-5 block w-full rounded-pill bg-ink-primary py-[13px] text-center text-[14px] font-medium text-canvas transition-colors hover:bg-accent"
+          <button
+            type="button"
+            onClick={handlePay}
+            disabled={loading}
+            className="mt-5 block w-full rounded-pill bg-ink-primary py-[13px] text-center text-[14px] font-medium text-canvas transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {plan === "monthly" ? "Попробовать 7 дней бесплатно" : "Подключить PRO на 6 месяцев"}
-          </Link>
+            {loading
+              ? "Переходим к оплате…"
+              : plan === "monthly"
+                ? "Подключить PRO на месяц"
+                : "Подключить PRO на 6 месяцев"}
+          </button>
+
+          {error && (
+            <p className="mt-3 text-center text-[13px] text-accent">{error}</p>
+          )}
         </div>
 
         {/* Что входит */}
@@ -133,7 +170,7 @@ export function UpgradeContent() {
 
         {/* Мелкий текст */}
         <p className="text-center text-[12px] leading-[1.6] text-ink-muted">
-          Оплата через ЮKassa. Отмена подписки — в любой момент.
+          Оплата через Robokassa. Отмена подписки — в любой момент.
         </p>
 
       </div>

@@ -7,6 +7,8 @@ import type {
   MoodKey,
   NotifPermission,
   QuizAnswer,
+  RobokassaPaymentStatus,
+  RobokassaPlan,
   RunIntensity,
   RunnerFear,
   RunnerGoal,
@@ -262,6 +264,36 @@ export interface Database {
         };
         Relationships: [];
       };
+      robokassa_payments: {
+        Row: {
+          inv_id: number;
+          user_id: string;
+          plan: RobokassaPlan;
+          amount: number;
+          status: RobokassaPaymentStatus;
+          created_at: string;
+          paid_at: string | null;
+        };
+        Insert: {
+          inv_id?: number;
+          user_id: string;
+          plan: RobokassaPlan;
+          amount: number;
+          status?: RobokassaPaymentStatus;
+          created_at?: string;
+          paid_at?: string | null;
+        };
+        Update: {
+          inv_id?: number;
+          user_id?: string;
+          plan?: RobokassaPlan;
+          amount?: number;
+          status?: RobokassaPaymentStatus;
+          created_at?: string;
+          paid_at?: string | null;
+        };
+        Relationships: [];
+      };
       rate_limits: {
         Row: {
           key: string;
@@ -370,6 +402,7 @@ export type DailyStateRow = Tables["daily_state"]["Row"];
 export type PeriodMarkRow = Tables["period_marks"]["Row"];
 export type Subscription = Tables["subscriptions"]["Row"];
 export type SprintRow = Tables["sprints"]["Row"];
+export type RobokassaPayment = Tables["robokassa_payments"]["Row"];
 
 /** Типы для вставки. */
 export type UserInsert = Tables["users"]["Insert"];
