@@ -62,12 +62,13 @@ function IcLotus() {
     </svg>
   );
 }
-function IcBell() {
+/** Советы: лампочка (подсказка / идея). */
+function IcTip() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-      <path d="M9 2a5 5 0 0 1 5 5v3l1.5 2H2.5L4 10V7a5 5 0 0 1 5-5Z"
+      <path d="M6 11.5a4 4 0 1 1 6 0c-.6.5-1 1.1-1 2v.5H7v-.5c0-.9-.4-1.5-1-2Z"
         stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-      <path d="M7.5 14a1.5 1.5 0 0 0 3 0" stroke="currentColor" strokeWidth="1.4" />
+      <path d="M7 16h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
     </svg>
   );
 }
@@ -206,7 +207,7 @@ export function Sidebar({ recentConvos, isPro = false, showRhythm = false }: Sid
     ...(isPro
       ? [{ href: "/sprint", label: "Спринт",          icon: <IcSprint />, implemented: true }]
       : []),
-    { href: "#",            label: "Пуши",            icon: <IcBell />,   implemented: false },
+    { href: "/tips",        label: "Советы",          icon: <IcTip />,    implemented: true },
   ];
 
   // Suppress width transition on first paint to avoid flash

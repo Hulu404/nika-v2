@@ -9,4 +9,5 @@ export const CHAT_HREF = "/chat/morning";
 export const MEDITATIONS_HREF = "/meditations";
 export const JOURNAL_HREF = "/journal";
 export const RHYTHM_HREF = "/rhythm";
+export const TIPS_HREF = "/tips";
 export const PROFILE_HREF = "/profile";

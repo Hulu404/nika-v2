@@ -231,6 +231,24 @@ export interface Database {
         };
         Relationships: [];
       };
+      saved_tips: {
+        Row: {
+          user_id: string;
+          tip_id: number;
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          tip_id: number;
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          tip_id?: number;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       subscriptions: {
         Row: {
           id: string;

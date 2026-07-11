@@ -4,7 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { showRhythm } from "@/lib/profile";
-import { HOME_HREF, CHAT_HREF, MEDITATIONS_HREF, JOURNAL_HREF, RHYTHM_HREF } from "@/lib/nav";
+import { HOME_HREF, CHAT_HREF, MEDITATIONS_HREF, JOURNAL_HREF, RHYTHM_HREF, TIPS_HREF } from "@/lib/nav";
 
 // ─── иконки (свой набор, 22×22, stroke 1.5) ──────────────────────────────────
 
@@ -53,6 +53,16 @@ function IcRhythm() {
     </svg>
   );
 }
+/** Советы: лампочка (подсказка / идея). */
+function IcTip() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 22 22" fill="none" aria-hidden>
+      <path d="M7.5 14a4.5 4.5 0 1 1 7 0c-.7.6-1.2 1.3-1.2 2.3v.4H8.7v-.4c0-1-.5-1.7-1.2-2.3Z"
+        stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+      <path d="M8.8 19.5h4.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 // ─── вкладки ─────────────────────────────────────────────────────────────────
 
@@ -93,14 +103,22 @@ const TAB_RHYTHM: Tab = {
   icon: <IcRhythm />,
   isActive: (p) => p.startsWith("/rhythm"),
 };
+const TAB_TIPS: Tab = {
+  href: TIPS_HREF,
+  label: "Советы",
+  icon: <IcTip />,
+  isActive: (p) => p.startsWith("/tips"),
+};
 
 /**
- * Набор вкладок из профиля: пятая («Мой ритм») — строго по showRhythm(gender, cycle).
- * «Профиль» переехал в аватар шапки, в баре его нет.
+ * Набор вкладок из профиля: «Мой ритм» появляется строго по showRhythm(gender,
+ * cycle), «Советы» всегда последней (общий раздел, без гейта). «Профиль»
+ * переехал в аватар шапки, в баре его нет.
  */
 function buildTabs(gender?: string | null, cycle?: string | null): Tab[] {
   const tabs = [TAB_HOME, TAB_CHAT, TAB_MEDITATIONS, TAB_JOURNAL];
   if (showRhythm(gender, cycle)) tabs.push(TAB_RHYTHM);
+  tabs.push(TAB_TIPS);
   return tabs;
 }
 
