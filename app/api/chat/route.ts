@@ -1,7 +1,9 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { anthropic, NIKA_MODEL } from "@/lib/anthropic";
-import { createConversation, updateConversation } from "@/lib/conversations";
+import { createConversation, getConversation, updateConversation } from "@/lib/conversations";
 import { checkDailyLimits } from "@/lib/limits";
+import { calculateQuotaUnits, planConfig } from "@/lib/plans/limits-config";
+import { countMessageTokens } from "@/lib/tokens";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { ALL_SCENARIOS } from "@/lib/scenarios";
@@ -9,7 +11,7 @@ import { buildSprintContext, getActiveSprint } from "@/lib/sprint";
 import { getRecentDailyState, parseYmd, userToday } from "@/lib/rhythm";
 import { buildRhythmContext } from "@/lib/rhythm/chat-context";
 import { SAVE_TIP_TOOL, executeSaveTip } from "@/lib/tips/save-tip";
-import { resolveIsPro } from "@/lib/subscription";
+import { resolveTier } from "@/lib/subscription";
 import { createServerComponentClient } from "@/lib/supabase";
 import type { Message } from "@/types/app";
 import type { Scenario } from "@/types/conversation";
@@ -87,7 +89,10 @@ export async function POST(req: Request) {
     .select("is_pro")
     .eq("id", user.id)
     .maybeSingle();
-  const isPro = resolveIsPro(userRow?.is_pro);
+  const tier = resolveTier(userRow?.is_pro);
+  const config = planConfig(tier);
+  // save_tip и правила сохранения советов — только для платных тарифов.
+  const isPro = tier !== "free";
 
   // Rate limit по пользователю — backstop против abuse независимо от Pro-статуса.
   const allowed = await checkRateLimit(
@@ -102,7 +107,30 @@ export async function POST(req: Request) {
     );
   }
 
-  const limitBlock = await checkDailyLimits(supabase, user.id, isPro, conversationId);
+  // (a) Стоимость реплики в токенах. Клиент шлёт историю, последняя реплика —
+  // новое сообщение пользователя; считаем только его входные токены.
+  const lastUserMessage = messages[messages.length - 1];
+  const { tokens: inputTokens } = await countMessageTokens(lastUserMessage.content);
+
+  // (b) Жёсткий потолок на одну реплику: блокируем отправку ДО вызова Claude,
+  // а не списываем больше единиц. Порог — из конфига тарифа.
+  if (inputTokens > config.hard_cap_tokens) {
+    return Response.json(
+      { error: "message_too_long", maxTokens: config.hard_cap_tokens },
+      { status: 413 },
+    );
+  }
+
+  // (c) Единицы, которые спишет реплика; (d) проверка суточной квоты (для
+  // premium — мягкий лимит: не блокирует, только логирует).
+  const newUnits = calculateQuotaUnits(inputTokens, config);
+  const limitBlock = await checkDailyLimits(
+    supabase,
+    user.id,
+    tier,
+    conversationId,
+    newUnits,
+  );
   if (limitBlock) {
     return Response.json(
       {
@@ -115,13 +143,21 @@ export async function POST(req: Request) {
     );
   }
 
-  // Определяем диалог: при отсутствии id создаём новый (так «Новый разговор»
-  // даёт свежий диалог, а не дописывает в последний).
+  // Определяем диалог: при отсутствии id (или если id чужой/удалён) создаём
+  // новый. Существующий подгружаем целиком — его сохранённые сообщения нужны,
+  // чтобы при дозаписи сохранить их реальные timestamp/inputTokens.
   let convId: string;
+  let storedMessages: Message[] = [];
   try {
-    convId = conversationId
-      ? conversationId
-      : (await createConversation(supabase, user.id, scenario)).id;
+    const existing = conversationId
+      ? await getConversation(supabase, conversationId, user.id)
+      : null;
+    if (existing) {
+      convId = existing.id;
+      storedMessages = (existing.messages as Message[]) ?? [];
+    } else {
+      convId = (await createConversation(supabase, user.id, scenario)).id;
+    }
   } catch (err) {
     console.error("[api/chat] conversation resolve failed:", err);
     return Response.json({ error: "Conversation error" }, { status: 500 });
@@ -229,15 +265,35 @@ export async function POST(req: Request) {
         // Сохраняем полный ход (обмен + ответ НИКИ). Опенер не храним — он
         // подставляется из SCENARIO_META при загрузке. Ошибка сохранения не
         // должна рвать уже доставленный ответ — логируем и продолжаем.
+        // (e) Списание единиц происходит именно здесь — после успешной отправки
+        // в Claude. Единицы не хранятся отдельным счётчиком: getTodayUsage
+        // суммирует их из inputTokens сохранённых реплик. Поэтому если стрим
+        // упал выше (catch → controller.error), сохранения нет и квота не
+        // списывается — ровно как требуется.
+        //
+        // Per-message timestamp пишем честно: у ранее сохранённых реплик берём
+        // их прежнее время (и inputTokens), новыми считаем только последнюю
+        // реплику пользователя и ответ НИКИ. Без этого продолжение старого
+        // диалога перебивало бы время всех реплик на «сейчас» и рушило дневной
+        // счёт. storedMessages выравниваем по хвосту истории (клиент мог
+        // прислать не всю ленту — учитываем сдвиг).
         const now = new Date().toISOString();
-        const toStore: Message[] = [
-          ...messages.map((m) => ({
+        const lastIdx = messages.length - 1;
+        const offset = storedMessages.length - lastIdx;
+        const toStore: Message[] = messages.map((m, i) => {
+          if (i === lastIdx) {
+            // Новая реплика пользователя: время сейчас + посчитанные токены.
+            return { role: m.role, content: m.content, timestamp: now, inputTokens };
+          }
+          const prior = offset >= 0 ? storedMessages[offset + i] : undefined;
+          return {
             role: m.role,
             content: m.content,
-            timestamp: now,
-          })),
-          { role: "assistant" as const, content: assistantText, timestamp: now },
-        ];
+            timestamp: prior?.timestamp ?? now,
+            ...(prior?.inputTokens != null ? { inputTokens: prior.inputTokens } : {}),
+          };
+        });
+        toStore.push({ role: "assistant", content: assistantText, timestamp: now });
         try {
           await updateConversation(supabase, convId, user.id, toStore);
         } catch (saveErr) {

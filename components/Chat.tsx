@@ -85,6 +85,10 @@ export function Chat({
         setError("Слишком быстро 🙂 Подожди немного и попробуй снова.");
         return;
       }
+      if (res.status === 413) {
+        setError("Сообщение слишком длинное — сократи и отправь ещё раз.");
+        return;
+      }
       if (!res.ok || !res.body) throw new Error(`status ${res.status}`);
 
       // Запоминаем id диалога (важно для только что созданного нового диалога).

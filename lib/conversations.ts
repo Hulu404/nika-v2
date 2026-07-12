@@ -27,6 +27,26 @@ export async function createConversation(
   return data;
 }
 
+/**
+ * Диалог по id, только если он принадлежит userId (иначе null). Фильтр по
+ * user_id — defense-in-depth поверх RLS. Нужен роуту чата, чтобы подгрузить
+ * сохранённые сообщения (с их реальными timestamp/inputTokens) и не потерять
+ * их при дозаписи нового хода.
+ */
+export async function getConversation(
+  supabase: Client,
+  id: string,
+  userId: string,
+): Promise<Conversation | null> {
+  const { data } = await supabase
+    .from("conversations")
+    .select("*")
+    .eq("id", id)
+    .eq("user_id", userId)
+    .maybeSingle();
+  return data ?? null;
+}
+
 /** Последний (самый свежий) диалог пользователя по сценарию или null. */
 export async function getLastConversation(
   supabase: Client,

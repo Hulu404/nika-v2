@@ -96,6 +96,13 @@ export interface Message {
   role: MessageRole;
   content: string;
   timestamp: string;
+  /**
+   * Входные токены реплики пользователя (по данным Anthropic countTokens).
+   * Нужен для дневного лимита в «единицах»: одна реплика списывает
+   * ceil(inputTokens / 250) единиц. Проставляется только для role="user";
+   * у ассистента и у старых записей отсутствует (тогда оцениваем по длине).
+   */
+  inputTokens?: number;
 }
 
 /** Пользователь вместе с его беговым профилем. */
