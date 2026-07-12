@@ -7,7 +7,6 @@ import { MessageBubble } from "@/components/MessageBubble";
 import { TypingIndicator } from "@/components/TypingIndicator";
 import { QuickReplies } from "@/components/QuickReplies";
 import { useChatScroll } from "@/hooks/useChatScroll";
-import { FREE_DAILY_LIMIT } from "@/lib/limits";
 import { SCENARIO_META } from "@/lib/scenarios";
 import { cn } from "@/lib/utils";
 import type { ChatMessage, Scenario } from "@/types/conversation";
@@ -30,6 +29,11 @@ export function Chat({
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [limitInfo, setLimitInfo] = useState<{
+    reason: "messages" | "dialogs";
+    limit: number;
+    canUpgrade: boolean;
+  } | null>(null);
 
   const last = messages[messages.length - 1];
   const scrollRef = useChatScroll(
@@ -43,6 +47,7 @@ export function Chat({
   async function send(text: string) {
     if (pending) return;
     setError(null);
+    setLimitInfo(null);
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -67,6 +72,12 @@ export function Chat({
         body: JSON.stringify({ scenario, messages: payload, conversationId }),
       });
       if (res.status === 402) {
+        const data = await res.json().catch(() => ({}));
+        setLimitInfo({
+          reason: data.reason === "dialogs" ? "dialogs" : "messages",
+          limit: typeof data.limit === "number" ? data.limit : 0,
+          canUpgrade: data.canUpgrade !== false,
+        });
         setError("limit_reached");
         return;
       }
@@ -128,16 +139,20 @@ export function Chat({
           ))}
           {showTyping && <TypingIndicator />}
           {error === "limit_reached" ? (
-            <div className="mx-auto mt-2 max-w-md rounded-card border border-[#C8553D]/20 bg-surface-warm px-5 py-4 text-center">
+            <div className="mx-auto mt-2 max-w-md rounded-card border border-accent/20 bg-surface-warm px-5 py-4 text-center">
               <p className="font-serif text-[15px] text-ink-primary">
-                Ты использовал все {FREE_DAILY_LIMIT} бесплатных сообщений сегодня.
+                {limitInfo?.reason === "dialogs"
+                  ? `На сегодня ты открыл максимум диалогов (${limitInfo.limit}).`
+                  : `Ты использовал все ${limitInfo?.limit ?? ""} сообщений на сегодня.`}
               </p>
-              <Link
-                href="/upgrade"
-                className="mt-3 inline-block rounded-pill bg-accent px-5 py-2.5 text-[13px] font-medium text-canvas transition-colors hover:bg-accent-deep"
-              >
-                Перейти на НИКА Pro
-              </Link>
+              {limitInfo?.canUpgrade && (
+                <Link
+                  href="/upgrade"
+                  className="mt-3 inline-block rounded-pill bg-accent px-5 py-2.5 text-[13px] font-medium text-canvas transition-colors hover:bg-accent-deep"
+                >
+                  Перейти на НИКА Pro
+                </Link>
+              )}
             </div>
           ) : error ? (
             <p className="px-1 text-center text-sm text-ink-muted">{error}</p>

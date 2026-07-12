@@ -1,7 +1,7 @@
 import type Anthropic from "@anthropic-ai/sdk";
 import { anthropic, NIKA_MODEL } from "@/lib/anthropic";
 import { createConversation, updateConversation } from "@/lib/conversations";
-import { FREE_DAILY_LIMIT, isLimitReached } from "@/lib/limits";
+import { checkDailyLimits } from "@/lib/limits";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { ALL_SCENARIOS } from "@/lib/scenarios";
@@ -102,10 +102,15 @@ export async function POST(req: Request) {
     );
   }
 
-  const limited = await isLimitReached(supabase, user.id);
-  if (limited) {
+  const limitBlock = await checkDailyLimits(supabase, user.id, isPro, conversationId);
+  if (limitBlock) {
     return Response.json(
-      { error: "limit_reached", limit: FREE_DAILY_LIMIT },
+      {
+        error: "limit_reached",
+        reason: limitBlock.reason,
+        limit: limitBlock.limit,
+        canUpgrade: !isPro,
+      },
       { status: 402 },
     );
   }

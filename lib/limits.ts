@@ -4,51 +4,86 @@ import { FORCE_PRO_FOR_ALL } from "@/lib/subscription";
 
 type Client = SupabaseClient<Database>;
 
-/** Дневной лимит сообщений от пользователя для бесплатного тарифа. */
-export const FREE_DAILY_LIMIT = 10;
+/** Дневные лимиты по тарифу: сколько диалогов и сообщений в день. */
+export interface PlanLimits {
+  dialogs: number;
+  messages: number;
+}
+
+export const PLAN_LIMITS: { free: PlanLimits; pro: PlanLimits } = {
+  free: { dialogs: 3, messages: 10 },
+  pro: { dialogs: 6, messages: 20 },
+};
+
+export function planLimits(isPro: boolean): PlanLimits {
+  return isPro ? PLAN_LIMITS.pro : PLAN_LIMITS.free;
+}
+
+interface TodayUsage {
+  /** Сообщений с role="user", отправленных сегодня (по всем диалогам). */
+  messages: number;
+  /** Диалоги, в которых сегодня уже есть хотя бы одна реплика пользователя. */
+  activeDialogIds: string[];
+}
 
 /**
- * Сколько сообщений с role="user" пользователь отправил «сегодня».
- * Считаем по диалогам, обновлённым с начала текущего дня: для каждого
- * суммируем число реплик пользователя.
+ * Использование за «сегодня»: считаем по диалогам, обновлённым с начала дня.
+ * Пустой диалог (без реплик пользователя) в счёт диалогов НЕ идёт — открытие
+ * «Нового разговора» без единого сообщения не съедает дневной лимит.
  */
-export async function getDailyUserMessageCount(
-  supabase: Client,
-  userId: string,
-): Promise<number> {
+export async function getTodayUsage(supabase: Client, userId: string): Promise<TodayUsage> {
   const startOfDay = new Date();
   startOfDay.setHours(0, 0, 0, 0);
 
   const { data } = await supabase
     .from("conversations")
-    .select("messages")
+    .select("id, messages")
     .eq("user_id", userId)
     .gte("updated_at", startOfDay.toISOString());
 
-  if (!data) return 0;
-
-  return data.reduce(
-    (sum, c) => sum + c.messages.filter((m) => m.role === "user").length,
-    0,
-  );
+  let messages = 0;
+  const activeDialogIds: string[] = [];
+  for (const c of data ?? []) {
+    const userMsgs = c.messages.filter((m) => m.role === "user").length;
+    messages += userMsgs;
+    if (userMsgs > 0) activeDialogIds.push(c.id);
+  }
+  return { messages, activeDialogIds };
 }
 
-/** true, если бесплатный пользователь исчерпал дневной лимит. Pro — без лимита. */
-export async function isLimitReached(
+export type LimitReason = "messages" | "dialogs";
+
+export interface LimitBlock {
+  reason: LimitReason;
+  limit: number;
+}
+
+/**
+ * Проверяет дневные лимиты перед ответом в чате. Возвращает описание блокировки
+ * или null, если можно продолжать. FORCE_PRO_FOR_ALL — глобальный обход лимитов.
+ *
+ * Лимит диалогов срабатывает только для «нового сегодня» диалога: продолжать уже
+ * начатые сегодня разговоры можно (до лимита сообщений).
+ */
+export async function checkDailyLimits(
   supabase: Client,
   userId: string,
-): Promise<boolean> {
-  // Временно: Pro у всех — лимиты отключены. См. lib/subscription.ts.
-  if (FORCE_PRO_FOR_ALL) return false;
+  isPro: boolean,
+  conversationId: string | null | undefined,
+): Promise<LimitBlock | null> {
+  if (FORCE_PRO_FOR_ALL) return null;
 
-  const { data: user } = await supabase
-    .from("users")
-    .select("is_pro")
-    .eq("id", userId)
-    .maybeSingle();
+  const limits = planLimits(isPro);
+  const usage = await getTodayUsage(supabase, userId);
 
-  if (user?.is_pro) return false;
+  if (usage.messages >= limits.messages) {
+    return { reason: "messages", limit: limits.messages };
+  }
 
-  const count = await getDailyUserMessageCount(supabase, userId);
-  return count >= FREE_DAILY_LIMIT;
+  const isNewDialogToday = !conversationId || !usage.activeDialogIds.includes(conversationId);
+  if (isNewDialogToday && usage.activeDialogIds.length >= limits.dialogs) {
+    return { reason: "dialogs", limit: limits.dialogs };
+  }
+
+  return null;
 }
