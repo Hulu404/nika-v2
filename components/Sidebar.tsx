@@ -17,15 +17,6 @@ function IcHome() {
     </svg>
   );
 }
-function IcTimer() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-      <circle cx="9" cy="10" r="6" stroke="currentColor" strokeWidth="1.4" />
-      <path d="M9 7v3l2 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      <path d="M7 2h4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  );
-}
 function IcList() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -197,7 +188,6 @@ export function Sidebar({ recentConvos, isPro = false, showRhythm = false }: Sid
 
   const NAV = [
     { href: "/today",       label: "Сегодня",        icon: <IcHome />,   implemented: true },
-    { href: "#",            label: "Трекинг",         icon: <IcTimer />,  implemented: false },
     { href: "#",            label: "Медитации",       icon: <IcLotus />,  implemented: false },
     { href: "/journal",     label: "Журнал пробежек", icon: <IcList />,   implemented: true },
     ...(showRhythm
