@@ -17,6 +17,7 @@ import type {
   SprintStatus,
   SubscriptionPlan,
   SubscriptionStatus,
+  TipCategory,
   WeeklyFocus,
 } from "./app";
 
@@ -231,21 +232,36 @@ export interface Database {
         };
         Relationships: [];
       };
-      saved_tips: {
+      personal_tips: {
         Row: {
+          id: string;
           user_id: string;
-          tip_id: number;
+          title: string;
+          body: string;
+          category: TipCategory;
+          source: string | null;
           created_at: string;
+          deleted_at: string | null;
         };
         Insert: {
+          id?: string;
           user_id: string;
-          tip_id: number;
+          title: string;
+          body: string;
+          category: TipCategory;
+          source?: string | null;
           created_at?: string;
+          deleted_at?: string | null;
         };
         Update: {
+          id?: string;
           user_id?: string;
-          tip_id?: number;
+          title?: string;
+          body?: string;
+          category?: TipCategory;
+          source?: string | null;
           created_at?: string;
+          deleted_at?: string | null;
         };
         Relationships: [];
       };
@@ -424,6 +440,7 @@ export type PeriodMarkRow = Tables["period_marks"]["Row"];
 export type Subscription = Tables["subscriptions"]["Row"];
 export type SprintRow = Tables["sprints"]["Row"];
 export type RobokassaPayment = Tables["robokassa_payments"]["Row"];
+export type PersonalTipRow = Tables["personal_tips"]["Row"];
 
 /** Типы для вставки. */
 export type UserInsert = Tables["users"]["Insert"];
@@ -431,6 +448,7 @@ export type ProfileInsert = Tables["profiles"]["Insert"];
 export type ConversationInsert = Tables["conversations"]["Insert"];
 export type RunInsert = Tables["runs"]["Insert"];
 export type SubscriptionInsert = Tables["subscriptions"]["Insert"];
+export type PersonalTipInsert = Tables["personal_tips"]["Insert"];
 
 /** Типы для обновления. */
 export type UserUpdate = Tables["users"]["Update"];

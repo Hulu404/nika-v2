@@ -61,6 +61,30 @@ export type RobokassaPlan = "monthly" | "halfyear";
 /** Статус платежа Robokassa. */
 export type RobokassaPaymentStatus = "pending" | "paid" | "failed";
 
+/**
+ * Категория личного совета (/tips). Один общий словарь для фронта и бэка.
+ * 'mindset' — «Настрой» (мотивация/голова), дефолт для эмоциональных советов.
+ */
+export type TipCategory =
+  | "before"
+  | "technique"
+  | "breathing"
+  | "gear"
+  | "recovery"
+  | "mindset";
+
+/**
+ * Личный совет — единый тип для фронта и бэка. Зеркалит строку personal_tips
+ * (без user_id/source/deleted_at — это не нужно клиенту ленты), createdAt в camelCase.
+ */
+export interface PersonalTip {
+  id: string;
+  category: TipCategory;
+  title: string;
+  body: string;
+  createdAt: string;
+}
+
 /** Роль автора реплики. */
 export type MessageRole = "user" | "assistant";
 

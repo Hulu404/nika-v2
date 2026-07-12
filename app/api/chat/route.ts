@@ -8,6 +8,7 @@ import { ALL_SCENARIOS } from "@/lib/scenarios";
 import { buildSprintContext, getActiveSprint } from "@/lib/sprint";
 import { getRecentDailyState, parseYmd, userToday } from "@/lib/rhythm";
 import { buildRhythmContext } from "@/lib/rhythm/chat-context";
+import { SAVE_TIP_TOOL, executeSaveTip } from "@/lib/tips/save-tip";
 import { createServerComponentClient } from "@/lib/supabase";
 import type { Message } from "@/types/app";
 import type { Scenario } from "@/types/conversation";
@@ -150,21 +151,62 @@ export async function POST(req: Request) {
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
       let assistantText = "";
-      try {
-        const anthropicStream = anthropic.messages.stream({
+
+      // Один стрим-раунд: льём text_delta клиенту (и копим в assistantText),
+      // возвращаем финальное сообщение (нужен stop_reason и tool_use-блок).
+      const runTurn = async (
+        turnMessages: Anthropic.MessageParam[],
+        toolChoice?: Anthropic.ToolChoice,
+      ) => {
+        const turn = anthropic.messages.stream({
           model: NIKA_MODEL,
           max_tokens: 1024,
           system: systemBlocks,
-          messages: anthropicMessages,
+          tools: [SAVE_TIP_TOOL],
+          ...(toolChoice ? { tool_choice: toolChoice } : {}),
+          messages: turnMessages,
         });
-
-        for await (const event of anthropicStream) {
+        for await (const event of turn) {
           if (
             event.type === "content_block_delta" &&
             event.delta.type === "text_delta"
           ) {
             assistantText += event.delta.text;
             controller.enqueue(encoder.encode(event.delta.text));
+          }
+        }
+        return turn.finalMessage();
+      };
+
+      try {
+        // Раунд 1: НИКА даёт ответ и, если уместно, вызывает save_tip.
+        const firstMsg = await runTurn(anthropicMessages);
+
+        // Если модель вызвала инструмент — исполняем на сервере и даём ей
+        // продолжить (раунд 2), чтобы финальный текст содержал отметку о
+        // сохранении. tool_choice: none в раунде 2 исключает повторный вызов.
+        if (firstMsg.stop_reason === "tool_use") {
+          const toolUse = firstMsg.content.find(
+            (b): b is Anthropic.ToolUseBlock =>
+              b.type === "tool_use" && b.name === "save_tip",
+          );
+          if (toolUse) {
+            const result = await executeSaveTip(supabase, user.id, toolUse.input);
+            const followup: Anthropic.MessageParam[] = [
+              ...anthropicMessages,
+              { role: "assistant", content: firstMsg.content },
+              {
+                role: "user",
+                content: [
+                  {
+                    type: "tool_result",
+                    tool_use_id: toolUse.id,
+                    content: result.modelMessage,
+                  },
+                ],
+              },
+            ];
+            await runTurn(followup, { type: "none" });
           }
         }
 
