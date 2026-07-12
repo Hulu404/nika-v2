@@ -350,12 +350,14 @@ export function ProfileContent({
               <p className="mb-4 text-[13px] leading-[1.6] text-ink-muted">
                 Память диалогов · все 5 сценариев · аналитика по словам · без ограничений на сообщения
               </p>
-              <p className="mb-4 font-mono text-[13px] text-ink-secondary">299 ₽/месяц</p>
+              <p className="mb-4 font-mono text-[13px] text-ink-muted">
+                <span className="font-semibold text-accent">Попробуй за 1 ₽</span> · далее 249 ₽/мес
+              </p>
               <Link
                 href="/upgrade"
                 className="block w-full rounded-pill bg-ink-primary py-[13px] text-center text-[14px] font-medium text-canvas transition-colors hover:bg-accent"
               >
-                Попробовать 7 дней бесплатно
+                Попробовать
               </Link>
             </div>
           )}
