@@ -112,3 +112,41 @@ input, textarea { font-family: inherit; }
     display: none;
   }
 }
+
+/* ============================================================
+   ПОЛЗУНКИ ПРОКРУТКИ — в стиле приложения
+   Цвета берутся из токенов, поэтому тёмная тема подхватывается сама.
+   Правила намеренно вне @layer — чтобы утилита .scrollbar-none
+   (display:none / scrollbar-width:none) по-прежнему перекрывала их
+   на своих элементах.
+   ============================================================ */
+
+/* Firefox: тонкий ползунок, прозрачный трек. Наследуется в дочерние
+   скролл-контейнеры; .scrollbar-none перебивает своим scrollbar-width:none. */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+/* WebKit / Chromium / Safari */
+*::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  /* Прозрачная рамка + padding-box делают ползунок «плавающим» и тоньше трека. */
+  background-color: var(--border-strong);
+  border: 3px solid transparent;
+  border-radius: var(--radius-pill);
+  background-clip: padding-box;
+  transition: background-color 200ms ease;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background-color: var(--ink-muted);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
