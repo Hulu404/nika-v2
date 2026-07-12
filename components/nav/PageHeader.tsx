@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { AccountButton } from "@/components/nav/AccountButton";
+import { UpgradeButton } from "@/components/nav/UpgradeButton";
 import { HOME_HREF } from "@/lib/nav";
 
 /**
@@ -33,6 +34,7 @@ export function PageHeader({ title, subtitle }: { title: string; subtitle?: stri
         </Link>
       </div>
 
+      <UpgradeButton />
       <AccountButton />
     </header>
   );

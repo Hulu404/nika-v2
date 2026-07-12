@@ -38,10 +38,19 @@ export const ROBOKASSA_PLANS: Record<
     subscriptionPlan: "yearly",
     description: "Подписка НИКА PRO — 6 месяцев",
   },
+  // PRO: стартовая цена первой недели 1 ₽. Автопродление 249 ₽/мес пока НЕ
+  // реализовано (Robokassa Recurring не подключён) — см. открытый вопрос в PR.
+  // months=1 здесь это интерим-грант доступа за первый платёж, а не срок триала.
+  pro: {
+    amount: 1,
+    months: 1,
+    subscriptionPlan: "monthly",
+    description: "Подписка НИКА PRO (первая неделя 1 ₽)",
+  },
 };
 
 export function isRobokassaPlan(value: unknown): value is RobokassaPlan {
-  return value === "monthly" || value === "halfyear";
+  return value === "monthly" || value === "halfyear" || value === "pro";
 }
 
 function md5(input: string): string {

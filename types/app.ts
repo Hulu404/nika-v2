@@ -55,8 +55,11 @@ export type SubscriptionPlan = "free" | "monthly" | "yearly";
 /** Статус подписки. */
 export type SubscriptionStatus = "active" | "pending" | "canceled" | "expired";
 
-/** Тариф оплаты Robokassa (заказ). monthly — месяц, halfyear — полгода. */
-export type RobokassaPlan = "monthly" | "halfyear";
+/**
+ * Тариф оплаты Robokassa (заказ). monthly — месяц, halfyear — полгода,
+ * pro — подписка PRO со стартовой ценой первой недели 1 ₽.
+ */
+export type RobokassaPlan = "monthly" | "halfyear" | "pro";
 
 /** Статус платежа Robokassa. */
 export type RobokassaPaymentStatus = "pending" | "paid" | "failed";
