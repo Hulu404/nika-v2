@@ -36,6 +36,15 @@ const GENDER_OPTIONS: { v: Gender; short: string; full: string; desc: string }[]
   { v: "neutral", short: "без рода",  full: "Без рода",  desc: "Без согласования по роду" },
 ];
 
+/**
+ * Приглушённый текст на инвертированной карточке подписки (bg-ink-primary).
+ * Через color-mix — переворачивается по теме. Модификатор text-canvas/60 тут не
+ * работает: цвет canvas задан как цельная CSS-переменная без alpha-канала.
+ */
+const MUTED_ON_INVERTED = {
+  color: "color-mix(in srgb, var(--bg-primary) 68%, var(--ink-primary))",
+} as const;
+
 // ─── Skeleton UI ──────────────────────────────────────────────────────────────
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -318,11 +327,11 @@ export function ProfileContent({
 
           {/* Карточка подписки (Free) */}
           {!isPro && (
-            <div className="mb-6 rounded-card border border-line-default bg-elevated p-5">
-              <span className="mb-3 inline-flex items-center rounded-pill border border-line-strong px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-ink-muted">
-                Free
+            <div className="mb-6 rounded-card bg-ink-primary p-5">
+              <span className="mb-3 inline-flex items-center rounded-pill bg-accent px-2.5 py-1 font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-canvas">
+                Pro
               </span>
-              <p className="mb-2 text-[18px] font-semibold leading-snug text-ink-primary">
+              <p className="mb-2 text-[18px] font-semibold leading-snug text-canvas">
                 Открой расширенную НИКУ
               </p>
               <ul className="mb-4 flex flex-col gap-2">
@@ -337,19 +346,22 @@ export function ProfileContent({
                     <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden className="mt-[2px] shrink-0 text-accent">
                       <path d="M4.5 10.5l3.5 3.5 7.5-7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
-                    <span className="text-[13px] leading-[1.5] text-ink-muted">{f}</span>
+                    <span className="text-[13px] leading-[1.5] text-canvas">{f}</span>
                   </li>
                 ))}
               </ul>
-              <p className="mb-4 font-mono text-[13px] text-ink-muted">
+              <p className="mb-4 font-mono text-[13px]" style={MUTED_ON_INVERTED}>
                 <span className="font-semibold text-accent">Попробуй за 1 ₽</span> · далее 249 ₽/мес
               </p>
               <Link
                 href="/upgrade"
-                className="block w-full rounded-pill bg-ink-primary py-[13px] text-center text-[14px] font-medium text-canvas transition-colors hover:bg-accent"
+                className="block w-full rounded-pill bg-accent py-[13px] text-center text-[14px] font-medium text-canvas transition-opacity hover:opacity-90"
               >
                 Попробовать
               </Link>
+              <p className="mt-2.5 text-center text-[11px] leading-[1.45]" style={MUTED_ON_INVERTED}>
+                Первая неделя — 1 ₽, далее 249 ₽/мес. Отменить можно в любой момент.
+              </p>
             </div>
           )}
 
