@@ -7,7 +7,6 @@ import { createClientComponentClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { requestNotifPermission } from "@/lib/notifications";
 import type { Gender, NotifPermission } from "@/types/app";
-import { SCENARIO_META, SCENARIO_ORDER } from "@/lib/scenarios";
 import { BottomSheet } from "@/components/BottomSheet";
 import { PlanBadge } from "@/components/PlanBadge";
 import { PrivacyContent } from "@/components/legal/PrivacyContent";
@@ -15,21 +14,14 @@ import { OfertaContent } from "@/components/legal/OfertaContent";
 
 // ─── типы ────────────────────────────────────────────────────────────────────
 
-type Tone = "soft" | "direct" | "brief";
 type WhenWrite = "morning" | "evening" | "never";
 type SheetId =
-  | "tone" | "when" | "scenarios" | "name" | "gender"
+  | "when" | "name" | "gender"
   | "export" | "delete" | "how" | "manifesto" | "support" | "terms"
   | "privacy" | "oferta"
   | null;
 
 // ─── константы ───────────────────────────────────────────────────────────────
-
-const TONE_OPTIONS: { v: Tone; short: string; full: string; desc: string }[] = [
-  { v: "soft",   short: "Тёплый",  full: "Мягко и бережно",   desc: "Как разговор с близким другом" },
-  { v: "direct", short: "Прямой",  full: "Прямо и честно",    desc: "Без лишних слов" },
-  { v: "brief",  short: "Краткий", full: "Коротко и по делу", desc: "Минимум текста" },
-];
 
 const WHEN_OPTIONS: { v: WhenWrite; short: string; full: string }[] = [
   { v: "morning", short: "Утром",     full: "Утром перед тренировкой" },
@@ -43,9 +35,6 @@ const GENDER_OPTIONS: { v: Gender; short: string; full: string; desc: string }[]
   { v: "male",    short: "он",        full: "Он / его",  desc: "«молодец, что вышел»" },
   { v: "neutral", short: "без рода",  full: "Без рода",  desc: "Без согласования по роду" },
 ];
-
-// Первые N сценариев доступны на Free
-const FREE_SCENARIOS = 2;
 
 // ─── Skeleton UI ──────────────────────────────────────────────────────────────
 
@@ -188,7 +177,6 @@ export function ProfileContent({
   const [supabase] = useState(() => createClientComponentClient());
 
   // Preferences
-  const [tone, setTone]         = useState<Tone>("soft");
   const [whenWrite, setWhenWrite] = useState<WhenWrite>(reminderEnabled ? "morning" : "never");
   const [gender, setGender]     = useState<Gender | null>(initialGender);
   const [genderSaving, setGenderSaving] = useState(false);
@@ -212,8 +200,6 @@ export function ProfileContent({
 
   // Read localStorage after mount
   useEffect(() => {
-    const t = localStorage.getItem("nika-tone") as Tone | null;
-    if (t) setTone(t);
     const w = localStorage.getItem("nika-when") as WhenWrite | null;
     if (w) setWhenWrite(w);
     const theme = localStorage.getItem("nika-theme");
@@ -222,12 +208,6 @@ export function ProfileContent({
   }, []);
 
   // ── Handlers ──
-
-  function handleToneChange(v: Tone) {
-    setTone(v);
-    localStorage.setItem("nika-tone", v);
-    closeSheet();
-  }
 
   async function handleWhenChange(v: WhenWrite) {
     setWhenWrite(v);
@@ -312,10 +292,8 @@ export function ProfileContent({
   }
 
   // Derived labels
-  const toneShort       = TONE_OPTIONS.find(o => o.v === tone)?.short ?? "Тёплый";
   const whenShort       = WHEN_OPTIONS.find(o => o.v === whenWrite)?.short ?? "Утром";
   const genderShort     = GENDER_OPTIONS.find(o => o.v === gender)?.short ?? "—";
-  const scenariosLabel  = isPro ? "Все 5" : `${FREE_SCENARIOS} из 5 FREE`;
 
   // ─────────────────────────────────────────────────────────────────────────────
 
@@ -347,9 +325,22 @@ export function ProfileContent({
               <p className="mb-2 text-[18px] font-semibold leading-snug text-ink-primary">
                 Открой расширенную НИКУ
               </p>
-              <p className="mb-4 text-[13px] leading-[1.6] text-ink-muted">
-                Память диалогов · все 5 сценариев · аналитика по словам · без ограничений на сообщения
-              </p>
+              <ul className="mb-4 flex flex-col gap-2">
+                {[
+                  "Страница советов собирается персонально под тебя",
+                  "До 20 сообщений за один сценарий",
+                  "Помнит контекст и не начинает с нуля каждый день",
+                  "Все сценарии без ограничений",
+                  "Узнаёт, что тобой движет, и держит эту нить",
+                ].map((f) => (
+                  <li key={f} className="flex items-start gap-2">
+                    <svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden className="mt-[2px] shrink-0 text-accent">
+                      <path d="M4.5 10.5l3.5 3.5 7.5-7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <span className="text-[13px] leading-[1.5] text-ink-muted">{f}</span>
+                  </li>
+                ))}
+              </ul>
               <p className="mb-4 font-mono text-[13px] text-ink-muted">
                 <span className="font-semibold text-accent">Попробуй за 1 ₽</span> · далее 249 ₽/мес
               </p>
@@ -366,8 +357,6 @@ export function ProfileContent({
           <div className="mb-5">
             <SectionLabel>НИКА</SectionLabel>
             <Card>
-              <Row label="Тон общения"                     value={toneShort}       onClick={() => setActiveSheet("tone")} />
-              <Row label="Сценарии"                        badge={scenariosLabel}  onClick={() => setActiveSheet("scenarios")} />
               <Row
                 label="Уведомления"
                 rightEl={<Toggle on={notifOn} onChange={handleNotifToggle} />}
@@ -444,41 +433,6 @@ export function ProfileContent({
 
       {/* ──────────────── BOTTOM SHEETS ──────────────────────────────────────── */}
 
-      {/* Тон общения */}
-      <BottomSheet isOpen={activeSheet === "tone"} onClose={closeSheet} title="Тон общения">
-        <div className="flex flex-col gap-2.5">
-          {TONE_OPTIONS.map((o) => {
-            const active = tone === o.v;
-            return (
-              <button
-                key={o.v}
-                onClick={() => handleToneChange(o.v)}
-                className={cn(
-                  "flex items-center gap-3 rounded-[14px] border px-4 py-4 text-left transition-all",
-                  active
-                    ? "border-ink-primary bg-ink-primary"
-                    : "border-line-default bg-canvas hover:border-line-strong",
-                )}
-              >
-                <div className="flex-1">
-                  <p className={cn("text-[15px] font-medium", active ? "text-canvas" : "text-ink-primary")}>
-                    {o.full}
-                  </p>
-                  <p className={cn("mt-0.5 text-[12px]", active ? "text-canvas/60" : "text-ink-muted")}>
-                    {o.desc}
-                  </p>
-                </div>
-                {active && (
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden className="flex-shrink-0 text-canvas">
-                    <path d="M4.5 10.5l3.5 3.5 7.5-7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </BottomSheet>
-
       {/* Когда писать первой */}
       <BottomSheet isOpen={activeSheet === "when"} onClose={closeSheet} title="Когда писать первой">
         <div className="flex flex-col gap-2.5">
@@ -546,48 +500,6 @@ export function ProfileContent({
         <p className="mt-4 text-[12px] leading-[1.5] text-ink-muted">
           От рода зависит, как НИКА к тебе обращается. Раздел «Мой ритм» доступен при женском роде.
         </p>
-      </BottomSheet>
-
-      {/* Сценарии */}
-      <BottomSheet isOpen={activeSheet === "scenarios"} onClose={closeSheet} title="Сценарии">
-        <div className="flex flex-col gap-2.5">
-          {SCENARIO_ORDER.map((key, i) => {
-            const meta = SCENARIO_META[key];
-            const locked = !isPro && i >= FREE_SCENARIOS;
-            return (
-              <div
-                key={key}
-                className={cn(
-                  "flex items-center gap-3 rounded-[14px] border px-4 py-4",
-                  locked
-                    ? "border-line-subtle bg-canvas/50 opacity-55"
-                    : "border-line-default bg-canvas",
-                )}
-              >
-                <div className="flex-1">
-                  <p className={cn("text-[15px] font-medium", locked ? "text-ink-muted" : "text-ink-primary")}>
-                    {meta.title}
-                  </p>
-                  <p className="mt-0.5 text-[12px] text-ink-muted">{meta.subtitle}</p>
-                </div>
-                {locked && (
-                  <span className="flex-shrink-0 rounded-pill bg-surface-warm px-2.5 py-[3px] font-mono text-[9px] font-bold uppercase tracking-widest text-accent">
-                    PRO
-                  </span>
-                )}
-              </div>
-            );
-          })}
-        </div>
-        {!isPro && (
-          <Link
-            href="/upgrade"
-            onClick={closeSheet}
-            className="mt-4 block w-full rounded-pill bg-accent py-[13px] text-center text-[14px] font-medium text-canvas transition-colors hover:bg-accent-deep"
-          >
-            Открыть все сценарии
-          </Link>
-        )}
       </BottomSheet>
 
       {/* Имя */}
