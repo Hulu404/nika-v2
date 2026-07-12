@@ -75,12 +75,17 @@ export const TIPS_TOOL_GUIDE = `Раздел «Советы» пользоват
 /**
  * Собирает полный системный промпт для конкретного сценария.
  *
+ * canSaveTips: подмешивать ли блок про инструмент save_tip. Для FREE-юзеров он
+ * false — им страница «Советы» не пополняется из диалога, поэтому и правила про
+ * сохранение в промпт не идут (а сам инструмент в чат-роут не передаётся).
+ *
  * TODO(segmentation): сегментация по goal временно отключена. Новый онбординг
  * не собирает goal/level/fears (в профиле они могут быть null), поэтому промпт
  * НЕ читает профиль и использует нейтральный дефолт — базовую персону НИКИ плюс
  * контекст выбранного сценария. Когда/если вернём сегментацию по цели бега,
  * подмешивать её нужно здесь, аккуратно обрабатывая null.
  */
-export function buildSystemPrompt(scenario: Scenario): string {
-  return `${NIKA_BASE_PROMPT}\n\n${SCENARIO_PROMPTS[scenario]}\n\n${TIPS_TOOL_GUIDE}`;
+export function buildSystemPrompt(scenario: Scenario, canSaveTips = true): string {
+  const base = `${NIKA_BASE_PROMPT}\n\n${SCENARIO_PROMPTS[scenario]}`;
+  return canSaveTips ? `${base}\n\n${TIPS_TOOL_GUIDE}` : base;
 }

@@ -9,6 +9,7 @@ import { buildSprintContext, getActiveSprint } from "@/lib/sprint";
 import { getRecentDailyState, parseYmd, userToday } from "@/lib/rhythm";
 import { buildRhythmContext } from "@/lib/rhythm/chat-context";
 import { SAVE_TIP_TOOL, executeSaveTip } from "@/lib/tips/save-tip";
+import { resolveIsPro } from "@/lib/subscription";
 import { createServerComponentClient } from "@/lib/supabase";
 import type { Message } from "@/types/app";
 import type { Scenario } from "@/types/conversation";
@@ -79,6 +80,15 @@ export async function POST(req: Request) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Pro-статус: FREE не пополняет «Советы» из диалога, поэтому инструмент
+  // save_tip и правила про сохранение в промпт не подмешиваем.
+  const { data: userRow } = await supabase
+    .from("users")
+    .select("is_pro")
+    .eq("id", user.id)
+    .maybeSingle();
+  const isPro = resolveIsPro(userRow?.is_pro);
+
   // Rate limit по пользователю — backstop против abuse независимо от Pro-статуса.
   const allowed = await checkRateLimit(
     `chat:${user.id}`,
@@ -122,7 +132,7 @@ export async function POST(req: Request) {
   const systemBlocks: Anthropic.TextBlockParam[] = [
     {
       type: "text",
-      text: buildSystemPrompt(scenario),
+      text: buildSystemPrompt(scenario, isPro),
       cache_control: { type: "ephemeral" },
     },
   ];
@@ -162,7 +172,8 @@ export async function POST(req: Request) {
           model: NIKA_MODEL,
           max_tokens: 1024,
           system: systemBlocks,
-          tools: [SAVE_TIP_TOOL],
+          // save_tip доступен только PRO — FREE «Советы» из диалога не пополняет.
+          ...(isPro ? { tools: [SAVE_TIP_TOOL] } : {}),
           ...(toolChoice ? { tool_choice: toolChoice } : {}),
           messages: turnMessages,
         });
@@ -185,7 +196,7 @@ export async function POST(req: Request) {
         // Если модель вызвала инструмент — исполняем на сервере и даём ей
         // продолжить (раунд 2), чтобы финальный текст содержал отметку о
         // сохранении. tool_choice: none в раунде 2 исключает повторный вызов.
-        if (firstMsg.stop_reason === "tool_use") {
+        if (isPro && firstMsg.stop_reason === "tool_use") {
           const toolUse = firstMsg.content.find(
             (b): b is Anthropic.ToolUseBlock =>
               b.type === "tool_use" && b.name === "save_tip",
