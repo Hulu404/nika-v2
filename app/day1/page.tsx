@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
 import { Day1InstallCard } from "@/components/onboarding/Day1InstallCard";
@@ -67,8 +66,7 @@ export default async function Day1Page() {
     hasConversations = (convData?.length ?? 0) > 0;
   }
 
-  // Редиректим на /today только после 24 часов — в первый день страница всегда доступна
-  if (!isDay1 && hasConversations) redirect("/today");
+  // Страница /day1 всегда доступна — пользователь возвращается сам
 
   // Карточки 2×2 (первые 3 — статичные, 4-я — Day1InstallCard, клиентская)
   const STATIC_CARDS = [

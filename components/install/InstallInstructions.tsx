@@ -11,7 +11,7 @@ const IOS_STEPS: Step[] = [
   {
     num: '01',
     caption: 'Нажми на кнопку «Поделиться» внизу экрана Safari — прямоугольник со стрелкой вверх',
-    img: '/images/pwa-install/ios-step-1-share.jpg',
+    img: '/images/pwa-install/ios-step-3-confirm.jpg',
   },
   {
     num: '02',
@@ -21,7 +21,7 @@ const IOS_STEPS: Step[] = [
   {
     num: '03',
     caption: 'Нажми «Добавить» в правом верхнем углу',
-    img: '/images/pwa-install/ios-step-3-confirm.jpg',
+    img: '/images/pwa-install/ios-step-1-share.jpg',
   },
 ];
 
