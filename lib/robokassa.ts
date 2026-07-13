@@ -78,17 +78,22 @@ function shpString(shp: Record<string, string>): string {
 }
 
 /**
- * Фискальный чек в виде, готовом к вставке в URL и в подпись.
+ * Фискальный чек в двух видах: `json` — сырой JSON для ПОДПИСИ, `encoded` —
+ * url-encoded JSON для URL.
  *
- * ВАЖНО (главный источник «wrong signature»): Receipt участвует в подписи
- * в URL-encoded виде и в ТОЧНО ТАКОМ ЖЕ виде кладётся в URL — одинарное
- * кодирование, без повторного. Поэтому кодируем один раз здесь, а в URL
- * подставляем эту строку вручную (URLSearchParams перекодировал бы иначе —
- * например пробел как `+` — и подпись бы не сошлась).
+ * ВАЖНО (иначе ошибка 29 «неверная подпись»): в строку подписи (MD5) Receipt
+ * входит СЫРЫМ JSON, а в URL кладётся url-encoded. Robokassa на своей стороне
+ * декодирует параметр обратно в сырой JSON и считает MD5 именно по нему —
+ * поэтому подписывать нужно неэкранированный JSON. (Проверено по рабочей
+ * реализации kvalood/Robokassa: md5("...:$receipt:$pass1"), где $receipt —
+ * json_encode без urlencode; в форму — urlencode($receipt).)
  *
  * Возвращает null, если фискализация выключена (ROBOKASSA_FISCALIZATION=0).
  */
-function buildReceiptEncoded(amount: number, description: string): string | null {
+function buildReceipt(
+  amount: number,
+  description: string,
+): { json: string; encoded: string } | null {
   if (!FISCALIZATION) return null;
   const receipt = {
     sno: SNO,
@@ -103,7 +108,8 @@ function buildReceiptEncoded(amount: number, description: string): string | null
       },
     ],
   };
-  return encodeURIComponent(JSON.stringify(receipt));
+  const json = JSON.stringify(receipt);
+  return { json, encoded: encodeURIComponent(json) };
 }
 
 /** Ссылка на оплату с подписью на Пароле #1. */
@@ -116,15 +122,15 @@ export function buildPaymentUrl(params: {
   const { invId, amount, description, shp } = params;
   const outSum = amount.toFixed(2);
   const shpStr = shpString(shp);
-  const receipt = buildReceiptEncoded(amount, description);
+  const receipt = buildReceipt(amount, description);
 
   // Порядок по докам Robokassa: MerchantLogin:OutSum:InvId[:Receipt]:Пароль#1[:Shp_*]
-  // Receipt (если фискализация включена) идёт строго перед Паролем #1.
+  // Receipt (если включён) идёт строго перед Паролем #1 и — сырым JSON, не url-encoded.
   const signatureBase = [
     MERCHANT_LOGIN,
     outSum,
     String(invId),
-    ...(receipt ? [receipt] : []),
+    ...(receipt ? [receipt.json] : []),
     PASSWORD_1,
     shpStr,
   ]
@@ -146,9 +152,11 @@ export function buildPaymentUrl(params: {
   }
 
   let finalUrl = url.toString();
-  // Receipt дописываем вручную уже закодированным — значение в URL должно
-  // байт-в-байт совпадать с тем, что вошло в подпись (см. buildReceiptEncoded).
-  if (receipt) finalUrl += `&Receipt=${receipt}`;
+  // В URL Receipt идёт url-encoded (в подписи — сырой JSON, см. buildReceipt).
+  // Дописываем вручную, чтобы контролировать кодирование (URLSearchParams
+  // закодировал бы пробел как `+`; encodeURIComponent даёт %20 — оба валидны,
+  // но так однозначнее, и Robokassa корректно декодирует обратно в JSON).
+  if (receipt) finalUrl += `&Receipt=${receipt.encoded}`;
 
   return finalUrl;
 }
