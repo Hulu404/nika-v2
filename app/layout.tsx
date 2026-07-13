@@ -4,6 +4,10 @@ import Script from "next/script";
 import { Fraunces } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
+import { ServiceWorkerRegistration } from "@/components/install/ServiceWorkerRegistration";
+import { IosInstallSheet } from "@/components/install/IosInstallSheet";
+import { AndroidInstallBanner } from "@/components/install/AndroidInstallBanner";
+import { NotificationPermissionPrompt } from "@/components/install/NotificationPermissionPrompt";
 import "./globals.css";
 
 const serif = Fraunces({
@@ -52,6 +56,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
         <link rel="manifest" href="/site.webmanifest" />
         <meta name="theme-color" content="#C8553D" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <meta name="apple-mobile-web-app-title" content="НИКА" />
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: darkModeScript }} />
         {/* Yandex.Metrika counter */}
         <Script
@@ -69,6 +76,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           </div>
         </noscript>
         {children}
+        {/* PWA: регистрация SW и глобальные install-баннеры */}
+        <ServiceWorkerRegistration />
+        <IosInstallSheet readyToShow={true} />
+        <AndroidInstallBanner readyToShow={true} />
+        <NotificationPermissionPrompt />
       </body>
     </html>
   );

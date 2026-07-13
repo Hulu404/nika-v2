@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState, useEffect } from "react";
+import { DesktopInstallCard } from "@/components/install/DesktopInstallCard";
 import { cn } from "@/lib/utils";
 import { PlanBadge } from "@/components/PlanBadge";
 import { ScenarioSheet } from "@/components/ScenarioSheet";
@@ -290,6 +291,9 @@ export function Sidebar({ recentConvos, isPro = false, showRhythm = false }: Sid
 
         {/* ── Нижний блок ───────────────────────────────────────────────── */}
         <div className={cn("mt-auto space-y-1 border-t border-[var(--border-default)] py-3", collapsed ? "px-2" : "px-3")}>
+
+          {/* Desktop install card — скрыт при свёрнутом */}
+          {!collapsed && <DesktopInstallCard readyToShow={true} />}
 
           {/* PRO-блок — скрыт при свёрнутом и для Pro-пользователей */}
           {!collapsed && !isPro && (

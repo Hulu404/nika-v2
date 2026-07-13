@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
+import { Day1InstallCard } from "@/components/onboarding/Day1InstallCard";
 import { createServerComponentClient } from "@/lib/supabase";
 
 // ── Иконки карточек ───────────────────────────────────────────────────────────
@@ -26,14 +27,6 @@ function IcManifesto() {
   return (
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
       <path d="M5 4h14v16l-7-3.5L5 20V4Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-    </svg>
-  );
-}
-function IcProfile() {
-  return (
-    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <circle cx="12" cy="8" r="4" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M4 20c.8-4 4.4-6 8-6s7.2 2 8 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -77,8 +70,8 @@ export default async function Day1Page() {
   // Пользователь уже общался — ведём на /today
   if (hasConversations) redirect("/today");
 
-  // Карточки 2×2
-  const CARDS = [
+  // Карточки 2×2 (первые 3 — статичные, 4-я — Day1InstallCard, клиентская)
+  const STATIC_CARDS = [
     {
       href: "/chat/morning",
       title: "Начать разговор",
@@ -99,13 +92,6 @@ export default async function Day1Page() {
       body: "Чтобы не было ложных ожиданий. Это важно.",
       warm: false,
       icon: <IcManifesto />,
-    },
-    {
-      href: "/profile",
-      title: "Настройки",
-      body: "Тон, когда писать первой, тёмная тема.",
-      warm: false,
-      icon: <IcProfile />,
     },
   ];
 
@@ -135,9 +121,9 @@ export default async function Day1Page() {
               : "Выбери момент — я рядом."}
           </p>
 
-          {/* Карточки 2×2 — иконка слева + текст слева от неё, выровнен по краю */}
+          {/* Карточки 2×2 */}
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-            {CARDS.map((card) => (
+            {STATIC_CARDS.map((card) => (
               <Link
                 key={card.title}
                 href={card.href}
@@ -168,6 +154,8 @@ export default async function Day1Page() {
                 </div>
               </Link>
             ))}
+            {/* 4-я карточка: установка PWA (или «Настройки» если уже установлено) */}
+            <Day1InstallCard />
           </div>
 
           {/* Доп. сценарии */}
