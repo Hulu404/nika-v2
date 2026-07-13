@@ -12,10 +12,23 @@ import type { RobokassaPlan } from "@/types/app";
  * Источник истины об оплате — Result URL, не redirect на success.
  */
 
-const MERCHANT_LOGIN = process.env.ROBOKASSA_MERCHANT_LOGIN!;
-const PASSWORD_1 = process.env.ROBOKASSA_PASSWORD_1!;
-const PASSWORD_2 = process.env.ROBOKASSA_PASSWORD_2!;
+// .trim() — на случай невидимых пробелов/переносов в .env: лишний символ в
+// логине или пароле ломает подпись и даёт ошибку 29.
+const MERCHANT_LOGIN = (process.env.ROBOKASSA_MERCHANT_LOGIN ?? "").trim();
+const PASSWORD_1 = (process.env.ROBOKASSA_PASSWORD_1 ?? "").trim();
+const PASSWORD_2 = (process.env.ROBOKASSA_PASSWORD_2 ?? "").trim();
 const IS_TEST = process.env.ROBOKASSA_IS_TEST === "1";
+
+/**
+ * Алгоритм расчёта подписи. ОБЯЗАН совпадать с настройкой магазина
+ * (кабинет Robokassa → Технические настройки → «Алгоритм расчёта хеша»).
+ * Если в кабинете стоит не MD5 (напр. SHA256), а код считает MD5 — ЛЮБАЯ
+ * подпись даёт ошибку 29. Node поддерживает md5/sha1/sha256/sha384/sha512.
+ */
+const HASH_ALGO = (process.env.ROBOKASSA_HASH_ALGO ?? "md5").trim().toLowerCase();
+
+/** Включить отладочный лог строки подписи (пароль маскируется): ROBOKASSA_DEBUG=1. */
+const DEBUG = process.env.ROBOKASSA_DEBUG === "1";
 
 /**
  * Фискализация (54-ФЗ). Боевой магазин Robokassa с включённой фискализацией
@@ -65,8 +78,8 @@ export function isRobokassaPlan(value: unknown): value is RobokassaPlan {
   return value === "monthly" || value === "halfyear" || value === "pro";
 }
 
-function md5(input: string): string {
-  return crypto.createHash("md5").update(input, "utf8").digest("hex");
+function hash(input: string): string {
+  return crypto.createHash(HASH_ALGO).update(input, "utf8").digest("hex");
 }
 
 /** Строка Shp_-параметров, отсортированных по ключу: `Shp_a=1:Shp_b=2`. */
@@ -136,7 +149,17 @@ export function buildPaymentUrl(params: {
   ]
     .filter(Boolean)
     .join(":");
-  const signature = md5(signatureBase);
+  const signature = hash(signatureBase);
+
+  if (DEBUG) {
+    // Пароль маскируем, чтобы не светить секрет в логах. По этой строке видно
+    // точный состав/порядок параметров подписи для сверки с кабинетом.
+    console.log(
+      "[robokassa] algo=%s sigBase=%s",
+      HASH_ALGO,
+      signatureBase.replace(PASSWORD_1, "***PASS1***"),
+    );
+  }
 
   const url = new URL("https://auth.robokassa.ru/Merchant/Index.aspx");
   url.searchParams.set("MerchantLogin", MERCHANT_LOGIN);
@@ -171,6 +194,6 @@ export function verifyResultSignature(params: {
   const { outSum, invId, signature, shp } = params;
   const shpStr = shpString(shp);
   const base = [outSum, invId, PASSWORD_2, shpStr].filter(Boolean).join(":");
-  const expected = md5(base);
+  const expected = hash(base);
   return expected.toLowerCase() === signature.toLowerCase();
 }

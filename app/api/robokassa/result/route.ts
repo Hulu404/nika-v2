@@ -14,13 +14,26 @@ export const runtime = "nodejs";
  *
  * Источник истины об оплате — именно этот роут, а не redirect на /payment/success.
  */
-export async function POST(request: Request) {
+/**
+ * Robokassa может слать Result и POST-ом (formData), и GET-ом (query) —
+ * зависит от «Метод отсылки данных по Result URL» в кабинете. Поддерживаем оба,
+ * чтобы уведомление доходило при любой настройке.
+ */
+async function readParams(request: Request): Promise<URLSearchParams> {
+  if (request.method === "GET") return new URL(request.url).searchParams;
   const form = await request.formData();
-  const outSum = String(form.get("OutSum") ?? "");
-  const invId = String(form.get("InvId") ?? "");
-  const signature = String(form.get("SignatureValue") ?? "");
-  const uid = String(form.get("Shp_uid") ?? "");
-  const plan = String(form.get("Shp_plan") ?? "");
+  const params = new URLSearchParams();
+  for (const [key, value] of form.entries()) params.set(key, String(value));
+  return params;
+}
+
+async function handleResult(request: Request) {
+  const params = await readParams(request);
+  const outSum = params.get("OutSum") ?? "";
+  const invId = params.get("InvId") ?? "";
+  const signature = params.get("SignatureValue") ?? "";
+  const uid = params.get("Shp_uid") ?? "";
+  const plan = params.get("Shp_plan") ?? "";
 
   const valid = verifyResultSignature({
     outSum,
@@ -92,3 +105,8 @@ export async function POST(request: Request) {
     headers: { "Content-Type": "text/plain" },
   });
 }
+
+// Robokassa шлёт Result GET-ом или POST-ом (см. настройку метода в кабинете) —
+// поддерживаем оба.
+export const GET = handleResult;
+export const POST = handleResult;
