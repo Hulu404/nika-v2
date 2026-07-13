@@ -18,6 +18,18 @@ const PASSWORD_2 = process.env.ROBOKASSA_PASSWORD_2!;
 const IS_TEST = process.env.ROBOKASSA_IS_TEST === "1";
 
 /**
+ * Фискализация (54-ФЗ). Боевой магазин Robokassa с включённой фискализацией
+ * ОБЯЗАТЕЛЬНО требует параметр Receipt (чек) — без него страница оплаты
+ * возвращает ошибку. По умолчанию включена; отключить можно
+ * ROBOKASSA_FISCALIZATION=0 (для магазина без фискализации).
+ *   SNO — система налогообложения магазина (УСН «доходы» → usn_income).
+ *   TAX — ставка НДС в позиции чека (на УСН НДС нет → none).
+ */
+const FISCALIZATION = process.env.ROBOKASSA_FISCALIZATION !== "0";
+const SNO = process.env.ROBOKASSA_SNO || "usn_income";
+const TAX = process.env.ROBOKASSA_TAX || "none";
+
+/**
  * Тарифы: цена в рублях, срок продления подписки в месяцах и соответствующий
  * план в public.subscriptions. Цены совпадают с экраном /upgrade
  * (см. components/UpgradeContent.tsx).
@@ -65,6 +77,35 @@ function shpString(shp: Record<string, string>): string {
     .join(":");
 }
 
+/**
+ * Фискальный чек в виде, готовом к вставке в URL и в подпись.
+ *
+ * ВАЖНО (главный источник «wrong signature»): Receipt участвует в подписи
+ * в URL-encoded виде и в ТОЧНО ТАКОМ ЖЕ виде кладётся в URL — одинарное
+ * кодирование, без повторного. Поэтому кодируем один раз здесь, а в URL
+ * подставляем эту строку вручную (URLSearchParams перекодировал бы иначе —
+ * например пробел как `+` — и подпись бы не сошлась).
+ *
+ * Возвращает null, если фискализация выключена (ROBOKASSA_FISCALIZATION=0).
+ */
+function buildReceiptEncoded(amount: number, description: string): string | null {
+  if (!FISCALIZATION) return null;
+  const receipt = {
+    sno: SNO,
+    items: [
+      {
+        name: description.slice(0, 128), // Robokassa: имя позиции ≤ 128 символов
+        quantity: 1,
+        sum: Number(amount), // одна позиция → сумма строки = сумме заказа (OutSum)
+        payment_method: "full_payment",
+        payment_object: "service",
+        tax: TAX,
+      },
+    ],
+  };
+  return encodeURIComponent(JSON.stringify(receipt));
+}
+
 /** Ссылка на оплату с подписью на Пароле #1. */
 export function buildPaymentUrl(params: {
   invId: number;
@@ -75,8 +116,18 @@ export function buildPaymentUrl(params: {
   const { invId, amount, description, shp } = params;
   const outSum = amount.toFixed(2);
   const shpStr = shpString(shp);
+  const receipt = buildReceiptEncoded(amount, description);
 
-  const signatureBase = [MERCHANT_LOGIN, outSum, invId, PASSWORD_1, shpStr]
+  // Порядок по докам Robokassa: MerchantLogin:OutSum:InvId[:Receipt]:Пароль#1[:Shp_*]
+  // Receipt (если фискализация включена) идёт строго перед Паролем #1.
+  const signatureBase = [
+    MERCHANT_LOGIN,
+    outSum,
+    String(invId),
+    ...(receipt ? [receipt] : []),
+    PASSWORD_1,
+    shpStr,
+  ]
     .filter(Boolean)
     .join(":");
   const signature = md5(signatureBase);
@@ -94,7 +145,12 @@ export function buildPaymentUrl(params: {
     url.searchParams.set(`Shp_${key}`, value);
   }
 
-  return url.toString();
+  let finalUrl = url.toString();
+  // Receipt дописываем вручную уже закодированным — значение в URL должно
+  // байт-в-байт совпадать с тем, что вошло в подпись (см. buildReceiptEncoded).
+  if (receipt) finalUrl += `&Receipt=${receipt}`;
+
+  return finalUrl;
 }
 
 /** Проверка подписи Result URL на Пароле #2 (регистр не важен). */
