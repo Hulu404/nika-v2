@@ -67,8 +67,8 @@ export default async function Day1Page() {
     hasConversations = (convData?.length ?? 0) > 0;
   }
 
-  // Пользователь уже общался — ведём на /today
-  if (hasConversations) redirect("/today");
+  // Редиректим на /today только после 24 часов — в первый день страница всегда доступна
+  if (!isDay1 && hasConversations) redirect("/today");
 
   // Карточки 2×2 (первые 3 — статичные, 4-я — Day1InstallCard, клиентская)
   const STATIC_CARDS = [

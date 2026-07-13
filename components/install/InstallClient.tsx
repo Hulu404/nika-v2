@@ -8,9 +8,12 @@ export function InstallClient() {
 
   if (isStandalone) {
     return (
-      <div className="rounded-2xl border border-[#E4D9C4] bg-[#FAF7F1] p-6 text-center">
-        <p className="font-serif text-[20px] text-[#1F1B16] mb-2">Уже установлено</p>
-        <p className="text-[14px] text-[#1F1B16]/60">
+      <div
+        className="rounded-2xl border p-6 text-center"
+        style={{ background: 'var(--bg-elevated)', borderColor: 'var(--border-subtle)' }}
+      >
+        <p className="font-serif text-[20px] text-ink-primary mb-2">Уже установлено</p>
+        <p className="text-[14px] text-ink-secondary">
           НИКА уже у тебя на экране — просто открой приложение.
         </p>
       </div>
