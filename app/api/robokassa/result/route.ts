@@ -16,14 +16,22 @@ export const runtime = "nodejs";
  */
 /**
  * Robokassa может слать Result и POST-ом (formData), и GET-ом (query) —
- * зависит от «Метод отсылки данных по Result URL» в кабинете. Поддерживаем оба,
- * чтобы уведомление доходило при любой настройке.
+ * зависит от «Метод отсылки данных по Result URL» в кабинете. Поддерживаем оба.
+ * Возвращаем ещё и «сырой» текст тела — на случай, если Content-Type не
+ * form-urlencoded и formData() ничего не разобрал: тогда парсим тело сами.
  */
 async function readParams(request: Request): Promise<URLSearchParams> {
   if (request.method === "GET") return new URL(request.url).searchParams;
-  const form = await request.formData();
-  const params = new URLSearchParams();
-  for (const [key, value] of form.entries()) params.set(key, String(value));
+
+  const raw = await request.text();
+  // Основной путь: тело в формате application/x-www-form-urlencoded.
+  const params = new URLSearchParams(raw);
+  // Подстраховка: если Robokassa прислала параметры в query даже на POST —
+  // дольём их (не перетирая то, что уже есть в теле).
+  const query = new URL(request.url).searchParams;
+  for (const [key, value] of query.entries()) {
+    if (!params.has(key)) params.set(key, value);
+  }
   return params;
 }
 
@@ -35,6 +43,18 @@ async function handleResult(request: Request) {
   const uid = params.get("Shp_uid") ?? "";
   const plan = params.get("Shp_plan") ?? "";
 
+  // Диагностика: что реально прислала Robokassa. Подпись маскируем.
+  console.log(
+    "[robokassa/result] method=%s ct=%s keys=%o InvId=%s OutSum=%s plan=%s uid=%s",
+    request.method,
+    request.headers.get("content-type") ?? "",
+    [...params.keys()],
+    invId,
+    outSum,
+    plan,
+    uid,
+  );
+
   const valid = verifyResultSignature({
     outSum,
     invId,
@@ -43,7 +63,12 @@ async function handleResult(request: Request) {
   });
 
   if (!valid || !isRobokassaPlan(plan)) {
-    console.warn("[robokassa/result] bad signature or plan", { invId });
+    console.warn("[robokassa/result] bad signature or plan", {
+      invId,
+      plan,
+      valid,
+      hasSignature: signature !== "",
+    });
     return new Response("bad sign", { status: 400 });
   }
 
