@@ -126,10 +126,10 @@ export default async function ChatPage({
       .gte("created_at", sevenDaysAgo.toISOString()),
     supabase
       .from("conversations")
-      .select("scenario, updated_at")
+      .select("scenario, updated_at, messages")
       .eq("user_id", user.id)
       .order("updated_at", { ascending: false })
-      .limit(10),
+      .limit(5),
   ]);
 
   const MONTHS = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
@@ -140,9 +140,15 @@ export default async function ChatPage({
     if (d.toDateString() === y.toDateString()) return "вчера";
     return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
   }
+  function convoLabel(messages: Message[], fallback: string): string {
+    const first = (messages ?? []).find((m) => m.role === "user");
+    if (!first?.content) return fallback;
+    const t = first.content.trim();
+    return t.length > 48 ? t.slice(0, 48) + "…" : t;
+  }
   const recentConvos = (recentConvData ?? []).map((c) => ({
     href: `/chat/${c.scenario}`,
-    label: SCENARIO_META[c.scenario as Scenario]?.title ?? c.scenario,
+    label: convoLabel(c.messages as Message[], SCENARIO_META[c.scenario as Scenario]?.title ?? c.scenario),
     time: fmtTime(c.updated_at),
   }));
 

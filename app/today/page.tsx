@@ -17,8 +17,7 @@ import { computeStreak, weekRibbon, humanDate, weekdayLong, greeting, weekMessag
 import { getDailyQuote } from "@/lib/quotes";
 import { getActiveSprint } from "@/lib/sprint";
 import { resolveIsPro } from "@/lib/subscription";
-import { SCENARIO_META } from "@/lib/scenarios";
-import type { Scenario } from "@/types/conversation";
+import type { Message } from "@/types/app";
 
 const MONTHS = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
 function fmtTime(s: string) {
@@ -27,6 +26,12 @@ function fmtTime(s: string) {
   const y = new Date(now); y.setDate(now.getDate() - 1);
   if (d.toDateString() === y.toDateString()) return "вчера";
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+function convoLabel(messages: Message[]): string {
+  const first = (messages ?? []).find((m) => m.role === "user");
+  if (!first?.content) return "Диалог";
+  const t = first.content.trim();
+  return t.length > 48 ? t.slice(0, 48) + "…" : t;
 }
 
 const CHIPS = ["Не хочется бежать сегодня", "Расскажу как прошло", "Перенести на вечер"];
@@ -41,7 +46,7 @@ export default async function TodayPage() {
   const [{ data: userData }, runs, { data: convs }, activeSprint] = await Promise.all([
     supabase.from("users").select("display_name, is_pro").eq("id", user.id).maybeSingle(),
     getRuns(supabase, user.id),
-    supabase.from("conversations").select("scenario, updated_at").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(10),
+    supabase.from("conversations").select("scenario, updated_at, messages").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(5),
     getActiveSprint(supabase, user.id),
   ]);
 
@@ -107,8 +112,8 @@ export default async function TodayPage() {
                     href={`/chat/${c.scenario}`}
                     className="flex items-center justify-between rounded-[12px] border border-line-subtle bg-elevated px-4 py-3.5 transition-colors hover:border-line-default"
                   >
-                    <span className="text-[14px] text-ink-primary">
-                      {SCENARIO_META[c.scenario as Scenario]?.title ?? c.scenario}
+                    <span className="flex-1 text-[14px] text-ink-primary leading-snug line-clamp-1">
+                      {convoLabel(c.messages as Message[])}
                     </span>
                     <span className="ml-3 shrink-0 text-[12px] text-ink-muted">{fmtTime(c.updated_at)}</span>
                   </Link>
