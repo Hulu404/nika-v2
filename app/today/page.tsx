@@ -27,11 +27,35 @@ function fmtTime(s: string) {
   if (d.toDateString() === y.toDateString()) return "вчера";
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
+const TITLE_STOP = new Set([
+  "что","как","это","для","или","если","чтобы","когда","там","тут","уже","ещё","еще",
+  "все","всё","меня","мне","мой","моя","мои","так","вот","нет","да","ладно","окей",
+  "хм","ага","угу","был","была","было","были","есть","будет","очень","тоже","просто",
+  "над","под","про","без","при","даже","чем","кто","они","она","оно","его","её","их",
+  "себя","свой","своя","эта","эти","этот","того","тебя","тебе","буду","быть","этом",
+  "можно","надо","нужно","хочу","могу","хорошо","привет","ника","помоги","помогите",
+]);
+
 function convoLabel(messages: Message[]): string {
-  const first = (messages ?? []).find((m) => m.role === "user");
-  if (!first?.content) return "Диалог";
-  const t = first.content.trim();
-  return t.length > 48 ? t.slice(0, 48) + "…" : t;
+  const userMsg = (messages ?? []).find(m => m.role === "user" && m.content.trim().length > 4);
+  const assistantMsg = (messages ?? []).find(m => m.role === "assistant");
+
+  let raw = (userMsg ?? assistantMsg)?.content?.trim() ?? "";
+  if (!userMsg && raw) {
+    // убираем приветствие из реплики ассистента
+    raw = raw.replace(/^(привет[!.,]?\s+|ника[!.,]?\s+|привет,\s*)/i, "").trim();
+  }
+  if (!raw) return "Диалог";
+
+  const words = raw
+    .split(/[^а-яёa-z]+/i)
+    .filter(w => w.length >= 3 && !TITLE_STOP.has(w.toLowerCase()));
+
+  const label = words.length >= 2
+    ? words.slice(0, 5).join(" ")
+    : raw.slice(0, 48).trimEnd() + (raw.length > 48 ? "…" : "");
+
+  return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
 const CHIPS = ["Не хочется бежать сегодня", "Расскажу как прошло", "Перенести на вечер"];

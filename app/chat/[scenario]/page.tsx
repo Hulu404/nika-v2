@@ -3,7 +3,6 @@ import { notFound, redirect } from "next/navigation";
 import { Chat } from "@/components/Chat";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
-import { ChatHistoryButton } from "@/components/chat/ChatHistorySheet";
 import { createConversation, getLastConversation } from "@/lib/conversations";
 import { ALL_SCENARIOS, SCENARIO_META } from "@/lib/scenarios";
 import { createServerComponentClient } from "@/lib/supabase";
@@ -117,40 +116,14 @@ export default async function ChatPage({
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  const [{ data: userData }, { data: weekConvs }, { data: recentConvData }] = await Promise.all([
+  const [{ data: userData }, { data: weekConvs }] = await Promise.all([
     supabase.from("users").select("created_at").eq("id", user.id).maybeSingle(),
     supabase
       .from("conversations")
       .select("id")
       .eq("user_id", user.id)
       .gte("created_at", sevenDaysAgo.toISOString()),
-    supabase
-      .from("conversations")
-      .select("scenario, updated_at, messages")
-      .eq("user_id", user.id)
-      .order("updated_at", { ascending: false })
-      .limit(5),
   ]);
-
-  const MONTHS = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
-  function fmtTime(s: string) {
-    const d = new Date(s); const now = new Date();
-    if (d.toDateString() === now.toDateString()) return "сегодня";
-    const y = new Date(now); y.setDate(now.getDate() - 1);
-    if (d.toDateString() === y.toDateString()) return "вчера";
-    return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
-  }
-  function convoLabel(messages: Message[], fallback: string): string {
-    const first = (messages ?? []).find((m) => m.role === "user");
-    if (!first?.content) return fallback;
-    const t = first.content.trim();
-    return t.length > 48 ? t.slice(0, 48) + "…" : t;
-  }
-  const recentConvos = (recentConvData ?? []).map((c) => ({
-    href: `/chat/${c.scenario}`,
-    label: convoLabel(c.messages as Message[], SCENARIO_META[c.scenario as Scenario]?.title ?? c.scenario),
-    time: fmtTime(c.updated_at),
-  }));
 
   const weekConvCount = weekConvs?.length ?? 0;
   const daysWithNika = userData?.created_at
@@ -203,7 +176,6 @@ export default async function ChatPage({
           <span className="font-serif text-[17px] font-medium tracking-[-0.01em] text-ink-primary">НИКА</span>
           <span className="mt-[3px] text-[11px] tracking-[0.02em] text-ink-muted">{meta.subtitle}</span>
         </div>
-        <ChatHistoryButton convos={recentConvos} />
       </header>
 
       {/* Чат + контекст. На мобайле снизу фиксированный таб-бар — резервируем его высоту. */}
