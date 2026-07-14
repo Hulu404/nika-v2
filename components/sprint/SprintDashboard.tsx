@@ -15,6 +15,11 @@ import {
 } from "@/lib/sprint";
 import { cn } from "@/lib/utils";
 import type { Sprint } from "@/types/app";
+import type { ChartDay, WordFreq } from "@/lib/analytics";
+import { MoodBarChart } from "@/components/analytics/MoodBarChart";
+import { WordCloud } from "@/components/analytics/WordCloud";
+import { PatternCard } from "@/components/analytics/PatternCard";
+import { InfoNote } from "@/components/analytics/InfoNote";
 
 const TOTAL_DAYS = 21;
 
@@ -56,9 +61,12 @@ function ProgressDots({ filled, total }: { filled: number; total: number }) {
 interface Props {
   sprint: Sprint;
   userId: string;
+  chartDays: ChartDay[];
+  wordFreqs: WordFreq[];
+  convCount: number;
 }
 
-export function SprintDashboard({ sprint: initialSprint, userId }: Props) {
+export function SprintDashboard({ sprint: initialSprint, userId, chartDays, wordFreqs, convCount }: Props) {
   const router = useRouter();
   const [supabase] = useState(() => createClientComponentClient());
   const [sprint, setSprint] = useState<Sprint>(initialSprint);
@@ -293,6 +301,31 @@ export function SprintDashboard({ sprint: initialSprint, userId }: Props) {
               <p className="text-[14px] leading-[1.5] text-ink-secondary">{tip}</p>
             </Card>
           ))}
+        </div>
+      </section>
+
+      {/* Аналитика */}
+      <section>
+        <SectionLabel>Аналитика · 14 дней</SectionLabel>
+        <div className="flex flex-col gap-3">
+          <Card>
+            <p className="mb-3 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-muted">
+              Интенсивность пробежек
+            </p>
+            <MoodBarChart days={chartDays} />
+          </Card>
+          {wordFreqs.length > 0 && (
+            <Card>
+              <p className="mb-3 font-mono text-[10.5px] font-semibold uppercase tracking-[0.14em] text-ink-muted">
+                Облако слов
+              </p>
+              <WordCloud words={wordFreqs} />
+            </Card>
+          )}
+          <Card>
+            <PatternCard count={convCount} topWord={wordFreqs[0]?.text} />
+          </Card>
+          <InfoNote />
         </div>
       </section>
 
