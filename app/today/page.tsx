@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
@@ -16,6 +17,17 @@ import { computeStreak, weekRibbon, humanDate, weekdayLong, greeting, weekMessag
 import { getDailyQuote } from "@/lib/quotes";
 import { getActiveSprint } from "@/lib/sprint";
 import { resolveIsPro } from "@/lib/subscription";
+import { SCENARIO_META } from "@/lib/scenarios";
+import type { Scenario } from "@/types/conversation";
+
+const MONTHS = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
+function fmtTime(s: string) {
+  const d = new Date(s); const now = new Date();
+  if (d.toDateString() === now.toDateString()) return "сегодня";
+  const y = new Date(now); y.setDate(now.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return "вчера";
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
 
 const CHIPS = ["Не хочется бежать сегодня", "Расскажу как прошло", "Перенести на вечер"];
 
@@ -29,7 +41,7 @@ export default async function TodayPage() {
   const [{ data: userData }, runs, { data: convs }, activeSprint] = await Promise.all([
     supabase.from("users").select("display_name, is_pro").eq("id", user.id).maybeSingle(),
     getRuns(supabase, user.id),
-    supabase.from("conversations").select("updated_at").eq("user_id", user.id),
+    supabase.from("conversations").select("scenario, updated_at").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(10),
     getActiveSprint(supabase, user.id),
   ]);
 
@@ -81,6 +93,29 @@ export default async function TodayPage() {
             </div>
             <SuggestionChips chips={CHIPS} />
           </section>
+
+          {/* История диалогов — только на мобиле (на десктопе видна в сайдбаре) */}
+          {(convs ?? []).length > 0 && (
+            <section className="mt-8 lg:hidden">
+              <div className="mb-3 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
+                Прошлые диалоги
+              </div>
+              <div className="flex flex-col gap-1">
+                {(convs ?? []).map((c, i) => (
+                  <Link
+                    key={i}
+                    href={`/chat/${c.scenario}`}
+                    className="flex items-center justify-between rounded-[12px] border border-line-subtle bg-elevated px-4 py-3.5 transition-colors hover:border-line-default"
+                  >
+                    <span className="text-[14px] text-ink-primary">
+                      {SCENARIO_META[c.scenario as Scenario]?.title ?? c.scenario}
+                    </span>
+                    <span className="ml-3 shrink-0 text-[12px] text-ink-muted">{fmtTime(c.updated_at)}</span>
+                  </Link>
+                ))}
+              </div>
+            </section>
+          )}
 
         </div>
       </div>

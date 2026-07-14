@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { Chat } from "@/components/Chat";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
+import { ChatHistoryButton } from "@/components/chat/ChatHistorySheet";
 import { createConversation, getLastConversation } from "@/lib/conversations";
 import { ALL_SCENARIOS, SCENARIO_META } from "@/lib/scenarios";
 import { createServerComponentClient } from "@/lib/supabase";
@@ -116,14 +117,34 @@ export default async function ChatPage({
   const sevenDaysAgo = new Date();
   sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
-  const [{ data: userData }, { data: weekConvs }] = await Promise.all([
+  const [{ data: userData }, { data: weekConvs }, { data: recentConvData }] = await Promise.all([
     supabase.from("users").select("created_at").eq("id", user.id).maybeSingle(),
     supabase
       .from("conversations")
       .select("id")
       .eq("user_id", user.id)
       .gte("created_at", sevenDaysAgo.toISOString()),
+    supabase
+      .from("conversations")
+      .select("scenario, updated_at")
+      .eq("user_id", user.id)
+      .order("updated_at", { ascending: false })
+      .limit(10),
   ]);
+
+  const MONTHS = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
+  function fmtTime(s: string) {
+    const d = new Date(s); const now = new Date();
+    if (d.toDateString() === now.toDateString()) return "сегодня";
+    const y = new Date(now); y.setDate(now.getDate() - 1);
+    if (d.toDateString() === y.toDateString()) return "вчера";
+    return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+  }
+  const recentConvos = (recentConvData ?? []).map((c) => ({
+    href: `/chat/${c.scenario}`,
+    label: SCENARIO_META[c.scenario as Scenario]?.title ?? c.scenario,
+    time: fmtTime(c.updated_at),
+  }));
 
   const weekConvCount = weekConvs?.length ?? 0;
   const daysWithNika = userData?.created_at
@@ -176,13 +197,7 @@ export default async function ChatPage({
           <span className="font-serif text-[17px] font-medium tracking-[-0.01em] text-ink-primary">НИКА</span>
           <span className="mt-[3px] text-[11px] tracking-[0.02em] text-ink-muted">{meta.subtitle}</span>
         </div>
-        <button aria-label="Ещё" className="flex h-9 w-9 items-center justify-center rounded-full text-ink-secondary hover:bg-[var(--surface-nika)] transition-colors">
-          <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor" aria-hidden>
-            <circle cx="4" cy="10" r="1.6" />
-            <circle cx="10" cy="10" r="1.6" />
-            <circle cx="16" cy="10" r="1.6" />
-          </svg>
-        </button>
+        <ChatHistoryButton convos={recentConvos} />
       </header>
 
       {/* Чат + контекст. На мобайле снизу фиксированный таб-бар — резервируем его высоту. */}
