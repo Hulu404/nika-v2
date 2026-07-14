@@ -617,11 +617,16 @@ export function ProfileContent({
             rel="noopener noreferrer"
             className="flex items-center gap-3 rounded-[14px] border border-line-default bg-canvas px-4 py-4 transition-colors hover:border-accent/40"
           >
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden className="flex-shrink-0 text-ink-muted">
-              <path d="M2 9C2 5.134 5.134 2 9 2s7 3.134 7 7-3.134 7-7 7-7-3.134-7-7z" stroke="currentColor" strokeWidth="1.3" />
-              <path d="M5.5 9l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+            {/* Telegram logo */}
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden className="flex-shrink-0 text-ink-muted">
+              <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M7 12l3 3 7-7" stroke="none" fill="none" />
+              <path d="M16.5 7.5l-6.5 6.5-2.5-2.5 9-4zm-6.5 6.5l.5 2.5 1.5-1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
-            <span className="flex-1 text-[15px] text-ink-primary">@meine_nika</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-[15px] text-ink-primary">Написать в Telegram</p>
+              <p className="text-[12px] text-ink-muted">@meine_nika</p>
+            </div>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden className="text-ink-faint">
               <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
