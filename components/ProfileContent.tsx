@@ -613,8 +613,6 @@ export function ProfileContent({
           </a>
           <a
             href="https://t.me/meine_nika"
-            target="_blank"
-            rel="noopener noreferrer"
             className="flex items-center gap-3 rounded-[14px] border border-line-default bg-canvas px-4 py-4 transition-colors hover:border-accent/40"
           >
             {/* Telegram logo */}
