@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@/lib/supabase";
 import { cn } from "@/lib/utils";
 import { requestNotifPermission } from "@/lib/notifications";
+import { subscribeToPush, unsubscribeFromPush } from "@/lib/push-subscribe";
 import type { Gender, NotifPermission } from "@/types/app";
 import { BottomSheet } from "@/components/BottomSheet";
 import { PlanBadge } from "@/components/PlanBadge";
@@ -14,7 +15,7 @@ import { OfertaContent } from "@/components/legal/OfertaContent";
 
 // ─── типы ────────────────────────────────────────────────────────────────────
 
-type WhenWrite = "morning" | "evening" | "never";
+type NotifFrequency = "daily" | "every_other_day" | "weekdays" | "weekly" | "biweekly" | "monthly";
 type SheetId =
   | "when" | "name" | "gender"
   | "export" | "delete" | "how" | "manifesto" | "support" | "terms"
@@ -23,10 +24,13 @@ type SheetId =
 
 // ─── константы ───────────────────────────────────────────────────────────────
 
-const WHEN_OPTIONS: { v: WhenWrite; short: string; full: string }[] = [
-  { v: "morning", short: "Утром",     full: "Утром перед тренировкой" },
-  { v: "evening", short: "Вечером",   full: "Вечером" },
-  { v: "never",   short: "Не писать", full: "Не писать первой" },
+const FREQUENCY_OPTIONS: { v: NotifFrequency; label: string }[] = [
+  { v: "daily",           label: "Каждый день" },
+  { v: "every_other_day", label: "Через день" },
+  { v: "weekdays",        label: "По будням" },
+  { v: "weekly",          label: "Раз в неделю" },
+  { v: "biweekly",        label: "Раз в две недели" },
+  { v: "monthly",         label: "Раз в месяц" },
 ];
 
 // Род определяет и обращение НИКИ, и видимость раздела «Мой ритм» (showRhythm).
@@ -167,6 +171,8 @@ interface Props {
   reminderEnabled: boolean;
   initialGender: Gender | null;
   initialProactive: boolean;
+  initialNotifTime: string;
+  initialNotifFrequency: string;
   createdAt: string;
 }
 
@@ -180,18 +186,24 @@ export function ProfileContent({
   reminderEnabled,
   initialGender,
   initialProactive,
+  initialNotifTime,
+  initialNotifFrequency,
   createdAt,
 }: Props) {
   const router = useRouter();
   const [supabase] = useState(() => createClientComponentClient());
 
   // Preferences
-  const [whenWrite, setWhenWrite] = useState<WhenWrite>(reminderEnabled ? "morning" : "never");
-  const [gender, setGender]     = useState<Gender | null>(initialGender);
+  const [gender, setGender]           = useState<Gender | null>(initialGender);
   const [genderSaving, setGenderSaving] = useState(false);
-  const [notifOn, setNotifOn]   = useState(initialProactive);
+  const [notifOn, setNotifOn]         = useState(initialProactive);
   const [notifSaving, setNotifSaving] = useState(false);
-  const [dark, setDark]         = useState(false);
+  const [notifTime, setNotifTime]     = useState(initialNotifTime);
+  const [notifFrequency, setNotifFrequency] = useState<NotifFrequency>(
+    (initialNotifFrequency as NotifFrequency) ?? "daily",
+  );
+  const [notifSettingsSaving, setNotifSettingsSaving] = useState(false);
+  const [dark, setDark]               = useState(false);
 
   // Name editing
   const [name, setName]         = useState(initialName);
@@ -209,8 +221,6 @@ export function ProfileContent({
 
   // Read localStorage after mount
   useEffect(() => {
-    const w = localStorage.getItem("nika-when") as WhenWrite | null;
-    if (w) setWhenWrite(w);
     const theme = localStorage.getItem("nika-theme");
     const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
     setDark(theme === "dark" || (!theme && prefersDark));
@@ -218,12 +228,13 @@ export function ProfileContent({
 
   // ── Handlers ──
 
-  async function handleWhenChange(v: WhenWrite) {
-    setWhenWrite(v);
-    localStorage.setItem("nika-when", v);
-    await supabase
-      .from("profiles")
-      .upsert({ user_id: userId, reminder_enabled: v !== "never" }, { onConflict: "user_id" });
+  async function handleNotifSettingsSave() {
+    setNotifSettingsSaving(true);
+    await supabase.from("profiles").upsert(
+      { user_id: userId, notif_time: notifTime, notif_frequency: notifFrequency, reminder_enabled: true },
+      { onConflict: "user_id" },
+    );
+    setNotifSettingsSaving(false);
     closeSheet();
   }
 
@@ -264,13 +275,19 @@ export function ProfileContent({
       user_id: userId,
       proactive: v,
     };
-    if (v) patch.notif_permission = await requestNotifPermission();
+    if (v) {
+      patch.notif_permission = await requestNotifPermission();
+      // Подписываем на web push — не блокируем тогл если не получилось
+      subscribeToPush().catch(() => {});
+    } else {
+      unsubscribeFromPush().catch(() => {});
+    }
 
     const { error } = await supabase.from("profiles").upsert(patch, { onConflict: "user_id" });
     setNotifSaving(false);
     if (error) {
       console.error("[profile] notifications save failed:", error.message);
-      setNotifOn(prev); // откатываем оптимистичное значение
+      setNotifOn(prev);
     }
   }
 
@@ -301,7 +318,7 @@ export function ProfileContent({
   }
 
   // Derived labels
-  const whenShort       = WHEN_OPTIONS.find(o => o.v === whenWrite)?.short ?? "Утром";
+  const notifTimeShort  = notifOn ? `${notifTime} · ${FREQUENCY_OPTIONS.find(o => o.v === notifFrequency)?.label ?? ""}` : "Выкл.";
   const genderShort     = GENDER_OPTIONS.find(o => o.v === gender)?.short ?? "—";
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -373,7 +390,9 @@ export function ProfileContent({
                 label="Уведомления"
                 rightEl={<Toggle on={notifOn} onChange={handleNotifToggle} />}
               />
-              <Row label="Когда писать первой"             value={whenShort}       onClick={() => setActiveSheet("when")} />
+              {notifOn && (
+                <Row label="Время и частота" value={notifTimeShort} onClick={() => setActiveSheet("when")} />
+              )}
               <Row label="Род обращения"                   value={genderShort}     onClick={() => setActiveSheet("gender")} />
               <Row label="Имя — как ко мне обращаться"     value={name || "—"}     onClick={() => { setEditName(name); setActiveSheet("name"); }} />
             </Card>
@@ -445,33 +464,62 @@ export function ProfileContent({
 
       {/* ──────────────── BOTTOM SHEETS ──────────────────────────────────────── */}
 
-      {/* Когда писать первой */}
-      <BottomSheet isOpen={activeSheet === "when"} onClose={closeSheet} title="Когда писать первой">
-        <div className="flex flex-col gap-2.5">
-          {WHEN_OPTIONS.map((o) => {
-            const active = whenWrite === o.v;
-            return (
-              <button
-                key={o.v}
-                onClick={() => handleWhenChange(o.v)}
-                className={cn(
-                  "flex items-center justify-between rounded-[14px] border px-4 py-[14px] text-left transition-all",
-                  active
-                    ? "border-ink-primary bg-ink-primary"
-                    : "border-line-default bg-canvas hover:border-line-strong",
-                )}
-              >
-                <span className={cn("text-[15px] font-medium", active ? "text-canvas" : "text-ink-primary")}>
-                  {o.full}
-                </span>
-                {active && (
-                  <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden className="flex-shrink-0 text-canvas">
-                    <path d="M4.5 10.5l3.5 3.5 7.5-7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                )}
-              </button>
-            );
-          })}
+      {/* Время и частота уведомлений */}
+      <BottomSheet isOpen={activeSheet === "when"} onClose={closeSheet} title="Время и частота">
+        <div className="flex flex-col gap-4">
+          {/* Time picker */}
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
+              Время
+            </p>
+            <input
+              type="time"
+              value={notifTime}
+              onChange={(e) => setNotifTime(e.target.value)}
+              className="w-full rounded-[14px] border border-line-default bg-canvas px-4 py-[14px] text-[16px] text-ink-primary outline-none focus:border-accent transition-colors"
+            />
+          </div>
+
+          {/* Frequency */}
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
+              Частота
+            </p>
+            <div className="flex flex-col gap-2">
+              {FREQUENCY_OPTIONS.map((o) => {
+                const active = notifFrequency === o.v;
+                return (
+                  <button
+                    key={o.v}
+                    onClick={() => setNotifFrequency(o.v)}
+                    className={cn(
+                      "flex items-center justify-between rounded-[14px] border px-4 py-3.5 text-left transition-all",
+                      active
+                        ? "border-ink-primary bg-ink-primary"
+                        : "border-line-default bg-canvas hover:border-line-strong",
+                    )}
+                  >
+                    <span className={cn("text-[15px] font-medium", active ? "text-canvas" : "text-ink-primary")}>
+                      {o.label}
+                    </span>
+                    {active && (
+                      <svg width="18" height="18" viewBox="0 0 20 20" fill="none" aria-hidden className="flex-shrink-0 text-canvas">
+                        <path d="M4.5 10.5l3.5 3.5 7.5-7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <button
+            onClick={handleNotifSettingsSave}
+            disabled={notifSettingsSaving}
+            className="mt-1 w-full rounded-full bg-accent py-3.5 text-[15px] font-semibold text-white disabled:opacity-40"
+          >
+            Сохранить
+          </button>
         </div>
       </BottomSheet>
 

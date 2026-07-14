@@ -78,6 +78,9 @@ export interface Database {
           notif_permission: NotifPermission | null;
           rhythm_consent_at: string | null;
           rhythm_consent_version: string | null;
+          notif_time: string | null;
+          notif_frequency: string | null;
+          last_push_sent_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -94,6 +97,9 @@ export interface Database {
           notif_permission?: NotifPermission | null;
           rhythm_consent_at?: string | null;
           rhythm_consent_version?: string | null;
+          notif_time?: string | null;
+          notif_frequency?: string | null;
+          last_push_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -110,6 +116,9 @@ export interface Database {
           notif_permission?: NotifPermission | null;
           rhythm_consent_at?: string | null;
           rhythm_consent_version?: string | null;
+          notif_time?: string | null;
+          notif_frequency?: string | null;
+          last_push_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -397,6 +406,33 @@ export interface Database {
           closed_at?: string | null;
           created_at?: string;
           updated_at?: string;
+        };
+        Relationships: [];
+      };
+      push_subscriptions: {
+        Row: {
+          id: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          endpoint: string;
+          p256dh: string;
+          auth: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          endpoint?: string;
+          p256dh?: string;
+          auth?: string;
+          created_at?: string;
         };
         Relationships: [];
       };
