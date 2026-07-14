@@ -9,7 +9,8 @@ import { QuickReplies } from "@/components/QuickReplies";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { SCENARIO_META } from "@/lib/scenarios";
 import { cn } from "@/lib/utils";
-import type { ChatMessage, Scenario } from "@/types/conversation";
+import type { ChatMessage, ChatAction, Scenario } from "@/types/conversation";
+import { parseAction } from "@/lib/chat-actions";
 
 export function Chat({
   scenario,
@@ -108,17 +109,33 @@ export function Chat({
         acc += decoder.decode(value, { stream: true });
         if (!acc) continue;
 
+        // Во время стриминга не показываем action-маркер — он в конце стрима.
+        const displayText = acc.replace(/\n⟪ACTION:\{.*?\}⟫$/, "");
+
         if (assistantId === null) {
           const id = crypto.randomUUID();
           assistantId = id;
           setMessages((prev) => [
             ...prev,
-            { id, role: "assistant", content: acc, createdAt: new Date().toISOString() },
+            { id, role: "assistant", content: displayText, createdAt: new Date().toISOString() },
           ]);
         } else {
           const id = assistantId;
           setMessages((prev) =>
-            prev.map((m) => (m.id === id ? { ...m, content: acc } : m)),
+            prev.map((m) => (m.id === id ? { ...m, content: displayText } : m)),
+          );
+        }
+      }
+
+      // Когда стрим завершён — парсим финальный action и прикрепляем к сообщению.
+      if (assistantId !== null) {
+        const { text: finalText, action } = parseAction(acc);
+        if (action) {
+          const id = assistantId;
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === id ? { ...m, content: finalText, action } : m,
+            ),
           );
         }
       }
@@ -137,9 +154,24 @@ export function Chat({
       <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain">
         <div className="mx-auto flex max-w-2xl flex-col gap-2 px-4 pb-2 pt-5">
           {messages.map((m) => (
-            <MessageBubble key={m.id} role={m.role}>
-              {m.content}
-            </MessageBubble>
+            <div key={m.id} className={cn(m.role === "assistant" ? "self-start" : "self-end", "w-full")}>
+              <MessageBubble role={m.role}>
+                {m.content}
+              </MessageBubble>
+              {m.role === "assistant" && m.action && (
+                <div className="mt-2 pl-1">
+                  <Link
+                    href={m.action.href}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-surface-nika px-3.5 py-2 text-[13px] font-medium text-accent transition-colors hover:bg-accent/10"
+                  >
+                    {m.action.label}
+                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                      <path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </Link>
+                </div>
+              )}
+            </div>
           ))}
           {showTyping && <TypingIndicator />}
           {error === "limit_reached" ? (

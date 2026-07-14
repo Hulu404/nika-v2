@@ -11,6 +11,7 @@ import { buildSprintContext, getActiveSprint } from "@/lib/sprint";
 import { getRecentDailyState, parseYmd, userToday } from "@/lib/rhythm";
 import { buildRhythmContext } from "@/lib/rhythm/chat-context";
 import { SAVE_TIP_TOOL, executeSaveTip } from "@/lib/tips/save-tip";
+import { LOG_RUN_TOOL, executeLogRun, encodeAction } from "@/lib/chat-actions";
 import { resolveTier } from "@/lib/subscription";
 import { createServerComponentClient } from "@/lib/supabase";
 import type { Message } from "@/types/app";
@@ -213,8 +214,8 @@ export async function POST(req: Request) {
           model: NIKA_MODEL,
           max_tokens: 1024,
           system: systemBlocks,
-          // save_tip доступен только PRO — FREE «Советы» из диалога не пополняет.
-          ...(isPro ? { tools: [SAVE_TIP_TOOL] } : {}),
+          // Инструменты доступны только PRO.
+          ...(isPro ? { tools: [SAVE_TIP_TOOL, LOG_RUN_TOOL] } : {}),
           ...(toolChoice ? { tool_choice: toolChoice } : {}),
           messages: turnMessages,
         });
@@ -239,30 +240,45 @@ export async function POST(req: Request) {
         // сохранении. tool_choice: none в раунде 2 исключает повторный вызов.
         if (isPro && firstMsg.stop_reason === "tool_use") {
           const toolUse = firstMsg.content.find(
-            (b): b is Anthropic.ToolUseBlock =>
-              b.type === "tool_use" && b.name === "save_tip",
+            (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
           );
           if (toolUse) {
-            const result = await executeSaveTip(supabase, user.id, toolUse.input);
+            let toolResultContent = "";
+            let actionToSend: { href: string; label: string } | null = null;
+
+            if (toolUse.name === "save_tip") {
+              const result = await executeSaveTip(supabase, user.id, toolUse.input);
+              toolResultContent = result.modelMessage;
+              if (result.status === "saved") {
+                actionToSend = { href: "/tips", label: "Открыть советы" };
+              }
+            } else if (toolUse.name === "log_run") {
+              const result = await executeLogRun(supabase, user.id, toolUse.input);
+              toolResultContent = result.modelMessage;
+              if (result.ok) {
+                actionToSend = { href: "/journal", label: "Открыть журнал" };
+              }
+            }
+
             const followup: Anthropic.MessageParam[] = [
               ...anthropicMessages,
               { role: "assistant", content: firstMsg.content },
               {
                 role: "user",
-                content: [
-                  {
-                    type: "tool_result",
-                    tool_use_id: toolUse.id,
-                    content: result.modelMessage,
-                  },
-                ],
+                content: [{ type: "tool_result", tool_use_id: toolUse.id, content: toolResultContent }],
               },
             ];
-            // Разделитель между основным ответом и фразой об отметке совета
             const sep = "\n\n";
             controller.enqueue(encoder.encode(sep));
             assistantText += sep;
             await runTurn(followup, { type: "none" });
+
+            // Action marker — после всего текста, фронтенд парсит и убирает из отображения.
+            if (actionToSend) {
+              const marker = encodeAction(actionToSend);
+              controller.enqueue(encoder.encode(marker));
+              // marker не добавляем в assistantText — не храним в БД
+            }
           }
         }
 
