@@ -51,7 +51,10 @@ export default async function TipsPage() {
 
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
         {isPro ? (
-          <TipsContent initialTips={tips} userId={user?.id ?? null} />
+          <>
+            <TipsContent initialTips={tips} userId={user?.id ?? null} />
+            <BasicTips showAsSection />
+          </>
         ) : (
           <BasicTips />
         )}

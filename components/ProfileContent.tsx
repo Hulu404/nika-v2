@@ -597,19 +597,36 @@ export function ProfileContent({
         <p className="mb-5 text-[14px] leading-[1.6] text-ink-secondary">
           Если что-то не работает или есть вопросы — напиши нам, мы читаем всё.
         </p>
-        <a
-          href="mailto:hello@nika-app.ru"
-          className="flex items-center gap-3 rounded-[14px] border border-line-default bg-canvas px-4 py-4 transition-colors hover:border-accent/40"
-        >
-          <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden className="flex-shrink-0 text-ink-muted">
-            <rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3" />
-            <path d="M2 6l7 5 7-5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-          </svg>
-          <span className="flex-1 text-[15px] text-ink-primary">hello@nika-app.ru</span>
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden className="text-ink-faint">
-            <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
-        </a>
+        <div className="flex flex-col gap-2.5">
+          <a
+            href="mailto:ceo@mynika.ru"
+            className="flex items-center gap-3 rounded-[14px] border border-line-default bg-canvas px-4 py-4 transition-colors hover:border-accent/40"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden className="flex-shrink-0 text-ink-muted">
+              <rect x="2" y="4" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M2 6l7 5 7-5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+            </svg>
+            <span className="flex-1 text-[15px] text-ink-primary">ceo@mynika.ru</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden className="text-ink-faint">
+              <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </a>
+          <a
+            href="https://t.me/meine_nika"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 rounded-[14px] border border-line-default bg-canvas px-4 py-4 transition-colors hover:border-accent/40"
+          >
+            <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden className="flex-shrink-0 text-ink-muted">
+              <path d="M2 9C2 5.134 5.134 2 9 2s7 3.134 7 7-3.134 7-7 7-7-3.134-7-7z" stroke="currentColor" strokeWidth="1.3" />
+              <path d="M5.5 9l2.5 2.5 4.5-5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            <span className="flex-1 text-[15px] text-ink-primary">@meine_nika</span>
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden className="text-ink-faint">
+              <path d="M6 3l5 5-5 5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </a>
+        </div>
       </BottomSheet>
 
       {/* Условия и приватность */}

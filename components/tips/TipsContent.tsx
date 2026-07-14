@@ -47,6 +47,7 @@ function TipCard({
   onCancelDelete: () => void;
   onConfirmDelete: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const added = addedLabel(tip.createdAt);
   return (
     <div className="relative flex flex-col gap-2.5 rounded-[16px] border border-line-subtle bg-elevated p-4 lg:p-5">
@@ -63,16 +64,32 @@ function TipCard({
         </button>
       </div>
 
-      <div>
+      <button
+        type="button"
+        onClick={() => setExpanded((v) => !v)}
+        className="text-left"
+        aria-expanded={expanded}
+      >
         <span className="mb-2 block font-mono text-[9.5px] uppercase tracking-[0.08em] text-ink-muted">
           {categoryLabel(tip.category)}
         </span>
         <h2 className="mb-1.5 font-serif text-[17px] font-medium leading-[1.3] tracking-[-0.01em] text-ink-primary">
           {tip.title}
         </h2>
-        <p className="text-[13.5px] leading-[1.48] text-ink-secondary">{tip.body}</p>
-        {added && <p className="mt-2.5 font-mono text-[10px] tracking-[0.04em] text-ink-faint">{added}</p>}
-      </div>
+        {expanded ? (
+          <p className="text-[13.5px] leading-[1.48] text-ink-secondary">{tip.body}</p>
+        ) : (
+          <p className="line-clamp-1 text-[13.5px] leading-[1.48] text-ink-muted">
+            {tip.body}
+          </p>
+        )}
+        {expanded && added && (
+          <p className="mt-2.5 font-mono text-[10px] tracking-[0.04em] text-ink-faint">{added}</p>
+        )}
+        <span className="mt-1.5 block text-[12px] text-accent">
+          {expanded ? "Свернуть" : "Читать"}
+        </span>
+      </button>
 
       {/* Подтверждение удаления — оверлей поверх карточки. */}
       {confirming && (

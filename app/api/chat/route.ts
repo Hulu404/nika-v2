@@ -258,6 +258,10 @@ export async function POST(req: Request) {
                 ],
               },
             ];
+            // Разделитель между основным ответом и фразой об отметке совета
+            const sep = "\n\n";
+            controller.enqueue(encoder.encode(sep));
+            assistantText += sep;
             await runTurn(followup, { type: "none" });
           }
         }

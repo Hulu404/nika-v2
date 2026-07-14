@@ -56,7 +56,7 @@ function ProUpsell() {
   );
 }
 
-export function BasicTips() {
+export function BasicTips({ showAsSection = false }: { showAsSection?: boolean }) {
   const [category, setCategory] = useState<CategoryDef["id"]>("all");
 
   useEffect(() => {
@@ -73,18 +73,32 @@ export function BasicTips() {
 
   return (
     <div className="mx-auto w-full max-w-[1040px] px-5 pt-6 lg:px-8 lg:pt-10">
-      {/* ── Герой ─────────────────────────────────────────────────────── */}
-      <div className="border-b border-line-subtle pb-5 lg:pb-6">
-        <div className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-muted">Подборка</div>
-        <h1 className="font-serif text-[26px] font-normal leading-[1.1] tracking-[-0.02em] text-ink-primary lg:text-[34px]">
-          Советы для бегунов
-        </h1>
-      </div>
-      <p className="mt-4 max-w-[520px] text-[15px] leading-[1.5] text-ink-secondary">
-        Базовая подборка на каждый день: перед бегом, техника, дыхание, экипировка и восстановление.
-      </p>
-
-      <ProUpsell />
+      {showAsSection ? (
+        /* У PRO — просто секция без апселла и без большого заголовка */
+        <div className="border-t border-line-subtle pt-8">
+          <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-muted">Подборка</div>
+          <h2 className="font-serif text-[22px] font-normal leading-[1.2] tracking-[-0.01em] text-ink-primary">
+            Советы для бегунов
+          </h2>
+          <p className="mt-2 max-w-[520px] text-[14px] leading-[1.5] text-ink-secondary">
+            Базовая подборка: техника, дыхание, экипировка, восстановление.
+          </p>
+        </div>
+      ) : (
+        <>
+          {/* ── Герой ─────────────────────────────────────────────────────── */}
+          <div className="border-b border-line-subtle pb-5 lg:pb-6">
+            <div className="mb-2 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-muted">Подборка</div>
+            <h1 className="font-serif text-[26px] font-normal leading-[1.1] tracking-[-0.02em] text-ink-primary lg:text-[34px]">
+              Советы для бегунов
+            </h1>
+          </div>
+          <p className="mt-4 max-w-[520px] text-[15px] leading-[1.5] text-ink-secondary">
+            Базовая подборка на каждый день: перед бегом, техника, дыхание, экипировка и восстановление.
+          </p>
+          <ProUpsell />
+        </>
+      )}
 
       {/* ── Фильтр категорий ──────────────────────────────────────────── */}
       <div className="scrollbar-none mt-6 flex gap-2 overflow-x-auto pb-1 lg:flex-wrap lg:overflow-visible">
