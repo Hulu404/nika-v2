@@ -25,13 +25,6 @@ function IcList() {
     </svg>
   );
 }
-function IcChart() {
-  return (
-    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
-      <path d="M3 14l4-4 3 3 5-6" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
 function IcRhythm() {
   return (
     <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
@@ -194,8 +187,7 @@ export function Sidebar({ recentConvos, isPro = false, showRhythm = false }: Sid
     ...(showRhythm
       ? [{ href: "/rhythm", label: "Мой ритм",        icon: <IcRhythm />, implemented: true }]
       : []),
-    { href: "/analytics",   label: "Аналитика",       icon: <IcChart />,  implemented: true },
-    ...(isPro
+...(isPro
       ? [{ href: "/sprint", label: "Спринт",          icon: <IcSprint />, implemented: true }]
       : []),
     { href: "/tips",        label: "Советы",          icon: <IcTip />,    implemented: true },
