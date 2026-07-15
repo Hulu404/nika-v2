@@ -5,13 +5,8 @@ import type { PushTrigger } from "@/lib/push-generate";
 import type { Database } from "@/types/database";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 export const maxDuration = 60;
-
-webpush.setVapidDetails(
-  process.env.VAPID_EMAIL ?? "mailto:ceo@mynika.ru",
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? "",
-  process.env.VAPID_PRIVATE_KEY ?? "",
-);
 
 function adminClient() {
   return createClient<Database>(
@@ -47,6 +42,17 @@ export async function GET(req: Request) {
   if (req.headers.get("x-cron-secret") !== process.env.CRON_SECRET) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const pubKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+  const privKey = process.env.VAPID_PRIVATE_KEY;
+  if (!pubKey || !privKey) {
+    return Response.json({ error: "VAPID keys not configured" }, { status: 500 });
+  }
+  webpush.setVapidDetails(
+    process.env.VAPID_EMAIL ?? "mailto:ceo@mynika.ru",
+    pubKey,
+    privKey,
+  );
 
   const db = adminClient();
   const now = new Date();
