@@ -84,7 +84,7 @@ export function BasicTips({ showAsSection = false }: { showAsSection?: boolean }
         <div className="border-t border-line-subtle pt-8">
           <div className="mb-1 font-mono text-[11px] uppercase tracking-[0.14em] text-ink-muted">Подборка</div>
           <h2 className="font-serif text-[22px] font-normal leading-[1.2] tracking-[-0.01em] text-ink-primary">
-            Советы для бегунов
+            Базовый гид бегуна
           </h2>
           <p className="mt-2 max-w-[520px] text-[14px] leading-[1.5] text-ink-secondary">
             Базовая подборка: техника, дыхание, экипировка, восстановление.

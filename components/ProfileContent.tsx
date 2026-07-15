@@ -161,6 +161,14 @@ function pluralDays(n: number): string {
   return "дней";
 }
 
+function formatTimeLeft(ms: number): string {
+  const totalMin = Math.ceil(ms / 60_000);
+  if (totalMin < 60) return `${totalMin} мин`;
+  const h = Math.floor(totalMin / 60);
+  const m = totalMin % 60;
+  return m > 0 ? `${h} ч ${m} мин` : `${h} ч`;
+}
+
 // ─── Props ────────────────────────────────────────────────────────────────────
 
 interface Props {
@@ -218,6 +226,14 @@ export function ProfileContent({
   const daysWithNika = Math.max(1, Math.floor(
     (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24),
   ));
+
+  // Usage
+  const [usage, setUsage] = useState<{ used: number; limit: number; msUntilReset?: number } | null>(null);
+  useEffect(() => {
+    fetch("/api/usage").then(r => r.ok ? r.json() : null).then(d => {
+      if (d && typeof d.used === "number") setUsage(d);
+    }).catch(() => {});
+  }, []);
 
   // Read localStorage after mount
   useEffect(() => {
@@ -341,6 +357,31 @@ export function ProfileContent({
               С НИКОЙ {daysWithNika} {pluralDays(daysWithNika)}
             </p>
           </div>
+
+          {/* Usage */}
+          {usage && (
+            <div className="mb-5 rounded-card border border-line-subtle bg-elevated p-4">
+              <div className="mb-2 flex items-center justify-between">
+                <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-muted">
+                  Диалоги сегодня
+                </span>
+                {usage.msUntilReset != null && (
+                  <span className="text-[11px] text-ink-muted">
+                    сброс через {formatTimeLeft(usage.msUntilReset)}
+                  </span>
+                )}
+              </div>
+              <div className="mb-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-deep">
+                <div
+                  className="h-full rounded-full bg-accent transition-all"
+                  style={{ width: `${Math.min(100, Math.round((usage.used / usage.limit) * 100))}%` }}
+                />
+              </div>
+              <p className="text-[12px] text-ink-muted">
+                {usage.used} / {usage.limit} {isPro ? "единиц" : "единиц — бесплатно"}
+              </p>
+            </div>
+          )}
 
           {/* Карточка подписки (Free) */}
           {!isPro && (

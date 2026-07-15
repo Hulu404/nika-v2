@@ -74,11 +74,22 @@ export function Chat({
       });
       if (res.status === 402) {
         const data = await res.json().catch(() => ({}));
+        const canUpgrade = data.canUpgrade !== false;
         setLimitInfo({
           reason: data.reason === "dialogs" ? "dialogs" : "messages",
           limit: typeof data.limit === "number" ? data.limit : 0,
-          canUpgrade: data.canUpgrade !== false,
+          canUpgrade,
         });
+        // Добавляем реплику от Ники в её голосе
+        const nikaMsg: ChatMessage = {
+          id: crypto.randomUUID(),
+          role: "assistant",
+          content: canUpgrade
+            ? "На сегодня у меня закончилось пространство для разговора. Это не конец — просто граница дня. В Про его намного больше, если хочется продолжать без ограничений."
+            : "На сегодня лимит диалогов закончился. Вернётся завтра.",
+          createdAt: new Date().toISOString(),
+        };
+        setMessages((prev) => [...prev, nikaMsg]);
         setError("limit_reached");
         return;
       }
@@ -174,23 +185,7 @@ export function Chat({
             </div>
           ))}
           {showTyping && <TypingIndicator />}
-          {error === "limit_reached" ? (
-            <div className="mx-auto mt-2 max-w-md rounded-card border border-accent/20 bg-surface-warm px-5 py-4 text-center">
-              <p className="font-serif text-[15px] text-ink-primary">
-                {limitInfo?.reason === "dialogs"
-                  ? `На сегодня ты открыл максимум диалогов (${limitInfo.limit}).`
-                  : `Ты использовал все ${limitInfo?.limit ?? ""} сообщений на сегодня.`}
-              </p>
-              {limitInfo?.canUpgrade && (
-                <Link
-                  href="/upgrade"
-                  className="mt-3 inline-block rounded-pill bg-accent px-5 py-2.5 text-[13px] font-medium text-canvas transition-colors hover:bg-accent-deep"
-                >
-                  Перейти на НИКА Pro
-                </Link>
-              )}
-            </div>
-          ) : error ? (
+          {error === "limit_reached" ? null : error ? (
             <p className="px-1 text-center text-sm text-ink-muted">{error}</p>
           ) : null}
         </div>
@@ -207,7 +202,46 @@ export function Chat({
         )}
       </div>
 
+      {/* Нейтральная заглушка для Про при исчерпании лимита */}
+      {error === "limit_reached" && !limitInfo?.canUpgrade && (
+        <div className="shrink-0 border-t border-line-subtle bg-[var(--bg-primary)] px-4 py-3 text-center text-[13px] text-ink-muted">
+          Лимит на сегодня исчерпан. Вернётся завтра.
+        </div>
+      )}
+
       <ChatInput onSend={send} disabled={pending || error === "limit_reached"} />
+
+      {/* Апгрейд-модал (только для Free при исчерпании лимита) */}
+      {error === "limit_reached" && limitInfo?.canUpgrade && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-5">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-[2px]" />
+          <div className="relative w-full max-w-[360px] rounded-[20px] bg-elevated px-6 py-7 shadow-2xl text-center">
+            <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-surface-nika">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+            </div>
+            <h3 className="mb-2 font-serif text-[20px] leading-tight text-ink-primary">
+              Больше пространства для разговора
+            </h3>
+            <p className="mb-6 text-[13.5px] leading-[1.55] text-ink-secondary">
+              В Про лимит намного выше и больше инструментов — журнал пробежек, советы, спринт.
+            </p>
+            <Link
+              href="/upgrade"
+              className="block w-full rounded-pill bg-accent py-3.5 text-[14px] font-medium text-canvas transition-opacity hover:opacity-90"
+            >
+              Открыть НИКА Про
+            </Link>
+            <button
+              onClick={() => setError(null)}
+              className="mt-3 block w-full text-[13px] text-ink-muted transition-colors hover:text-ink-primary"
+            >
+              Не сейчас
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

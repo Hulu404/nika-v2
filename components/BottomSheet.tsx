@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 export interface BottomSheetProps {
@@ -13,9 +13,6 @@ export interface BottomSheetProps {
 export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetProps) {
   const [mounted, setMounted] = useState(false);
   const [shown, setShown] = useState(false);
-  const [dragY, setDragY] = useState(0);
-  const [dragging, setDragging] = useState(false);
-  const touchStartY = useRef(0);
 
   useEffect(() => {
     if (isOpen) {
@@ -24,7 +21,7 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
       return () => clearTimeout(t);
     } else {
       setShown(false);
-      const t = setTimeout(() => { setMounted(false); setDragY(0); }, 340);
+      const t = setTimeout(() => setMounted(false), 280);
       return () => clearTimeout(t);
     }
   }, [isOpen]);
@@ -43,44 +40,36 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
 
   if (!mounted) return null;
 
-  const getTransform = () => {
-    if (dragY > 0) return `translateY(${dragY}px)`;
-    return shown ? "translateY(0)" : "translateY(100%)";
-  };
-
   return (
-    <div className="fixed inset-0 z-50 flex items-end lg:items-center lg:justify-center">
+    <div
+      className={cn(
+        "fixed inset-0 z-50 flex items-center justify-center px-5 transition-opacity duration-280",
+        shown ? "opacity-100" : "opacity-0",
+      )}
+    >
+      {/* Backdrop */}
       <div
-        className={cn(
-          "absolute inset-0 bg-black/50 transition-opacity duration-300",
-          shown ? "opacity-100" : "opacity-0",
-        )}
+        className="absolute inset-0 bg-black/50 backdrop-blur-[2px]"
         onClick={onClose}
       />
+
+      {/* Modal card */}
       <div
-        style={{ transform: getTransform() }}
         className={cn(
-          "relative w-full lg:max-w-md bg-elevated rounded-t-[24px] lg:rounded-[24px] max-h-[90vh] flex flex-col",
-          !dragging && "transition-transform duration-300 ease-out",
+          "relative w-full max-w-[420px] rounded-[20px] bg-elevated shadow-2xl",
+          "flex max-h-[82dvh] flex-col",
+          "transition-transform duration-280",
+          shown ? "scale-100" : "scale-95",
         )}
-        onTouchStart={(e) => { touchStartY.current = e.touches[0].clientY; setDragging(true); }}
-        onTouchMove={(e) => {
-          const delta = e.touches[0].clientY - touchStartY.current;
-          if (delta > 0) setDragY(delta);
-        }}
-        onTouchEnd={() => {
-          setDragging(false);
-          if (dragY > 100) { setDragY(0); onClose(); }
-          else setDragY(0);
-        }}
       >
-        <div className="flex flex-shrink-0 justify-center pt-3 pb-1">
-          <div className="h-[5px] w-10 rounded-full bg-line-strong" />
-        </div>
-        <div className="flex flex-shrink-0 items-center justify-between px-5 pb-2 pt-3">
-          <h3 className="text-[17px] font-semibold text-ink-primary">{title}</h3>
+        {/* Header */}
+        <div className="flex flex-shrink-0 items-center justify-between px-5 pb-3 pt-5">
+          <h3 className="font-serif text-[18px] font-semibold leading-tight text-ink-primary">
+            {title}
+          </h3>
           <button
             onClick={onClose}
+            aria-label="Закрыть"
             className="flex h-8 w-8 items-center justify-center rounded-full bg-surface-deep text-ink-muted transition-colors hover:text-ink-primary"
           >
             <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden>
@@ -88,7 +77,9 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
             </svg>
           </button>
         </div>
-        <div className="overflow-y-auto px-5 pb-8 pt-3">
+
+        {/* Scrollable content */}
+        <div className="overflow-y-auto px-5 pb-6 pt-1">
           {children}
         </div>
       </div>

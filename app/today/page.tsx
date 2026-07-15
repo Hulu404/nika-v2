@@ -86,7 +86,7 @@ export default async function TodayPage() {
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
-      <PageHeader title="Сегодня" subtitle={humanDate(now)} />
+      <PageHeader title="НИКА" subtitle={humanDate(now)} />
 
       {/* Дашборд */}
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">

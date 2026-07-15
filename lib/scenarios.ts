@@ -21,11 +21,27 @@ interface ScenarioMeta {
   suggestions: string[];
 }
 
+/**
+ * Открывающее сообщение НИКИ с учётом реального времени суток.
+ * Для сценария «morning» заменяем приветствие на актуальное.
+ * Для нового пустого чата (general) даём короткое нейтральное приглашение.
+ */
+export function timeAwareOpener(scenario: Scenario, hour: number): string {
+  if (scenario === "morning") {
+    const meta = SCENARIO_META.morning;
+    const tail = " Не будем торопиться — давай сначала просто поймём, как ты сейчас. Хочется выйти или внутри сопротивление?";
+    if (hour >= 17) return "Добрый вечер." + tail;
+    if (hour >= 12) return "Добрый день." + tail;
+    return meta.opener;
+  }
+  return SCENARIO_META[scenario].opener;
+}
+
 export const SCENARIO_META: Record<Scenario, ScenarioMeta> = {
   general: {
     title: "Просто поговорить",
     subtitle: "Без темы — просто написать",
-    opener: "Привет. Я здесь. Как ты?",
+    opener: "Привет. Напиши что хочется.",
     suggestions: [
       "Просто хочу поговорить",
       "Как дела с бегом",

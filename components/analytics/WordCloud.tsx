@@ -14,15 +14,15 @@ const MID_VARIANTS = [
 
 function wordStyles(rank: number): string {
   if (rank === 0) {
-    return "leading-none font-serif font-medium uppercase tracking-wide text-accent text-[36px]";
+    return "leading-none font-serif font-medium uppercase tracking-wide text-accent text-[28px] max-w-full break-words";
   }
   if (rank <= 2) {
-    return "leading-none font-serif font-medium text-ink-primary text-[28px]";
+    return "leading-none font-serif font-medium text-ink-primary text-[24px] max-w-full break-words";
   }
   if (rank <= 6) {
-    return cn("leading-none", MID_VARIANTS[(rank - 3) % MID_VARIANTS.length]);
+    return cn("leading-none max-w-full break-words", MID_VARIANTS[(rank - 3) % MID_VARIANTS.length]);
   }
-  return "leading-none font-mono text-ink-muted text-[13px]";
+  return "leading-none font-mono text-ink-muted text-[13px] max-w-full break-words";
 }
 
 export function WordCloud({ words }: { words: WordFreq[] }) {
@@ -34,7 +34,7 @@ export function WordCloud({ words }: { words: WordFreq[] }) {
     );
   }
   return (
-    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-3">
+    <div className="flex flex-wrap items-baseline gap-x-3 gap-y-3 overflow-hidden">
       {words.map((w, i) => (
         <span key={w.text} className={wordStyles(i)}>
           {w.text}

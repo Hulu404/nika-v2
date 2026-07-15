@@ -235,7 +235,7 @@ export function SprintDashboard({ sprint: initialSprint, userId, chartDays, word
             </div>
           ) : (
             <div className="flex items-start justify-between gap-3">
-              <p className="font-serif text-[17px] leading-[1.4] text-ink-primary">{sprint.goal_text}</p>
+              <p className="font-serif italic text-[17px] leading-[1.4] text-accent">{sprint.goal_text}</p>
               <button
                 onClick={() => { setGoalDraft(sprint.goal_text); setEditingGoal(true); }}
                 className="flex-shrink-0 text-[12px] text-ink-muted underline-offset-2 hover:underline"

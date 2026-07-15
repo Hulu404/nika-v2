@@ -4,7 +4,7 @@ import { Chat } from "@/components/Chat";
 import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
 import { createConversation, getLastConversation } from "@/lib/conversations";
-import { ALL_SCENARIOS, SCENARIO_META } from "@/lib/scenarios";
+import { ALL_SCENARIOS, SCENARIO_META, timeAwareOpener } from "@/lib/scenarios";
 import { createServerComponentClient } from "@/lib/supabase";
 import type { ChatMessage, Scenario } from "@/types/conversation";
 import type { Message } from "@/types/app";
@@ -136,11 +136,11 @@ export default async function ChatPage({
       ?.filter((m) => m.role === "assistant" && m.content.length > 100)
       .at(-1)?.content ?? null;
 
-  // Опенер НИКИ
+  // Опенер НИКИ — с учётом реального времени суток
   const opener: ChatMessage = {
     id: "opener",
     role: "assistant",
-    content: SCENARIO_META[scenario].opener,
+    content: timeAwareOpener(scenario, new Date().getHours()),
     createdAt: new Date().toISOString(),
   };
 
@@ -160,15 +160,6 @@ export default async function ChatPage({
     <AppLayout sidebarSlot={<SidebarData />}>
       {/* Шапка чата */}
       <header className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-blur)] px-4 py-3 backdrop-blur-[16px]">
-        <Link
-          href="/day1"
-          aria-label="Назад"
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-ink-secondary transition-colors hover:bg-[var(--surface-nika)] hover:text-ink-primary"
-        >
-          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-        </Link>
         <div className="relative h-9 w-9 flex-shrink-0 rounded-full bg-nika-avatar shadow-[0_0_0_3px_rgba(200,85,61,0.06)]">
           <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--bg-primary)] bg-[#7BA968]" />
         </div>
@@ -176,6 +167,17 @@ export default async function ChatPage({
           <span className="font-serif text-[17px] font-medium tracking-[-0.01em] text-ink-primary">НИКА</span>
           <span className="mt-[3px] text-[11px] tracking-[0.02em] text-ink-muted">{meta.subtitle}</span>
         </div>
+        {/* Новый диалог */}
+        <Link
+          href="/chat/general?new=1"
+          aria-label="Новый диалог"
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-ink-secondary transition-colors hover:bg-[var(--surface-nika)] hover:text-ink-primary"
+        >
+          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <path d="M12 5H7a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5" />
+            <path d="M17 3l4 4-8.5 8.5H9v-3.5L17 3Z" />
+          </svg>
+        </Link>
       </header>
 
       {/* Чат + контекст. На мобайле снизу фиксированный таб-бар — резервируем его высоту. */}
