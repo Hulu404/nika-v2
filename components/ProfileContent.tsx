@@ -246,11 +246,15 @@ export function ProfileContent({
 
   async function handleNotifSettingsSave() {
     setNotifSettingsSaving(true);
-    await supabase.from("profiles").upsert(
+    const { error } = await supabase.from("profiles").upsert(
       { user_id: userId, notif_time: notifTime, notif_frequency: notifFrequency, reminder_enabled: true },
       { onConflict: "user_id" },
     );
     setNotifSettingsSaving(false);
+    if (error) {
+      console.error("[profile] notif settings save failed:", error.message);
+      // показываем ошибку в консоли, но модалку закрываем — локальный стейт обновлён
+    }
     closeSheet();
   }
 

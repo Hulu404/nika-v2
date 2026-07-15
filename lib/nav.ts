@@ -5,7 +5,7 @@
  * /chat/[scenario]. Меняется здесь, а не по компонентам.
  */
 export const HOME_HREF = "/today";
-export const CHAT_HREF = "/chat/morning";
+export const CHAT_HREF = "/chat";
 export const MEDITATIONS_HREF = "/meditations";
 export const JOURNAL_HREF = "/journal";
 export const RHYTHM_HREF = "/rhythm";

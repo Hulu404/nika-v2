@@ -79,7 +79,7 @@ export function BottomSheet({ isOpen, onClose, title, children }: BottomSheetPro
         </div>
 
         {/* Scrollable content */}
-        <div className="overflow-y-auto px-5 pb-6 pt-1">
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6 pt-1">
           {children}
         </div>
       </div>

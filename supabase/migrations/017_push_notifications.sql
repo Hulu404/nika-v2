@@ -3,9 +3,10 @@
 
 -- notif_time: время суток для плановых пушей (например '08:00').
 alter table public.profiles
-  add column if not exists notif_time  time    default '08:00',
-  add column if not exists notif_frequency text  default 'daily'
-    check (notif_frequency in ('daily','every_other_day','weekdays','weekly','biweekly','monthly'));
+  add column if not exists notif_time      time         default '08:00',
+  add column if not exists notif_frequency text         default 'daily'
+    check (notif_frequency in ('daily','every_other_day','weekdays','weekly','biweekly','monthly')),
+  add column if not exists last_push_sent_at timestamptz default null;
 
 -- Web Push-подписки: одна строка на устройство.
 create table if not exists public.push_subscriptions (
