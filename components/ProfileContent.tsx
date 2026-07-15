@@ -367,7 +367,7 @@ export function ProfileContent({
             <div className="mb-5 rounded-card border border-line-subtle bg-elevated p-4">
               <div className="mb-2 flex items-center justify-between">
                 <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-ink-muted">
-                  Диалоги сегодня
+                  Использовано сегодня
                 </span>
                 {usage.msUntilReset != null && (
                   <span className="text-[11px] text-ink-muted">
@@ -375,14 +375,16 @@ export function ProfileContent({
                   </span>
                 )}
               </div>
-              <div className="mb-1.5 h-1.5 w-full overflow-hidden rounded-full bg-surface-deep">
+              <div className="mb-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-deep">
                 <div
                   className="h-full rounded-full bg-accent transition-all"
                   style={{ width: `${Math.min(100, Math.round((usage.used / usage.limit) * 100))}%` }}
                 />
               </div>
               <p className="text-[12px] text-ink-muted">
-                {usage.used} / {usage.limit} {isPro ? "единиц" : "единиц — бесплатно"}
+                {Math.min(100, Math.round((usage.used / usage.limit) * 100))}%
+                {" "}·{" "}
+                осталось {Math.max(0, Math.round(((usage.limit - usage.used) / usage.limit) * 100))}%
               </p>
             </div>
           )}
@@ -521,7 +523,7 @@ export function ProfileContent({
               type="time"
               value={notifTime}
               onChange={(e) => setNotifTime(e.target.value)}
-              className="w-full rounded-[14px] border border-line-default bg-canvas px-4 py-[14px] text-[16px] text-ink-primary outline-none focus:border-accent transition-colors"
+              className="w-full rounded-[14px] border border-line-default bg-canvas px-4 py-2.5 text-[15px] text-center text-ink-primary outline-none focus:border-accent transition-colors"
             />
           </div>
 

@@ -32,7 +32,7 @@ export function ChatInput({
 
   return (
     <div className="shrink-0 border-t border-line-subtle bg-[var(--bg-blur-strong)] px-[14px] pb-8 pt-3 backdrop-blur-[16px]">
-      <div className="flex items-end gap-2.5">
+      <div className="flex items-center gap-2.5">
 
         {/* Поле ввода */}
         <div className="flex flex-1 items-center rounded-[22px] border border-line-default bg-elevated px-[14px] transition-colors focus-within:border-ink-primary">

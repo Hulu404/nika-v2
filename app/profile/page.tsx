@@ -13,7 +13,7 @@ export default async function ProfilePage() {
 
   if (!user) redirect("/auth?next=/profile");
 
-  const [{ data: userData }, { data: profileData }] = await Promise.all([
+  const [{ data: userData }, profileResult] = await Promise.all([
     supabase
       .from("users")
       .select("display_name, email, is_pro, created_at")
@@ -25,6 +25,18 @@ export default async function ProfilePage() {
       .eq("user_id", user.id)
       .maybeSingle(),
   ]);
+
+  // Если запрос упал (например, колонки из миграции 017 ещё не созданы),
+  // перечитываем без новых полей — базовые настройки должны работать всегда.
+  let profileData = profileResult.error ? null : profileResult.data;
+  if (profileResult.error) {
+    const { data: basic } = await supabase
+      .from("profiles")
+      .select("reminder_enabled, gender, proactive")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    profileData = basic ? { ...basic, notif_time: null, notif_frequency: null } : null;
+  }
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
