@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
-import Script from "next/script";
 import { Fraunces } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
@@ -8,6 +7,7 @@ import { ServiceWorkerRegistration } from "@/components/install/ServiceWorkerReg
 import { IosInstallSheet } from "@/components/install/IosInstallSheet";
 import { AndroidInstallBanner } from "@/components/install/AndroidInstallBanner";
 import { NotificationPermissionPrompt } from "@/components/install/NotificationPermissionPrompt";
+import { YandexMetrika } from "@/components/analytics/YandexMetrika";
 import "./globals.css";
 
 const serif = Fraunces({
@@ -30,15 +30,6 @@ const darkModeScript = `(function(){
   if (t === 'dark' || (!t && p)) document.documentElement.classList.add('dark');
 })();`;
 
-// Yandex.Metrika counter (id 109611856)
-const yandexMetrikaScript = `(function(m,e,t,r,i,k,a){
-    m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
-    m[i].l=1*new Date();
-    for (var j = 0; j < document.scripts.length; j++) {if (document.scripts[j].src === r) { return; }}
-    k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
-})(window, document,'script','https://mc.yandex.ru/metrika/tag.js?id=109611856', 'ym');
-ym(109611856, 'init', {ssr:true, webvisor:true, clickmap:true, ecommerce:"dataLayer", referrer: document.referrer, url: location.href, accurateTrackBounce:true, trackLinks:true});`;
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   // nonce из middleware (CSP). На страницах вне matcher'а middleware его нет —
   // тогда undefined, и скрипт рендерится без nonce (там и CSP не выставляется).
@@ -60,21 +51,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
         <meta name="apple-mobile-web-app-title" content="НИКА" />
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: darkModeScript }} />
-        {/* Yandex.Metrika counter */}
-        <Script
-          id="yandex-metrika"
-          nonce={nonce}
-          strategy="afterInteractive"
-          dangerouslySetInnerHTML={{ __html: yandexMetrikaScript }}
-        />
-        {/* /Yandex.Metrika counter */}
       </head>
       <body className="min-h-screen text-ink-primary antialiased">
-        <noscript>
-          <div>
-            <img src="https://mc.yandex.ru/watch/109611856" style={{ position: "absolute", left: "-9999px" }} alt="" />
-          </div>
-        </noscript>
+        {/* Yandex.Metrika: загрузка счётчика + hit при клиентской навигации */}
+        <YandexMetrika nonce={nonce} />
         {children}
         {/* PWA: регистрация SW и глобальные install-баннеры */}
         <ServiceWorkerRegistration />
