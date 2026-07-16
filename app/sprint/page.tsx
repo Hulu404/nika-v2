@@ -4,10 +4,10 @@ import { SidebarData } from "@/components/SidebarData";
 import { PageHeader } from "@/components/nav/PageHeader";
 import { createServerComponentClient } from "@/lib/supabase";
 import { resolveIsPro } from "@/lib/subscription";
-import { getActiveSprint } from "@/lib/sprint";
+import { getActiveSprint, buildSprintRhythm, buildWeekRecaps, buildSprintSummary } from "@/lib/sprint";
 import { SprintDashboard } from "@/components/sprint/SprintDashboard";
 import { getRuns } from "@/lib/runs";
-import { buildMoodChart, buildWordCloud } from "@/lib/analytics";
+import { buildWordCloud } from "@/lib/analytics";
 export default async function SprintPage() {
   const supabase = await createServerComponentClient();
   const {
@@ -15,23 +15,31 @@ export default async function SprintPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth?next=/sprint");
 
-  const since = new Date();
-  since.setDate(since.getDate() - 14);
-
-  const [{ data: userData }, sprint, runs, { data: convs }] = await Promise.all([
+  const [{ data: userData }, sprint, runs] = await Promise.all([
     supabase.from("users").select("is_pro").eq("id", user.id).maybeSingle(),
     getActiveSprint(supabase, user.id),
     getRuns(supabase, user.id),
-    supabase.from("conversations").select("messages, updated_at").eq("user_id", user.id).gte("updated_at", since.toISOString()),
   ]);
 
   if (!resolveIsPro(userData?.is_pro)) redirect("/upgrade");
   if (!sprint) redirect("/sprint/setup");
 
-  const days = buildMoodChart(runs);
+  // Окно наблюдений — с начала спринта до сегодня (а не скользящие 14 дней).
+  const since = new Date(sprint.start_date);
+  since.setHours(0, 0, 0, 0);
+
+  const { data: convs } = await supabase
+    .from("conversations")
+    .select("messages, updated_at")
+    .eq("user_id", user.id)
+    .gte("updated_at", since.toISOString());
+
+  const rhythm = buildSprintRhythm(sprint, runs);
   const words = buildWordCloud(
     (convs ?? []).map((c) => ({ messages: c.messages as import("@/types/app").Message[] })),
   );
+  const weekRecaps = buildWeekRecaps(rhythm, words[0]?.text);
+  const summary = buildSprintSummary(sprint, rhythm, words);
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
@@ -41,7 +49,9 @@ export default async function SprintPage() {
           <SprintDashboard
             sprint={sprint}
             userId={user.id}
-            chartDays={days}
+            sprintRhythm={rhythm}
+            weekRecaps={weekRecaps}
+            summary={summary}
             wordFreqs={words}
             convCount={(convs ?? []).length}
           />

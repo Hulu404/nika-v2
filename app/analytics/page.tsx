@@ -8,6 +8,7 @@ import { WordCloud } from "@/components/analytics/WordCloud";
 import { PatternCard } from "@/components/analytics/PatternCard";
 import { InfoNote } from "@/components/analytics/InfoNote";
 import { getRuns } from "@/lib/runs";
+import { getActiveSprint } from "@/lib/sprint";
 import { buildMoodChart, buildWordCloud } from "@/lib/analytics";
 import type { Gender } from "@/types/app";
 
@@ -17,6 +18,11 @@ export default async function AnalyticsPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth?next=/analytics");
+
+  // При активном спринте наблюдения живут на /sprint (окно = с начала спринта).
+  // Без спринта — эта страница работает как раньше: скользящие 14 дней.
+  const activeSprint = await getActiveSprint(supabase, user.id);
+  if (activeSprint) redirect("/sprint");
 
   const since = new Date();
   since.setDate(since.getDate() - 14);

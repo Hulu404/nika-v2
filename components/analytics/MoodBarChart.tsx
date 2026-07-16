@@ -1,11 +1,11 @@
-import type { ChartDay } from "@/lib/analytics";
+import { INTENSITY_COLORS, type ChartDay } from "@/lib/analytics";
 import type { RunIntensity } from "@/types/app";
 
-// Цвета/высота по интенсивности — фиксированные (это визуализация).
+// Высота/подпись — локальные; цвет берём из единого INTENSITY_COLORS.
 const STYLE: Record<RunIntensity, { color: string; h: number; label: string }> = {
-  easy: { color: "#EDADA0", h: 35, label: "легко" },
-  medium: { color: "#C8553D", h: 60, label: "средне" },
-  hard: { color: "#7A2E1F", h: 85, label: "тяжело" },
+  easy: { color: INTENSITY_COLORS.easy, h: 35, label: "легко" },
+  medium: { color: INTENSITY_COLORS.medium, h: 60, label: "средне" },
+  hard: { color: INTENSITY_COLORS.hard, h: 85, label: "тяжело" },
 };
 
 function DayColumn({ day }: { day: ChartDay }) {

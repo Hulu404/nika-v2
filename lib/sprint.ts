@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/types/database";
-import type { ArchetypeId, Milestone, QuizAnswer, Sprint, SprintStatus, WeeklyFocus } from "@/types/app";
+import type { Database, RunRow } from "@/types/database";
+import type { ArchetypeId, Milestone, QuizAnswer, RunIntensity, Sprint, SprintStatus, WeeklyFocus } from "@/types/app";
+import type { WordFreq } from "@/lib/analytics";
 import { ARCHETYPES } from "@/lib/archetypes";
 
 type Supa = SupabaseClient<Database>;
@@ -43,6 +44,101 @@ export function sprintWeek(day: number): 1 | 2 | 3 {
   if (day <= 7) return 1;
   if (day <= 14) return 2;
   return 3;
+}
+
+const SPRINT_TOTAL_DAYS = 21;
+
+/** Один день ритма спринта. */
+export interface RhythmDay {
+  dayNumber: number; // 1..21
+  week: 1 | 2 | 3;
+  date: string; // YYYY-MM-DD
+  intensity: RunIntensity | null;
+  state: "past" | "today" | "future";
+}
+
+/**
+ * Ритм спринта: ровно 21 день от start_date. Интенсивность — по пробежке этой
+ * даты (маппинг по дате; если несколько за день — первая, как в buildMoodChart).
+ * Чистая функция — считается на сервере и прокидывается пропом.
+ */
+export function buildSprintRhythm(sprint: Sprint, runs: RunRow[], now = new Date()): RhythmDay[] {
+  const byDate = new Map<string, RunRow>();
+  for (const r of runs) if (!byDate.has(r.date)) byDate.set(r.date, r);
+
+  const start = new Date(sprint.start_date);
+  start.setHours(0, 0, 0, 0);
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+
+  const days: RhythmDay[] = [];
+  for (let i = 0; i < SPRINT_TOTAL_DAYS; i++) {
+    const d = new Date(start);
+    d.setDate(d.getDate() + i);
+    const ymd = d.toLocaleDateString("en-CA");
+    const run = byDate.get(ymd);
+    const state: RhythmDay["state"] =
+      d.getTime() > today.getTime() ? "future"
+      : d.getTime() === today.getTime() ? "today"
+      : "past";
+    days.push({
+      dayNumber: i + 1,
+      week: sprintWeek(i + 1),
+      date: ymd,
+      intensity: run ? run.intensity : null,
+      state,
+    });
+  }
+  return days;
+}
+
+/** Рекап одной недели спринта — данные для карточек чек-ина в хронологии. */
+export interface WeekRecap {
+  week: 1 | 2 | 3;
+  runs: number; // пробежек за неделю
+  hard: number; // из них тяжёлых
+  skipped: number; // прошедших дней без пробежки
+  topWord?: string; // частое слово недели
+}
+
+/**
+ * Рекапы всех трёх недель из ритма. `topWord` — MVP-упрощение: одно слово на весь
+ * спринт (wordFreqs[0]). TODO: считать топ-слово по конкретной неделе.
+ */
+export function buildWeekRecaps(rhythm: RhythmDay[], topWord?: string): WeekRecap[] {
+  const weeks: (1 | 2 | 3)[] = [1, 2, 3];
+  return weeks.map((week) => {
+    const days = rhythm.filter((d) => d.week === week);
+    return {
+      week,
+      runs: days.filter((d) => d.intensity !== null).length,
+      hard: days.filter((d) => d.intensity === "hard").length,
+      skipped: days.filter((d) => d.state === "past" && d.intensity === null).length,
+      topWord,
+    };
+  });
+}
+
+/** Тёплый итог спринта для карточки закрытия — без оценок и нормативов. */
+export interface SprintSummary {
+  totalRuns: number;
+  runsByWeek: number[]; // [неделя1, неделя2, неделя3]
+  achievedMilestones: string[]; // подписи отмеченных ориентиров
+  topWords: string[]; // топ-3 слова
+}
+
+export function buildSprintSummary(
+  sprint: Sprint,
+  rhythm: RhythmDay[],
+  words: WordFreq[],
+): SprintSummary {
+  const runsByWeek = buildWeekRecaps(rhythm).map((r) => r.runs);
+  return {
+    totalRuns: runsByWeek.reduce((a, b) => a + b, 0),
+    runsByWeek,
+    achievedMilestones: sprint.milestones.filter((m) => m.achieved_at).map((m) => m.label),
+    topWords: words.slice(0, 3).map((w) => w.text),
+  };
 }
 
 // ─── Создание / обновление ───────────────────────────────────────────────────
