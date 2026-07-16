@@ -12,20 +12,21 @@ import type { Database } from "@/types/database";
  *
  * Заметки по директивам:
  * - script-src: 'strict-dynamic' даёт право подгрузки скриптов тем, что уже
- *   доверены через nonce (так Metrika грузит tag.js без перечисления доменов).
+ *   доверены через nonce (так Metrika и gtag.js грузятся без перечисления доменов).
  * - style-src 'unsafe-inline' — намеренно: приложение использует inline
  *   style-атрибуты (style={{...}}), их nonce'ом не пометить. Инъекция стилей
  *   куда менее опасна, чем скриптов; главную защиту даёт script-src.
  * - mc.yandex.ru в img-src/connect-src — пиксель и беконы Metrika/webvisor.
+ * - *.google-analytics.com / *.googletagmanager.com — беконы и пиксели GA4 (gtag).
  */
 function buildCsp(nonce: string): string {
   return [
     `default-src 'self'`,
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'`,
     `style-src 'self' 'unsafe-inline'`,
-    `img-src 'self' data: blob: https://mc.yandex.ru`,
+    `img-src 'self' data: blob: https://mc.yandex.ru https://*.google-analytics.com https://*.googletagmanager.com`,
     `font-src 'self' data:`,
-    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://mc.yandex.ru`,
+    `connect-src 'self' https://*.supabase.co wss://*.supabase.co https://mc.yandex.ru https://*.google-analytics.com https://*.googletagmanager.com`,
     `frame-ancestors 'none'`,
     `base-uri 'self'`,
     `form-action 'self'`,
