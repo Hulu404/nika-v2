@@ -8,6 +8,7 @@ import { IosInstallSheet } from "@/components/install/IosInstallSheet";
 import { AndroidInstallBanner } from "@/components/install/AndroidInstallBanner";
 import { NotificationPermissionPrompt } from "@/components/install/NotificationPermissionPrompt";
 import { YandexMetrika } from "@/components/analytics/YandexMetrika";
+import { GoogleAnalytics } from "@/components/analytics/GoogleAnalytics";
 import "./globals.css";
 
 const serif = Fraunces({
@@ -53,8 +54,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: darkModeScript }} />
       </head>
       <body className="min-h-screen text-ink-primary antialiased">
-        {/* Yandex.Metrika: загрузка счётчика + hit при клиентской навигации */}
+        {/* Аналитика: загрузка счётчиков + хит при клиентской навигации */}
         <YandexMetrika nonce={nonce} />
+        <GoogleAnalytics nonce={nonce} />
         {children}
         {/* PWA: регистрация SW и глобальные install-баннеры */}
         <ServiceWorkerRegistration />

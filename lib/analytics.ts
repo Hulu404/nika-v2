@@ -3,6 +3,13 @@ import type { Message, RunIntensity } from "@/types/app";
 
 const WEEKDAYS = ["ПН", "ВТ", "СР", "ЧТ", "ПТ", "СБ", "ВС"];
 
+/** Цвета интенсивности — единый источник для всех визуализаций (бар-чарт, ритм). */
+export const INTENSITY_COLORS: Record<RunIntensity, string> = {
+  easy: "#EDADA0",
+  medium: "#C8553D",
+  hard: "#7A2E1F",
+};
+
 export interface ChartDay {
   label: string;
   intensity: RunIntensity | null;
@@ -13,13 +20,16 @@ export interface WordFreq {
   freq: number;
 }
 
-/** Последние 14 дней: интенсивность пробежки по дню (или null — «не было»). */
-export function buildMoodChart(runs: RunRow[], now = new Date()): ChartDay[] {
+/** Максимальная длина спринта в днях — окно графика не выходит за неё. */
+const SPRINT_MAX_DAYS = 21;
+
+/** Построитель `count` дней, заканчивающихся сегодняшним (now). */
+function buildDays(runs: RunRow[], count: number, now: Date): ChartDay[] {
   const byDate = new Map<string, RunRow>();
   for (const r of runs) if (!byDate.has(r.date)) byDate.set(r.date, r);
 
   const days: ChartDay[] = [];
-  for (let i = 13; i >= 0; i--) {
+  for (let i = count - 1; i >= 0; i--) {
     const d = new Date(now);
     d.setHours(0, 0, 0, 0);
     d.setDate(d.getDate() - i);
@@ -28,6 +38,29 @@ export function buildMoodChart(runs: RunRow[], now = new Date()): ChartDay[] {
     days.push({ label: WEEKDAYS[(d.getDay() + 6) % 7], intensity: run ? run.intensity : null });
   }
   return days;
+}
+
+/** Последние 14 дней: интенсивность пробежки по дню (или null — «не было»). */
+export function buildMoodChart(runs: RunRow[], now = new Date()): ChartDay[] {
+  return buildDays(runs, 14, now);
+}
+
+/**
+ * Окно спринта: дни [startDate .. сегодня] включительно, но не больше 21 дня.
+ * Для /sprint — чтобы график охватывал весь спринт, а не скользящие 14 дней.
+ */
+export function buildSprintMoodChart(
+  runs: RunRow[],
+  startDate: string | Date,
+  now = new Date(),
+): ChartDay[] {
+  const start = new Date(startDate);
+  start.setHours(0, 0, 0, 0);
+  const today = new Date(now);
+  today.setHours(0, 0, 0, 0);
+  const spanDays = Math.floor((today.getTime() - start.getTime()) / 86_400_000) + 1;
+  const count = Math.min(Math.max(spanDays, 1), SPRINT_MAX_DAYS);
+  return buildDays(runs, count, now);
 }
 
 // Частые служебные слова (длиной ≥3; короткие и так отсекаются по длине).
@@ -41,7 +74,8 @@ const STOP = new Set([
   "ничего", "когда", "после", "перед", "потом", "сейчас", "можно", "надо",
 ]);
 
-function tokenize(text: string): string[] {
+/** Разбивает текст на значимые токены (та же логика, что и для облака слов). */
+export function tokenize(text: string): string[] {
   return text
     .toLowerCase()
     .split(/[^а-яёa-z0-9-]+/i)
