@@ -4,7 +4,7 @@ import Script from 'next/script';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef } from 'react';
 
-const GA_ID = 'G-ZWBYL9Z5L7';
+const GA_ID = 'G-ER87YDW7M9';
 
 declare global {
   interface Window {
