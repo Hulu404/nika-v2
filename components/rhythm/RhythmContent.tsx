@@ -190,7 +190,7 @@ export function RhythmContent({
         Жду отметку нового цикла.
       </h1>
       <p className="text-[13.5px] leading-[1.6] text-ink-secondary">
-        Прошло больше времени, чем обычно. Как только отметишь начало — прогноз обновится.
+        Прошло больше времени, чем обычно. Как только отметишь начало, прогноз обновится.
       </p>
     </section>
   ) : (
@@ -252,7 +252,7 @@ export function RhythmContent({
         Месячные начались?
       </div>
       <div className="mb-3 text-[12px] leading-[1.5] text-ink-secondary">
-        Одно нажатие в месяц — и прогноз остаётся точным.
+        Одно нажатие в месяц, и прогноз остаётся точным.
       </div>
       {markError && <p className="mb-2 text-[12px] text-accent">{markError}</p>}
       {alreadyMarkedToday ? (
@@ -341,7 +341,7 @@ export function RhythmContent({
             Ника заметила
           </div>
           <p className="text-[13px] leading-[1.55] text-ink-primary">
-            В фазе подъёма твои длинные пробежки стабильно быстрее, а слово «лёгкость» звучит чаще. Твоё тело уже знает свой ритм — я помогу его использовать.
+            В фазе подъёма твои длинные пробежки стабильно быстрее, а слово «лёгкость» звучит чаще. Твоё тело уже знает свой ритм. Я помогу его услышать.
           </p>
         </div>
       </div>
@@ -352,7 +352,7 @@ export function RhythmContent({
   const settingsModal = (
     <BottomSheet isOpen={settingsOpen} onClose={() => { setSettingsOpen(false); setConfirmDelete(false); setSettingsError(null); }} title="Мои данные">
       <p className="mb-4 rounded-card bg-surface-nika p-4 text-[13px] leading-[1.6] text-ink-secondary">
-        Мой ритм — про бег и самочувствие: это подсказки, а форма врачебной помощи — консультация специалиста. Данные хранятся только у тебя в профиле и работают на подстройку Ники.
+        Мой ритм про бег и самочувствие. Это подсказки, а за врачебной помощью лучше обратиться к специалисту. Данные хранятся только у тебя в профиле и работают на подстройку Ники.
       </p>
       <div className="flex flex-col gap-2">
         <button
@@ -442,7 +442,7 @@ export function RhythmContent({
 
           {/* Футноут */}
           <p className="text-center text-[11px] leading-[1.6] text-ink-muted">
-            Мой ритм — про бег и самочувствие. С медицинскими вопросами лучше к специалисту.{" "}
+            Мой ритм про бег и самочувствие. С медицинскими вопросами лучше к специалисту.{" "}
             <button type="button" onClick={() => setSettingsOpen(true)} className="underline underline-offset-2 hover:text-ink-secondary">
               Настройки ритма
             </button>
@@ -531,7 +531,7 @@ export function RhythmContent({
                 Удалить мои данные ритма
               </button>
               <p className="mt-3 border-t border-line-subtle pt-3 text-[11px] leading-[1.55] text-ink-muted">
-                Мой ритм — про бег и самочувствие: это подсказки, а форма врачебной помощи — консультация специалиста.
+                Мой ритм про бег и самочувствие. Это подсказки, а за врачебной помощью лучше обратиться к специалисту.
               </p>
             </div>
           </aside>

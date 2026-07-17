@@ -55,7 +55,7 @@ export function RhythmOnboarding({ userId, todayStr }: RhythmOnboardingProps) {
             Настроим ритм
           </h1>
           <p className="text-[14px] leading-[1.6] text-ink-secondary">
-            Мне нужна одна дата — когда начались последние месячные. Дальше я всё посчитаю сама и буду обновлять прогноз после каждой твоей отметки.
+            Мне нужна одна дата: когда начались последние месячные. Дальше я всё посчитаю сама и буду обновлять прогноз после каждой твоей отметки.
           </p>
         </div>
 
@@ -72,7 +72,7 @@ export function RhythmOnboarding({ userId, todayStr }: RhythmOnboardingProps) {
               min={minDate}
               max={todayStr}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full rounded-[14px] border border-line-default bg-canvas px-4 py-2.5 text-[15px] text-center text-ink-primary outline-none transition-colors focus:border-accent"
+              className="block h-12 w-full min-w-0 appearance-none rounded-[14px] border border-line-default bg-canvas px-4 text-center text-[15px] text-ink-primary outline-none transition-colors focus:border-accent [-webkit-appearance:none]"
             />
           </div>
 
@@ -86,8 +86,9 @@ export function RhythmOnboarding({ userId, todayStr }: RhythmOnboardingProps) {
                 type="button"
                 onClick={() => setCycleLen((v) => Math.max(21, v - 1))}
                 className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-line-default bg-canvas text-[20px] text-ink-primary transition-colors hover:bg-surface-nika"
+                aria-label="Уменьшить длину цикла"
               >
-                –
+                −
               </button>
               <div className="flex-1 rounded-[14px] border border-line-default bg-canvas py-2 text-center text-[20px] font-medium text-ink-primary">
                 {cycleLen}
@@ -101,7 +102,7 @@ export function RhythmOnboarding({ userId, todayStr }: RhythmOnboardingProps) {
               </button>
             </div>
             <p className="mt-2 text-[11.5px] leading-[1.5] text-ink-muted">
-              Если сомневаешься, оставь 28 — я уточню по твоим отметкам.
+              Если сомневаешься, оставь 28, я уточню по твоим отметкам.
             </p>
           </div>
 
@@ -119,7 +120,7 @@ export function RhythmOnboarding({ userId, todayStr }: RhythmOnboardingProps) {
 
         {/* Дисклеймер */}
         <p className="mt-8 text-center text-[11px] leading-[1.6] text-ink-muted">
-          Мой ритм — про бег и самочувствие. С медицинскими вопросами лучше к специалисту.
+          Мой ритм про бег и самочувствие. С медицинскими вопросами лучше к специалисту.
         </p>
       </div>
     </div>

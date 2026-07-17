@@ -26,7 +26,7 @@ export function CycleGrid({ cycleLen, cycleDay }: CycleGridProps) {
       {weeks.map((days, wi) => (
         <div key={wi} className="mb-3 last:mb-0">
           <div className="mb-2 text-[10.5px] font-medium text-ink-muted">
-            Дни {days[0]}–{days[days.length - 1]}
+            Дни с {days[0]} по {days[days.length - 1]}
           </div>
           <div className="grid grid-cols-7 gap-1.5">
             {days.map((day) => {

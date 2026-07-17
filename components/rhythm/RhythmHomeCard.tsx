@@ -24,7 +24,7 @@ export function RhythmHomeCard(props: RhythmHomeCardProps) {
       >
         <div className="mb-1 font-serif text-[16px] font-medium text-ink-primary">Мой ритм</div>
         <p className="mb-3 text-[13px] leading-[1.55] text-ink-secondary">
-          Отметь начало цикла — и я буду подстраивать бег под твоё тело: советы, темп и план на неделю.
+          Отметь начало цикла, и я буду подстраивать бег под твоё тело: советы, темп и план на неделю.
         </p>
         <span className="inline-block rounded-full bg-ink-primary px-4 py-1.5 text-[13px] font-medium text-[var(--bg-primary)]">
           Настроить

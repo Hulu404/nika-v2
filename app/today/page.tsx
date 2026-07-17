@@ -174,6 +174,27 @@ export default async function TodayPage() {
             </section>
           )}
 
+          {/* Медитации — переехали с таб-бара сюда; пока в разработке (моб.) */}
+          <section className="mt-8 lg:hidden">
+            <div className="flex items-center gap-3.5 rounded-[12px] border border-line-subtle bg-elevated px-4 py-3.5">
+              <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-surface-nika text-ink-muted" aria-hidden>
+                <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
+                  <path d="M11 4c1.9 2.2 2.9 4.2 2.9 6 0 1.6-1.2 2.7-2.9 2.7S8.1 11.6 8.1 10c0-1.8 1-3.8 2.9-6Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+                  <path d="M8.3 8.9C6.2 8.6 4.4 9.4 3.4 10.7c1 2.2 3.4 3.5 5.9 3.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M13.7 8.9c2.1-.3 3.9.5 4.9 1.8-1 2.2-3.4 3.5-5.9 3.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <path d="M4.2 16.4c2 1.2 4.3 1.8 6.8 1.8s4.8-.6 6.8-1.8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                </svg>
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="text-[14px] font-medium text-ink-primary">Медитации</div>
+                <div className="text-[12px] text-ink-muted">Дыхательные практики и покой</div>
+              </div>
+              <span className="ml-auto flex-shrink-0 rounded-full bg-surface-nika px-2.5 py-1 font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+                soon
+              </span>
+            </div>
+          </section>
+
         </div>
       </div>
     </AppLayout>

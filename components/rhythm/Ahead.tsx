@@ -22,7 +22,7 @@ export function Ahead({ latestCycleStartedAt, cycleDay, cycleLen, phase }: Ahead
   const daysRemaining = cycleLen - cycleDay;
 
   // Конец текущей фазы
-  const currentEnd = `дней ${cycleDay}–${cycleLen}`;
+  const currentEnd = `дни с ${cycleDay} по ${cycleLen}`;
 
   // Следующие месячные: начало следующего цикла
   const nextPeriodDate = addDays(latestCycleStartedAt, cycleLen);
@@ -52,7 +52,7 @@ export function Ahead({ latestCycleStartedAt, cycleDay, cycleLen, phase }: Ahead
       current: false,
     });
     items.push({
-      title: `Дни 6–13 · окно энергии`,
+      title: `Дни с 6 по 13 · окно энергии`,
       pill: nextEnergyStr,
       text: PHASE_META.rise.aheadText,
       current: false,
@@ -64,7 +64,7 @@ export function Ahead({ latestCycleStartedAt, cycleDay, cycleLen, phase }: Ahead
       // До пика ещё есть фаза подъёма
       const peakDate = addDays(latestCycleStartedAt, peakDay - 1);
       items.push({
-        title: `Дни ${peakDay}–${peakDay + 1} · пик`,
+        title: `Дни ${peakDay} и ${peakDay + 1} · пик`,
         pill: `≈ ${fmtDateRu(peakDate)}`,
         text: PHASE_META.peak.aheadText,
         current: false,
