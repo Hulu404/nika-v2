@@ -241,6 +241,81 @@ export interface Database {
         };
         Relationships: [];
       };
+      rhythm_cycles: {
+        Row: {
+          id: string;
+          user_id: string;
+          started_at: string;
+          cycle_length: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          started_at: string;
+          cycle_length?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          started_at?: string;
+          cycle_length?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      rhythm_checkins: {
+        Row: {
+          id: string;
+          user_id: string;
+          date: string;
+          tags: string[];
+          note: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          date: string;
+          tags?: string[];
+          note?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          date?: string;
+          tags?: string[];
+          note?: string | null;
+        };
+        Relationships: [];
+      };
+      rhythm_daily_advice: {
+        Row: {
+          user_id: string;
+          date: string;
+          phase: string;
+          cycle_day: number;
+          advice_short: string;
+          advice_full: string;
+        };
+        Insert: {
+          user_id: string;
+          date: string;
+          phase: string;
+          cycle_day: number;
+          advice_short: string;
+          advice_full: string;
+        };
+        Update: {
+          user_id?: string;
+          date?: string;
+          phase?: string;
+          cycle_day?: number;
+          advice_short?: string;
+          advice_full?: string;
+        };
+        Relationships: [];
+      };
       personal_tips: {
         Row: {
           id: string;

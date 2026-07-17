@@ -10,6 +10,8 @@ import { ALL_SCENARIOS } from "@/lib/scenarios";
 import { buildSprintContext, getActiveSprint } from "@/lib/sprint";
 import { getRecentDailyState, parseYmd, userToday } from "@/lib/rhythm";
 import { buildRhythmContext } from "@/lib/rhythm/chat-context";
+import { getLatestCycles, getTodayCheckin, getCycleLength, getCycleDay, getPhase, buildCycleContext } from "@/lib/rhythm/cycles";
+import { getProfile, showRhythm } from "@/lib/profile";
 import { SAVE_TIP_TOOL, executeSaveTip } from "@/lib/tips/save-tip";
 import { LOG_RUN_TOOL, executeLogRun, encodeAction } from "@/lib/chat-actions";
 import { resolveTier } from "@/lib/subscription";
@@ -182,19 +184,40 @@ export async function POST(req: Request) {
     systemBlocks.push({ type: "text", text: buildSprintContext(activeSprint) });
   }
 
-  // Контекст дня из раздела «Мой ритм»: если есть свежая отметка состояния
-  // (сегодня/вчера), передаём её и границы генерации, чтобы «Обсудить в чате»
-  // продолжало тот же голос. Берём последнюю запись — так не зависим от TZ.
-  const [latestState] = await getRecentDailyState(supabase, user.id, 1);
-  if (latestState) {
-    const gapDays = Math.round(
-      (parseYmd(userToday()).getTime() - parseYmd(latestState.date).getTime()) / 86_400_000,
-    );
-    if (gapDays <= 1) {
-      systemBlocks.push({
-        type: "text",
-        text: buildRhythmContext(latestState.moods, latestState.ran),
-      });
+  // Контекст ритма: новая система (фаза цикла) → приоритет. Если нет данных —
+  // fallback на старый daily_state (отметки настроения/пробежек).
+  const today = new Date().toISOString().slice(0, 10);
+  const profile = await getProfile(supabase, user.id);
+  let rhythmContextAdded = false;
+
+  if (showRhythm(profile?.gender, profile?.cycle)) {
+    const cycles = await getLatestCycles(supabase, user.id, 3);
+    if (cycles.length > 0) {
+      const cycleLen = getCycleLength(cycles);
+      const cycleDay = getCycleDay(cycles[0].started_at, today);
+      const phase = getPhase(cycleDay, cycleLen);
+      // Вчерашний чек-ин
+      const yesterday = new Date(today);
+      yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+      const checkin = await getTodayCheckin(supabase, user.id, yesterday.toISOString().slice(0, 10));
+      systemBlocks.push({ type: "text", text: buildCycleContext(cycleDay, cycleLen, phase, checkin) });
+      rhythmContextAdded = true;
+    }
+  }
+
+  if (!rhythmContextAdded) {
+    // Старый daily_state fallback
+    const [latestState] = await getRecentDailyState(supabase, user.id, 1);
+    if (latestState) {
+      const gapDays = Math.round(
+        (parseYmd(userToday()).getTime() - parseYmd(latestState.date).getTime()) / 86_400_000,
+      );
+      if (gapDays <= 1) {
+        systemBlocks.push({
+          type: "text",
+          text: buildRhythmContext(latestState.moods, latestState.ran),
+        });
+      }
     }
   }
 

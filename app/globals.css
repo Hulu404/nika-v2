@@ -43,6 +43,12 @@
   --bg-blur: rgba(250,247,241,0.85);
   --bg-blur-strong: rgba(250,247,241,0.95);
   --topbar-blur: rgba(250,247,241,0.7);
+
+  /* Цвета фаз цикла */
+  --ph-menses: #C8553D;
+  --ph-rise: #85AB6E;
+  --ph-peak: #E8C04E;
+  --ph-slow: #EDADA0;
 }
 
 /* ============================================================
@@ -70,6 +76,10 @@ html.dark {
   --bg-blur: rgba(20,17,14,0.85);
   --bg-blur-strong: rgba(20,17,14,0.95);
   --topbar-blur: rgba(20,17,14,0.7);
+
+  /* Цвета фаз цикла (тёмная тема) */
+  --ph-menses: #E07A5F;
+  --ph-slow: #C98F82;
 }
 
 html.dark body {

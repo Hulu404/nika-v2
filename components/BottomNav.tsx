@@ -110,25 +110,15 @@ const TAB_TIPS: Tab = {
   isActive: (p) => p.startsWith("/tips"),
 };
 
-/**
- * Набор вкладок из профиля: «Мой ритм» появляется строго по showRhythm(gender,
- * cycle), «Советы» всегда последней (общий раздел, без гейта). «Профиль»
- * переехал в аватар шапки, в баре его нет.
- */
-function buildTabs(gender?: string | null, cycle?: string | null): Tab[] {
-  const tabs = [TAB_HOME, TAB_CHAT, TAB_MEDITATIONS, TAB_JOURNAL];
-  if (showRhythm(gender, cycle)) tabs.push(TAB_RHYTHM);
-  tabs.push(TAB_TIPS);
-  return tabs;
+/** 5 фиксированных вкладок. «Мой ритм» переехал на Главную карточкой. */
+function buildTabs(): Tab[] {
+  return [TAB_HOME, TAB_CHAT, TAB_MEDITATIONS, TAB_JOURNAL, TAB_TIPS];
 }
 
-/**
- * gender и cycle приходят пропами с сервера (BottomNavData) и пересчитываются на
- * каждом серверном рендере, поэтому после router.refresh() бар сам перестраивается 5↔4.
- */
 export function BottomNav({ gender, cycle }: { gender?: string | null; cycle?: string | null }) {
+  void gender; void cycle; // props сохранены для совместимости, больше не влияют на состав
   const pathname = usePathname();
-  const tabs = buildTabs(gender, cycle);
+  const tabs = buildTabs();
 
   return (
     <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-[var(--bg-blur-strong)] backdrop-blur-[20px] border-t border-line-subtle pb-safe">
