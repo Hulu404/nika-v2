@@ -17,9 +17,6 @@ import { computeStreak, weekRibbon, humanDate, weekdayLong, greeting, weekMessag
 import { getDailyQuote } from "@/lib/quotes";
 import { getActiveSprint } from "@/lib/sprint";
 import { resolveIsPro } from "@/lib/subscription";
-import { getProfile, showRhythm } from "@/lib/profile";
-import { getLatestCycles, getTodayAdvice, getCycleLength, getCycleDay, getPhase } from "@/lib/rhythm/cycles";
-import { RhythmHomeCard } from "@/components/rhythm/RhythmHomeCard";
 import type { Message } from "@/types/app";
 
 const MONTHS = ["янв","фев","мар","апр","мая","июн","июл","авг","сен","окт","ноя","дек"];
@@ -70,30 +67,12 @@ export default async function TodayPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/auth?next=/today");
 
-  const todayStr = new Date().toISOString().slice(0, 10);
-
-  const [{ data: userData }, runs, { data: convs }, activeSprint, profile] = await Promise.all([
+  const [{ data: userData }, runs, { data: convs }, activeSprint] = await Promise.all([
     supabase.from("users").select("display_name, is_pro").eq("id", user.id).maybeSingle(),
     getRuns(supabase, user.id),
     supabase.from("conversations").select("scenario, updated_at, messages").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(5),
     getActiveSprint(supabase, user.id),
-    getProfile(supabase, user.id),
   ]);
-
-  // Ритм-карточка (только для женской формы обращения)
-  const showRhythmCard = showRhythm(profile?.gender, profile?.cycle);
-  let rhythmCardProps: React.ComponentProps<typeof RhythmHomeCard> = { configured: false };
-  if (showRhythmCard) {
-    const cycles = await getLatestCycles(supabase, user.id, 3);
-    if (cycles.length > 0) {
-      const cycleLen = getCycleLength(cycles);
-      const cycleDay = getCycleDay(cycles[0].started_at, todayStr);
-      const phase = getPhase(cycleDay, cycleLen);
-      void phase;
-      const advice = await getTodayAdvice(supabase, user.id, todayStr);
-      rhythmCardProps = { configured: true, cycleDay, cycleLen, advice };
-    }
-  }
 
   const isPro = resolveIsPro(userData?.is_pro);
 
@@ -124,13 +103,6 @@ export default async function TodayPage() {
               {weekMessage(now)}
             </h1>
           </section>
-
-          {/* Мой ритм — ниже героя, выше сетки (только для female) */}
-          {showRhythmCard && (
-            <div className="mb-4">
-              <RhythmHomeCard {...rhythmCardProps} />
-            </div>
-          )}
 
           {/* Сетка карточек */}
           <div className="grid grid-cols-2 gap-3.5">
