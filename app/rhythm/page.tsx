@@ -24,13 +24,20 @@ export default async function RhythmPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/auth?next=/rhythm");
 
-  const profile = await getProfile(supabase, user.id);
-  if (!showRhythm(profile?.gender, profile?.cycle)) redirect("/");
-
   const today = todayUtc();
 
-  // Загружаем данные параллельно
-  const cycles = await getLatestCycles(supabase, user.id, 5);
+  // Все запросы к БД одной параллельной волной, а не цепочкой ожиданий.
+  // Профиль/циклы/чек-ин/совет/имя независимы, поэтому грузятся сразу вместе;
+  // гейт showRhythm и ветку онбординга проверяем уже по готовым данным.
+  const [profile, cycles, checkin, advice, { data: userData }] = await Promise.all([
+    getProfile(supabase, user.id),
+    getLatestCycles(supabase, user.id, 5),
+    getTodayCheckin(supabase, user.id, today),
+    getTodayAdvice(supabase, user.id, today),
+    supabase.from("users").select("display_name").eq("id", user.id).maybeSingle(),
+  ]);
+
+  if (!showRhythm(profile?.gender, profile?.cycle)) redirect("/");
 
   // Нет ни одного цикла — онбординг
   if (cycles.length === 0) {
@@ -47,18 +54,7 @@ export default async function RhythmPage() {
   const phase = getPhase(cycleDay, cycleLen);
   const isOverdue = cycleDay > cycleLen + 7;
 
-  const [checkin, advice] = await Promise.all([
-    getTodayCheckin(supabase, user.id, today),
-    getTodayAdvice(supabase, user.id, today),
-  ]);
-
   const completedCycles = cycles.filter((c) => c.cycle_length != null).length;
-
-  const { data: userData } = await supabase
-    .from("users")
-    .select("display_name")
-    .eq("id", user.id)
-    .maybeSingle();
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
