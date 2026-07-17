@@ -4,7 +4,7 @@ import Script from 'next/script';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect, useRef } from 'react';
 
-const COUNTER_ID = 109611856;
+const COUNTER_ID = 110821642;
 
 declare global {
   interface Window {
