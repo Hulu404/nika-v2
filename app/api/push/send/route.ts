@@ -39,7 +39,15 @@ function isDue(frequency: string | null, lastSentAt: string | null): boolean {
 }
 
 export async function GET(req: Request) {
-  if (req.headers.get("x-cron-secret") !== process.env.CRON_SECRET) {
+  // Vercel Cron сам добавляет заголовок `Authorization: Bearer <CRON_SECRET>`
+  // (кастомные заголовки в vercel.json недоступны). Поддерживаем и его, и
+  // ручной вызов через `x-cron-secret` — для локальных/отладочных прогонов.
+  const secret = process.env.CRON_SECRET;
+  const authHeader = req.headers.get("authorization");
+  const legacyHeader = req.headers.get("x-cron-secret");
+  const authorized =
+    !!secret && (authHeader === `Bearer ${secret}` || legacyHeader === secret);
+  if (!authorized) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
   }
 

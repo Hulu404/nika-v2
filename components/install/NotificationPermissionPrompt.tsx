@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { usePwaInstall } from '@/lib/hooks/usePwaInstall';
+import { subscribeToPush } from '@/lib/push-subscribe';
 
 export function NotificationPermissionPrompt() {
   const { isStandalone } = usePwaInstall();
@@ -20,7 +21,10 @@ export function NotificationPermissionPrompt() {
   const handleEnable = async () => {
     markShown();
     setShow(false);
-    await Notification.requestPermission();
+    const perm = await Notification.requestPermission();
+    // Разрешение без подписки на web-push бесполезно — крон-рассылке
+    // некому слать. Подписываем устройство при согласии.
+    if (perm === 'granted') subscribeToPush().catch(() => {});
   };
 
   const handleSkip = () => {

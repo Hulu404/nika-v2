@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { createClientComponentClient } from "@/lib/supabase";
 import { saveOnboarding } from "@/lib/profile";
 import { requestNotifPermission, tryOsNotification } from "@/lib/notifications";
+import { subscribeToPush } from "@/lib/push-subscribe";
 import type { NotifPermission } from "@/types/app";
 import {
   STEP,
@@ -406,6 +407,9 @@ export function ChatOnboarding({ userId }: { userId: string }) {
           const res = await requestNotifPermission();
           if (token !== genRef.current) return;
           notifPermissionRef.current = res;
+          // Подписываем устройство на web-push — без этого крон-рассылке
+          // некому слать. Не блокируем сценарий, если не получилось.
+          if (res === "granted") subscribeToPush().catch(() => {});
           await nikaType([permissionAck(res)], token);
           if (token !== genRef.current) return;
           await nikaType(["Например, вот так это будет выглядеть:"], token);
