@@ -1,0 +1,43 @@
+name: push-notifications-cron
+
+# Планировщик проактивных пуш-уведомлений НИКИ.
+# На Railway нет встроенного крона (vercel.json там игнорируется), поэтому
+# расписание держим здесь: GitHub Actions по времени дёргает /api/push/send,
+# а сам эндпоинт уже решает, кому и что слать.
+#
+# Требуется настроить в репозитории (Settings → Secrets and variables → Actions):
+#   • Variable  PUSH_CRON_URL  — базовый URL прода, напр. https://mynika.online
+#   • Secret    CRON_SECRET    — то же значение, что в переменных Railway
+#
+# Время в cron — UTC. 05:00 и 14:00 UTC = 08:00 и 17:00 МСК (как было в vercel.json).
+
+on:
+  schedule:
+    - cron: "0 5,14 * * *"
+  workflow_dispatch: {} # ручной запуск из вкладки Actions для проверки
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/push/send
+        env:
+          BASE_URL: ${{ vars.PUSH_CRON_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::error::PUSH_CRON_URL (variable) и CRON_SECRET (secret) должны быть заданы в настройках репозитория."
+            exit 1
+          fi
+          # -sS: без прогресс-бара, но с ошибками; тело и HTTP-код печатаем, секрет не логируем.
+          response=$(curl -sS -w "\n%{http_code}" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            "${BASE_URL%/}/api/push/send")
+          body=$(echo "$response" | head -n -1)
+          code=$(echo "$response" | tail -n 1)
+          echo "HTTP $code"
+          echo "Response: $body"
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "::error::Крон-запрос вернул $code"
+            exit 1
+          fi
