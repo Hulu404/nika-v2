@@ -3,6 +3,28 @@ import { tgAdmin } from "./supabase";
 import type { BotContext } from "./bot";
 
 /**
+ * Формулировка согласия — В ОДНОМ МЕСТЕ (для сверки с privacy-политикой сайта,
+ * 152-ФЗ). Момент согласия фиксируется в tg_bindings.tg_opt_in_at.
+ */
+export const CONSENT_VERSION = "2026-07-18";
+
+export const CONSENT_PROMPT =
+  "Можно я буду иногда писать сюда сама, по утрам? Коротко и по делу, без спама. Приостановить можно в любой момент.";
+
+/** Инлайн-кнопки согласия. callback_data — optin_yes / optin_no. */
+export function consentKeyboard(): InlineKeyboard {
+  return new InlineKeyboard()
+    .text("Согласна получать сообщения", "optin_yes")
+    .row()
+    .text("Пока не надо", "optin_no");
+}
+
+/** Отправляет запрос согласия (после привязки и по /start у привязанного). */
+export async function sendConsentRequest(ctx: BotContext): Promise<void> {
+  await ctx.reply(CONSENT_PROMPT, { reply_markup: consentKeyboard() });
+}
+
+/**
  * Привязка Telegram по одноразовому токену из deep-link (t.me/<bot>?start=<token>).
  * chat_id получаем на сервере из ctx.from.id (нельзя подделать через payload).
  *
@@ -91,15 +113,9 @@ export async function handleStartToken(ctx: BotContext, token: string): Promise<
   await admin.from("tg_link_tokens").update({ used_at: now }).eq("token", token);
   await admin.from("users").update({ telegram_id: String(chatId) }).eq("id", userId);
 
-  // Приветствие + запрос opt-in (согласие на сообщения).
-  await ctx.reply(
-    "Готово, привязала этот чат к твоему аккаунту НИКИ.\n\nМожно я иногда буду писать сюда сама, деликатно и по делу?",
-    {
-      reply_markup: new InlineKeyboard()
-        .text("Да, можно", "tg_optin:yes")
-        .text("Пока нет", "tg_optin:no"),
-    },
-  );
+  // Приветствие + запрос согласия (opt-in). Без согласия бот сам не пишет.
+  await ctx.reply("Готово, привязала этот чат к твоему аккаунту НИКИ.");
+  await sendConsentRequest(ctx);
 }
 
 /**
@@ -113,7 +129,10 @@ export async function handleStartToken(ctx: BotContext, token: string): Promise<
  * Коллизии обрабатываются так же, как в handleStartToken.
  */
 
-/** Обработка ответа на opt-in (согласие/отказ на проактивные сообщения). */
+/**
+ * Ответ на opt-in. yes → tg_opt_in=true, tg_opt_in_at=now(); no → остаётся false.
+ * answerCallbackQuery гасит «часик» на кнопке. Связку не трогаем.
+ */
 export async function handleOptIn(ctx: BotContext, yes: boolean): Promise<void> {
   const admin = tgAdmin();
   const chatId = ctx.from?.id;
@@ -130,7 +149,51 @@ export async function handleOptIn(ctx: BotContext, yes: boolean): Promise<void> 
   await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard() }).catch(() => {});
   await ctx.reply(
     yes
-      ? "Спасибо. Буду писать редко и по делу. Отключить можно в любой момент в настройках НИКИ."
-      : "Поняла, сама писать не буду. Если передумаешь — включи в настройках НИКИ.",
+      ? "Здорово. Буду заглядывать по утрам, и всегда можно приостановить (команда /stop или настройки НИКИ)."
+      : "Поняла, сама писать не буду. Включить можно в настройках НИКИ или командой /start заново.",
   );
+}
+
+/**
+ * /stop — приостановка сообщений. tg_opt_in=false, связку НЕ рвём (в отличие от
+ * unlink). Повторный opt-in доступен через /start или настройки.
+ */
+export async function handleStop(ctx: BotContext): Promise<void> {
+  const admin = tgAdmin();
+  const chatId = ctx.from?.id;
+  if (chatId === undefined) return;
+
+  const { data: binding } = await admin
+    .from("tg_bindings")
+    .select("id")
+    .eq("chat_id", chatId)
+    .eq("is_active", true)
+    .maybeSingle();
+
+  if (!binding) {
+    await ctx.reply("Сейчас я тебе и так не пишу. Чтобы подключить меня, открой настройки НИКИ.");
+    return;
+  }
+
+  await admin
+    .from("tg_bindings")
+    .update({ tg_opt_in: false, tg_opt_in_at: null })
+    .eq("id", binding.id);
+
+  await ctx.reply(
+    "Приостановила. Сама писать не буду, но связку не разрываю. Включить обратно можно командой /start или в настройках НИКИ.",
+  );
+}
+
+/** Активная связка по chat_id (для /start у уже привязанного). */
+export async function findActiveBinding(
+  chatId: number,
+): Promise<{ id: string; tg_opt_in: boolean } | null> {
+  const { data } = await tgAdmin()
+    .from("tg_bindings")
+    .select("id, tg_opt_in")
+    .eq("chat_id", chatId)
+    .eq("is_active", true)
+    .maybeSingle();
+  return (data as { id: string; tg_opt_in: boolean } | null) ?? null;
 }

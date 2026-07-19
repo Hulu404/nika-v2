@@ -9,7 +9,14 @@ import { getNikaResponse } from "./nika";
 import { SCENARIO_META, isScenario } from "./scenarios";
 import { menuKeyboard, chatKeyboard } from "./keyboards";
 import { supabaseSessionStorage } from "./storage";
-import { handleStartToken, handleOptIn } from "./linking";
+import {
+  handleStartToken,
+  handleOptIn,
+  handleStop,
+  findActiveBinding,
+  sendConsentRequest,
+} from "./linking";
+import { handleCheckinAnswer } from "./checkin";
 import type { SessionData } from "./types";
 
 export type BotContext = Context & SessionFlavor<SessionData>;
@@ -62,7 +69,22 @@ function registerHandlers(bot: Bot<BotContext>): void {
       return;
     }
 
-    // Без токена: короткое приветствие + подсказка подключиться из настроек.
+    // Без токена, но чат уже привязан → снова предлагаем включить сообщения.
+    const chatId = ctx.from?.id;
+    if (chatId !== undefined) {
+      const binding = await findActiveBinding(chatId);
+      if (binding) {
+        if (binding.tg_opt_in) {
+          await ctx.reply("Мы уже на связи, и сообщения включены. Приостановить можно командой /stop.");
+        } else {
+          await ctx.reply("Мы уже на связи.");
+          await sendConsentRequest(ctx);
+        }
+        return;
+      }
+    }
+
+    // Не привязан: короткое приветствие + подсказка подключиться из настроек.
     const name = ctx.from?.first_name ?? "друг";
     await ctx.reply(
       `Привет, ${name}! 👋\n\nЯ — НИКА, ментальный ассистент для бегунов-любителей.\n\nЯ не тренер. Я рядом, чтобы ты не бросил бег.\n\nЧтобы я могла писать сюда, подключи Telegram в настройках НИКИ (раздел профиля).`,
@@ -70,9 +92,19 @@ function registerHandlers(bot: Bot<BotContext>): void {
     await showMenu(ctx);
   });
 
+  // ── /stop — приостановить сообщения (связку не рвём) ─────────────────────────
+  bot.command("stop", async (ctx) => {
+    await handleStop(ctx);
+  });
+
   // ── Opt-in на проактивные сообщения (после привязки) ─────────────────────────
-  bot.callbackQuery(/^tg_optin:(yes|no)$/, async (ctx) => {
+  bot.callbackQuery(/^optin_(yes|no)$/, async (ctx) => {
     await handleOptIn(ctx, ctx.match[1] === "yes");
+  });
+
+  // ── Ответ на утренний чек-ин (кнопки ans_*) ──────────────────────────────────
+  bot.callbackQuery(/^ans_/, async (ctx) => {
+    await handleCheckinAnswer(ctx, ctx.callbackQuery.data ?? "");
   });
 
   bot.command("menu", async (ctx) => {
