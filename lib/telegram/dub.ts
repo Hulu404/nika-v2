@@ -1,6 +1,7 @@
 import { tgAdmin } from "./supabase";
 import { canReceiveBotMessages } from "./gate";
 import { sendBotMessage } from "./send";
+import { siteKeyboard } from "./cta";
 
 /**
  * Пуш-дубль в Telegram: шлёт тот же текст уведомления пользователю, если у него
@@ -23,7 +24,8 @@ export async function dubToTelegram(userId: string, text: string): Promise<boole
     if (!canReceiveBotMessages(binding)) return false;
 
     const chatId = Number((binding as { chat_id: number | string }).chat_id);
-    const res = await sendBotMessage(chatId, text);
+    // Уведомление с кнопкой перехода на сайт (как и все бот-сообщения).
+    const res = await sendBotMessage(chatId, text, siteKeyboard());
     return res.ok;
   } catch (err) {
     console.error("[tg-dub] failed:", err instanceof Error ? err.message : String(err));

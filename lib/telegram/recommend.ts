@@ -1,5 +1,6 @@
 import { InlineKeyboard } from "grammy";
 import { tgAdmin } from "./supabase";
+import { siteKeyboard } from "./cta";
 import { getPhase, getCycleDay, getCycleLength, type Phase, type CycleRecord } from "../rhythm/cycles";
 import type { CheckinAnswer } from "./checkin-copy";
 
@@ -77,19 +78,12 @@ export async function getPhaseEnergyHint(userId: string): Promise<EnergyHint | n
   }
 }
 
-/** Инлайн-кнопка «Открыть НИКУ» (buildCta из notify-cta пока нет — минимальная ссылка). */
-function ctaKeyboard(): InlineKeyboard | undefined {
-  const url = process.env.NEXT_PUBLIC_APP_URL;
-  if (!url) return undefined;
-  return new InlineKeyboard().url("Открыть НИКУ", url.replace(/\/$/, ""));
-}
-
-/** Текст рекомендации + опциональная CTA-кнопка по ответу пользователя. */
+/** Текст рекомендации + опциональная CTA-кнопка на сайт по ответу пользователя. */
 export async function recommendForAnswer(
   userId: string,
   answer: CheckinAnswer,
 ): Promise<{ text: string; keyboard?: InlineKeyboard }> {
   const phaseHint = await getPhaseEnergyHint(userId); // внутренний дефолт
   const category = resolveRecommendationCategory(answer, phaseHint); // ответ приоритетнее
-  return { text: RECO_TEXT[category], keyboard: ctaKeyboard() };
+  return { text: RECO_TEXT[category], keyboard: siteKeyboard() };
 }

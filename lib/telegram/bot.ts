@@ -1,14 +1,4 @@
-import {
-  Bot,
-  InlineKeyboard,
-  session,
-  type Context,
-  type SessionFlavor,
-} from "grammy";
-import { getNikaResponse } from "./nika";
-import { SCENARIO_META, isScenario } from "./scenarios";
-import { menuKeyboard, chatKeyboard } from "./keyboards";
-import { supabaseSessionStorage } from "./storage";
+import { Bot, type Context } from "grammy";
 import {
   handleStartToken,
   handleOptIn,
@@ -17,9 +7,23 @@ import {
   sendConsentRequest,
 } from "./linking";
 import { handleCheckinAnswer } from "./checkin";
-import type { SessionData } from "./types";
+import { handleResetCommand } from "./reset";
+import { siteKeyboard } from "./cta";
 
-export type BotContext = Context & SessionFlavor<SessionData>;
+/**
+ * Служебный бот НИКИ. Его роль — НЕ второй чат-клон, а канал уведомлений:
+ *   • напоминания (утренние чек-ины) с кнопкой перехода на сайт;
+ *   • сброс пароля (/reset и доставка ссылки, инициированной с сайта);
+ *   • привязка аккаунта и управление согласием (opt-in / /stop).
+ *
+ * Свободного диалога с Anthropic здесь нет — общение с НИКОЙ живёт на сайте.
+ * Поэтому нет ни сессий, ни меню сценариев: любой прочий ввод уводит на сайт.
+ */
+export type BotContext = Context;
+
+const BOT_ROLE =
+  "Я служебный бот НИКИ. Присылаю напоминания и помогаю сбросить пароль. " +
+  "Пообщаться с НИКОЙ, посмотреть «Мой ритм» и всё остальное — на сайте.";
 
 /** Токен бота. TELEGRAM_BOT_TOKEN — приоритетно, BOT_TOKEN — совместимость. */
 function botToken(): string {
@@ -28,39 +32,13 @@ function botToken(): string {
   return t;
 }
 
-// ── Утилиты ─────────────────────────────────────────────────────────────────
-
-/** Отправляет типинг-индикатор каждые 4 с, пока идёт запрос к Anthropic. */
-function startTyping(ctx: BotContext): ReturnType<typeof setInterval> {
-  void ctx.replyWithChatAction("typing");
-  return setInterval(() => void ctx.replyWithChatAction("typing"), 4_000);
+/** Опции reply с клавиатурой, только если она построена (нужен NEXT_PUBLIC_APP_URL). */
+function withKeyboard(kb: ReturnType<typeof siteKeyboard>) {
+  return kb ? { reply_markup: kb } : undefined;
 }
 
-/** Сбрасывает диалог и показывает главное меню. */
-async function showMenu(ctx: BotContext): Promise<void> {
-  ctx.session.scenario = null;
-  ctx.session.messages = [];
-  await ctx.reply("Выбери, о чём хочешь поговорить с НИКОЙ:", {
-    reply_markup: menuKeyboard(),
-  });
-}
-
-/**
- * Регистрирует все хендлеры на экземпляр бота. Логика сохранена из bot/src/bot.ts;
- * отличие — сессия хранится в БД (StorageAdapter), а не в памяти.
- */
 function registerHandlers(bot: Bot<BotContext>): void {
-  // Сессия в БД: ключ — id чата, поэтому состояние переживает рестарты/инстансы.
-  bot.use(
-    session<SessionData, BotContext>({
-      initial: (): SessionData => ({ scenario: null, messages: [] }),
-      storage: supabaseSessionStorage<SessionData>(),
-      getSessionKey: (ctx) =>
-        ctx.chat?.id !== undefined ? String(ctx.chat.id) : undefined,
-    }),
-  );
-
-  // ── Команды ────────────────────────────────────────────────────────────────
+  // ── /start ───────────────────────────────────────────────────────────────
   bot.command("start", async (ctx) => {
     // Deep-link из приложения: /start <token> → привязка аккаунта.
     const token = (ctx.match ?? "").trim();
@@ -69,117 +47,48 @@ function registerHandlers(bot: Bot<BotContext>): void {
       return;
     }
 
-    // Без токена, но чат уже привязан → снова предлагаем включить сообщения.
+    // Без токена, но чат уже привязан → статус / повторный запрос согласия.
     const chatId = ctx.from?.id;
     if (chatId !== undefined) {
       const binding = await findActiveBinding(chatId);
       if (binding) {
         if (binding.tg_opt_in) {
-          await ctx.reply("Мы уже на связи, и сообщения включены. Приостановить можно командой /stop.");
+          await ctx.reply(
+            "Мы на связи, напоминания включены. Приостановить — командой /stop.",
+            withKeyboard(siteKeyboard()),
+          );
         } else {
-          await ctx.reply("Мы уже на связи.");
           await sendConsentRequest(ctx);
         }
         return;
       }
     }
 
-    // Не привязан: короткое приветствие + подсказка подключиться из настроек.
+    // Не привязан: коротко о роли бота + как подключить (из профиля на сайте).
     const name = ctx.from?.first_name ?? "друг";
     await ctx.reply(
-      `Привет, ${name}! 👋\n\nЯ — НИКА, ментальный ассистент для бегунов-любителей.\n\nЯ не тренер. Я рядом, чтобы ты не бросил бег.\n\nЧтобы я могла писать сюда, подключи Telegram в настройках НИКИ (раздел профиля).`,
+      `Привет, ${name}! 👋\n\n${BOT_ROLE}\n\nЧтобы я могла присылать напоминания, подключи Telegram в профиле НИКИ.`,
+      withKeyboard(siteKeyboard()),
     );
-    await showMenu(ctx);
   });
 
-  // ── /stop — приостановить сообщения (связку не рвём) ─────────────────────────
-  bot.command("stop", async (ctx) => {
-    await handleStop(ctx);
+  // ── Команды-утилиты ────────────────────────────────────────────────────────
+  bot.command("stop", (ctx) => handleStop(ctx)); // приостановить напоминания
+  bot.command(["reset", "password"], (ctx) => handleResetCommand(ctx)); // сброс пароля
+  bot.command("help", async (ctx) => {
+    await ctx.reply(
+      `${BOT_ROLE}\n\nКоманды:\n/reset — сбросить пароль\n/stop — приостановить напоминания\n/start — подключить или возобновить`,
+      withKeyboard(siteKeyboard()),
+    );
   });
 
-  // ── Opt-in на проактивные сообщения (после привязки) ─────────────────────────
-  bot.callbackQuery(/^optin_(yes|no)$/, async (ctx) => {
-    await handleOptIn(ctx, ctx.match[1] === "yes");
-  });
+  // ── Инлайн-ответы уведомлений ───────────────────────────────────────────────
+  bot.callbackQuery(/^optin_(yes|no)$/, (ctx) => handleOptIn(ctx, ctx.match[1] === "yes"));
+  bot.callbackQuery(/^ans_/, (ctx) => handleCheckinAnswer(ctx, ctx.callbackQuery.data ?? ""));
 
-  // ── Ответ на утренний чек-ин (кнопки ans_*) ──────────────────────────────────
-  bot.callbackQuery(/^ans_/, async (ctx) => {
-    await handleCheckinAnswer(ctx, ctx.callbackQuery.data ?? "");
-  });
-
-  bot.command("menu", async (ctx) => {
-    await showMenu(ctx);
-  });
-
-  // ── Выбор сценария ───────────────────────────────────────────────────────────
-  bot.callbackQuery(/^scenario:(.+)$/, async (ctx) => {
-    const raw = ctx.match[1];
-    if (!isScenario(raw)) {
-      await ctx.answerCallbackQuery("Неизвестный сценарий");
-      return;
-    }
-
-    await ctx.answerCallbackQuery();
-
-    const meta = SCENARIO_META[raw];
-
-    // Сохраняем сценарий и кладём открывашку НИКИ первым сообщением в историю.
-    ctx.session.scenario = raw;
-    ctx.session.messages = [{ role: "assistant", content: meta.opener }];
-
-    // Редактируем исходное сообщение меню, чтобы убрать кнопки.
-    await ctx.editMessageText(`*${meta.label}*`, { parse_mode: "Markdown" }).catch(() => {});
-
-    // Отправляем открывашку НИКИ с кнопкой смены сценария.
-    await ctx.reply(meta.opener, { reply_markup: chatKeyboard() });
-  });
-
-  // ── Кнопка «Сменить сценарий» ─────────────────────────────────────────────────
-  bot.callbackQuery("back_to_menu", async (ctx) => {
-    await ctx.answerCallbackQuery();
-    // Убираем кнопки у последнего сообщения (пустая клавиатура — единственный способ).
-    await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard() }).catch(() => {});
-    await showMenu(ctx);
-  });
-
-  // ── Основной обработчик сообщений ─────────────────────────────────────────────
-  bot.on("message:text", async (ctx) => {
-    const { scenario, messages } = ctx.session;
-
-    // Если сценарий не выбран — направляем в меню.
-    if (!scenario) {
-      await showMenu(ctx);
-      return;
-    }
-
-    const userText = ctx.message.text.trim();
-    if (!userText) return;
-
-    // Добавляем реплику пользователя в историю.
-    messages.push({ role: "user", content: userText });
-
-    const typingInterval = startTyping(ctx);
-
-    try {
-      const nikaReply = await getNikaResponse(scenario, messages);
-
-      // Сохраняем ответ НИКИ в историю.
-      messages.push({ role: "assistant", content: nikaReply });
-
-      await ctx.reply(nikaReply, { reply_markup: chatKeyboard() });
-    } catch (err) {
-      console.error("[bot] Anthropic error:", err instanceof Error ? err.message : String(err));
-      await ctx.reply("Что-то пошло не так — не смогла получить ответ. Попробуй ещё раз.");
-      // Убираем неудавшуюся реплику пользователя из истории.
-      messages.pop();
-    } finally {
-      clearInterval(typingInterval);
-    }
-  });
-
-  // ── Неподдерживаемые типы сообщений ──────────────────────────────────────────
+  // ── Любой прочий ввод: это не чат-бот — коротко уводим на сайт ───────────────
   bot.on("message", async (ctx) => {
-    await ctx.reply("Я понимаю только текстовые сообщения. Напиши что-нибудь словами 🙂");
+    await ctx.reply(BOT_ROLE, withKeyboard(siteKeyboard()));
   });
 
   // ── Глобальный обработчик ошибок ─────────────────────────────────────────────
