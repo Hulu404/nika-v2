@@ -1,6 +1,7 @@
 import { GrammyError, type InlineKeyboard } from "grammy";
 import { getBot } from "./bot";
 import { tgAdmin } from "./supabase";
+import { trackServer } from "../track-server";
 
 /**
  * Транспорт бот-инициированных сообщений. ЕДИНАЯ точка отправки — её
@@ -36,7 +37,7 @@ export async function sendBotMessage(
   } catch (err) {
     if (err instanceof GrammyError) {
       if (err.error_code === 403) {
-        await tgAdmin()
+        const { data: gased } = await tgAdmin()
           .from("tg_bindings")
           .update({
             is_active: false,
@@ -44,7 +45,10 @@ export async function sendBotMessage(
             unlink_reason: "blocked",
           })
           .eq("chat_id", chatId)
-          .eq("is_active", true);
+          .eq("is_active", true)
+          .select("user_id");
+        const userId = (gased?.[0] as { user_id: string } | undefined)?.user_id;
+        if (userId) trackServer(userId, "tg_unlinked", { reason: "blocked" });
         return { ok: false, blocked: true };
       }
       if (err.error_code === 429) {

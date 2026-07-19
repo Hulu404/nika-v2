@@ -4,6 +4,7 @@ import { canReceiveBotMessages } from "./gate";
 import { sendBotMessage } from "./send";
 import { pickVariant, checkinKeyboard, ANSWER_CODES } from "./checkin-copy";
 import { recommendForAnswer } from "./recommend";
+import { trackServer } from "../track-server";
 import type { BotContext } from "./bot";
 
 export interface SendCheckinResult {
@@ -59,8 +60,17 @@ export async function sendCheckin(userId: string): Promise<SendCheckinResult> {
     .maybeSingle();
   const chosen = pickVariant((last as { question_variant?: string } | null)?.question_variant ?? undefined);
 
+  // Тихий режим: короче/без эмодзи (безлико на локскрине).
+  const { data: prefs } = await admin
+    .from("notification_prefs")
+    .select("quiet_mode")
+    .eq("user_id", userId)
+    .maybeSingle();
+  const quiet = (prefs as { quiet_mode?: boolean } | null)?.quiet_mode === true;
+  const text = quiet ? chosen.quietText : chosen.text;
+
   // Отправка через единый транспорт (403/429 обрабатываются там).
-  const result = await sendBotMessage(chatId, chosen.text, checkinKeyboard(chosen.variant));
+  const result = await sendBotMessage(chatId, text, checkinKeyboard(chosen.variant, quiet));
   if (!result.ok) {
     return {
       sent: false,
@@ -78,6 +88,7 @@ export async function sendCheckin(userId: string): Promise<SendCheckinResult> {
     source: "telegram",
   });
 
+  trackServer(userId, "checkin_sent");
   return { sent: true, variant: chosen.variant };
 }
 
@@ -131,6 +142,8 @@ export async function handleCheckinAnswer(ctx: BotContext, code: string): Promis
     .is("answer", null)
     .select("id");
   if (!updated || updated.length === 0) return;
+
+  trackServer(userId, "checkin_answered", { answer });
 
   // Рекомендация на день (ответ приоритетнее фазы; фаза в текст не попадает).
   const { text, keyboard } = await recommendForAnswer(userId, answer);

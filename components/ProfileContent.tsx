@@ -182,6 +182,8 @@ interface Props {
   initialNotifTime: string;
   initialNotifFrequency: string;
   initialTelegramLinked: boolean;
+  initialTelegramBlocked: boolean;
+  initialQuietMode: boolean;
   createdAt: string;
 }
 
@@ -198,6 +200,8 @@ export function ProfileContent({
   initialNotifTime,
   initialNotifFrequency,
   initialTelegramLinked,
+  initialTelegramBlocked,
+  initialQuietMode,
   createdAt,
 }: Props) {
   const router = useRouter();
@@ -218,6 +222,11 @@ export function ProfileContent({
   // Telegram-связка
   const [telegramLinked, setTelegramLinked] = useState(initialTelegramLinked);
   const [telegramBusy, setTelegramBusy]     = useState(false);
+  const telegramBlocked = initialTelegramBlocked && !telegramLinked;
+
+  // Тихий режим
+  const [quietMode, setQuietMode] = useState(initialQuietMode);
+  const [quietSaving, setQuietSaving] = useState(false);
 
   // Name editing
   const [name, setName]         = useState(initialName);
@@ -345,6 +354,25 @@ export function ProfileContent({
       /* молча */
     } finally {
       setTelegramBusy(false);
+    }
+  }
+
+  async function handleQuietToggle(v: boolean) {
+    if (quietSaving) return;
+    setQuietSaving(true);
+    const prev = quietMode;
+    setQuietMode(v);
+    try {
+      const res = await fetch("/api/prefs/quiet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quiet_mode: v }),
+      });
+      if (!res.ok) setQuietMode(prev);
+    } catch {
+      setQuietMode(prev);
+    } finally {
+      setQuietSaving(false);
     }
   }
 
@@ -489,12 +517,23 @@ export function ProfileContent({
                 />
               ) : (
                 <Row
-                  label="Подключить Telegram"
+                  label={telegramBlocked ? "Переподключить Telegram" : "Подключить Telegram"}
                   value={telegramBusy ? "…" : undefined}
                   disabled={telegramBusy}
                   onClick={handleTelegramConnect}
                 />
               )}
+              {telegramBlocked && (
+                <div className="px-4 pb-3 pt-1">
+                  <p className="text-[12px] leading-[1.55] text-ink-faint">
+                    Похоже, бот был остановлен. Если хочешь снова получать сообщения — переподключи.
+                  </p>
+                </div>
+              )}
+              <Row
+                label="Тихий режим"
+                rightEl={<Toggle on={quietMode} onChange={handleQuietToggle} />}
+              />
             </Card>
           </div>
 

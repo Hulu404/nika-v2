@@ -13,13 +13,15 @@ export type CheckinAnswer = "full" | "ok" | "tired" | "bad";
 export interface CheckinVariant {
   variant: string;
   text: string;
+  /** Тихий режим (quiet_mode): короче, без эмодзи и деталей — безлико на локскрине. */
+  quietText: string;
 }
 
 export const CHECKIN_VARIANTS: CheckinVariant[] = [
-  { variant: "morning_how", text: "Доброе утро 🌸 Как ты сегодня?" },
-  { variant: "morning_today", text: "Что сегодня по силам: размяться или разогнаться?" },
-  { variant: "morning_sleep", text: "Как спалось, как настрой?" },
-  { variant: "morning_energy", text: "Энергия сегодня на сколько из 5?" },
+  { variant: "morning_how", text: "Доброе утро 🌸 Как ты сегодня?", quietText: "Как ты сегодня?" },
+  { variant: "morning_today", text: "Что сегодня по силам: размяться или разогнаться?", quietText: "Как сегодня силы?" },
+  { variant: "morning_sleep", text: "Как спалось, как настрой?", quietText: "Как настрой?" },
+  { variant: "morning_energy", text: "Энергия сегодня на сколько из 5?", quietText: "Как энергия сегодня?" },
 ];
 
 /**
@@ -57,12 +59,20 @@ export const ANSWER_CODES: Record<string, CheckinAnswer> = {
   ...SCALE_TO_ANSWER,
 };
 
-/** Вариант morning_energy показывает шкалу, остальные — 4 стандартные кнопки. */
-export function checkinKeyboard(variant: string): InlineKeyboard {
+/**
+ * Вариант morning_energy показывает шкалу, остальные — 4 стандартные кнопки.
+ * quiet=true — подписи без эмодзи (тихий режим).
+ */
+export function checkinKeyboard(variant: string, quiet = false): InlineKeyboard {
   const kb = new InlineKeyboard();
   if (variant === "morning_energy") {
     for (const b of SCALE_BUTTONS) kb.text(b.label, b.code);
     return kb; // одна строка 1..5
+  }
+  if (quiet) {
+    kb.text("полна сил", "ans_full").text("норм", "ans_ok").row();
+    kb.text("устала", "ans_tired").text("не оч", "ans_bad");
+    return kb;
   }
   kb.text("💪 полна сил", "ans_full").text("🙂 норм", "ans_ok").row();
   kb.text("😮‍💨 устала", "ans_tired").text("🤕 не оч", "ans_bad");

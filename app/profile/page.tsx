@@ -48,6 +48,25 @@ export default async function ProfilePage() {
     .maybeSingle();
   const telegramLinked = !bindingResult.error && bindingResult.data != null;
 
+  // Бот заблокирован пользователем (Промт 7): предложим мягко переподключить.
+  const blockedResult = await supabase
+    .from("tg_bindings")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("is_active", false)
+    .eq("unlink_reason", "blocked")
+    .limit(1)
+    .maybeSingle();
+  const telegramBlocked = !telegramLinked && !blockedResult.error && blockedResult.data != null;
+
+  // Тихий режим (notification_prefs может ещё не существовать — тогда false).
+  const prefsResult = await supabase
+    .from("notification_prefs")
+    .select("quiet_mode")
+    .eq("user_id", user.id)
+    .maybeSingle();
+  const quietMode = !prefsResult.error && prefsResult.data?.quiet_mode === true;
+
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
       <ProfileContent
@@ -61,6 +80,8 @@ export default async function ProfilePage() {
         initialNotifTime={(profileData?.notif_time as string | null) ?? "08:00"}
         initialNotifFrequency={(profileData?.notif_frequency as string | null) ?? "daily"}
         initialTelegramLinked={telegramLinked}
+        initialTelegramBlocked={telegramBlocked}
+        initialQuietMode={quietMode}
         createdAt={userData?.created_at ?? user.created_at ?? new Date().toISOString()}
       />
     </AppLayout>

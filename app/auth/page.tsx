@@ -345,6 +345,14 @@ export default function AuthPage() {
                       </p>
                     </div>
                   )}
+                  {/* Забыли пароль — только на входе */}
+                  {mode === "signin" && (
+                    <p className="mt-2 text-right text-[12.5px]">
+                      <a href="/forgot-password" className="text-ink-muted underline-offset-2 hover:text-ink-secondary hover:underline">
+                        Забыли пароль?
+                      </a>
+                    </p>
+                  )}
                 </div>
 
                 {/* Юридическая строка (только регистрация) */}

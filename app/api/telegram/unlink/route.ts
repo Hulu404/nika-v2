@@ -1,5 +1,6 @@
 import { createServerComponentClient } from "@/lib/supabase";
 import { createServiceRoleClient } from "@/lib/supabase-server";
+import { trackServer } from "@/lib/track-server";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -34,5 +35,6 @@ export async function POST() {
   // Зеркало на users.telegram_id — чистим (не критично, но держим консистентным).
   await admin.from("users").update({ telegram_id: null }).eq("id", user.id);
 
+  trackServer(user.id, "tg_unlinked", { reason: "user" });
   return Response.json({ ok: true });
 }

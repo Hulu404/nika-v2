@@ -55,6 +55,31 @@ types/              user, conversation, subscription
 - Каталог `bot/` (старый polling) **ретайрнут** — его npm-скрипты выводят
   предупреждение и не поднимают бота.
 
+## Приватность Telegram-бота (152-ФЗ, чек-лист)
+
+Сверка перед релизом проактивных сообщений (спека §5.5, §10, §13):
+
+- ✅ **Явный opt-in зафиксирован.** Согласие берётся кнопкой после привязки,
+  момент фиксируется в `tg_bindings.tg_opt_in_at`. Без `tg_opt_in=true` бот не
+  инициирует сообщения (единый гейт `canReceiveBotMessages`).
+- ✅ **Отключение доступно в любой момент.** Команда `/stop` (opt-in выкл, связку
+  не рвёт) и отвязка `/api/telegram/unlink` (связку рвёт). В профиле — кнопки
+  «Отключить/Переподключить Telegram» и «Тихий режим».
+- ✅ **Данные цикла не покидают приложение и не попадают в текст.** Фаза читается
+  только как внутренний дефолт (`getPhaseEnergyHint`, read-only `rhythm_cycles`),
+  субъективный ответ приоритетнее; ни фаза, ни слово «цикл» в сообщениях не
+  появляются (проверяется тестами `checkin-copy.test.ts`, `recommend.test.ts`).
+- ✅ **Тихий режим.** `notification_prefs.quiet_mode` — короткие безэмодзи-тексты,
+  безлико на локскрине.
+- ✅ **Метрики без PII.** События (`tg_linked`, `tg_opt_in`, `checkin_sent`,
+  `checkin_answered`, `tg_unlinked`, `password_reset_sent`) шлют только
+  структурные свойства (enum ответа, причина, канал). Email/имя/тексты/токены/
+  chat_id в события и логи не попадают (`lib/track-server.ts`).
+- ⚠️ **Формулировка согласия — требует ревью юристом.** Текст в
+  `CONSENT_PROMPT`/`CONSENT_VERSION` (`lib/telegram/linking.ts`) нужно сверить с
+  privacy-политикой сайта (`components/legal/PrivacyContent.tsx`). Политику в коде
+  этой задачей не меняем.
+
 ## Заметки
 
 - **Шрифты.** Cormorant Garamond — через `next/font/google`. Geist/Geist Mono —

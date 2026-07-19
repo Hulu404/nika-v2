@@ -1,5 +1,6 @@
 import { InlineKeyboard } from "grammy";
 import { tgAdmin } from "./supabase";
+import { trackServer } from "../track-server";
 import type { BotContext } from "./bot";
 
 /**
@@ -113,6 +114,8 @@ export async function handleStartToken(ctx: BotContext, token: string): Promise<
   await admin.from("tg_link_tokens").update({ used_at: now }).eq("token", token);
   await admin.from("users").update({ telegram_id: String(chatId) }).eq("id", userId);
 
+  trackServer(userId, "tg_linked");
+
   // Приветствие + запрос согласия (opt-in). Без согласия бот сам не пишет.
   await ctx.reply("Готово, привязала этот чат к твоему аккаунту НИКИ.");
   await sendConsentRequest(ctx);
@@ -140,11 +143,15 @@ export async function handleOptIn(ctx: BotContext, yes: boolean): Promise<void> 
   if (chatId === undefined) return;
 
   const now = new Date().toISOString();
-  await admin
+  const { data: updated } = await admin
     .from("tg_bindings")
     .update({ tg_opt_in: yes, tg_opt_in_at: yes ? now : null })
     .eq("chat_id", chatId)
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .select("user_id");
+
+  const userId = (updated?.[0] as { user_id: string } | undefined)?.user_id;
+  if (yes && userId) trackServer(userId, "tg_opt_in");
 
   await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard() }).catch(() => {});
   await ctx.reply(
