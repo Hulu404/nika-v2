@@ -3,6 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { generatePushText } from "@/lib/push-generate";
 import type { PushTrigger } from "@/lib/push-generate";
 import type { Database } from "@/types/database";
+import { dubToTelegram } from "@/lib/telegram/dub";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -70,6 +71,7 @@ export async function GET(req: Request) {
   if (!subs?.length) return Response.json({ sent: 0 });
 
   let sent = 0;
+  let dubbed = 0; // сколько уведомлений продублировано в Telegram
   const errors: string[] = [];
 
   for (const sub of subs) {
@@ -157,6 +159,9 @@ export async function GET(req: Request) {
         .eq("user_id", sub.user_id);
 
       sent++;
+
+      // Пуш-дубль в Telegram (гейт opt-in внутри, ошибки изолированы).
+      if (await dubToTelegram(sub.user_id, `${title}\n${body}`)) dubbed++;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       if (msg.includes("410")) {
@@ -167,5 +172,5 @@ export async function GET(req: Request) {
     }
   }
 
-  return Response.json({ sent, errors: errors.length ? errors : undefined });
+  return Response.json({ sent, dubbed, errors: errors.length ? errors : undefined });
 }
