@@ -72,7 +72,7 @@ export function RhythmOnboarding({ userId, todayStr }: RhythmOnboardingProps) {
               min={minDate}
               max={todayStr}
               onChange={(e) => setDate(e.target.value)}
-              className="block h-12 w-full min-w-0 appearance-none rounded-[14px] border border-line-default bg-canvas px-4 text-center text-[15px] text-ink-primary outline-none transition-colors focus:border-accent [-webkit-appearance:none]"
+              className="block h-12 w-full min-w-0 appearance-none rounded-[14px] border border-line-default bg-canvas px-4 text-center text-[15px] text-ink-primary outline-none transition-colors focus:border-accent [-webkit-appearance:none] [&::-webkit-date-and-time-value]:text-center [&::-webkit-datetime-edit]:text-center [&::-webkit-datetime-edit-fields-wrapper]:justify-center"
             />
           </div>
 
