@@ -36,6 +36,13 @@
     <text x="600" y="630" font-family="Georgia,serif" font-style="italic" font-size="40" fill="#5C534A" text-anchor="middle">твой бег изнутри</text>
   </svg>
 </div>
+  <!-- Гарантированный путь на регистрацию, пока грузится/если не отрендерился
+       standalone-бандл (он клиентски компилирует React через Babel и заменяет
+       весь документ; на медленных/старых устройствах это может не сработать).
+       При успешном рендере бандл вызывает documentElement.replaceWith и эта
+       кнопка исчезает вместе со сплэшем. -->
+  <a id="__nika_cta_fallback" href="/auth"
+     style="position:fixed;left:50%;bottom:14%;transform:translateX(-50%);z-index:10001;background:#C8553D;color:#FAF7F1;font:600 16px/1 -apple-system,BlinkMacSystemFont,sans-serif;padding:16px 34px;border-radius:999px;text-decoration:none;box-shadow:0 6px 20px rgba(200,85,61,0.35);white-space:nowrap;">Начать&nbsp;→</a>
   <div id="__bundler_loading">Unpacking...</div>
 
   <script>
