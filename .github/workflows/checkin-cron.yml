@@ -1,0 +1,38 @@
+name: checkin-cron
+
+# Ежечасный планировщик утренних чек-инов Telegram-бота.
+# Крон дёргает /api/cron/checkins каждый час; сам эндпоинт решает, у кого сейчас
+# локальное утро (по таймзоне пользователя) и кому положено по частоте.
+# Переиспользует те же настройки репозитория, что и push-cron:
+#   • Variable  PUSH_CRON_URL  — базовый URL прода (https://www.mynika.online)
+#   • Secret    CRON_SECRET    — то же значение, что в переменных Railway
+
+on:
+  schedule:
+    - cron: "0 * * * *" # каждый час (UTC); «утро» фильтруется по tz внутри
+  workflow_dispatch: {}
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call /api/cron/checkins
+        env:
+          BASE_URL: ${{ vars.PUSH_CRON_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          if [ -z "$BASE_URL" ] || [ -z "$CRON_SECRET" ]; then
+            echo "::error::PUSH_CRON_URL (variable) и CRON_SECRET (secret) должны быть заданы в настройках репозитория."
+            exit 1
+          fi
+          response=$(curl -sS -w "\n%{http_code}" \
+            -H "x-cron-secret: $CRON_SECRET" \
+            "${BASE_URL%/}/api/cron/checkins")
+          body=$(echo "$response" | head -n -1)
+          code=$(echo "$response" | tail -n 1)
+          echo "HTTP $code"
+          echo "Response: $body"
+          if [ "$code" -lt 200 ] || [ "$code" -ge 300 ]; then
+            echo "::error::Крон чек-инов вернул $code"
+            exit 1
+          fi
