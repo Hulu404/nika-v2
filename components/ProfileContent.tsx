@@ -329,6 +329,8 @@ export function ProfileContent({
   // Подключение Telegram: минтим токен и открываем deep-link. Статус «Подключён»
   // проставится сам после того, как пользователь нажмёт Start в боте (при
   // следующей загрузке профиля). Если связка уже активна — сервер вернёт linked.
+  // Пока бот не запущен, кнопка показана как «soon» — обработчик припаркован.
+  void handleTelegramConnect;
   async function handleTelegramConnect() {
     if (telegramBusy) return;
     setTelegramBusy(true);
@@ -516,12 +518,8 @@ export function ProfileContent({
                   onClick={handleTelegramDisconnect}
                 />
               ) : (
-                <Row
-                  label={telegramBlocked ? "Переподключить Telegram" : "Подключить Telegram"}
-                  value={telegramBusy ? "…" : undefined}
-                  disabled={telegramBusy}
-                  onClick={handleTelegramConnect}
-                />
+                // Telegram-бот ещё не запущен — показываем как «скоро», без действия.
+                <Row label="Подключить Telegram" tag="soon" disabled />
               )}
               {telegramBlocked && (
                 <div className="px-4 pb-3 pt-1">
