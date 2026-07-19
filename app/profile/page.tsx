@@ -38,6 +38,16 @@ export default async function ProfilePage() {
     profileData = basic ? { ...basic, notif_time: null, notif_frequency: null } : null;
   }
 
+  // Активная Telegram-связка (для кнопки «Подключить/Отключить»). Таблица
+  // tg_bindings из миграции 019 может ещё не существовать — тогда просто false.
+  const bindingResult = await supabase
+    .from("tg_bindings")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("is_active", true)
+    .maybeSingle();
+  const telegramLinked = !bindingResult.error && bindingResult.data != null;
+
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
       <ProfileContent
@@ -50,6 +60,7 @@ export default async function ProfilePage() {
         initialProactive={profileData?.proactive ?? false}
         initialNotifTime={(profileData?.notif_time as string | null) ?? "08:00"}
         initialNotifFrequency={(profileData?.notif_frequency as string | null) ?? "daily"}
+        initialTelegramLinked={telegramLinked}
         createdAt={userData?.created_at ?? user.created_at ?? new Date().toISOString()}
       />
     </AppLayout>

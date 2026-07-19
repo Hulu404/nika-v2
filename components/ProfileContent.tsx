@@ -181,6 +181,7 @@ interface Props {
   initialProactive: boolean;
   initialNotifTime: string;
   initialNotifFrequency: string;
+  initialTelegramLinked: boolean;
   createdAt: string;
 }
 
@@ -196,6 +197,7 @@ export function ProfileContent({
   initialProactive,
   initialNotifTime,
   initialNotifFrequency,
+  initialTelegramLinked,
   createdAt,
 }: Props) {
   const router = useRouter();
@@ -212,6 +214,10 @@ export function ProfileContent({
   );
   const [notifSettingsSaving, setNotifSettingsSaving] = useState(false);
   const [dark, setDark]               = useState(false);
+
+  // Telegram-связка
+  const [telegramLinked, setTelegramLinked] = useState(initialTelegramLinked);
+  const [telegramBusy, setTelegramBusy]     = useState(false);
 
   // Name editing
   const [name, setName]         = useState(initialName);
@@ -308,6 +314,37 @@ export function ProfileContent({
     if (error) {
       console.error("[profile] notifications save failed:", error.message);
       setNotifOn(prev);
+    }
+  }
+
+  // Подключение Telegram: минтим токен и открываем deep-link. Статус «Подключён»
+  // проставится сам после того, как пользователь нажмёт Start в боте (при
+  // следующей загрузке профиля). Если связка уже активна — сервер вернёт linked.
+  async function handleTelegramConnect() {
+    if (telegramBusy) return;
+    setTelegramBusy(true);
+    try {
+      const res = await fetch("/api/telegram/link", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (data.linked) { setTelegramLinked(true); return; }
+      if (data.url) window.open(data.url, "_blank", "noopener,noreferrer");
+    } catch {
+      /* молча — пользователь может повторить */
+    } finally {
+      setTelegramBusy(false);
+    }
+  }
+
+  async function handleTelegramDisconnect() {
+    if (telegramBusy) return;
+    setTelegramBusy(true);
+    try {
+      const res = await fetch("/api/telegram/unlink", { method: "POST" });
+      if (res.ok) setTelegramLinked(false);
+    } catch {
+      /* молча */
+    } finally {
+      setTelegramBusy(false);
     }
   }
 
@@ -442,6 +479,22 @@ export function ProfileContent({
               )}
               <Row label="Род обращения"                   value={genderShort}     onClick={() => setActiveSheet("gender")} />
               <Row label="Имя — как ко мне обращаться"     value={name || "—"}     onClick={() => { setEditName(name); setActiveSheet("name"); }} />
+              {telegramLinked ? (
+                <Row
+                  label="Telegram подключён"
+                  value={telegramBusy ? "…" : "Отключить"}
+                  red
+                  disabled={telegramBusy}
+                  onClick={handleTelegramDisconnect}
+                />
+              ) : (
+                <Row
+                  label="Подключить Telegram"
+                  value={telegramBusy ? "…" : undefined}
+                  disabled={telegramBusy}
+                  onClick={handleTelegramConnect}
+                />
+              )}
             </Card>
           </div>
 

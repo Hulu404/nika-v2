@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "tsx watch src/bot.ts",
-    "start": "tsx src/bot.ts"
+    "dev": "node -e \"console.log('[deprecated] polling-бот ретайрнут. Прод: webhook в Next-приложении (/api/telegram/webhook). Локальный dev: npm run bot:dev в корне репозитория.')\"",
+    "start": "node -e \"console.log('[deprecated] polling-бот ретайрнут. Прод работает через webhook (/api/telegram/webhook). Этот процесс больше не поднимает бота.'); process.exit(0)\""
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",

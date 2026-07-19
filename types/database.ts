@@ -511,6 +511,126 @@ export interface Database {
         };
         Relationships: [];
       };
+      tg_link_tokens: {
+        Row: {
+          id: string;
+          token: string;
+          user_id: string;
+          created_at: string;
+          expires_at: string;
+          used_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          token: string;
+          user_id: string;
+          created_at?: string;
+          expires_at: string;
+          used_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          token?: string;
+          user_id?: string;
+          created_at?: string;
+          expires_at?: string;
+          used_at?: string | null;
+        };
+        Relationships: [];
+      };
+      tg_bindings: {
+        Row: {
+          id: string;
+          user_id: string;
+          chat_id: number;
+          tg_username: string | null;
+          first_name: string | null;
+          linked_at: string;
+          is_active: boolean;
+          unlinked_at: string | null;
+          unlink_reason: string | null;
+          tg_opt_in: boolean;
+          tg_opt_in_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          chat_id: number;
+          tg_username?: string | null;
+          first_name?: string | null;
+          linked_at?: string;
+          is_active?: boolean;
+          unlinked_at?: string | null;
+          unlink_reason?: string | null;
+          tg_opt_in?: boolean;
+          tg_opt_in_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          chat_id?: number;
+          tg_username?: string | null;
+          first_name?: string | null;
+          linked_at?: string;
+          is_active?: boolean;
+          unlinked_at?: string | null;
+          unlink_reason?: string | null;
+          tg_opt_in?: boolean;
+          tg_opt_in_at?: string | null;
+        };
+        Relationships: [];
+      };
+      checkins: {
+        Row: {
+          id: string;
+          user_id: string;
+          asked_at: string;
+          question_variant: string | null;
+          answer: "full" | "ok" | "tired" | "bad" | "skipped" | null;
+          answered_at: string | null;
+          source: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          asked_at?: string;
+          question_variant?: string | null;
+          answer?: "full" | "ok" | "tired" | "bad" | "skipped" | null;
+          answered_at?: string | null;
+          source?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          asked_at?: string;
+          question_variant?: string | null;
+          answer?: "full" | "ok" | "tired" | "bad" | "skipped" | null;
+          answered_at?: string | null;
+          source?: string;
+        };
+        Relationships: [];
+      };
+      notification_prefs: {
+        Row: {
+          user_id: string;
+          quiet_mode: boolean;
+          frequency: string;
+          timezone: string | null;
+        };
+        Insert: {
+          user_id: string;
+          quiet_mode?: boolean;
+          frequency?: string;
+          timezone?: string | null;
+        };
+        Update: {
+          user_id?: string;
+          quiet_mode?: boolean;
+          frequency?: string;
+          timezone?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -552,6 +672,10 @@ export type Subscription = Tables["subscriptions"]["Row"];
 export type SprintRow = Tables["sprints"]["Row"];
 export type RobokassaPayment = Tables["robokassa_payments"]["Row"];
 export type PersonalTipRow = Tables["personal_tips"]["Row"];
+export type TgLinkTokenRow = Tables["tg_link_tokens"]["Row"];
+export type TgBindingRow = Tables["tg_bindings"]["Row"];
+export type CheckinRow = Tables["checkins"]["Row"];
+export type NotificationPrefsRow = Tables["notification_prefs"]["Row"];
 
 /** Типы для вставки. */
 export type UserInsert = Tables["users"]["Insert"];

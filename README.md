@@ -39,6 +39,22 @@ types/              user, conversation, subscription
 
 Системные промпты — в `lib/prompts.ts`, метаданные для UI — в `lib/scenarios.ts`.
 
+## Telegram-бот
+
+Бот работает **через webhook внутри Next-приложения** (роут
+`app/api/telegram/webhook`), отдельного always-on polling-процесса больше нет.
+Композер бота (создание `Bot` + хендлеры) — в `lib/telegram/`, сессии grammY
+хранятся в БД (`tg_sessions`), а не в памяти.
+
+- **Установка вебхука** (один раз после деплоя):
+  `curl -H "x-cron-secret: $CRON_SECRET" https://<app>/api/telegram/set-webhook`
+- **Локальная разработка** (webhook недоступен без туннеля): `npm run bot:dev` —
+  поднимает тот же бот через long-polling.
+- **Env:** `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `NEXT_PUBLIC_APP_URL`,
+  `CRON_SECRET`, плюс Supabase service-role и `ANTHROPIC_API_KEY`.
+- Каталог `bot/` (старый polling) **ретайрнут** — его npm-скрипты выводят
+  предупреждение и не поднимают бота.
+
 ## Заметки
 
 - **Шрифты.** Cormorant Garamond — через `next/font/google`. Geist/Geist Mono —

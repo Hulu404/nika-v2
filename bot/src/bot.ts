@@ -1,3 +1,7 @@
+// ⚠️ РЕТАЙРНУТО. Этот polling-энтрипоинт больше не используется в проде.
+// Бот переведён на webhook внутри Next-приложения: композер — lib/telegram/bot.ts,
+// приём апдейтов — app/api/telegram/webhook, локальный dev — `npm run bot:dev`
+// в корне репозитория. Файл оставлен для истории.
 import "dotenv/config";
 import { Bot, InlineKeyboard, session, type Context, type SessionFlavor } from "grammy";
 import { config } from "./config";
