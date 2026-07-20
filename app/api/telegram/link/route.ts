@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createServerComponentClient } from "@/lib/supabase";
 import { createServiceRoleClient } from "@/lib/supabase-server";
+import { isTelegramAllowed } from "@/lib/telegram/allowlist";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,11 @@ export async function POST() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Тест-режим: привязка Telegram открыта только пользователям из allowlist.
+  if (!isTelegramAllowed(user.email)) {
+    return Response.json({ error: "Not available yet" }, { status: 403 });
+  }
 
   const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
   if (!botUsername) {

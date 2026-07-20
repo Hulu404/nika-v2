@@ -4,6 +4,7 @@ import { AppLayout } from "@/components/AppLayout";
 import { SidebarData } from "@/components/SidebarData";
 import { ProfileContent } from "@/components/ProfileContent";
 import { resolveIsPro } from "@/lib/subscription";
+import { isTelegramAllowed } from "@/lib/telegram/allowlist";
 
 export default async function ProfilePage() {
   const supabase = await createServerComponentClient();
@@ -67,12 +68,16 @@ export default async function ProfilePage() {
     .maybeSingle();
   const quietMode = !prefsResult.error && prefsResult.data?.quiet_mode === true;
 
+  // Тест-режим: подключение Telegram доступно только пользователям из allowlist.
+  const email = userData?.email ?? user.email ?? "";
+  const telegramAllowed = isTelegramAllowed(email);
+
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
       <ProfileContent
         userId={user.id}
         initialName={userData?.display_name ?? ""}
-        email={userData?.email ?? user.email ?? ""}
+        email={email}
         isPro={resolveIsPro(userData?.is_pro)}
         reminderEnabled={profileData?.reminder_enabled ?? false}
         initialGender={profileData?.gender ?? null}
@@ -81,6 +86,7 @@ export default async function ProfilePage() {
         initialNotifFrequency={(profileData?.notif_frequency as string | null) ?? "daily"}
         initialTelegramLinked={telegramLinked}
         initialTelegramBlocked={telegramBlocked}
+        initialTelegramAllowed={telegramAllowed}
         initialQuietMode={quietMode}
         createdAt={userData?.created_at ?? user.created_at ?? new Date().toISOString()}
       />

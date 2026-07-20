@@ -183,6 +183,7 @@ interface Props {
   initialNotifFrequency: string;
   initialTelegramLinked: boolean;
   initialTelegramBlocked: boolean;
+  initialTelegramAllowed: boolean;
   initialQuietMode: boolean;
   createdAt: string;
 }
@@ -201,6 +202,7 @@ export function ProfileContent({
   initialNotifFrequency,
   initialTelegramLinked,
   initialTelegramBlocked,
+  initialTelegramAllowed,
   initialQuietMode,
   createdAt,
 }: Props) {
@@ -329,8 +331,8 @@ export function ProfileContent({
   // Подключение Telegram: минтим токен и открываем deep-link. Статус «Подключён»
   // проставится сам после того, как пользователь нажмёт Start в боте (при
   // следующей загрузке профиля). Если связка уже активна — сервер вернёт linked.
-  // Пока бот не запущен, кнопка показана как «soon» — обработчик припаркован.
-  void handleTelegramConnect;
+  // Тест-режим: кнопка активна только для allowlist (initialTelegramAllowed),
+  // остальным показана как «soon». Серверный гейт — в /api/telegram/link.
   async function handleTelegramConnect() {
     if (telegramBusy) return;
     setTelegramBusy(true);
@@ -517,8 +519,16 @@ export function ProfileContent({
                   disabled={telegramBusy}
                   onClick={handleTelegramDisconnect}
                 />
+              ) : initialTelegramAllowed ? (
+                // Тест-режим: allowlist-пользователи могут подключить бота.
+                <Row
+                  label="Подключить Telegram"
+                  value={telegramBusy ? "…" : "Подключить"}
+                  disabled={telegramBusy}
+                  onClick={handleTelegramConnect}
+                />
               ) : (
-                // Telegram-бот ещё не запущен — показываем как «скоро», без действия.
+                // Остальным бот ещё «недоступен» — показываем как «скоро».
                 <Row label="Подключить Telegram" tag="soon" disabled />
               )}
               {telegramBlocked && (

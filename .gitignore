@@ -1,6 +1,5 @@
 # dependencies
 /node_modules
-bot/node_modules
 /.pnp
 .pnp.js
 
