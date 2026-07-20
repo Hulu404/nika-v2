@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@/lib/supabase";
 import { ARCHETYPES } from "@/lib/archetypes";
@@ -17,7 +17,7 @@ import {
   type SprintSummary,
 } from "@/lib/sprint";
 import { cn } from "@/lib/utils";
-import type { Sprint, WeeklyFocus } from "@/types/app";
+import type { Sprint, WeeklyFocus, SprintTip } from "@/types/app";
 import { INTENSITY_COLORS, tokenize, type WordFreq } from "@/lib/analytics";
 import { WordCloud } from "@/components/analytics/WordCloud";
 import { PatternCard } from "@/components/analytics/PatternCard";
@@ -345,6 +345,25 @@ export function SprintDashboard({ sprint: initialSprint, userId, sprintRhythm, w
     [sprint.goal_text, focus],
   );
 
+  // ── Персональные советы (гибрид: правила выбирают тему, LLM формулирует) ───────
+  // Кэшируются по неделе спринта (обновление на чек-ине недели). При ошибке/пустом
+  // ответе показываем статичные советы архетипа (arch.tips).
+  const [tips, setTips] = useState<SprintTip[] | null>(null);
+  const [tipsLoading, setTipsLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setTipsLoading(true);
+    fetch("/api/sprint/advice", { method: "POST" })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error("advice"))))
+      .then((d: { tips?: SprintTip[] }) => {
+        if (!cancelled && Array.isArray(d.tips) && d.tips.length > 0) setTips(d.tips);
+      })
+      .catch(() => { /* остаёмся на фолбэке arch.tips */ })
+      .finally(() => { if (!cancelled) setTipsLoading(false); });
+    return () => { cancelled = true; };
+  }, [week]);
+
   // ── Редактирование цели ──────────────────────────────────────────────────────
 
   const [editingGoal, setEditingGoal] = useState(false);
@@ -535,15 +554,32 @@ export function SprintDashboard({ sprint: initialSprint, userId, sprintRhythm, w
         </section>
       )}
 
-      {/* Советы архетипа */}
+      {/* Советы для тебя — персональные под цель/ориентиры/состояние; фолбэк на архетип */}
       <section>
         <SectionLabel>Советы для тебя</SectionLabel>
         <div className="flex flex-col gap-2">
-          {arch.tips.map((tip, i) => (
-            <Card key={i}>
-              <p className="text-[14px] leading-[1.5] text-ink-secondary">{tip}</p>
-            </Card>
-          ))}
+          {tips ? (
+            tips.map((t, i) => (
+              <Card key={i}>
+                <p className="text-[14px] leading-[1.5] text-ink-secondary">{t.text}</p>
+              </Card>
+            ))
+          ) : tipsLoading ? (
+            [0, 1].map((i) => (
+              <Card key={i}>
+                <div className="animate-pulse space-y-2">
+                  <div className="h-3 w-full rounded bg-line-subtle" />
+                  <div className="h-3 w-3/4 rounded bg-line-subtle" />
+                </div>
+              </Card>
+            ))
+          ) : (
+            arch.tips.map((tip, i) => (
+              <Card key={i}>
+                <p className="text-[14px] leading-[1.5] text-ink-secondary">{tip}</p>
+              </Card>
+            ))
+          )}
         </div>
       </section>
 

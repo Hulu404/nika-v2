@@ -15,6 +15,7 @@ import type {
   RunnerLevel,
   ScenarioType,
   SprintStatus,
+  SprintTip,
   SubscriptionPlan,
   SubscriptionStatus,
   TipCategory,
@@ -313,6 +314,30 @@ export interface Database {
           cycle_day?: number;
           advice_short?: string;
           advice_full?: string;
+        };
+        Relationships: [];
+      };
+      sprint_advice: {
+        Row: {
+          user_id: string;
+          sprint_id: string;
+          week_number: number;
+          tips: SprintTip[];
+          created_at: string;
+        };
+        Insert: {
+          user_id: string;
+          sprint_id: string;
+          week_number: number;
+          tips?: SprintTip[];
+          created_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          sprint_id?: string;
+          week_number?: number;
+          tips?: SprintTip[];
+          created_at?: string;
         };
         Relationships: [];
       };
