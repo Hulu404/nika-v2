@@ -531,6 +531,19 @@ export function ProfileContent({
                 // Остальным бот ещё «недоступен» — показываем как «скоро».
                 <Row label="Подключить Telegram" tag="soon" disabled />
               )}
+              {telegramLinked && (
+                // Плашка-подтверждение: аккаунт связан, напоминания идут в бот.
+                <div className="px-4 pb-3 pt-1">
+                  <div className="flex items-center gap-2 rounded-input bg-accent-soft px-3 py-2">
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden className="flex-shrink-0 text-accent">
+                      <path d="M3.5 8.5l3 3 6-7" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                    <p className="text-[12px] leading-[1.45] text-ink-secondary">
+                      Аккаунт привязан к Telegram — напоминания приходят в чат с ботом.
+                    </p>
+                  </div>
+                </div>
+              )}
               {telegramBlocked && (
                 <div className="px-4 pb-3 pt-1">
                   <p className="text-[12px] leading-[1.55] text-ink-faint">
