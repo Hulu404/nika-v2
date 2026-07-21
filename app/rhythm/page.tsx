@@ -14,6 +14,7 @@ import {
 } from "@/lib/rhythm/cycles";
 import { RhythmContent } from "@/components/rhythm/RhythmContent";
 import { RhythmOnboarding } from "@/components/rhythm/RhythmOnboarding";
+import { MorningAttribution } from "@/components/rhythm/MorningAttribution";
 
 function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
@@ -43,6 +44,7 @@ export default async function RhythmPage() {
   if (cycles.length === 0) {
     return (
       <AppLayout sidebarSlot={<SidebarData />}>
+        <MorningAttribution />
         <PageHeader title="Мой ритм" />
         <RhythmOnboarding userId={user.id} todayStr={today} />
       </AppLayout>
@@ -58,6 +60,7 @@ export default async function RhythmPage() {
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
+      <MorningAttribution />
       <PageHeader title="Мой ритм" />
       <RhythmContent
         userId={user.id}
