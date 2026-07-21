@@ -60,13 +60,30 @@ export default async function ProfilePage() {
     .maybeSingle();
   const telegramBlocked = !telegramLinked && !blockedResult.error && blockedResult.data != null;
 
-  // Тихий режим (notification_prefs может ещё не существовать — тогда false).
+  // Настройки уведомлений (notification_prefs). Читаем тихий режим + поля
+  // утреннего нуджа. Если новых колонок ещё нет (миграция 023) — фолбэк на quiet.
   const prefsResult = await supabase
     .from("notification_prefs")
-    .select("quiet_mode")
+    .select("quiet_mode, morning_enabled, morning_time, pause_until")
     .eq("user_id", user.id)
     .maybeSingle();
-  const quietMode = !prefsResult.error && prefsResult.data?.quiet_mode === true;
+  let prefsData:
+    | { quiet_mode?: boolean | null; morning_enabled?: boolean | null; morning_time?: string | null; pause_until?: string | null }
+    | null = prefsResult.error ? null : prefsResult.data;
+  if (prefsResult.error) {
+    const { data: basicPrefs } = await supabase
+      .from("notification_prefs")
+      .select("quiet_mode")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    prefsData = basicPrefs
+      ? { ...basicPrefs, morning_enabled: null, morning_time: null, pause_until: null }
+      : null;
+  }
+  const quietMode = prefsData?.quiet_mode === true;
+  const morningEnabled = prefsData?.morning_enabled ?? true; // дефолт вкл.
+  const morningTime = (prefsData?.morning_time as string | null)?.slice(0, 5) ?? "08:00";
+  const pauseUntil = (prefsData?.pause_until as string | null) ?? null;
 
   // Тест-режим: подключение Telegram доступно только пользователям из allowlist.
   const email = userData?.email ?? user.email ?? "";
@@ -88,6 +105,9 @@ export default async function ProfilePage() {
         initialTelegramBlocked={telegramBlocked}
         initialTelegramAllowed={telegramAllowed}
         initialQuietMode={quietMode}
+        initialMorningEnabled={morningEnabled}
+        initialMorningTime={morningTime}
+        initialPauseUntil={pauseUntil}
         createdAt={userData?.created_at ?? user.created_at ?? new Date().toISOString()}
       />
     </AppLayout>

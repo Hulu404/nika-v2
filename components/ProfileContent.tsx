@@ -17,7 +17,7 @@ import { OfertaContent } from "@/components/legal/OfertaContent";
 
 type NotifFrequency = "daily" | "every_other_day" | "weekdays" | "weekly" | "biweekly" | "monthly";
 type SheetId =
-  | "when" | "name" | "gender"
+  | "when" | "name" | "gender" | "morning" | "pause"
   | "export" | "delete" | "how" | "manifesto" | "support" | "terms"
   | "privacy" | "oferta"
   | null;
@@ -185,6 +185,9 @@ interface Props {
   initialTelegramBlocked: boolean;
   initialTelegramAllowed: boolean;
   initialQuietMode: boolean;
+  initialMorningEnabled: boolean;
+  initialMorningTime: string;
+  initialPauseUntil: string | null;
   createdAt: string;
 }
 
@@ -204,6 +207,9 @@ export function ProfileContent({
   initialTelegramBlocked,
   initialTelegramAllowed,
   initialQuietMode,
+  initialMorningEnabled,
+  initialMorningTime,
+  initialPauseUntil,
   createdAt,
 }: Props) {
   const router = useRouter();
@@ -229,6 +235,12 @@ export function ProfileContent({
   // Тихий режим
   const [quietMode, setQuietMode] = useState(initialQuietMode);
   const [quietSaving, setQuietSaving] = useState(false);
+
+  // Утренние сообщения (notification_prefs.morning_*)
+  const [morningEnabled, setMorningEnabled] = useState(initialMorningEnabled);
+  const [morningTime, setMorningTime]       = useState(initialMorningTime);
+  const [pauseUntil, setPauseUntil]         = useState<string | null>(initialPauseUntil);
+  const [morningBusy, setMorningBusy]       = useState(false);
 
   // Name editing
   const [name, setName]         = useState(initialName);
@@ -380,6 +392,66 @@ export function ProfileContent({
     }
   }
 
+  // Утренние сообщения: сохраняем в notification_prefs. Таймзону определяем
+  // молча через Intl и шлём вместе с любым изменением.
+  async function saveMorningPrefs(patch: Record<string, unknown>): Promise<boolean> {
+    try {
+      const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      const res = await fetch("/api/notifications/prefs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...patch, timezone }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async function handleMorningToggle(v: boolean) {
+    if (morningBusy) return;
+    setMorningBusy(true);
+    const prev = morningEnabled;
+    setMorningEnabled(v);
+    const ok = await saveMorningPrefs({ morning_enabled: v });
+    if (!ok) setMorningEnabled(prev);
+    setMorningBusy(false);
+  }
+
+  async function handleMorningTimeSave() {
+    if (morningBusy) return;
+    setMorningBusy(true);
+    await saveMorningPrefs({ morning_time: morningTime });
+    setMorningBusy(false);
+    closeSheet();
+  }
+
+  // pause_until = сегодня + N дней (локально). null снимает паузу.
+  async function setPauseDays(days: number) {
+    if (morningBusy) return;
+    setMorningBusy(true);
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    const ymd = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const prev = pauseUntil;
+    setPauseUntil(ymd);
+    const ok = await saveMorningPrefs({ pause_until: ymd });
+    if (!ok) setPauseUntil(prev);
+    setMorningBusy(false);
+    closeSheet();
+  }
+
+  async function clearPause() {
+    if (morningBusy) return;
+    setMorningBusy(true);
+    const prev = pauseUntil;
+    setPauseUntil(null);
+    const ok = await saveMorningPrefs({ pause_until: null });
+    if (!ok) setPauseUntil(prev);
+    setMorningBusy(false);
+    closeSheet();
+  }
+
   function handleDarkToggle(v: boolean) {
     setDark(v);
     document.documentElement.classList.toggle("dark", v);
@@ -408,6 +480,14 @@ export function ProfileContent({
 
   // Derived labels
   const notifTimeShort  = notifOn ? `${notifTime} · ${FREQUENCY_OPTIONS.find(o => o.v === notifFrequency)?.label ?? ""}` : "Выкл.";
+
+  // Пауза активна, пока pause_until >= сегодня (локально).
+  const todayYmd = (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })();
+  const pauseActive = pauseUntil != null && pauseUntil >= todayYmd;
+  const pauseLabel = pauseActive ? `до ${pauseUntil!.slice(8, 10)}.${pauseUntil!.slice(5, 7)}` : "Нет";
   const genderShort     = GENDER_OPTIONS.find(o => o.v === gender)?.short ?? "—";
 
   // ─────────────────────────────────────────────────────────────────────────────
@@ -551,6 +631,20 @@ export function ProfileContent({
                   </p>
                 </div>
               )}
+              {telegramLinked && (
+                <>
+                  <Row
+                    label="Утренние сообщения от Ники"
+                    rightEl={<Toggle on={morningEnabled} onChange={handleMorningToggle} />}
+                  />
+                  {morningEnabled && (
+                    <>
+                      <Row label="Когда написать утром" value={morningTime} onClick={() => setActiveSheet("morning")} />
+                      <Row label="Пауза" value={pauseLabel} onClick={() => setActiveSheet("pause")} />
+                    </>
+                  )}
+                </>
+              )}
               <Row
                 label="Тихий режим"
                 rightEl={<Toggle on={quietMode} onChange={handleQuietToggle} />}
@@ -680,6 +774,69 @@ export function ProfileContent({
           >
             Сохранить
           </button>
+        </div>
+      </BottomSheet>
+
+      {/* Когда написать утром */}
+      <BottomSheet isOpen={activeSheet === "morning"} onClose={closeSheet} title="Когда написать утром">
+        <div className="flex flex-col gap-4">
+          <p className="text-[13px] leading-[1.5] text-ink-secondary">
+            Напишу примерно в это время — тёплое «доброе утро», без будильника и давления.
+          </p>
+          <div>
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-ink-muted">
+              Время
+            </p>
+            <input
+              type="time"
+              value={morningTime}
+              onChange={(e) => setMorningTime(e.target.value)}
+              className="w-full rounded-[14px] border border-line-default bg-canvas px-4 py-2.5 text-center text-[15px] text-ink-primary outline-none transition-colors focus:border-accent"
+            />
+          </div>
+          <button
+            onClick={handleMorningTimeSave}
+            disabled={morningBusy}
+            className="mt-1 w-full rounded-full bg-accent py-3.5 text-[15px] font-semibold text-white disabled:opacity-40"
+          >
+            Сохранить
+          </button>
+        </div>
+      </BottomSheet>
+
+      {/* Пауза */}
+      <BottomSheet isOpen={activeSheet === "pause"} onClose={closeSheet} title="Отдохнуть от сообщений">
+        <div className="flex flex-col gap-4">
+          <p className="text-[13px] leading-[1.5] text-ink-secondary">
+            {pauseActive
+              ? `Утренние сообщения на паузе ${pauseLabel}. Можно вернуть в любой момент.`
+              : "Иногда нужна тишина — это нормально. Выбери, на сколько сделать паузу, и я не буду писать по утрам."}
+          </p>
+          <div className="flex flex-col gap-2">
+            <button
+              onClick={() => setPauseDays(3)}
+              disabled={morningBusy}
+              className="rounded-[14px] border border-line-default bg-canvas px-4 py-3.5 text-left text-[15px] font-medium text-ink-primary transition-colors hover:border-line-strong disabled:opacity-40"
+            >
+              Отдохнуть 3 дня
+            </button>
+            <button
+              onClick={() => setPauseDays(7)}
+              disabled={morningBusy}
+              className="rounded-[14px] border border-line-default bg-canvas px-4 py-3.5 text-left text-[15px] font-medium text-ink-primary transition-colors hover:border-line-strong disabled:opacity-40"
+            >
+              Отдохнуть 7 дней
+            </button>
+            {pauseActive && (
+              <button
+                onClick={clearPause}
+                disabled={morningBusy}
+                className="rounded-[14px] px-4 py-3.5 text-left text-[15px] font-medium text-accent transition-colors hover:bg-surface-warm disabled:opacity-40"
+              >
+                Снять паузу
+              </button>
+            )}
+          </div>
         </div>
       </BottomSheet>
 
