@@ -6,7 +6,6 @@ import {
   findActiveBinding,
   sendConsentRequest,
 } from "./linking";
-import { handleCheckinAnswer } from "./checkin";
 import { handleResetCommand } from "./reset";
 import { siteKeyboard } from "./cta";
 
@@ -84,7 +83,10 @@ function registerHandlers(bot: Bot<BotContext>): void {
 
   // ── Инлайн-ответы уведомлений ───────────────────────────────────────────────
   bot.callbackQuery(/^optin_(yes|no)$/, (ctx) => handleOptIn(ctx, ctx.match[1] === "yes"));
-  bot.callbackQuery(/^ans_/, (ctx) => handleCheckinAnswer(ctx, ctx.callbackQuery.data ?? ""));
+  // pure-push: интерактивного чек-ина больше нет. Хендлер оставлен пустым
+  // «ловцом» — на случай устаревших сообщений с кнопками ans_* в проде: мягко
+  // гасим «часик», НИЧЕГО не пишем (никаких answer/answered_at из Telegram).
+  bot.callbackQuery(/^ans_/, (ctx) => ctx.answerCallbackQuery().catch(() => {}));
 
   // ── Любой прочий ввод: это не чат-бот — коротко уводим на сайт ───────────────
   bot.on("message", async (ctx) => {
