@@ -108,7 +108,11 @@ export default function AuthPage() {
       }
       // Жёсткий переход: полная перезагрузка гарантирует, что сервер увидит
       // свежий cookie сессии (мягкая навигация ловит гонку и кидает на /auth).
-      window.location.assign("/day1");
+      // Уважаем ?next (напр. /rhythm?src=tg_morning от клика по нуджу) — только
+      // локальный путь, защита от open-redirect. Иначе — дефолт /day1.
+      const nextParam = new URLSearchParams(window.location.search).get("next");
+      const safeNext = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : null;
+      window.location.assign(safeNext ?? "/day1");
       return;
     }
 

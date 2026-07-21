@@ -126,9 +126,10 @@ export async function middleware(request: NextRequest) {
       pathname === "/onboarding"
     ) {
       const url = request.nextUrl.clone();
+      const original = pathname + request.nextUrl.search; // сохраняем query (напр. ?src=tg_morning)
       url.pathname = "/auth";
       url.search = "";
-      url.searchParams.set("next", pathname);
+      url.searchParams.set("next", original);
       return redirect(url);
     }
     return response;
