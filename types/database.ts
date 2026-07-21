@@ -641,18 +641,66 @@ export interface Database {
           quiet_mode: boolean;
           frequency: string;
           timezone: string | null;
+          morning_enabled: boolean;
+          morning_time: string;
+          pause_until: string | null;
+          quiet_hours: Json | null;
         };
         Insert: {
           user_id: string;
           quiet_mode?: boolean;
           frequency?: string;
           timezone?: string | null;
+          morning_enabled?: boolean;
+          morning_time?: string;
+          pause_until?: string | null;
+          quiet_hours?: Json | null;
         };
         Update: {
           user_id?: string;
           quiet_mode?: boolean;
           frequency?: string;
           timezone?: string | null;
+          morning_enabled?: boolean;
+          morning_time?: string;
+          pause_until?: string | null;
+          quiet_hours?: Json | null;
+        };
+        Relationships: [];
+      };
+      notifications_log: {
+        Row: {
+          id: string;
+          user_id: string;
+          type: string;
+          local_date: string;
+          question_variant: string | null;
+          sent_at: string | null;
+          status: "sent" | "failed" | "skipped_dedup" | "skipped_prefs";
+          error: string | null;
+          clicked_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          type?: string;
+          local_date: string;
+          question_variant?: string | null;
+          sent_at?: string | null;
+          status: "sent" | "failed" | "skipped_dedup" | "skipped_prefs";
+          error?: string | null;
+          clicked_at?: string | null;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          type?: string;
+          local_date?: string;
+          question_variant?: string | null;
+          sent_at?: string | null;
+          status?: "sent" | "failed" | "skipped_dedup" | "skipped_prefs";
+          error?: string | null;
+          clicked_at?: string | null;
         };
         Relationships: [];
       };
@@ -701,6 +749,8 @@ export type TgLinkTokenRow = Tables["tg_link_tokens"]["Row"];
 export type TgBindingRow = Tables["tg_bindings"]["Row"];
 export type CheckinRow = Tables["checkins"]["Row"];
 export type NotificationPrefsRow = Tables["notification_prefs"]["Row"];
+export type NotificationsLogRow = Tables["notifications_log"]["Row"];
+export type NotificationsLogInsert = Tables["notifications_log"]["Insert"];
 
 /** Типы для вставки. */
 export type UserInsert = Tables["users"]["Insert"];
