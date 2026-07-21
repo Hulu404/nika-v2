@@ -30,6 +30,16 @@ const MORNING_TYPE = "morning";
 /** local_date окно ~40ч назад — хватает, чтобы поймать «сегодня» в любой tz. */
 const CHECKIN_LOOKBACK_MS = 40 * 60 * 60 * 1000;
 
+/**
+ * Троттлинг под лимиты Telegram (~1 msg/sec на чат, ~30/sec суммарно). Шлём
+ * последовательно с паузой — не залпом. Порция за тик ограничена MAX_SENDS_PER_TICK,
+ * остаток разошлётся следующими тиками (окно «пора» — grace, дедуп — слот).
+ */
+const THROTTLE_MS = 1100;
+const MAX_SENDS_PER_TICK = 25; // держим тик заметно ниже maxDuration=60s
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 type PrefsRow = {
   user_id: string;
   timezone: string | null;
@@ -106,9 +116,12 @@ export async function GET(req: Request) {
     candidates: recipients.length,
     due: 0, // прошли окно «пора»
     sent: 0,
-    failed: 0,
+    failed: 0, // прочие ошибки доставки (не 403/429)
+    blocked: 0, // 403 — связка погашена, повторно не шлём
     skipped_dedup: 0,
     skipped_prefs: 0,
+    deferred: 0, // отложены на следующий тик (лимит порции или 429-бэкофф)
+    throttled: false, // тик прерван бэтч-лимитом или 429
   };
   const preview: { user_id: string; outcome: string; variant?: string }[] = [];
 
@@ -122,76 +135,114 @@ export async function GET(req: Request) {
     for (const p of (prefsRows ?? []) as PrefsRow[]) prefsByUser.set(p.user_id, p);
   }
 
+  let sends = 0; // фактические отправки в этом тике (бэтч-лимит + троттлинг)
+  let stop = false; // 429-бэкофф: прекращаем тик, остаток — на следующий
   for (const r of recipients) {
-    const prefs = prefsByUser.get(r.user_id);
-    const tz = validTimezone(prefs?.timezone);
-    const { hour, minuteOfDay, ymd } = localParts(tz, now);
-    const morningTime = prefs?.morning_time ?? "08:00";
+    // Изоляция: сбой (БД/сеть) по одному получателю не должен ронять весь тик.
+    try {
+      const prefs = prefsByUser.get(r.user_id);
+      const tz = validTimezone(prefs?.timezone);
+      const { hour, minuteOfDay, ymd } = localParts(tz, now);
+      const morningTime = prefs?.morning_time ?? "08:00";
 
-    // Не «утро» этой пользовательницы прямо сейчас → тихо пропускаем (без лога).
-    if (!isPora(minuteOfDay, morningTime)) continue;
-    summary.due++;
+      // Не «утро» этой пользовательницы прямо сейчас → тихо пропускаем (без лога).
+      if (!isPora(minuteOfDay, morningTime)) continue;
+      summary.due++;
 
-    // Проверки по порядку; первая непройденная задаёт статус.
-    const morningEnabled = prefs?.morning_enabled !== false; // дефолт true
-    let outcome: "skipped_prefs" | "skipped_dedup" | "send";
-    if (!morningEnabled) outcome = "skipped_prefs";
-    else if (isPaused(prefs?.pause_until, ymd)) outcome = "skipped_prefs";
-    else if (isQuiet(hour, minuteOfDay, prefs?.quiet_hours)) outcome = "skipped_prefs";
-    else if (await hasCheckinToday(admin, r.user_id, tz, ymd, now)) outcome = "skipped_dedup";
-    else outcome = "send";
+      // Проверки по порядку; первая непройденная задаёт статус.
+      const morningEnabled = prefs?.morning_enabled !== false; // дефолт true
+      let outcome: "skipped_prefs" | "skipped_dedup" | "send";
+      if (!morningEnabled) outcome = "skipped_prefs";
+      else if (isPaused(prefs?.pause_until, ymd)) outcome = "skipped_prefs";
+      else if (isQuiet(hour, minuteOfDay, prefs?.quiet_hours)) outcome = "skipped_prefs";
+      else if (await hasCheckinToday(admin, r.user_id, tz, ymd, now)) outcome = "skipped_dedup";
+      else outcome = "send";
 
-    if (dryRun) {
-      const variant =
-        outcome === "send"
-          ? buildMorningMessage(r.user_id, await lastVariant(admin, r.user_id)).variant
-          : undefined;
-      preview.push({ user_id: r.user_id, outcome, variant });
-      if (outcome === "send") summary.sent++;
-      else summary[outcome]++;
-      continue;
-    }
+      if (dryRun) {
+        const variant =
+          outcome === "send"
+            ? buildMorningMessage(r.user_id, await lastVariant(admin, r.user_id)).variant
+            : undefined;
+        preview.push({ user_id: r.user_id, outcome, variant });
+        if (outcome === "send") summary.sent++;
+        else summary[outcome]++;
+        continue;
+      }
 
-    // Пропуски: занимаем слот статусом (идемпотентно), не шлём.
-    if (outcome !== "send") {
-      await admin
+      // Пропуски: занимаем слот статусом (идемпотентно), не шлём.
+      if (outcome !== "send") {
+        await admin
+          .from("notifications_log")
+          .upsert(
+            { user_id: r.user_id, type: MORNING_TYPE, local_date: ymd, status: outcome },
+            { onConflict: "user_id,type,local_date", ignoreDuplicates: true },
+          );
+        summary[outcome]++;
+        continue;
+      }
+
+      // Бэтч-лимит порции: остаток НЕ слотим — подхватят следующие тики (окно grace).
+      if (sends >= MAX_SENDS_PER_TICK) {
+        summary.deferred++;
+        summary.throttled = true;
+        continue;
+      }
+
+      // Отправка: слот-инсерт 'sent' on conflict do nothing returning id.
+      const { data: slot } = await admin
         .from("notifications_log")
         .upsert(
-          { user_id: r.user_id, type: MORNING_TYPE, local_date: ymd, status: outcome },
+          { user_id: r.user_id, type: MORNING_TYPE, local_date: ymd, status: "sent" },
           { onConflict: "user_id,type,local_date", ignoreDuplicates: true },
-        );
-      summary[outcome]++;
-      continue;
-    }
+        )
+        .select("id");
+      // Нет returning-строки → сегодня уже отправлено/в работе другим тиком.
+      if (!slot || slot.length === 0) continue;
+      const rowId = (slot[0] as { id: string }).id;
 
-    // Отправка: слот-инсерт 'sent' on conflict do nothing returning id.
-    const { data: slot } = await admin
-      .from("notifications_log")
-      .upsert(
-        { user_id: r.user_id, type: MORNING_TYPE, local_date: ymd, status: "sent" },
-        { onConflict: "user_id,type,local_date", ignoreDuplicates: true },
-      )
-      .select("id");
-    // Нет returning-строки → сегодня уже отправлено/в работе другим тиком.
-    if (!slot || slot.length === 0) continue;
-    const rowId = (slot[0] as { id: string }).id;
+      const lv = await lastVariant(admin, r.user_id);
+      const msg = buildMorningMessage(r.user_id, lv);
+      const res = await sendBotMessage(r.chat_id, msg.text, toKeyboard(msg.reply_markup));
+      sends++;
 
-    const lv = await lastVariant(admin, r.user_id);
-    const msg = buildMorningMessage(r.user_id, lv);
-    const res = await sendBotMessage(r.chat_id, msg.text, toKeyboard(msg.reply_markup));
-
-    if (res.ok) {
-      await admin
-        .from("notifications_log")
-        .update({ sent_at: new Date().toISOString(), question_variant: msg.variant, status: "sent" })
-        .eq("id", rowId);
-      summary.sent++;
-    } else {
-      // Обработку конкретных ошибок доставки доводит Промт 5; тут — код в лог.
-      const err = res.blocked ? "403" : res.retryAfter != null ? `429:${res.retryAfter}` : "send_failed";
-      await admin.from("notifications_log").update({ status: "failed", error: err }).eq("id", rowId);
+      if (res.ok) {
+        await admin
+          .from("notifications_log")
+          .update({ sent_at: new Date().toISOString(), question_variant: msg.variant, status: "sent" })
+          .eq("id", rowId);
+        summary.sent++;
+      } else if (res.retryAfter != null) {
+        // 429 (rate limit) — ВРЕМЕННО. Освобождаем слот (удаляем строку), чтобы
+        // следующий тик повторил, и прекращаем долбить в текущем тике (бэкофф).
+        await admin.from("notifications_log").delete().eq("id", rowId);
+        summary.deferred++;
+        summary.throttled = true;
+        stop = true;
+      } else if (res.blocked) {
+        // 403 — бот заблокирован. Связка уже погашена в транспорте
+        // (is_active=false, unlink_reason='blocked'). Фиксируем в логе, больше не шлём.
+        // TODO(UI): предложить переподключить — хук telegramBlocked в ProfileContent.
+        await admin
+          .from("notifications_log")
+          .update({ status: "failed", error: "blocked" })
+          .eq("id", rowId);
+        summary.blocked++;
+      } else {
+        // Прочие ошибки: фиксируем без чувствительного содержимого, без ретрая сегодня.
+        await admin
+          .from("notifications_log")
+          .update({ status: "failed", error: "send_failed" })
+          .eq("id", rowId);
+        summary.failed++;
+      }
+    } catch (err) {
+      // Один сбой не роняет тик — код в консоль (без тела/chat_id), идём дальше.
+      console.error("[morning-cron] recipient failed:", err instanceof Error ? err.message : String(err));
       summary.failed++;
     }
+
+    await sleep(THROTTLE_MS); // троттлинг ~1 msg/sec
+    if (stop) break; // 429-бэкофф
   }
 
   return Response.json(dryRun ? { ...summary, preview } : summary);

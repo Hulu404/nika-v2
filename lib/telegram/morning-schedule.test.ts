@@ -5,7 +5,7 @@ import {
   isNightHour,
   isQuiet,
   isPaused,
-  MORNING_CRON_STEP_MIN,
+  MORNING_WINDOW_MIN,
 } from "./morning-schedule";
 
 describe("parseHhmm", () => {
@@ -21,13 +21,18 @@ describe("parseHhmm", () => {
   });
 });
 
-describe("isPora — окно [morning_time, +шаг)", () => {
-  it("в окне (начало и внутри), вне окна", () => {
+describe("isPora — окно [morning_time, +grace)", () => {
+  it("в окне (начало и внутри grace), вне окна", () => {
     expect(isPora(480, "08:00")).toBe(true); // ровно 08:00
-    expect(isPora(480 + MORNING_CRON_STEP_MIN - 1, "08:00")).toBe(true); // 08:14
-    expect(isPora(480 + MORNING_CRON_STEP_MIN, "08:00")).toBe(false); // 08:15 — уже вне
-    expect(isPora(479, "08:00")).toBe(false); // 07:59
-    expect(isPora(600, "08:00")).toBe(false); // 10:00
+    expect(isPora(480 + MORNING_WINDOW_MIN - 1, "08:00")).toBe(true); // конец окна − 1 мин
+    expect(isPora(480 + MORNING_WINDOW_MIN, "08:00")).toBe(false); // ровно граница — уже вне
+    expect(isPora(479, "08:00")).toBe(false); // 07:59 — рано
+    expect(isPora(480 + MORNING_WINDOW_MIN + 60, "08:00")).toBe(false); // сильно позже
+  });
+
+  it("отложенный получатель остаётся «пора» на следующих тиках (батчинг)", () => {
+    // 08:00 morning_time, тик через 30 мин (08:30) — всё ещё в окне.
+    expect(isPora(510, "08:00")).toBe(true);
   });
 });
 

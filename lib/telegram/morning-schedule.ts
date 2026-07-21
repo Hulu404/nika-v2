@@ -4,8 +4,16 @@
  * Локальная дата/минуты берутся из lib/telegram/schedule (localParts/localDate).
  */
 
-/** Шаг крона: Vercel дёргает эндпоинт раз в 15 мин (см. vercel.json). */
+/** Шаг крона: планировщик дёргает эндпоинт раз в ~15 мин (см. vercel.json). */
 export const MORNING_CRON_STEP_MIN = 15;
+
+/**
+ * Окно «пора» шире одного тика — grace-период. Нужно для батчинга: если тик
+ * упёрся в лимит Telegram или в MAX_SENDS_PER_TICK, недоотправленные получатели
+ * ОСТАЮТСЯ в окне и подхватываются следующими тиками (дедуп — слот в
+ * notifications_log, повторно не шлём). Также страховка от пропущенного тика.
+ */
+export const MORNING_WINDOW_MIN = 90;
 
 /** Жёсткая защита от ночи: не шлём с 22:00 до 06:00 даже при сдвинутом morning_time. */
 export const NIGHT_START_HOUR = 22;
@@ -21,16 +29,18 @@ export function parseHhmm(t: string | null | undefined): number {
 }
 
 /**
- * «Пора»: локальное время попало в окно [morning_time, morning_time + шаг_крона).
- * Так каждая пользовательница проходит ровно один тик в день.
+ * «Пора»: локальное время попало в окно [morning_time, morning_time + окно).
+ * Окно = grace-период (MORNING_WINDOW_MIN), а не один тик, чтобы отложенные из-за
+ * троттлинга/лимита получатели подхватывались следующими тиками. Дедуп по слоту
+ * notifications_log гарантирует ровно один нудж в день.
  */
 export function isPora(
   minuteOfDay: number,
   morningTime: string | null | undefined,
-  stepMin: number = MORNING_CRON_STEP_MIN,
+  windowMin: number = MORNING_WINDOW_MIN,
 ): boolean {
   const start = parseHhmm(morningTime);
-  return minuteOfDay >= start && minuteOfDay < start + stepMin;
+  return minuteOfDay >= start && minuteOfDay < start + windowMin;
 }
 
 /** Ночь по жёсткой защите (22:00–06:00). */
