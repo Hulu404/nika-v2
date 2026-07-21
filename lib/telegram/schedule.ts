@@ -63,11 +63,14 @@ export function validTimezone(tz: string | null | undefined): string {
   }
 }
 
-/** Локальные час / день недели / дата (YYYY-MM-DD) в заданной таймзоне. */
+/**
+ * Локальные час / минута / день недели / дата (YYYY-MM-DD) в заданной таймзоне.
+ * `minuteOfDay` = hour*60+minute — удобно для окна утреннего нуджа.
+ */
 export function localParts(
   tz: string,
   now: Date = new Date(),
-): { hour: number; weekday: number; ymd: string } {
+): { hour: number; minute: number; minuteOfDay: number; weekday: number; ymd: string } {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone: tz,
     hour12: false,
@@ -76,10 +79,21 @@ export function localParts(
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
+    minute: "2-digit",
   }).formatToParts(now);
   const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
   const hour = parseInt(get("hour"), 10) % 24; // "24" в полночь → 0
+  const minute = parseInt(get("minute"), 10) || 0;
   const weekday = WEEKDAY_INDEX[get("weekday")] ?? 0;
   const ymd = `${get("year")}-${get("month")}-${get("day")}`;
-  return { hour, weekday, ymd };
+  return { hour, minute, minuteOfDay: hour * 60 + minute, weekday, ymd };
+}
+
+/**
+ * Локальная дата (YYYY-MM-DD) пользователя в его таймзоне. ЕДИНЫЙ хелпер для
+ * дедупа/идемпотентности нуджа: local_date считаем в tz пользователя, не в UTC
+ * сервера, иначе на границе суток дедуп и слот-инсерт поедут.
+ */
+export function localDate(tz: string, now: Date = new Date()): string {
+  return localParts(tz, now).ymd;
 }

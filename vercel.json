@@ -3,6 +3,10 @@
     {
       "path": "/api/push/send",
       "schedule": "0 5,14 * * *"
+    },
+    {
+      "path": "/api/telegram/notifications/morning",
+      "schedule": "*/15 * * * *"
     }
   ]
 }
