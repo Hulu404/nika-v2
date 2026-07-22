@@ -132,7 +132,9 @@ export function BottomNav({ gender, cycle }: { gender?: string | null; cycle?: s
 
   return (
     <nav className={cn(
-      "lg:hidden fixed bottom-0 inset-x-0 z-50 bg-[var(--bg-blur-strong)] backdrop-blur-[20px] border-t border-line-subtle pb-safe",
+      // Сплошной фон без backdrop-blur: на iOS blur на fixed-элементе при скролле
+      // «размазывается» вверх полупрозрачной тёмной панелью. Фон и так был 95%.
+      "lg:hidden fixed bottom-0 inset-x-0 z-50 bg-[var(--bg-primary)] border-t border-line-subtle pb-safe",
       typing && "hidden",
     )}>
       <div className="flex items-stretch px-1 pt-1.5 pb-2">
