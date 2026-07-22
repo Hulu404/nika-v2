@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
@@ -99,12 +100,41 @@ function buildTabs(rhythm: boolean): Tab[] {
   return [TAB_HOME, TAB_CHAT, ...middle, TAB_JOURNAL, TAB_TIPS];
 }
 
+/** Является ли элемент текстовым полем (открывает клавиатуру). */
+function isTextField(el: EventTarget | null): boolean {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.isContentEditable || el.tagName === "TEXTAREA") return true;
+  if (el.tagName !== "INPUT") return false;
+  const t = (el as HTMLInputElement).type;
+  return !["button", "submit", "reset", "checkbox", "radio", "range", "file", "color", "image"].includes(t);
+}
+
 export function BottomNav({ gender, cycle }: { gender?: string | null; cycle?: string | null }) {
   const pathname = usePathname();
   const tabs = buildTabs(showRhythm(gender, cycle));
 
+  // Прячем нижнюю навигацию, пока в фокусе текстовое поле (открыта клавиатура):
+  // на iOS fixed+backdrop-blur панель иначе всплывает над контентом при вводе.
+  const [typing, setTyping] = useState(false);
+  useEffect(() => {
+    const onFocusIn = (e: FocusEvent) => { if (isTextField(e.target)) setTyping(true); };
+    const onFocusOut = () => {
+      // Отложенно: при переходе между полями focusout→focusin не мигаем.
+      setTimeout(() => { if (!isTextField(document.activeElement)) setTyping(false); }, 0);
+    };
+    document.addEventListener("focusin", onFocusIn);
+    document.addEventListener("focusout", onFocusOut);
+    return () => {
+      document.removeEventListener("focusin", onFocusIn);
+      document.removeEventListener("focusout", onFocusOut);
+    };
+  }, []);
+
   return (
-    <nav className="lg:hidden fixed bottom-0 inset-x-0 z-50 bg-[var(--bg-blur-strong)] backdrop-blur-[20px] border-t border-line-subtle pb-safe">
+    <nav className={cn(
+      "lg:hidden fixed bottom-0 inset-x-0 z-50 bg-[var(--bg-blur-strong)] backdrop-blur-[20px] border-t border-line-subtle pb-safe",
+      typing && "hidden",
+    )}>
       <div className="flex items-stretch px-1 pt-1.5 pb-2">
         {tabs.map(({ href, label, icon, isActive }) => {
           const active = isActive(pathname);

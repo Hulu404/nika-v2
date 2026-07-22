@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
 import { Fraunces } from "next/font/google";
 import { GeistSans } from "geist/font/sans";
@@ -22,6 +22,18 @@ const serif = Fraunces({
 export const metadata: Metadata = {
   title: "НИКА — ментальный ассистент для бегунов",
   description: "НИКА помогает бегунам-любителям не бросить бег. Тёплый собеседник, а не тренер.",
+};
+
+// maximum-scale=1 / user-scalable=false — гасит iOS-авто-зум при фокусе на
+// input/textarea с шрифтом < 16px (наш дизайн намеренно мельче). Заодно снимает
+// артефакт «замороженной» backdrop-blur панели (BottomNav) при этом зуме.
+// На iOS ручной pinch-zoom по-прежнему доступен (система игнорирует запрет ради
+// доступности); на Android — компромисс ради стабильного ввода в PWA.
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 // Скрипт запускается до рендера — предотвращает мигание при смене темы.
