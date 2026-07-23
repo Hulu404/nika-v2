@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@/lib/supabase";
@@ -89,6 +89,7 @@ export function RhythmContent({
     () => new Set(initialCheckin?.tags ?? []),
   );
   const [note, setNote] = useState(initialCheckin?.note ?? "");
+  const noteRef = useRef<HTMLTextAreaElement>(null);
   const [checkinSaving, setCheckinSaving] = useState(false);
   const [checkinSaved, setCheckinSaved] = useState(false);
   const [checkinError, setCheckinError] = useState<string | null>(null);
@@ -102,6 +103,9 @@ export function RhythmContent({
     });
 
   const saveCheckin = useCallback(async () => {
+    // Снимаем фокус с поля — закрываем клавиатуру и её системную панель
+    // навигации (↑↓✓), чтобы она не «зависала» над контентом после ввода.
+    noteRef.current?.blur();
     setCheckinSaving(true);
     setCheckinError(null);
     const { error } = await supabase.from("rhythm_checkins").upsert(
@@ -309,10 +313,12 @@ export function RhythmContent({
         ))}
       </div>
       <textarea
+        ref={noteRef}
         value={note}
         onChange={(e) => setNote(e.target.value)}
         placeholder="Пара слов, если хочется"
         rows={2}
+        enterKeyHint="done"
         className="mb-3 w-full resize-none rounded-[14px] border border-line-default bg-canvas px-3.5 py-2.5 text-[13.5px] leading-[1.5] text-ink-primary placeholder:text-ink-faint outline-none transition-colors focus:border-accent"
       />
       {checkinError && <p className="mb-2 text-[12px] text-accent">{checkinError}</p>}
