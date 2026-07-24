@@ -1,17 +1,33 @@
 "use client";
 
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { useAutoResizeTextarea } from "@/hooks/useAutoResizeTextarea";
 
 export function ChatInput({
   onSend,
   disabled,
+  restore,
 }: {
   onSend: (text: string) => void;
   disabled?: boolean;
+  /**
+   * Вернуть текст в поле — например, когда отправка сорвалась из-за потерянной
+   * сессии. Поле очищается сразу при submit, поэтому вернуть черновик может
+   * только родитель. Реагируем на смену `id`, а не текста: один и тот же текст
+   * может понадобиться восстановить дважды.
+   */
+  restore?: { id: number; text: string } | null;
 }) {
   const [value, setValue] = useState("");
   const { ref, resize } = useAutoResizeTextarea();
+
+  const restoreId = restore?.id;
+  const restoreText = restore?.text;
+  useEffect(() => {
+    if (restoreId === undefined || restoreText === undefined) return;
+    setValue(restoreText);
+    resize();
+  }, [restoreId, restoreText, resize]);
 
   function submit() {
     const trimmed = value.trim();

@@ -40,12 +40,21 @@ export async function middleware(request: NextRequest) {
   const nonce = btoa(crypto.randomUUID());
   const csp = buildCsp(nonce);
 
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-nonce", nonce);
-  requestHeaders.set("content-security-policy-report-only", csp);
+  // Заголовки запроса, которые уедут вниз (в роуты и серверные компоненты).
+  // Собираются заново на каждый вызов, а НЕ снимаются снимком один раз:
+  // request.cookies.set() ниже пишет обновлённый `Cookie` прямо в
+  // request.headers, и отсоединённая копия этого уже не увидит — downstream
+  // получил бы старый, только что ротированный refresh-токен и упал бы на
+  // "Invalid Refresh Token: Refresh Token Not Found".
+  const buildRequestHeaders = () => {
+    const headers = new Headers(request.headers);
+    headers.set("x-nonce", nonce);
+    headers.set("content-security-policy-report-only", csp);
+    return headers;
+  };
 
   // Базовый ответ; пересоздаётся, если Supabase обновит cookies сессии.
-  let response = NextResponse.next({ request: { headers: requestHeaders } });
+  let response = NextResponse.next({ request: { headers: buildRequestHeaders() } });
 
   const supabase = createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -59,7 +68,9 @@ export async function middleware(request: NextRequest) {
           cookiesToSet.forEach(({ name, value }) => {
             request.cookies.set(name, value);
           });
-          response = NextResponse.next({ request: { headers: requestHeaders } });
+          // Пересобираем заголовки уже ПОСЛЕ мутации cookies — так свежая
+          // сессия доезжает до роута/страницы в этом же запросе.
+          response = NextResponse.next({ request: { headers: buildRequestHeaders() } });
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
           });
@@ -77,6 +88,16 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
+
+  // API: ранний выход. getUser() выше уже сделал ротацию и положил свежие
+  // cookies в `response` — роут получит их в request и вернёт клиенту, поэтому
+  // getUser() внутри роута видит живой токен и не рефрешит его во время стрима
+  // (в стриме Set-Cookie уже не доедет: заголовки отправлены). Гейтинг здесь
+  // намеренно не делаем: заворачивать fetch на /auth или /onboarding нельзя —
+  // фронт получил бы HTML вместо JSON. Отсутствие сессии роуты отдают 401 сами.
+  if (pathname.startsWith("/api")) {
+    return response;
+  }
 
   // Корень "/" отдаёт разный контент в зависимости от авторизации
   // (гость → лендинг, вошедший → приложение), поэтому его НЕЛЬЗЯ кэшировать:
@@ -163,5 +184,23 @@ export async function middleware(request: NextRequest) {
 export const config = {
   // "/" и "/onboarding" добавлены, чтобы заворачивать на онбординг сразу
   // после входа. /auth/callback намеренно вне матчера и не блокируется.
-  matcher: ["/", "/day1", "/day1/:path*", "/today", "/today/:path*", "/journal", "/journal/:path*", "/analytics", "/analytics/:path*", "/rhythm", "/rhythm/:path*", "/meditations", "/meditations/:path*", "/chat/:path*", "/auth", "/onboarding", "/profile", "/profile/:path*"],
+  //
+  // Пользовательские /api/* перечислены поимённо (не общим "/api/:path*"),
+  // потому что машинные эндпоинты гонять через пользовательскую сессию нельзя.
+  // Вне матчера намеренно оставлены: /api/telegram/webhook, /api/telegram/
+  // set-webhook, /api/robokassa/result, /api/cron/*, /api/push/send,
+  // /api/telegram/notifications/* (вебхуки и кроны, авторизация по CRON_SECRET
+  // или подписи) и /api/auth/* (регистрация и восстановление — до входа).
+  matcher: [
+    "/", "/day1", "/day1/:path*", "/today", "/today/:path*", "/journal", "/journal/:path*", "/analytics", "/analytics/:path*", "/rhythm", "/rhythm/:path*", "/meditations", "/meditations/:path*", "/chat/:path*", "/auth", "/onboarding", "/profile", "/profile/:path*",
+    "/api/chat", "/api/chat/:path*",
+    "/api/usage",
+    "/api/rhythm/advice",
+    "/api/sprint/advice",
+    "/api/notifications/:path*",
+    "/api/prefs/:path*",
+    "/api/push/subscribe",
+    "/api/telegram/link",
+    "/api/telegram/unlink",
+  ],
 };
