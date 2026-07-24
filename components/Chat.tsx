@@ -87,17 +87,19 @@ export function Chat({
     };
 
     try {
-      // API ждёт историю с реплики пользователя — опенер НИКИ отбрасываем.
-      const firstUser = history.findIndex((m) => m.role === "user");
-      const payload = history
-        .slice(firstUser)
-        .map((m) => ({ role: m.role, content: m.content }));
-
+      // Историю больше не шлём: она лежит в БД, и сервер сам её читает.
+      // clientMessageId делает повтор идемпотентным — ретрай на 401 ниже
+      // переиспользует этот же id и не создаёт вторую реплику.
       const request = () =>
         fetch("/api/chat", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scenario, messages: payload, conversationId }),
+          body: JSON.stringify({
+            scenario,
+            text,
+            clientMessageId: userMessage.id,
+            conversationId,
+          }),
         });
 
       let res = await request();

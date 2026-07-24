@@ -23,20 +23,11 @@ import type { Scenario } from "@/types/conversation";
 
 export const runtime = "nodejs";
 
-// ── Ограничения payload ───────────────────────────────────────────────────────
-// Абсолютный потолок — защита от абьюза, а НЕ от долгого диалога. Обычную
-// переписку он не задевает.
-//
-// Раньше здесь стояли 50 реплик / 24 000 символов, и превышение отдавало 400.
-// Клиент шлёт всю историю каждый раз, а диалог живёт через дни и растёт — так
-// что тред, перевалив за 50 реплик, ломался НАВСЕГДА: каждая отправка получала
-// молчаливый 400, и пользователю оставалось только начать новый диалог, о чём
-// он никак не узнавал. Теперь длинная история обрезается окном ниже.
-const MAX_MESSAGES = 400; // реплик в истории за запрос
-const MAX_MESSAGE_CHARS = 4_000; // символов в одной реплике
-const MAX_TOTAL_CHARS = 200_000; // суммарно по всем репликам
+/** Символов в одной реплике пользователя. */
+const MAX_MESSAGE_CHARS = 4_000;
 
-// Сколько истории реально уходит в Claude — см. lib/chat-window.ts.
+// Сколько истории уходит в Claude — окно из lib/chat-window.ts. Хранение окном
+// не ограничено: в БД лежит весь диалог.
 
 // ── Rate limit на пользователя ────────────────────────────────────────────────
 const CHAT_RATE_LIMIT = 20; // запросов
@@ -44,8 +35,52 @@ const CHAT_RATE_WINDOW_SECONDS = 60; // за окно (1 минута)
 
 interface ChatRequest {
   scenario: Scenario;
-  messages: { role: "user" | "assistant"; content: string }[];
+  /** Новая реплика пользователя. Историю клиент больше не присылает. */
+  text?: string;
+  /**
+   * Идемпотентность: один и тот же id при повторе не создаёт вторую реплику,
+   * а возвращает уже готовый ответ. Критично — на 401 фронт ретраит сам.
+   */
+  clientMessageId?: string;
   conversationId?: string | null;
+  /** Legacy-поле: старый клиент слал всю историю. См. resolveText. */
+  messages?: { role: "user" | "assistant"; content: string }[];
+}
+
+/**
+ * Текст новой реплики. Источник правды по истории — БД, поэтому из legacy-payload
+ * (старый клиент во время выката) берём только последнюю реплику, остальное
+ * игнорируем. Когда старых клиентов не останется, поле messages можно убрать.
+ */
+function resolveText(body: ChatRequest): string | null {
+  if (typeof body.text === "string") return body.text;
+  const legacy = body.messages;
+  if (Array.isArray(legacy) && legacy.length > 0) {
+    const last = legacy[legacy.length - 1];
+    if (last && typeof last.content === "string") return last.content;
+  }
+  return null;
+}
+
+/** Отдать готовый текст тем же стримовым контрактом, что и живой ответ. */
+function replayResponse(text: string, convId: string): Response {
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(text));
+      controller.close();
+    },
+  });
+  return new Response(stream, { headers: streamHeaders(convId) });
+}
+
+function streamHeaders(convId: string): HeadersInit {
+  return {
+    "Content-Type": "text/plain; charset=utf-8",
+    "Cache-Control": "no-store",
+    "X-Conversation-Id": convId,
+    // Отключаем буферизацию у прокси, чтобы токены шли сразу.
+    "X-Accel-Buffering": "no",
+  };
 }
 
 export async function POST(req: Request) {
@@ -56,37 +91,19 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { scenario, messages, conversationId } = body;
+  const { scenario, conversationId, clientMessageId } = body;
 
   if (!ALL_SCENARIOS.includes(scenario)) {
     return Response.json({ error: "Unknown scenario" }, { status: 400 });
   }
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return Response.json({ error: "messages is required" }, { status: 400 });
-  }
-  if (messages.length > MAX_MESSAGES) {
-    console.warn("[api/chat] payload rejected: too many messages", messages.length);
-    return Response.json({ error: "Too many messages" }, { status: 400 });
-  }
 
-  // Каждая реплика должна быть валидной парой role/content разумного размера.
-  let totalChars = 0;
-  for (const m of messages) {
-    if (
-      (m.role !== "user" && m.role !== "assistant") ||
-      typeof m.content !== "string"
-    ) {
-      return Response.json({ error: "Invalid message" }, { status: 400 });
-    }
-    if (m.content.length > MAX_MESSAGE_CHARS) {
-      console.warn("[api/chat] payload rejected: message too long", m.content.length);
-      return Response.json({ error: "Message too long" }, { status: 400 });
-    }
-    totalChars += m.content.length;
+  const text = resolveText(body);
+  if (text === null || text.trim().length === 0) {
+    return Response.json({ error: "text is required" }, { status: 400 });
   }
-  if (totalChars > MAX_TOTAL_CHARS) {
-    console.warn("[api/chat] payload rejected: conversation too long", totalChars);
-    return Response.json({ error: "Conversation too long" }, { status: 400 });
+  if (text.length > MAX_MESSAGE_CHARS) {
+    console.warn("[api/chat] payload rejected: message too long", text.length);
+    return Response.json({ error: "Message too long" }, { status: 400 });
   }
 
   const supabase = await createServerComponentClient();
@@ -144,10 +161,50 @@ export async function POST(req: Request) {
     );
   }
 
-  // (a) Стоимость реплики в токенах. Клиент шлёт историю, последняя реплика —
-  // новое сообщение пользователя; считаем только его входные токены.
-  const lastUserMessage = messages[messages.length - 1];
-  const { tokens: inputTokens } = await countMessageTokens(lastUserMessage.content);
+  // ── Диалог ──────────────────────────────────────────────────────────────────
+  // История берётся ИЗ БД, а не из запроса: клиент присылает только новую
+  // реплику. Раньше сервер собирал диалог из клиентского payload и перезаписывал
+  // им строку — из-за этого любой баг на клиенте правил историю, две вкладки
+  // затирали друг друга, а подменённый payload мог вложить в уста НИКИ что угодно
+  // и уехать обратно в модель как её собственные прошлые слова.
+  let convId: string;
+  let storedMessages: Message[] = [];
+  try {
+    const existing = conversationId
+      ? await getConversation(supabase, conversationId, user.id)
+      : null;
+    if (existing) {
+      convId = existing.id;
+      storedMessages = (existing.messages as Message[]) ?? [];
+    } else {
+      convId = (await createConversation(supabase, user.id, scenario)).id;
+    }
+  } catch (err) {
+    console.error("[api/chat] conversation resolve failed:", err);
+    return Response.json({ error: "Conversation error" }, { status: 500 });
+  }
+
+  // ── Идемпотентность ─────────────────────────────────────────────────────────
+  // Строго до подсчёта токенов и списания квоты: повтор не должен стоить денег.
+  if (clientMessageId) {
+    const idx = storedMessages.findIndex(
+      (m) => m.role === "user" && m.clientId === clientMessageId,
+    );
+    if (idx !== -1) {
+      const answer = storedMessages[idx + 1];
+      if (answer?.role === "assistant") {
+        // Ответ уже готов — отдаём его, без Claude и без списания квоты.
+        console.warn("[api/chat] duplicate send, replaying stored answer");
+        return replayResponse(answer.content, convId);
+      }
+      // Реплика записалась, а ответа нет — прошлая попытка оборвалась между
+      // сохранением и ответом. Отбрасываем хвост и генерируем заново.
+      storedMessages = storedMessages.slice(0, idx);
+    }
+  }
+
+  // (a) Стоимость новой реплики в токенах.
+  const { tokens: inputTokens } = await countMessageTokens(text);
 
   // (b) Жёсткий потолок на одну реплику: блокируем отправку ДО вызова Claude,
   // а не списываем больше единиц. Порог — из конфига тарифа.
@@ -180,29 +237,18 @@ export async function POST(req: Request) {
     );
   }
 
-  // Определяем диалог: при отсутствии id (или если id чужой/удалён) создаём
-  // новый. Существующий подгружаем целиком — его сохранённые сообщения нужны,
-  // чтобы при дозаписи сохранить их реальные timestamp/inputTokens.
-  let convId: string;
-  let storedMessages: Message[] = [];
-  try {
-    const existing = conversationId
-      ? await getConversation(supabase, conversationId, user.id)
-      : null;
-    if (existing) {
-      convId = existing.id;
-      storedMessages = (existing.messages as Message[]) ?? [];
-    } else {
-      convId = (await createConversation(supabase, user.id, scenario)).id;
-    }
-  } catch (err) {
-    console.error("[api/chat] conversation resolve failed:", err);
-    return Response.json({ error: "Conversation error" }, { status: 500 });
-  }
+  // Новая реплика пользователя и полная история хода.
+  const userMessage: Message = {
+    role: "user",
+    content: text,
+    timestamp: new Date().toISOString(),
+    inputTokens,
+    ...(clientMessageId ? { clientId: clientMessageId } : {}),
+  };
+  const history: Message[] = [...storedMessages, userMessage];
 
-  // В модель уходит окно, в БД — вся история (см. toStore ниже). Обрезка тут,
-  // а не на клиенте: клиентская обрезка порезала бы и сохраняемый диалог.
-  const anthropicMessages: Anthropic.MessageParam[] = contextWindow(messages).map((m) => ({
+  // В модель уходит окно, в БД — вся история.
+  const anthropicMessages: Anthropic.MessageParam[] = contextWindow(history).map((m) => ({
     role: m.role,
     content: m.content,
   }));
@@ -341,38 +387,18 @@ export async function POST(req: Request) {
           }
         }
 
-        // Сохраняем полный ход (обмен + ответ НИКИ). Опенер не храним — он
-        // подставляется из SCENARIO_META при загрузке. Ошибка сохранения не
-        // должна рвать уже доставленный ответ — логируем и продолжаем.
-        // (e) Списание единиц происходит именно здесь — после успешной отправки
-        // в Claude. Единицы не хранятся отдельным счётчиком: getTodayUsage
-        // суммирует их из inputTokens сохранённых реплик. Поэтому если стрим
-        // упал выше (catch → controller.error), сохранения нет и квота не
-        // списывается — ровно как требуется.
+        // Дописываем ход к истории из БД. Прежние реплики переносятся как есть,
+        // со своими timestamp и inputTokens — раньше их приходилось угадывать,
+        // выравнивая клиентский payload по хвосту сохранённого (offset), и любое
+        // расхождение перебивало время всех реплик на «сейчас», ломая дневной счёт.
         //
-        // Per-message timestamp пишем честно: у ранее сохранённых реплик берём
-        // их прежнее время (и inputTokens), новыми считаем только последнюю
-        // реплику пользователя и ответ НИКИ. Без этого продолжение старого
-        // диалога перебивало бы время всех реплик на «сейчас» и рушило дневной
-        // счёт. storedMessages выравниваем по хвосту истории (клиент мог
-        // прислать не всю ленту — учитываем сдвиг).
-        const now = new Date().toISOString();
-        const lastIdx = messages.length - 1;
-        const offset = storedMessages.length - lastIdx;
-        const toStore: Message[] = messages.map((m, i) => {
-          if (i === lastIdx) {
-            // Новая реплика пользователя: время сейчас + посчитанные токены.
-            return { role: m.role, content: m.content, timestamp: now, inputTokens };
-          }
-          const prior = offset >= 0 ? storedMessages[offset + i] : undefined;
-          return {
-            role: m.role,
-            content: m.content,
-            timestamp: prior?.timestamp ?? now,
-            ...(prior?.inputTokens != null ? { inputTokens: prior.inputTokens } : {}),
-          };
-        });
-        toStore.push({ role: "assistant", content: assistantText, timestamp: now });
+        // Списание единиц происходит именно здесь: отдельного счётчика нет,
+        // getTodayUsage суммирует inputTokens сохранённых реплик. Если стрим упал
+        // выше (catch → controller.error), сохранения нет и квота не списывается.
+        const toStore: Message[] = [
+          ...history,
+          { role: "assistant", content: assistantText, timestamp: new Date().toISOString() },
+        ];
         try {
           await updateConversation(supabase, convId, user.id, toStore);
         } catch (saveErr) {
@@ -387,13 +413,5 @@ export async function POST(req: Request) {
     },
   });
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/plain; charset=utf-8",
-      "Cache-Control": "no-store",
-      "X-Conversation-Id": convId,
-      // Отключаем буферизацию у прокси, чтобы токены шли сразу.
-      "X-Accel-Buffering": "no",
-    },
-  });
+  return new Response(stream, { headers: streamHeaders(convId) });
 }
