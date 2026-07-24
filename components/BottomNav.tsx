@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { showRhythm } from "@/lib/profile";
 import { HOME_HREF, CHAT_HREF, JOURNAL_HREF, RHYTHM_HREF, TIPS_HREF } from "@/lib/nav";
@@ -111,7 +111,60 @@ function isTextField(el: EventTarget | null): boolean {
 
 export function BottomNav({ gender, cycle }: { gender?: string | null; cycle?: string | null }) {
   const pathname = usePathname();
-  const tabs = buildTabs(showRhythm(gender, cycle));
+  const router = useRouter();
+  const rhythm = showRhythm(gender, cycle);
+  const tabs = useMemo(() => buildTabs(rhythm), [rhythm]);
+
+  // Мгновенный отклик на тап: подсвечиваем цель ещё до того, как приедет новая
+  // страница. Без этого тап «проваливается» — CSS active:scale-95 гаснет вместе
+  // с отпусканием пальца, и до ответа сервера бар выглядит нетронутым.
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  const handleTabClick = useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+      // Клик с модификатором или не левой кнопкой не перехватываем: «открыть в
+      // новой вкладке», средняя кнопка и Shift-окно должны работать штатно.
+      if (
+        e.defaultPrevented ||
+        e.button !== 0 ||
+        e.metaKey ||
+        e.ctrlKey ||
+        e.shiftKey ||
+        e.altKey
+      ) {
+        return;
+      }
+      e.preventDefault();
+      setPendingHref(href);
+      // Сигнал для глобального прогресс-бара (Фаза 2). Пока слушателя нет —
+      // событие просто некому поймать, это безвредно.
+      window.dispatchEvent(new Event("nav:start"));
+      startTransition(() => router.push(href));
+    },
+    [router],
+  );
+
+  // Снятие pending-подсветки.
+  useEffect(() => {
+    if (!pendingHref) return;
+
+    // Сравниваем не строкой: у «Чата» href="/chat", а pathname после редиректа
+    // станет "/chat/general" — строгое равенство не сработало бы никогда.
+    // Спрашиваем сам предикат вкладки.
+    const target = tabs.find((t) => t.href === pendingHref);
+    if (target?.isActive(pathname)) {
+      setPendingHref(null);
+      return;
+    }
+
+    // Переход завершился, но мы не там, куда метили (редирект на онбординг,
+    // отмена) — не держим подсветку вечно.
+    if (!isPending) {
+      const id = setTimeout(() => setPendingHref(null), 400);
+      return () => clearTimeout(id);
+    }
+  }, [pathname, pendingHref, isPending, tabs]);
 
   // Прячем нижнюю навигацию, пока в фокусе текстовое поле (открыта клавиатура):
   // на iOS fixed+backdrop-blur панель иначе всплывает над контентом при вводе.
@@ -139,18 +192,27 @@ export function BottomNav({ gender, cycle }: { gender?: string | null; cycle?: s
     )}>
       <div className="flex items-stretch px-1 pt-1.5 pb-2">
         {tabs.map(({ href, label, icon, isActive }) => {
-          const active = isActive(pathname);
+          const isCurrent = isActive(pathname);
+          const isTarget = pendingHref === href;
+          // Подсветка забегает вперёд навигации — в этом весь смысл.
+          const active = isCurrent || isTarget;
           return (
             <Link
               key={href}
               href={href}
-              aria-current={active ? "page" : undefined}
+              onClick={(e) => handleTabClick(e, href)}
+              // aria-current держим честным: это «страница, на которой я сейчас»,
+              // а не та, куда едем. Про сам переход сообщает aria-busy.
+              aria-current={isCurrent ? "page" : undefined}
+              aria-busy={isTarget || undefined}
               className={cn(
                 "flex min-h-[44px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[10px] px-1 py-1 transition-all duration-150 active:scale-95 active:text-accent",
                 active ? "text-accent" : "text-ink-muted",
               )}
             >
-              {icon}
+              <span className={cn("inline-flex", isTarget && "animate-pulse")}>
+                {icon}
+              </span>
               <span className="whitespace-nowrap text-[10px] font-medium leading-none">{label}</span>
             </Link>
           );
