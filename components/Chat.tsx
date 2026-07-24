@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { createClientComponentClient } from "@/lib/supabase";
 import { ChatInput } from "@/components/ChatInput";
 import { MessageBubble } from "@/components/MessageBubble";
 import { TypingIndicator } from "@/components/TypingIndicator";
@@ -24,12 +26,20 @@ export function Chat({
   className?: string;
 }) {
   const meta = SCENARIO_META[scenario];
+  const pathname = usePathname();
+  const [supabase] = useState(() => createClientComponentClient());
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [conversationId, setConversationId] = useState<string | null>(
     initialConversationId,
   );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Сессия окончательно потеряна: и тихий рефреш, и повтор вернули 401.
+  const [authLost, setAuthLost] = useState(false);
+  // Черновик, который надо вернуть в поле ввода (ChatInput очищает его при
+  // отправке). Растущий id заставляет ChatInput перечитать текст — в том числе
+  // когда второй раз восстанавливаем тот же самый текст.
+  const [restoreDraft, setRestoreDraft] = useState<{ id: number; text: string } | null>(null);
   const [limitInfo, setLimitInfo] = useState<{
     reason: "messages" | "dialogs";
     limit: number;
@@ -49,6 +59,7 @@ export function Chat({
     if (pending) return;
     setError(null);
     setLimitInfo(null);
+    setAuthLost(false);
 
     const userMessage: ChatMessage = {
       id: crypto.randomUUID(),
@@ -67,11 +78,40 @@ export function Chat({
         .slice(firstUser)
         .map((m) => ({ role: m.role, content: m.content }));
 
-      const res = await fetch("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ scenario, messages: payload, conversationId }),
-      });
+      const request = () =>
+        fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ scenario, messages: payload, conversationId }),
+        });
+
+      let res = await request();
+
+      // 401 — сессия истекла или слетела. Не пугаем пользователя сразу:
+      // форсируем клиентский рефреш (getUser() сходит в Supabase и, если
+      // access-токен протух, обновит его и перезапишет cookies) и повторяем
+      // запрос РОВНО ОДИН раз. Счётчика не нужно: повтор здесь ровно один,
+      // рекурсии нет, поэтому зациклиться невозможно.
+      if (res.status === 401) {
+        try {
+          await supabase.auth.getUser();
+        } catch (refreshErr) {
+          // Рефреш не удался — повтор ниже всё равно делаем: он даст честный
+          // 401, и мы покажем мягкое предложение войти заново.
+          console.warn("[Chat] session refresh failed:", refreshErr);
+        }
+
+        res = await request();
+
+        if (res.status === 401) {
+          // Реплику пользователя из ленты не убираем, а текст возвращаем в
+          // поле ввода — после повторного входа его можно отправить снова.
+          setAuthLost(true);
+          setRestoreDraft((prev) => ({ id: (prev?.id ?? 0) + 1, text }));
+          return;
+        }
+      }
+
       if (res.status === 402) {
         const data = await res.json().catch(() => ({}));
         const canUpgrade = data.canUpgrade !== false;
@@ -185,7 +225,22 @@ export function Chat({
             </div>
           ))}
           {showTyping && <TypingIndicator />}
-          {error === "limit_reached" ? null : error ? (
+          {authLost ? (
+            <div className="px-1 pt-1 text-center">
+              <p className="text-sm text-ink-muted">
+                Кажется, тебя разлогинило. Зайди заново — и продолжим, я никуда не денусь.
+              </p>
+              <Link
+                href={`/auth?next=${encodeURIComponent(pathname)}`}
+                className="mt-2 inline-flex items-center gap-1.5 rounded-full border border-accent/40 bg-surface-nika px-3.5 py-2 text-[13px] font-medium text-accent transition-colors hover:bg-accent/10"
+              >
+                Войти заново
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden>
+                  <path d="M2.5 6h7M6.5 3l3 3-3 3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </Link>
+            </div>
+          ) : error === "limit_reached" ? null : error ? (
             <p className="px-1 text-center text-sm text-ink-muted">{error}</p>
           ) : null}
         </div>
@@ -209,7 +264,11 @@ export function Chat({
         </div>
       )}
 
-      <ChatInput onSend={send} disabled={pending || error === "limit_reached"} />
+      <ChatInput
+        onSend={send}
+        disabled={pending || error === "limit_reached"}
+        restore={restoreDraft}
+      />
 
       {/* Апгрейд-модал (только для Free при исчерпании лимита) */}
       {error === "limit_reached" && limitInfo?.canUpgrade && (
