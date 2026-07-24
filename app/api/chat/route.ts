@@ -1,4 +1,5 @@
 import type Anthropic from "@anthropic-ai/sdk";
+import { isAuthError, type User } from "@supabase/supabase-js";
 import { anthropic, NIKA_MODEL } from "@/lib/anthropic";
 import { createConversation, getConversation, updateConversation } from "@/lib/conversations";
 import { checkDailyLimits } from "@/lib/limits";
@@ -78,11 +79,33 @@ export async function POST(req: Request) {
   }
 
   const supabase = await createServerComponentClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+
+  // ── Сессия ──────────────────────────────────────────────────────────────────
+  // Ошибки авторизации getUser() отдаёт в поле `error` (refresh_token_not_found
+  // приходит именно так), но сорваться может и броском — например если не
+  // удалось взять внутренний лок клиента. Обрабатываем оба пути: протухшая
+  // сессия — это не 500, фронт должен получить однозначный 401 и предложить
+  // войти заново.
+  let user: User | null = null;
+  try {
+    const { data, error } = await supabase.auth.getUser();
+    if (error) throw error;
+    user = data.user;
+  } catch (err) {
+    // Не про авторизацию (сеть, недоступный Supabase) — это честная 500,
+    // маскировать её под «войди заново» нельзя.
+    if (!isAuthError(err)) throw err;
+    // Раньше `error` молча отбрасывался — поэтому refresh_token_not_found и
+    // не был виден в логах роута.
+    console.warn("[api/chat] session invalid:", err.code ?? err.message);
+  }
+
+  // Нет сессии или она протухла — один и тот же структурированный ответ.
   if (!user) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+    return Response.json(
+      { error: "auth", code: "session_expired" },
+      { status: 401 },
+    );
   }
 
   // Pro-статус: FREE не пополняет «Советы» из диалога, поэтому инструмент
