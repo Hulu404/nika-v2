@@ -6,7 +6,7 @@ export default function Loading() {
     <AppLayout>
       <SkeletonPageHeader />
       <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
-        <div className="mx-auto w-full max-w-[600px] px-5 pt-8">
+        <div className="mx-auto w-full max-w-[720px] px-6 pt-6 lg:pt-10">
           {Array.from({ length: 5 }).map((_, i) => (
             <div key={i} className="mb-4 flex gap-4">
               <div className="flex flex-col items-center">
