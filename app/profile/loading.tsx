@@ -1,17 +1,22 @@
 import { AppLayout } from "@/components/AppLayout";
-import { Skeleton, SkeletonPageHeader } from "@/components/ui/Skeleton";
+import { Skeleton } from "@/components/ui/Skeleton";
 
+/**
+ * Скелет профиля. PageHeader здесь намеренно нет: app/profile/page.tsx его не
+ * рендерит — ProfileContent сам открывает скролл-область с блоком идентичности.
+ */
 export default function Loading() {
   return (
     <AppLayout>
-      <SkeletonPageHeader />
-      <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
-        <div className="mx-auto w-full max-w-[540px] px-5 pt-8">
-          {/* Аватар + имя */}
-          <div className="mb-8 flex flex-col items-center gap-3">
-            <Skeleton className="h-20 w-20 rounded-full" />
-            <Skeleton className="h-5 w-32 rounded" />
-            <Skeleton className="h-3 w-44 rounded" />
+      <div className="flex-1 overflow-y-auto">
+        <div className="mx-auto w-full max-w-[720px] px-6 pb-32 pt-5">
+          {/* Блок идентичности: имя + бейдж тарифа, ниже «С НИКОЙ N дней» */}
+          <div className="mb-6">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <Skeleton className="h-9 w-52 max-w-full rounded" />
+              <Skeleton className="h-5 w-14 rounded-pill" />
+            </div>
+            <Skeleton className="mt-1 h-3.5 w-36 rounded" />
           </div>
 
           {/* Секции настроек */}
