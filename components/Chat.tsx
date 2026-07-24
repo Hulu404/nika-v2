@@ -71,6 +71,21 @@ export function Chat({
     setMessages(history);
     setPending(true);
 
+    // id реплики НИКИ, если стрим успел что-то напечатать. Нужен снаружи try:
+    // по нему в catch отличаем «не начали отвечать» от «оборвались на полпути».
+    let assistantId: string | null = null;
+
+    // Откат неудачной отправки: убираем реплику из ленты и возвращаем текст в
+    // поле ввода. Без этого каждый повтор дописывает ещё одну копию — и в
+    // ленту, и в payload следующего запроса (клиент шлёт всю историю целиком),
+    // так что после трёх попыток в Claude уезжает сообщение в трёх экземплярах.
+    // Если НИКА уже начала отвечать — не откатываем, иначе ответ осиротеет.
+    const rollback = () => {
+      if (assistantId !== null) return;
+      setMessages((prev) => prev.filter((m) => m.id !== userMessage.id));
+      setRestoreDraft((prev) => ({ id: (prev?.id ?? 0) + 1, text }));
+    };
+
     try {
       // API ждёт историю с реплики пользователя — опенер НИКИ отбрасываем.
       const firstUser = history.findIndex((m) => m.role === "user");
@@ -104,10 +119,10 @@ export function Chat({
         res = await request();
 
         if (res.status === 401) {
-          // Реплику пользователя из ленты не убираем, а текст возвращаем в
-          // поле ввода — после повторного входа его можно отправить снова.
+          // Текст возвращаем в поле — после повторного входа его можно
+          // отправить снова, не набирая заново.
           setAuthLost(true);
-          setRestoreDraft((prev) => ({ id: (prev?.id ?? 0) + 1, text }));
+          rollback();
           return;
         }
       }
@@ -134,14 +149,28 @@ export function Chat({
         return;
       }
       if (res.status === 429) {
+        rollback();
         setError("Слишком быстро 🙂 Подожди немного и попробуй снова.");
         return;
       }
       if (res.status === 413) {
+        rollback();
         setError("Сообщение слишком длинное — сократи и отправь ещё раз.");
         return;
       }
-      if (!res.ok || !res.body) throw new Error(`status ${res.status}`);
+
+      // Прочие не-ok. Разделяем 5xx и остальное: одинаковый текст на все случаи
+      // не давал понять по скриншоту от тестера, что вообще произошло.
+      if (!res.ok || !res.body) {
+        console.error("[Chat] request failed:", res.status, res.statusText);
+        rollback();
+        setError(
+          res.status >= 500
+            ? "У меня сбой на сервере. Попробуй ещё раз через минуту."
+            : `Не получилось отправить (${res.status}). Попробуй ещё раз.`,
+        );
+        return;
+      }
 
       // Запоминаем id диалога (важно для только что созданного нового диалога).
       const returnedId = res.headers.get("X-Conversation-Id");
@@ -151,7 +180,6 @@ export function Chat({
 
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
-      let assistantId: string | null = null;
       let acc = "";
 
       for (;;) {
@@ -193,8 +221,16 @@ export function Chat({
 
       if (assistantId === null) throw new Error("empty stream");
     } catch (err) {
+      // Сюда попадают обрыв сети и падение уже начатого стрима (сервер зовёт
+      // controller.error, и reader.read() бросает).
       console.error("[Chat] send failed:", err);
-      setError("Не получилось получить ответ. Попробуй ещё раз.");
+      const started = assistantId !== null;
+      rollback(); // no-op, если НИКА уже начала отвечать
+      setError(
+        started
+          ? "Ответ оборвался на полпути. Попробуй ещё раз."
+          : "Не получилось получить ответ. Попробуй ещё раз.",
+      );
     } finally {
       setPending(false);
     }
