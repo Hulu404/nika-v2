@@ -7,6 +7,7 @@ import { calculateQuotaUnits, planConfig } from "@/lib/plans/limits-config";
 import { countMessageTokens } from "@/lib/tokens";
 import { buildSystemPrompt } from "@/lib/prompts";
 import { checkRateLimit } from "@/lib/rate-limit";
+import { contextWindow } from "@/lib/chat-window";
 import { ALL_SCENARIOS } from "@/lib/scenarios";
 import { buildSprintContext, getActiveSprint } from "@/lib/sprint";
 import { getRecentDailyState, parseYmd, userToday } from "@/lib/rhythm";
@@ -23,12 +24,19 @@ import type { Scenario } from "@/types/conversation";
 export const runtime = "nodejs";
 
 // ── Ограничения payload ───────────────────────────────────────────────────────
-// Защита от раздувания счёта за токены: один запрос не может нести бесконечную
-// историю или гигантские реплики. Клиент шлёт всю историю каждый раз, поэтому
-// без этих cap'ов один запрос способен сжечь огромный контекст.
-const MAX_MESSAGES = 50; // реплик в истории за запрос
+// Абсолютный потолок — защита от абьюза, а НЕ от долгого диалога. Обычную
+// переписку он не задевает.
+//
+// Раньше здесь стояли 50 реплик / 24 000 символов, и превышение отдавало 400.
+// Клиент шлёт всю историю каждый раз, а диалог живёт через дни и растёт — так
+// что тред, перевалив за 50 реплик, ломался НАВСЕГДА: каждая отправка получала
+// молчаливый 400, и пользователю оставалось только начать новый диалог, о чём
+// он никак не узнавал. Теперь длинная история обрезается окном ниже.
+const MAX_MESSAGES = 400; // реплик в истории за запрос
 const MAX_MESSAGE_CHARS = 4_000; // символов в одной реплике
-const MAX_TOTAL_CHARS = 24_000; // суммарно по всем репликам
+const MAX_TOTAL_CHARS = 200_000; // суммарно по всем репликам
+
+// Сколько истории реально уходит в Claude — см. lib/chat-window.ts.
 
 // ── Rate limit на пользователя ────────────────────────────────────────────────
 const CHAT_RATE_LIMIT = 20; // запросов
@@ -57,6 +65,7 @@ export async function POST(req: Request) {
     return Response.json({ error: "messages is required" }, { status: 400 });
   }
   if (messages.length > MAX_MESSAGES) {
+    console.warn("[api/chat] payload rejected: too many messages", messages.length);
     return Response.json({ error: "Too many messages" }, { status: 400 });
   }
 
@@ -70,11 +79,13 @@ export async function POST(req: Request) {
       return Response.json({ error: "Invalid message" }, { status: 400 });
     }
     if (m.content.length > MAX_MESSAGE_CHARS) {
+      console.warn("[api/chat] payload rejected: message too long", m.content.length);
       return Response.json({ error: "Message too long" }, { status: 400 });
     }
     totalChars += m.content.length;
   }
   if (totalChars > MAX_TOTAL_CHARS) {
+    console.warn("[api/chat] payload rejected: conversation too long", totalChars);
     return Response.json({ error: "Conversation too long" }, { status: 400 });
   }
 
@@ -189,7 +200,9 @@ export async function POST(req: Request) {
     return Response.json({ error: "Conversation error" }, { status: 500 });
   }
 
-  const anthropicMessages: Anthropic.MessageParam[] = messages.map((m) => ({
+  // В модель уходит окно, в БД — вся история (см. toStore ниже). Обрезка тут,
+  // а не на клиенте: клиентская обрезка порезала бы и сохраняемый диалог.
+  const anthropicMessages: Anthropic.MessageParam[] = contextWindow(messages).map((m) => ({
     role: m.role,
     content: m.content,
   }));
