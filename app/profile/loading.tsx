@@ -8,8 +8,8 @@ import { Skeleton } from "@/components/ui/Skeleton";
 export default function Loading() {
   return (
     <AppLayout>
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[720px] px-6 pb-32 pt-5">
+      <div className="flex-1 overflow-y-auto pt-safe-top">
+        <div className="mx-auto w-full max-w-[720px] px-6 pb-tabbar pt-5">
           {/* Блок идентичности: имя + бейдж тарифа, ниже «С НИКОЙ N дней» */}
           <div className="mb-6">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

@@ -81,9 +81,16 @@ const config: Config = {
       },
       spacing: {
         safe: "env(safe-area-inset-bottom, 0px)",
+        // Верхний вырез (чёлка/строка статуса) — для pt-safe-top на sticky-шапках,
+        // чтобы при viewport-fit=cover они не уезжали под строку статуса.
+        "safe-top": "env(safe-area-inset-top, 0px)",
         // Высота мобильного таб-бара (pt-1.5 + 44 + pb-2) + safe-area.
         // Экраны, у которых контент упирается в низ, резервируют её через pb-tabbar.
         tabbar: "calc(58px + env(safe-area-inset-bottom, 0px))",
+        // Высота таб-бара + верхний вырез — для шапок, которым нужен и базовый
+        // отступ, и safe-area (см. заголовки разделов).
+        "header-top": "calc(0.5rem + env(safe-area-inset-top, 0px))",
+        "header-top-lg": "calc(0.75rem + env(safe-area-inset-top, 0px))",
       },
     },
   },

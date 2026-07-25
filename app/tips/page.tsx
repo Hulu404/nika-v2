@@ -49,7 +49,7 @@ export default async function TipsPage() {
     <AppLayout sidebarSlot={<SidebarData />}>
       <PageHeader title="Советы" subtitle={isPro ? "от Ники" : "для бегунов"} />
 
-      <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
+      <div className="flex-1 overflow-y-auto pb-tabbar lg:pb-10">
         {isPro ? (
           <>
             <TipsContent initialTips={tips} userId={user?.id ?? null} />

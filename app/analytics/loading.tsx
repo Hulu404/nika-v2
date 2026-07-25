@@ -5,7 +5,7 @@ export default function Loading() {
   return (
     <AppLayout>
       <SkeletonPageHeader />
-      <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
+      <div className="flex-1 overflow-y-auto pb-tabbar lg:pb-10">
         <div className="mx-auto w-full max-w-[720px] px-6 pt-6 lg:pt-10 xl:max-w-[960px] xl:px-8 2xl:max-w-[1200px] 2xl:px-10">
           <div className="flex flex-col gap-4">
             <SkeletonCard>

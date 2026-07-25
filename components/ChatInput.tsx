@@ -46,8 +46,11 @@ export function ChatInput({
 
   const canSend = !disabled && value.trim().length > 0;
 
+  // pb: на мобиле под полем всегда таб-бар (родитель резервирует pb-tabbar),
+  // поэтому большой отступ тут — лишняя пустота. Оставляем его только на
+  // десктопе (lg), где таб-бара нет и поле стоит у самого низа экрана.
   return (
-    <div className="shrink-0 border-t border-line-subtle bg-[var(--bg-blur-strong)] px-[14px] pb-8 pt-3 backdrop-blur-[16px]">
+    <div className="shrink-0 border-t border-line-subtle bg-[var(--bg-blur-strong)] px-[14px] pb-3 pt-3 backdrop-blur-[16px] lg:pb-8">
       <div className="flex items-center gap-2.5">
 
         {/* Поле ввода */}

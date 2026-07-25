@@ -34,6 +34,11 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Без cover в установленном PWA на iPhone с чёлкой iOS «письмецует» контент
+  // (полосы сверху/снизу, приложение меньше экрана — выглядит как неверный
+  // масштаб). Cover растягивает на весь экран и включает реальные
+  // env(safe-area-inset-*), которыми пользуются pb-safe/pb-tabbar/pt-safe-top.
+  viewportFit: "cover",
 };
 
 // Скрипт запускается до рендера — предотвращает мигание при смене темы.

@@ -24,7 +24,7 @@ export default async function JournalPage() {
     <AppLayout sidebarSlot={<SidebarData />}>
       <PageHeader title="Журнал" subtitle={`${totalKm} км`} />
 
-      <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
+      <div className="flex-1 overflow-y-auto pb-tabbar lg:pb-10">
         <div className="mx-auto w-full max-w-[720px] px-6 pt-6 lg:pt-10">
 
           {/* Заголовок (десктоп) */}

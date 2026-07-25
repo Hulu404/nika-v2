@@ -159,7 +159,7 @@ export default async function ChatPage({
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
       {/* Шапка чата */}
-      <header className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-blur)] px-4 py-3 backdrop-blur-[16px]">
+      <header className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-[var(--border-subtle)] bg-[var(--bg-blur)] px-4 pb-3 pt-header-top-lg backdrop-blur-[16px]">
         <div className="relative h-9 w-9 flex-shrink-0 rounded-full bg-nika-avatar shadow-[0_0_0_3px_rgba(200,85,61,0.06)]">
           <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[var(--bg-primary)] bg-[#7BA968]" />
         </div>

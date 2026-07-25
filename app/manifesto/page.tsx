@@ -28,7 +28,7 @@ const ITEMS = [
 export default function ManifestoPage() {
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
-      <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
+      <div className="flex-1 overflow-y-auto pt-safe-top pb-tabbar lg:pb-10">
         <div className="mx-auto w-full max-w-[720px] px-6 pb-12 pt-10 lg:pt-14">
 
           {/* Назад */}

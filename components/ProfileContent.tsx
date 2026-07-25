@@ -495,8 +495,8 @@ export function ProfileContent({
   return (
     <>
       {/* ── Scrollable page ── */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto w-full max-w-[720px] px-6 pb-32 pt-5">
+      <div className="flex-1 overflow-y-auto pt-safe-top">
+        <div className="mx-auto w-full max-w-[720px] px-6 pb-tabbar pt-5">
 
           {/* Блок идентичности */}
           <div className="mb-6">

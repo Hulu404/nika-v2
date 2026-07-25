@@ -15,7 +15,7 @@ export default async function MeditationsPage() {
     <AppLayout sidebarSlot={<SidebarData />}>
       <PageHeader title="Медитации" />
 
-      <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
+      <div className="flex-1 overflow-y-auto pb-tabbar lg:pb-10">
         <div className="mx-auto w-full max-w-[640px] px-6 pt-10 lg:pt-16">
           <div className="rounded-card border border-line-default bg-surface-warm p-7 lg:p-9">
             <span className="mb-6 block h-14 w-14 rounded-full bg-nika-avatar shadow-card" aria-hidden />

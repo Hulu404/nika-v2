@@ -11,7 +11,7 @@ import { HOME_HREF } from "@/lib/nav";
  */
 export function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
-    <header className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-line-default bg-[var(--bg-blur)] px-4 py-2 backdrop-blur-[16px] lg:px-8">
+    <header className="sticky top-0 z-10 flex shrink-0 items-center gap-2 border-b border-line-default bg-[var(--bg-blur)] px-4 pb-2 pt-header-top backdrop-blur-[16px] lg:px-8">
       {/* Обёртка держит ширину, а сама ссылка обнимает содержимое — иначе
           подсветка при наведении растягивалась бы на всю шапку. */}
       <div className="min-w-0 flex-1">

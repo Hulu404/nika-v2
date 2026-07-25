@@ -98,7 +98,7 @@ export default async function Day1Page() {
 
   return (
     <AppLayout sidebarSlot={<SidebarData />}>
-      <div className="flex-1 overflow-y-auto pb-24 lg:pb-10">
+      <div className="flex-1 overflow-y-auto pt-safe-top pb-tabbar lg:pb-10">
         <div className="mx-auto w-full max-w-[680px] px-5 pt-10 lg:pt-14 xl:max-w-[900px] xl:px-8 2xl:max-w-[1120px] 2xl:px-10">
 
           {/* Бейдж (только день 1) */}
