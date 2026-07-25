@@ -45,13 +45,17 @@ export function parseAction(text: string): { text: string; action: ChatAction | 
 export const LOG_RUN_TOOL: Anthropic.Tool = {
   name: "log_run",
   description:
-    "Записать пробежку пользователя в журнал тренировок. Вызывать только когда пользователь явно рассказал о пробежке с конкретными данными (дистанция или время).",
+    "Записать пробежку пользователя в журнал тренировок. Вызывать только когда пользователь явно рассказал о состоявшейся пробежке с конкретными данными (дистанция или время).",
   input_schema: {
     type: "object",
     properties: {
-      date: {
-        type: "string",
-        description: "Дата пробежки в формате YYYY-MM-DD. Если пользователь говорит «сегодня» — использовать сегодняшнюю дату.",
+      // Намеренно НЕ абсолютная дата: модель систематически ошибается в годе
+      // (ставит прошлый год), и пробежка уезжает в чужой день. Дату по этому
+      // смещению считает сервер по своим часам.
+      days_ago: {
+        type: "integer",
+        description: "Сколько дней назад была пробежка: 0 — сегодня, 1 — вчера, 2 — позавчера. Если не сказано, когда именно, ставь 0.",
+        minimum: 0,
       },
       distance_km: {
         type: "number",
@@ -71,12 +75,25 @@ export const LOG_RUN_TOOL: Anthropic.Tool = {
         description: "Короткая заметка о пробежке, 1 предложение, в голосе пользователя.",
       },
     },
-    // Обязательна только дистанция. date и intensity сервер подставит по
-    // умолчанию (сегодня / easy), если модель их не передала — так одна забытая
-    // деталь не роняет запись пробежки.
+    // Обязательна только дистанция. days_ago (0 — сегодня) и intensity (easy)
+    // сервер подставит по умолчанию, если модель их не передала.
     required: ["distance_km"],
   },
 };
+
+/**
+ * Дата пробежки по смещению в днях от сегодня (UTC, по часам сервера).
+ * Абсолютную дату от модели сознательно не принимаем — именно её год галлюцинирует.
+ */
+export function resolveRunDate(daysAgoRaw: unknown, now = new Date()): string {
+  let daysAgo = 0;
+  if (typeof daysAgoRaw === "number" && Number.isFinite(daysAgoRaw)) {
+    daysAgo = Math.min(365, Math.max(0, Math.round(daysAgoRaw)));
+  }
+  const d = new Date(now);
+  d.setUTCDate(d.getUTCDate() - daysAgo);
+  return d.toISOString().slice(0, 10);
+}
 
 export async function executeLogRun(
   supabase: Client,
@@ -91,7 +108,7 @@ export async function executeLogRun(
     return { ok: false, modelMessage: "Некорректные данные пробежки." };
   }
   const raw = input as Record<string, unknown>;
-  const date = typeof raw.date === "string" ? raw.date : new Date().toLocaleDateString("en-CA");
+  const date = resolveRunDate(raw.days_ago);
   const distance_km = typeof raw.distance_km === "number" ? raw.distance_km : null;
   const intensity = ["easy", "medium", "hard"].includes(raw.intensity as string)
     ? (raw.intensity as RunIntensity)
@@ -101,6 +118,25 @@ export async function executeLogRun(
 
   if (!distance_km || distance_km <= 0) {
     return { ok: false, modelMessage: "Дистанция пробежки не указана или некорректна." };
+  }
+
+  // Защита от дубля: если оборванный стрим успел записать пробежку, но не
+  // сохранил ответ, ретрай прогонит log_run ещё раз. Совпадающую запись за ту же
+  // дату (дистанция + время) не плодим повторно.
+  const { data: dup } = await supabase
+    .from("runs")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("date", date)
+    .eq("distance_km", distance_km)
+    .eq("duration_min", duration_min)
+    .limit(1)
+    .maybeSingle();
+  if (dup) {
+    return {
+      ok: true,
+      modelMessage: "Эта пробежка уже есть в журнале. Не отмечай сохранение повторно, просто продолжи разговор.",
+    };
   }
 
   const { error } = await supabase.from("runs").insert({
