@@ -166,6 +166,46 @@ describe("POST /api/chat — история принадлежит сервер�
   });
 });
 
+describe("POST /api/chat — инструмент журнала доступен всем тарифам", () => {
+  it("FREE: log_run передаётся, save_tip — нет", async () => {
+    vi.mocked(resolveTier).mockReturnValue("free");
+    vi.mocked(countMessageTokens).mockResolvedValue({ tokens: 10, estimated: false });
+    vi.mocked(anthropic.messages.stream).mockReturnValue(textStream());
+
+    await drain(await POST(makeReqV2({ text: "пробежал 5 км" })));
+
+    const params = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
+    const toolNames = (params.tools ?? []).map((t) => t.name);
+    expect(toolNames).toContain("log_run");
+    expect(toolNames).not.toContain("save_tip");
+  });
+
+  it("PRO: доступны оба инструмента", async () => {
+    vi.mocked(resolveTier).mockReturnValue("pro");
+    vi.mocked(countMessageTokens).mockResolvedValue({ tokens: 10, estimated: false });
+    vi.mocked(anthropic.messages.stream).mockReturnValue(textStream());
+
+    await drain(await POST(makeReqV2({ text: "пробежал 5 км" })));
+
+    const params = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
+    const toolNames = (params.tools ?? []).map((t) => t.name);
+    expect(toolNames).toEqual(expect.arrayContaining(["log_run", "save_tip"]));
+  });
+
+  it("сегодняшняя дата уходит в системный промпт", async () => {
+    vi.mocked(resolveTier).mockReturnValue("free");
+    vi.mocked(countMessageTokens).mockResolvedValue({ tokens: 10, estimated: false });
+    vi.mocked(anthropic.messages.stream).mockReturnValue(textStream());
+
+    await drain(await POST(makeReqV2({ text: "привет" })));
+
+    const params = vi.mocked(anthropic.messages.stream).mock.calls[0][0];
+    const systemText = (params.system as { text: string }[]).map((b) => b.text).join("\n");
+    const today = new Date().toISOString().slice(0, 10);
+    expect(systemText).toContain(today);
+  });
+});
+
 describe("POST /api/chat — идемпотентность повторной отправки", () => {
   it("повтор с тем же clientMessageId отдаёт готовый ответ, не трогая Claude и квоту", async () => {
     vi.mocked(getConversation).mockResolvedValue({

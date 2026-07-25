@@ -71,7 +71,10 @@ export const LOG_RUN_TOOL: Anthropic.Tool = {
         description: "Короткая заметка о пробежке, 1 предложение, в голосе пользователя.",
       },
     },
-    required: ["date", "distance_km", "intensity"],
+    // Обязательна только дистанция. date и intensity сервер подставит по
+    // умолчанию (сегодня / easy), если модель их не передала — так одна забытая
+    // деталь не роняет запись пробежки.
+    required: ["distance_km"],
   },
 };
 

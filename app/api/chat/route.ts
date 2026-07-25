@@ -253,6 +253,12 @@ export async function POST(req: Request) {
     content: m.content,
   }));
 
+  // Сегодняшняя дата — модель её иначе не знает, а log_run требует date.
+  // Без этого блока НИКА подставляла в журнал выдуманную дату (обычно из своего
+  // обучения), и пробежка уезжала в чужой день — на странице «этой недели» её
+  // не видно, будто и не записалась.
+  const today = new Date().toISOString().slice(0, 10);
+
   // Активный спринт — добавляем динамический <user_context> в промт.
   const activeSprint = await getActiveSprint(supabase, user.id);
   const systemBlocks: Anthropic.TextBlockParam[] = [
@@ -261,6 +267,9 @@ export async function POST(req: Request) {
       text: buildSystemPrompt(scenario, isPro),
       cache_control: { type: "ephemeral" },
     },
+    // Отдельным НЕкэшируемым блоком: дата меняется каждый день, кэш базового
+    // промпта она портить не должна.
+    { type: "text", text: `Сегодняшняя дата: ${today} (формат YYYY-MM-DD).` },
   ];
   if (activeSprint) {
     systemBlocks.push({ type: "text", text: buildSprintContext(activeSprint) });
@@ -268,7 +277,6 @@ export async function POST(req: Request) {
 
   // Контекст ритма: новая система (фаза цикла) → приоритет. Если нет данных —
   // fallback на старый daily_state (отметки настроения/пробежек).
-  const today = new Date().toISOString().slice(0, 10);
   const profile = await getProfile(supabase, user.id);
   let rhythmContextAdded = false;
 
@@ -319,8 +327,8 @@ export async function POST(req: Request) {
           model: NIKA_MODEL,
           max_tokens: 1024,
           system: systemBlocks,
-          // Инструменты доступны только PRO.
-          ...(isPro ? { tools: [SAVE_TIP_TOOL, LOG_RUN_TOOL] } : {}),
+          // log_run (журнал) доступен всем; save_tip (Советы) — только PRO.
+          tools: isPro ? [SAVE_TIP_TOOL, LOG_RUN_TOOL] : [LOG_RUN_TOOL],
           ...(toolChoice ? { tool_choice: toolChoice } : {}),
           messages: turnMessages,
         });
@@ -343,7 +351,9 @@ export async function POST(req: Request) {
         // Если модель вызвала инструмент — исполняем на сервере и даём ей
         // продолжить (раунд 2), чтобы финальный текст содержал отметку о
         // сохранении. tool_choice: none в раунде 2 исключает повторный вызов.
-        if (isPro && firstMsg.stop_reason === "tool_use") {
+        // Не гейтим по isPro: log_run доступен всем, а save_tip у FREE просто
+        // не окажется в списке инструментов, поэтому и не вызовется.
+        if (firstMsg.stop_reason === "tool_use") {
           const toolUse = firstMsg.content.find(
             (b): b is Anthropic.ToolUseBlock => b.type === "tool_use",
           );
