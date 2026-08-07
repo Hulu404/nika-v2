@@ -30,6 +30,24 @@ export interface WeekSummary {
   today: number;
 }
 
+// ─── дата пробежки ───────────────────────────────────────────────────────────
+
+export const FUTURE_DATE_ERROR = "run date is in the future";
+
+/** Сегодня в локальном времени пользователя, YYYY-MM-DD. */
+export function todayStr(now = new Date()): string {
+  return now.toLocaleDateString("en-CA");
+}
+
+/**
+ * Пробежку записывают постфактум — дата позже сегодняшней недопустима.
+ * Строки YYYY-MM-DD сравнимы лексикографически, так что часовой пояс
+ * учитывается ровно один раз — в todayStr().
+ */
+export function isFutureDate(date: string, now = new Date()): boolean {
+  return date > todayStr(now);
+}
+
 // ─── запросы ───────────────────────────────────────────────────────────────
 
 /** Пробежки пользователя, новые сверху. Терпим к отсутствию таблицы (вернёт []). */
@@ -56,6 +74,7 @@ export interface NewRun {
 }
 
 export async function createRun(supabase: Client, run: NewRun): Promise<string | null> {
+  if (isFutureDate(run.date)) return FUTURE_DATE_ERROR;
   const { error } = await supabase.from("runs").insert({
     user_id: run.userId,
     date: run.date,
@@ -77,6 +96,7 @@ export interface RunPatch {
 
 /** Обновляет пробежку. RLS ограничивает строки владельцем (auth.uid() = user_id). */
 export async function updateRun(supabase: Client, runId: string, patch: RunPatch): Promise<string | null> {
+  if (isFutureDate(patch.date)) return FUTURE_DATE_ERROR;
   const { error } = await supabase
     .from("runs")
     .update({

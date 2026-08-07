@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClientComponentClient } from "@/lib/supabase";
-import { createRun, updateRun, deleteRun, formatPace } from "@/lib/runs";
+import { createRun, updateRun, deleteRun, formatPace, todayStr, isFutureDate } from "@/lib/runs";
 import { cn } from "@/lib/utils";
 import type { RunRow } from "@/types/database";
 import type { RunIntensity } from "@/types/app";
@@ -13,10 +13,6 @@ const INTENSITY: { v: RunIntensity; l: string }[] = [
   { v: "medium", l: "Средне" },
   { v: "hard", l: "Тяжело" },
 ];
-
-function todayStr() {
-  return new Date().toLocaleDateString("en-CA"); // YYYY-MM-DD в локальном времени
-}
 
 /**
  * Переводит ввод длительности в минуты (в БД храним duration_min).
@@ -100,7 +96,10 @@ export function RunSheet({ open, onClose, mode, userId, run, onSaved }: RunSheet
   const km = parseFloat(distance.replace(",", "."));
   // Время: число в выбранных единицах либо формат чч:мм:сс / мм:сс. В БД — минуты.
   const min = durationToMinutes(duration, durationUnit);
-  const valid = Boolean(date) && km > 0 && min > 0;
+  // max у <input type="date"> — только подсказка браузеру, значение всё равно
+  // может оказаться в будущем (ручной ввод, автозаполнение), поэтому проверяем сами.
+  const futureDate = Boolean(date) && isFutureDate(date);
+  const valid = Boolean(date) && !futureDate && km > 0 && min > 0;
   // Показываем живой пересчёт, когда ввод не равен «просто минутам».
   const showMinConversion = min > 0 && (durationUnit === "h" || duration.includes(":"));
   // Живой предпросмотр темпа.
@@ -171,7 +170,19 @@ export function RunSheet({ open, onClose, mode, userId, run, onSaved }: RunSheet
           <div className="flex flex-col gap-4">
             <label className="flex flex-col gap-1.5">
               <span className="text-xs uppercase tracking-wide text-ink-secondary">Дата</span>
-              <input type="date" value={date} max={todayStr()} onChange={(e) => setDate(e.target.value)} className={fieldCls} />
+              <input
+                type="date"
+                value={date}
+                max={todayStr()}
+                onChange={(e) => setDate(e.target.value)}
+                aria-invalid={futureDate}
+                className={cn(fieldCls, futureDate && "border-accent focus:border-accent")}
+              />
+              {futureDate && (
+                <span className="text-[11px] leading-snug text-accent">
+                  Дата в будущем — пробежку можно записать только за сегодня или раньше.
+                </span>
+              )}
             </label>
 
             <div className="flex flex-col gap-1.5">
