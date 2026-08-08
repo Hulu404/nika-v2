@@ -346,7 +346,7 @@ export function Chat({
 /** Скелет-лоадер чата — показывается, пока серверный компонент грузит историю. */
 export function ChatSkeleton() {
   return (
-    <div className="flex h-dvh animate-pulse flex-col bg-canvas">
+    <div className="flex h-app animate-pulse flex-col bg-canvas">
       <header className="sticky top-0 z-10 flex shrink-0 items-center gap-3 border-b border-line-subtle px-4 pb-3 pt-header-top-lg">
         <div className="h-9 w-9 shrink-0 rounded-full bg-surface-warm" />
         <div className="h-9 w-9 shrink-0 rounded-full bg-surface-warm" />

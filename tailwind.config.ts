@@ -79,14 +79,19 @@ const config: Config = {
         "fade-in": "fade-in 0.25s ease-out",
         blink: "blink 1.3s infinite",
       },
+      // h-app вместо h-dvh: 100dvh не уменьшается при открытии клавиатуры,
+      // поэтому высоту держит переменная (см. globals.css / KeyboardInsets).
+      height: {
+        app: "var(--app-h)",
+      },
       spacing: {
         safe: "env(safe-area-inset-bottom, 0px)",
         // Верхний вырез (чёлка/строка статуса) — для pt-safe-top на sticky-шапках,
         // чтобы при viewport-fit=cover они не уезжали под строку статуса.
         "safe-top": "env(safe-area-inset-top, 0px)",
-        // Высота мобильного таб-бара (pt-1.5 + 44 + pb-2) + safe-area.
-        // Экраны, у которых контент упирается в низ, резервируют её через pb-tabbar.
-        tabbar: "calc(58px + env(safe-area-inset-bottom, 0px))",
+        // Высота мобильного таб-бара + safe-area; при открытой клавиатуре
+        // схлопывается в ноль (значение живёт в globals.css).
+        tabbar: "var(--tabbar-h)",
         // Высота таб-бара + верхний вырез — для шапок, которым нужен и базовый
         // отступ, и safe-area (см. заголовки разделов).
         "header-top": "calc(0.5rem + env(safe-area-inset-top, 0px))",

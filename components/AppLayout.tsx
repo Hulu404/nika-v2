@@ -1,6 +1,7 @@
 import { BottomNavData } from "@/components/BottomNavData";
 import { PageTransition } from "@/components/PageTransition";
 import { LockBodyScroll } from "@/components/LockBodyScroll";
+import { KeyboardInsets } from "@/components/KeyboardInsets";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -21,8 +22,9 @@ interface AppLayoutProps {
  */
 export function AppLayout({ children, sidebarSlot, hideTabBar }: AppLayoutProps) {
   return (
-    <div className="flex h-dvh overflow-hidden bg-[var(--bg-primary)]">
+    <div className="flex h-app overflow-hidden bg-[var(--bg-primary)]">
       <LockBodyScroll />
+      <KeyboardInsets />
       {sidebarSlot}
 
       {/* Основная область контента */}

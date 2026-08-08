@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { KeyboardInsets } from "@/components/KeyboardInsets";
 import { createClientComponentClient } from "@/lib/supabase";
 import { saveOnboarding } from "@/lib/profile";
 import { requestNotifPermission, tryOsNotification } from "@/lib/notifications";
@@ -501,7 +502,10 @@ export function ChatOnboarding({ userId }: { userId: string }) {
 
   // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-dvh w-full overflow-hidden bg-canvas-outer">
+    <div className="flex h-app w-full overflow-hidden bg-canvas-outer">
+      {/* Тут тоже поле ввода у нижней кромки — без этого клавиатура уводит его
+          под себя ровно так же, как в чате. */}
+      <KeyboardInsets />
       {/* Брендпанель (десктоп) */}
       <aside
         className="hidden h-full w-[42%] max-w-[430px] flex-col gap-6 overflow-y-auto border-r border-line-default p-12 lg:flex"
