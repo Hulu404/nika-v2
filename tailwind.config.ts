@@ -79,11 +79,6 @@ const config: Config = {
         "fade-in": "fade-in 0.25s ease-out",
         blink: "blink 1.3s infinite",
       },
-      // h-app вместо h-dvh: 100dvh не уменьшается при открытии клавиатуры,
-      // поэтому высоту держит переменная (см. globals.css / KeyboardInsets).
-      height: {
-        app: "var(--app-h)",
-      },
       spacing: {
         safe: "env(safe-area-inset-bottom, 0px)",
         // Верхний вырез (чёлка/строка статуса) — для pt-safe-top на sticky-шапках,

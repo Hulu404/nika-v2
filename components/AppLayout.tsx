@@ -22,7 +22,7 @@ interface AppLayoutProps {
  */
 export function AppLayout({ children, sidebarSlot, hideTabBar }: AppLayoutProps) {
   return (
-    <div className="flex h-app overflow-hidden bg-[var(--bg-primary)]">
+    <div className="app-shell flex overflow-hidden bg-[var(--bg-primary)]">
       <LockBodyScroll />
       <KeyboardInsets />
       {sidebarSlot}

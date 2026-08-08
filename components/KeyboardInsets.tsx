@@ -24,7 +24,8 @@ const KEYBOARD_MIN_OVERLAP = 120;
  *
  *   • класс keyboard-open — сворачивает --tabbar-h в ноль (таб-бар на время
  *     ввода прячется, и его резерв не должен оставаться дырой над клавиатурой);
- *   • --app-h — высоту видимой части экрана.
+ *   • --app-h и --app-top — высоту видимой части экрана и её смещение вниз
+ *     относительно верха layout-вьюпорта (см. .app-shell в globals.css).
  *
  * Зачем --app-h вообще нужна: 100dvh при открытии клавиатуры НЕ уменьшается ни
  * на iOS, ни в Chrome с дефолтным interactive-widget=resizes-visual. Контейнер
@@ -70,15 +71,23 @@ export function KeyboardInsets() {
         // (iOS даёт зумить даже при user-scalable=no, ради доступности.)
         if (vv.scale > 1) return;
 
-        const overlap = window.innerHeight - vv.height - vv.offsetTop;
+        // Ровно то, что съедено снизу: offsetTop тут вычитать нельзя. Это не
+        // часть перекрытия, а подъём экрана к полю — при большом подъёме
+        // перекрытие ушло бы под порог, мы бы отпустили высоту, поле снова
+        // нырнуло под клавиатуру, iOS поднял бы экран ещё раз. Компенсируем
+        // подъём отдельно, через --app-top.
+        const overlap = window.innerHeight - vv.height;
         if (overlap > KEYBOARD_MIN_OVERLAP) {
           root.style.setProperty("--app-h", `${Math.round(vv.height)}px`);
-          // iOS успевает подтянуть страницу к полю до того, как мы ужмём
-          // контейнер. Возвращаем документ на место — иначе шапка остаётся
-          // за верхней кромкой. Условие гасит цикл scroll → scrollTo → scroll.
+          root.style.setProperty("--app-top", `${Math.round(vv.offsetTop)}px`);
+          // Там, где документ всё-таки скроллится (онбординг — он без
+          // LockBodyScroll), iOS подтягивает к полю страницу. Возвращаем её на
+          // место: каркас в fixed, и сдвинутым остался бы только фон под ним.
+          // Условие гасит цикл scroll → scrollTo → scroll.
           if (window.scrollY !== 0) window.scrollTo(0, 0);
         } else {
           root.style.removeProperty("--app-h");
+          root.style.removeProperty("--app-top");
         }
       });
     };
@@ -95,6 +104,7 @@ export function KeyboardInsets() {
       cancelAnimationFrame(raf);
       root.classList.remove("keyboard-open");
       root.style.removeProperty("--app-h");
+      root.style.removeProperty("--app-top");
     };
   }, []);
 

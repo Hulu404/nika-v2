@@ -502,7 +502,7 @@ export function ChatOnboarding({ userId }: { userId: string }) {
 
   // ─────────────────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-app w-full overflow-hidden bg-canvas-outer">
+    <div className="app-shell flex overflow-hidden bg-canvas-outer">
       {/* Тут тоже поле ввода у нижней кромки — без этого клавиатура уводит его
           под себя ровно так же, как в чате. */}
       <KeyboardInsets />
