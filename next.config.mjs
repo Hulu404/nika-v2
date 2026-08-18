@@ -28,6 +28,15 @@ const nextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
+  async rewrites() {
+    return [
+      // /coffeerunsurfsport → /coffeerunsurfsport/index.html (без редиректа)
+      {
+        source: "/coffeerunsurfsport",
+        destination: "/coffeerunsurfsport/index.html",
+      },
+    ];
+  },
 };
 
 export default nextConfig;
