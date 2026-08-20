@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
 
     if (!token) return new NextResponse(null, { status: 204 });
 
-    const admin = createServiceRoleClient();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const admin = createServiceRoleClient() as any;
     await admin
       .from("promo_tokens")
       .update({ status: "clicked", clicked_at: new Date().toISOString() })

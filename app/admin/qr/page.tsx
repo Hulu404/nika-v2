@@ -28,17 +28,14 @@ export default async function AdminQrPage() {
 
   const admin = createServiceRoleClient();
 
-  // Воронка по кодам и дням
-  const { data: funnel } = await admin
-    .from("v_qr_funnel")
-    .select("*")
-    .order("day", { ascending: false });
+  // Воронка по кодам и дням (новые таблицы, типы ещё не сгенерированы)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const a = admin as any;
+  const { data: funnel = [] } = await a.from("v_qr_funnel").select("*").order("day", { ascending: false }) as { data: Array<Record<string, unknown>> | null };
 
   // Справочник кодов для переключателя is_active
-  const { data: codes } = await admin
-    .from("qr_codes")
-    .select("code, label, quota, grant_days, is_active")
-    .order("created_at");
+  type QrCode = { code: string; label: string; quota: number; grant_days: number; is_active: boolean };
+  const { data: codes = [] } = await a.from("qr_codes").select("code, label, quota, grant_days, is_active").order("created_at") as { data: QrCode[] | null };
 
   // Сводка по кодам (агрегат)
   const summary: Record<string, {

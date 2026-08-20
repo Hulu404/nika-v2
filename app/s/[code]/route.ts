@@ -22,7 +22,8 @@ export async function GET(
   { params }: { params: { code: string } },
 ) {
   const code = (params.code ?? "").toUpperCase().slice(0, 32);
-  const admin = createServiceRoleClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createServiceRoleClient() as any;
 
   // Проверяем, что код существует и активен
   const { data: qr } = await admin

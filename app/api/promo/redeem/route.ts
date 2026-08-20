@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Missing token" }, { status: 400 });
   }
 
-  const admin = createServiceRoleClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createServiceRoleClient() as any;
 
   // Rate limit: 5 попыток в час на аккаунт
   const { data: rl } = await admin.rpc("check_rate_limit", {
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Ошибка сервера" }, { status: 500 });
   }
 
-  const result = data as { status: string; grant_days?: number; period_end?: string };
+  const result = data as unknown as { status: string; grant_days?: number; period_end?: string };
 
   switch (result.status) {
     case "ok":

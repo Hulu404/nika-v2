@@ -20,7 +20,8 @@ export async function POST(req: NextRequest) {
   const code = (form.get("code") as string ?? "").toUpperCase().slice(0, 32);
   const isActive = form.get("is_active") === "true";
 
-  const admin = createServiceRoleClient();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const admin = createServiceRoleClient() as any;
   await admin.from("qr_codes").update({ is_active: isActive }).eq("code", code);
 
   return NextResponse.redirect(new URL("/admin/qr", req.url), 303);
