@@ -256,6 +256,38 @@ export function ProfileContent({
     (Date.now() - new Date(createdAt).getTime()) / (1000 * 60 * 60 * 24),
   ));
 
+  // Промокод (ручной ввод)
+  const [promoInput, setPromoInput]   = useState("");
+  const [promoStatus, setPromoStatus] = useState<"idle" | "loading" | "ok" | "error">("idle");
+  const [promoMessage, setPromoMessage] = useState("");
+
+  async function handlePromoRedeem() {
+    const token = promoInput.trim().toUpperCase();
+    if (!token) return;
+    setPromoStatus("loading");
+    setPromoMessage("");
+    try {
+      const r = await fetch("/api/promo/redeem", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ token }),
+      });
+      const d = await r.json();
+      if (r.ok && d.ok) {
+        setPromoStatus("ok");
+        setPromoMessage("Pro активирован! Обновляем страницу…");
+        setTimeout(() => window.location.reload(), 1500);
+      } else {
+        setPromoStatus("error");
+        setPromoMessage(d.error ?? "Не получилось активировать код.");
+      }
+    } catch {
+      setPromoStatus("error");
+      setPromoMessage("Нет соединения. Попробуй ещё раз.");
+    }
+  }
+
   // Usage
   const [usage, setUsage] = useState<{ used: number; limit: number; msUntilReset?: number } | null>(null);
   useEffect(() => {
@@ -575,6 +607,43 @@ export function ProfileContent({
               <p className="mt-2.5 text-center text-[11px] leading-[1.45]" style={MUTED_ON_INVERTED}>
                 Первая неделя — 1 ₽, далее 249 ₽/мес. Отменить можно в любой момент.
               </p>
+            </div>
+          )}
+
+          {/* Промокод */}
+          {!isPro && (
+            <div className="mb-5">
+              <SectionLabel>Промокод</SectionLabel>
+              <Card>
+                <div className="px-4 py-3 flex flex-col gap-3">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={promoInput}
+                      onChange={e => { setPromoInput(e.target.value); setPromoStatus("idle"); setPromoMessage(""); }}
+                      onKeyDown={e => e.key === "Enter" && handlePromoRedeem()}
+                      placeholder="Введи промокод"
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      disabled={promoStatus === "loading" || promoStatus === "ok"}
+                      className="flex-1 rounded-input border border-ink-tertiary bg-canvas px-3 py-2 text-[14px] font-mono text-ink-primary placeholder:text-ink-tertiary focus:border-accent focus:outline-none disabled:opacity-50"
+                    />
+                    <button
+                      onClick={handlePromoRedeem}
+                      disabled={promoStatus === "loading" || promoStatus === "ok" || !promoInput.trim()}
+                      className="rounded-input bg-accent px-4 py-2 text-[13px] font-medium text-canvas transition-opacity hover:opacity-90 disabled:opacity-40"
+                    >
+                      {promoStatus === "loading" ? "…" : "Применить"}
+                    </button>
+                  </div>
+                  {promoMessage && (
+                    <p className={`text-[12px] leading-[1.45] ${promoStatus === "ok" ? "text-accent" : "text-red-500"}`}>
+                      {promoMessage}
+                    </p>
+                  )}
+                </div>
+              </Card>
             </div>
           )}
 

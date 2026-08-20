@@ -60,13 +60,25 @@ export default function AuthPage() {
   useEffect(() => {
     setDark(document.documentElement.classList.contains("dark"));
 
+    const q = new URLSearchParams(window.location.search);
+
     // Ошибки из /auth/callback (неудачное подтверждение по ссылке из письма).
-    const e = new URLSearchParams(window.location.search).get("error");
+    const e = q.get("error");
     if (e === "auth") {
       setError("Ссылка подтверждения недействительна или открыта в другом браузере. Войди по почте и паролю.");
     } else if (e === "missing_code") {
       setError("Ссылка подтверждения неполная. Войди по почте и паролю.");
     }
+
+    // Промокод из QR-страницы: сохраняем в sessionStorage, чтобы не потерять
+    // если пользователь переключился на вкладку входа и вернулся.
+    const promo = q.get("promo");
+    const src   = q.get("src");
+    if (promo) sessionStorage.setItem("nika_promo", promo);
+    if (src)   sessionStorage.setItem("nika_src",   src);
+
+    // Если ?mode=signup пришёл из /signup-редиректа — переключаем форму
+    if (q.get("mode") === "signup") setMode("signup");
   }, []);
   function applyTheme(next: "light" | "dark") {
     const d = next === "dark";
@@ -127,7 +139,23 @@ export default function AuthPage() {
       return;
     }
     if (data.session) {
-      // Сессия сразу (Confirm email выключен) — ведём на онбординг.
+      // Сессия сразу (Confirm email выключен).
+      // Погашаем промокод из QR-страницы если он есть (серверно через API).
+      const promoToken = sessionStorage.getItem("nika_promo");
+      if (promoToken) {
+        try {
+          await fetch("/api/promo/redeem", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            credentials: "same-origin",
+            body: JSON.stringify({ token: promoToken }),
+          });
+        } catch {
+          // Ошибки погашения не блокируют регистрацию — идём дальше
+        }
+        sessionStorage.removeItem("nika_promo");
+        sessionStorage.removeItem("nika_src");
+      }
       window.location.assign("/onboarding");
       return;
     }
