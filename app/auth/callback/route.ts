@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/supabase";
 import { createServiceRoleClient } from "@/lib/supabase-server";
+import { getPublicOrigin } from "@/lib/public-origin";
 
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url);
+  const { searchParams } = new URL(request.url);
+  const origin = getPublicOrigin(request);
   const code = searchParams.get("code");
   const token = searchParams.get("token");
   const type = searchParams.get("type");

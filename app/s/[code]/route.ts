@@ -1,22 +1,10 @@
 import { createHash } from "crypto";
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase-server";
+import { getPublicOrigin } from "@/lib/public-origin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-/** Railway проксирует через localhost:8080 → req.url содержит внутренний хост.
- *  Берём реальный origin из X-Forwarded-Host / Host. */
-function getPublicOrigin(req: NextRequest): string {
-  const host =
-    req.headers.get("x-forwarded-host") ??
-    req.headers.get("host") ??
-    "www.mynika.online";
-  const proto =
-    req.headers.get("x-forwarded-proto") ??
-    (process.env.NODE_ENV === "production" ? "https" : "http");
-  return `${proto}://${host}`;
-}
 
 /** Railway ставит реальный IP в X-Forwarded-For. Берём первый адрес в цепочке. */
 function extractIp(req: NextRequest): string {

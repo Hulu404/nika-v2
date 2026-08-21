@@ -4,6 +4,7 @@ import { createServiceRoleClient } from "@/lib/supabase-server";
 import { sendBotMessage } from "@/lib/telegram/send";
 import { canReceiveBotMessages } from "@/lib/telegram/gate";
 import { trackServer } from "@/lib/track-server";
+import { getPublicOrigin } from "@/lib/public-origin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -59,7 +60,7 @@ export async function POST(req: Request) {
   }
   if (!email) return Response.json(NEUTRAL);
 
-  const origin = (process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin).replace(/\/$/, "");
+  const origin = getPublicOrigin(req);
   const admin = createServiceRoleClient();
 
   try {

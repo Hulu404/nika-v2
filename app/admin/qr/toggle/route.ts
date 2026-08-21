@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase-server";
+import { getPublicOrigin } from "@/lib/public-origin";
 
 export const runtime = "nodejs";
 
@@ -12,8 +13,10 @@ function isAuthorized(req: NextRequest): boolean {
 }
 
 export async function POST(req: NextRequest) {
+  const origin = getPublicOrigin(req);
+
   if (!isAuthorized(req)) {
-    return NextResponse.redirect(new URL("/", req.url));
+    return NextResponse.redirect(new URL("/", origin));
   }
 
   const form = await req.formData();
@@ -24,5 +27,5 @@ export async function POST(req: NextRequest) {
   const admin = createServiceRoleClient() as any;
   await admin.from("qr_codes").update({ is_active: isActive }).eq("code", code);
 
-  return NextResponse.redirect(new URL("/admin/qr", req.url), 303);
+  return NextResponse.redirect(new URL("/admin/qr", origin), 303);
 }
