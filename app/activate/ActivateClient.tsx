@@ -140,7 +140,7 @@ function readCookie(name: string): string {
   return m ? decodeURIComponent(m[1]) : "";
 }
 
-const APP = "https://mynika.online";
+const APP = "https://www.mynika.online";
 
 export function ActivateClient() {
   const [code, setCode] = useState("direct");
@@ -412,7 +412,7 @@ export function ActivateClient() {
                 <span className="nm"><b>НИКА</b></span>
               </div>
               <div className="f-links">
-                <a href="https://mynika.online">mynika.online</a>
+                <a href="https://www.mynika.online">mynika.online</a>
                 <a href="/legal/privacy">Персональные данные</a>
                 <a href="mailto:ceo@mynika.ru">ceo@mynika.ru</a>
               </div>
