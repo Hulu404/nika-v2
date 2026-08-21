@@ -5,6 +5,19 @@ import { createServiceRoleClient } from "@/lib/supabase-server";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** Railway проксирует через localhost:8080 → req.url содержит внутренний хост.
+ *  Берём реальный origin из X-Forwarded-Host / Host. */
+function getPublicOrigin(req: NextRequest): string {
+  const host =
+    req.headers.get("x-forwarded-host") ??
+    req.headers.get("host") ??
+    "www.mynika.online";
+  const proto =
+    req.headers.get("x-forwarded-proto") ??
+    (process.env.NODE_ENV === "production" ? "https" : "http");
+  return `${proto}://${host}`;
+}
+
 /** Railway ставит реальный IP в X-Forwarded-For. Берём первый адрес в цепочке. */
 function extractIp(req: NextRequest): string {
   const xff = req.headers.get("x-forwarded-for");
@@ -23,6 +36,7 @@ export async function GET(
   { params }: { params: { code: string } },
 ) {
   const code = (params.code ?? "").toUpperCase().slice(0, 32);
+  const origin = getPublicOrigin(req);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createServiceRoleClient() as any;
@@ -42,7 +56,7 @@ export async function GET(
 
   if (!qr || !qr.is_active) {
     // Неизвестный или отключённый код — тихий 302 на главную без деталей
-    return NextResponse.redirect(new URL("/", req.url), 302);
+    return NextResponse.redirect(new URL("/", origin), 302);
   }
 
   // ── 2. Пишем скан (ошибка не ломает переход) ─────────────────────────────
@@ -72,7 +86,7 @@ export async function GET(
   }
 
   // ── 3. Редирект на страницу активации ────────────────────────────────────
-  const dest = new URL("/activate", req.url);
+  const dest = new URL("/activate", origin);
   dest.searchParams.set("c", code);
   if (scanId) dest.searchParams.set("s", scanId);
 
