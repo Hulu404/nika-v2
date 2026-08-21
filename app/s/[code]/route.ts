@@ -12,9 +12,10 @@ function extractIp(req: NextRequest): string {
   return req.headers.get("x-real-ip") ?? "unknown";
 }
 
+/** SHA-256 (64 hex-символа) от IP + соль. Сырой IP нигде не хранится. */
 function hashIp(ip: string): string {
   const salt = process.env.IP_HASH_SALT ?? "nika-qr-salt";
-  return createHash("sha256").update(ip + salt).digest("hex").slice(0, 16);
+  return createHash("sha256").update(ip + salt).digest("hex"); // 64 символа
 }
 
 export async function GET(
@@ -22,37 +23,55 @@ export async function GET(
   { params }: { params: { code: string } },
 ) {
   const code = (params.code ?? "").toUpperCase().slice(0, 32);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const admin = createServiceRoleClient() as any;
 
-  // Проверяем, что код существует и активен
-  const { data: qr } = await admin
-    .from("qr_codes")
-    .select("code, is_active")
-    .eq("code", code)
-    .maybeSingle();
-
-  if (!qr || !qr.is_active) {
-    // Код неизвестен — тихий редирект на главную без технических деталей
-    return NextResponse.redirect(new URL("/", req.url));
+  // ── 1. Проверяем код ──────────────────────────────────────────────────────
+  let qr: { code: string; is_active: boolean } | null = null;
+  try {
+    const { data } = await admin
+      .from("qr_codes")
+      .select("code, is_active")
+      .eq("code", code)
+      .maybeSingle();
+    qr = data;
+  } catch (err) {
+    console.error("[/s] qr_codes lookup error:", err);
   }
 
-  // Пишем скан
+  if (!qr || !qr.is_active) {
+    // Неизвестный или отключённый код — тихий 302 на главную без деталей
+    return NextResponse.redirect(new URL("/", req.url), 302);
+  }
+
+  // ── 2. Пишем скан (ошибка не ломает переход) ─────────────────────────────
   const ip = extractIp(req);
-  const { data: scan } = await admin
-    .from("qr_scans")
-    .insert({
-      code,
-      ip_hash: hashIp(ip),
-      user_agent: req.headers.get("user-agent")?.slice(0, 512) ?? null,
-      referer: req.headers.get("referer")?.slice(0, 512) ?? null,
-    })
-    .select("id")
-    .single();
+  const ipHash = hashIp(ip);
 
-  const scanId = scan?.id ?? "";
+  let scanId = "";
+  try {
+    const { data: scan, error: scanErr } = await admin
+      .from("qr_scans")
+      .insert({
+        code,
+        ip_hash: ipHash,
+        user_agent: req.headers.get("user-agent")?.slice(0, 512) ?? null,
+        referer: req.headers.get("referer")?.slice(0, 512) ?? null,
+      })
+      .select("id")
+      .single();
 
-  // Редирект на страницу активации
+    if (scanErr) {
+      console.error("[/s] qr_scans insert error:", scanErr.message);
+    } else {
+      scanId = scan?.id ?? "";
+    }
+  } catch (err) {
+    console.error("[/s] qr_scans unexpected error:", err);
+  }
+
+  // ── 3. Редирект на страницу активации ────────────────────────────────────
   const dest = new URL("/activate", req.url);
   dest.searchParams.set("c", code);
   if (scanId) dest.searchParams.set("s", scanId);
