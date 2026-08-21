@@ -303,12 +303,6 @@ export function ActivateClient() {
                 <i>приложение</i>
                 <b>НИКА</b>
               </span>
-              <span className="sep">×</span>
-              <span className="surf">
-                <b>
-                  Surf Coffee<sup>®</sup>
-                </b>
-              </span>
             </div>
             <span className="hint">
               Код со стакана: <b>{code === "direct" ? "не найден" : code}</b>
@@ -393,8 +387,6 @@ export function ActivateClient() {
                   <li><span className="t"><b>Карта не нужна</b>, ничего не спишется ни сейчас, ни потом</span></li>
                 </ul>
                 <div className="act-pair">
-                  <span className="wm sxs">Surf Coffee<sup>®</sup><i className="x">×</i>Sport</span>
-                  <span style={{ opacity: 0.5 }}>×</span>
                   <span className="logo-n" /> НИКА
                 </div>
               </div>
