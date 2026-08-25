@@ -11,7 +11,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { name, contact, email, source } = body as Record<string, string>;
+  const { name, contact, email, source, run_date } = body as Record<string, string>;
 
   if (!name || !contact || !email) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 422 });
@@ -28,11 +28,16 @@ export async function POST(req: Request) {
     auth: { persistSession: false },
   });
 
+  // Дата забега: берём из формы, если пришла валидная YYYY-MM-DD.
+  // Иначе не передаём — сработает default столбца run_date в БД.
+  const runDate = /^\d{4}-\d{2}-\d{2}$/.test(String(run_date || "")) ? String(run_date) : null;
+
   const { error } = await supabase.from("coffee_run_signups").insert({
     name: String(name).trim().slice(0, 200),
     contact: String(contact).trim().slice(0, 200),
     email: String(email).trim().slice(0, 200),
     source: String(source || "coffeerunsurfsport").slice(0, 100),
+    ...(runDate ? { run_date: runDate } : {}),
   });
 
   if (error) {
