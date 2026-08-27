@@ -7,6 +7,11 @@ import {
   sendConsentRequest,
 } from "./linking";
 import { handleResetCommand } from "./reset";
+import {
+  COFFEE_RUN_START_PREFIX,
+  handleCoffeeRunStart,
+  handleCoffeeRunByUsername,
+} from "./coffeerun";
 import { siteKeyboard } from "./cta";
 
 /**
@@ -39,12 +44,24 @@ function withKeyboard(kb: ReturnType<typeof siteKeyboard>) {
 function registerHandlers(bot: Bot<BotContext>): void {
   // ── /start ───────────────────────────────────────────────────────────────
   bot.command("start", async (ctx) => {
-    // Deep-link из приложения: /start <token> → привязка аккаунта.
     const token = (ctx.match ?? "").trim();
+
+    // Deep-link с лендинга кофе-рана: /start cr_<token> → подтверждение записи.
+    // Проверяем ПЕРВЫМ: префикс cr_ однозначно отделяет его от токена привязки.
+    if (token.startsWith(COFFEE_RUN_START_PREFIX)) {
+      await handleCoffeeRunStart(ctx, token);
+      return;
+    }
+
+    // Deep-link из приложения: /start <token> → привязка аккаунта.
     if (token) {
       await handleStartToken(ctx, token);
       return;
     }
+
+    // Без токена: сначала — неподтверждённая заявка на кофе-ран по нику. Человек
+    // мог найти бота поиском вместо кнопки, и для него /start значит именно это.
+    if (await handleCoffeeRunByUsername(ctx)) return;
 
     // Без токена, но чат уже привязан → статус / повторный запрос согласия.
     const chatId = ctx.from?.id;
