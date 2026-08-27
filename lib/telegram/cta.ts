@@ -19,3 +19,15 @@ export function siteKeyboard(label = "Открыть НИКУ"): InlineKeyboard 
   const url = siteUrl();
   return url ? new InlineKeyboard().url(label, url) : undefined;
 }
+
+/**
+ * Живая поддержка мероприятий — личка организатора. Держим здесь, рядом с
+ * остальными CTA бота, чтобы адрес не расползался по текстам.
+ */
+export const SUPPORT_URL = "https://t.me/meine_nika";
+export const SUPPORT_LABEL = "Служба поддержки";
+
+/** Клавиатура из одной кнопки поддержки — для сообщений без другого контекста. */
+export function supportKeyboard(): InlineKeyboard {
+  return new InlineKeyboard().url(SUPPORT_LABEL, SUPPORT_URL);
+}

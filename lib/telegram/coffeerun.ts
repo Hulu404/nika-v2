@@ -3,6 +3,7 @@ import { tgAdmin } from "./supabase";
 import { nextRun, runWhenWhere, type CoffeeRun } from "../coffeerun/run";
 import { normalizeTelegramUsername, formatTelegramUsername } from "../coffeerun/telegram-username";
 import { publicOriginFromEnv } from "../public-origin";
+import { SUPPORT_LABEL, SUPPORT_URL } from "./cta";
 import type { BotContext } from "./bot";
 
 /**
@@ -101,11 +102,21 @@ export function reminderText(signup: Pick<CoffeeRunSignup, "name">, run: CoffeeR
   ].join("\n");
 }
 
-/** Кнопки под сообщениями о забеге: маршрут до спота и сайт НИКИ. */
-export function runKeyboard(run: CoffeeRun): InlineKeyboard {
+/**
+ * Кнопки под сообщениями о забеге: маршрут до спота и сайт НИКИ.
+ *
+ * `support` добавляет кнопку живой поддержки. Включаем её в подтверждении
+ * записи: это момент, когда у человека возникают вопросы («а можно с другом?»,
+ * «я опоздаю»), и ему нужен человек, а не бот.
+ */
+export function runKeyboard(
+  run: CoffeeRun,
+  opts: { support?: boolean } = {},
+): InlineKeyboard {
   const kb = new InlineKeyboard().url("Как добраться", run.mapUrl);
   const site = publicOriginFromEnv();
   if (site) kb.row().url("Открыть НИКУ", site);
+  if (opts.support) kb.row().url(SUPPORT_LABEL, SUPPORT_URL);
   return kb;
 }
 
@@ -175,7 +186,7 @@ async function confirmAndReply(
 
   await markConfirmed(signup, chatId, actual);
   await ctx.reply(confirmationText(signup, run, actual, repeat), {
-    reply_markup: runKeyboard(run),
+    reply_markup: runKeyboard(run, { support: true }),
   });
 }
 
@@ -186,7 +197,7 @@ function landingUrl(): string | null {
   return site ? `${site}/coffeerunsurfsport` : null;
 }
 
-function landingKeyboard(): InlineKeyboard | undefined {
+export function landingKeyboard(): InlineKeyboard | undefined {
   const url = landingUrl();
   return url ? new InlineKeyboard().url("Записаться на кофе-ран", url) : undefined;
 }

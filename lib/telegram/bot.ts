@@ -11,23 +11,37 @@ import {
   COFFEE_RUN_START_PREFIX,
   handleCoffeeRunStart,
   handleCoffeeRunByUsername,
+  landingKeyboard,
 } from "./coffeerun";
-import { siteKeyboard } from "./cta";
+import { siteKeyboard, supportKeyboard, SUPPORT_LABEL, SUPPORT_URL } from "./cta";
 
 /**
- * Служебный бот НИКИ. Его роль — НЕ второй чат-клон, а канал уведомлений:
- *   • напоминания (утренние чек-ины) с кнопкой перехода на сайт;
- *   • сброс пароля (/reset и доставка ссылки, инициированной с сайта);
- *   • привязка аккаунта и управление согласием (opt-in / /stop).
+ * Бот мероприятий НИКИ. Снаружи он читается ровно как бот забегов:
+ *   • подтверждает запись на кофе-ран (deep-link с лендинга или просто /start);
+ *   • напоминает о старте накануне;
+ *   • даёт кнопку живой поддержки, когда нужен человек, а не бот.
  *
- * Свободного диалога с Anthropic здесь нет — общение с НИКОЙ живёт на сайте.
- * Поэтому нет ни сессий, ни меню сценариев: любой прочий ввод уводит на сайт.
+ * Свободного диалога здесь нет: любой прочий ввод коротко объясняет роль и
+ * отдаёт две кнопки — записаться и написать в поддержку.
+ *
+ * Привязка аккаунта НИКИ, opt-in и /reset остаются РАБОЧИМИ (приложение ходит
+ * тем же токеном), но в текстах бота больше не рекламируются: снаружи это бот
+ * мероприятий, а не «служебка» приложения.
  */
 export type BotContext = Context;
 
 const BOT_ROLE =
-  "Я служебный бот НИКИ. Присылаю напоминания и помогаю сбросить пароль. " +
-  "Пообщаться с НИКОЙ, посмотреть «Мой ритм» и всё остальное — на сайте.";
+  "Я бот мероприятий НИКИ: подтверждаю запись на забеги и напоминаю о них накануне.";
+
+/**
+ * Куда идти дальше из любого «не понял тебя» сообщения: записаться на забег и
+ * написать живому человеку. Без NEXT_PUBLIC_APP_URL ссылки на лендинг нет —
+ * тогда остаётся одна поддержка.
+ */
+function eventKeyboard() {
+  const landing = landingKeyboard();
+  return landing ? landing.row().url(SUPPORT_LABEL, SUPPORT_URL) : supportKeyboard();
+}
 
 /** Токен бота. TELEGRAM_BOT_TOKEN — приоритетно, BOT_TOKEN — совместимость. */
 function botToken(): string {
@@ -80,21 +94,28 @@ function registerHandlers(bot: Bot<BotContext>): void {
       }
     }
 
-    // Не привязан: коротко о роли бота + как подключить (из профиля на сайте).
+    // Ни заявки, ни привязки: коротко о роли и куда идти за местом на старте.
     const name = ctx.from?.first_name ?? "друг";
     await ctx.reply(
-      `Привет, ${name}! 👋\n\n${BOT_ROLE}\n\nЧтобы я могла присылать напоминания, подключи Telegram в профиле НИКИ.`,
-      withKeyboard(siteKeyboard()),
+      `Привет, ${name}! 👋\n\n${BOT_ROLE}\n\n` +
+        "Заявки на твой ник я не нашла. Хочешь бежать — оставь её на странице " +
+        "кофе-рана и нажми там «Подтвердить в Telegram».",
+      { reply_markup: eventKeyboard() },
     );
   });
 
   // ── Команды-утилиты ────────────────────────────────────────────────────────
-  bot.command("stop", (ctx) => handleStop(ctx)); // приостановить напоминания
-  bot.command(["reset", "password"], (ctx) => handleResetCommand(ctx)); // сброс пароля
+  bot.command("stop", (ctx) => handleStop(ctx)); // приостановить сообщения
+  // /reset остаётся рабочим для приложения, но в /help не рекламируется —
+  // снаружи бот про мероприятия.
+  bot.command(["reset", "password"], (ctx) => handleResetCommand(ctx));
   bot.command("help", async (ctx) => {
     await ctx.reply(
-      `${BOT_ROLE}\n\nКоманды:\n/reset — сбросить пароль\n/stop — приостановить напоминания\n/start — подключить или возобновить`,
-      withKeyboard(siteKeyboard()),
+      `${BOT_ROLE}\n\nКоманды:\n` +
+        "/start — подтвердить запись на забег\n" +
+        "/stop — приостановить сообщения\n\n" +
+        "Нужен живой человек — кнопка «Служба поддержки» ниже.",
+      { reply_markup: eventKeyboard() },
     );
   });
 
@@ -105,9 +126,13 @@ function registerHandlers(bot: Bot<BotContext>): void {
   // гасим «часик», НИЧЕГО не пишем (никаких answer/answered_at из Telegram).
   bot.callbackQuery(/^ans_/, (ctx) => ctx.answerCallbackQuery().catch(() => {}));
 
-  // ── Любой прочий ввод: это не чат-бот — коротко уводим на сайт ───────────────
+  // ── Любой прочий ввод: это не чат-бот — объясняем роль и даём кнопки ─────────
   bot.on("message", async (ctx) => {
-    await ctx.reply(BOT_ROLE, withKeyboard(siteKeyboard()));
+    await ctx.reply(
+      `${BOT_ROLE}\n\nСвободно общаться я не умею — но если нужен живой человек, ` +
+        "нажми «Служба поддержки».",
+      { reply_markup: eventKeyboard() },
+    );
   });
 
   // ── Глобальный обработчик ошибок ─────────────────────────────────────────────

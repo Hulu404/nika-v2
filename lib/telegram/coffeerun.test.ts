@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { confirmationText, parseCoffeeRunToken, reminderText } from "./coffeerun";
+import { confirmationText, parseCoffeeRunToken, reminderText, runKeyboard } from "./coffeerun";
 import { COFFEE_RUNS } from "../coffeerun/run";
 
 const RUN = COFFEE_RUNS[0];
@@ -75,5 +75,27 @@ describe("reminderText — напоминание накануне", () => {
     const text = reminderText(SIGNUP, RUN);
     expect(text).not.toContain(SIGNUP.email);
     expect(text).not.toContain(SIGNUP.tg_username);
+  });
+});
+
+describe("runKeyboard — кнопки под сообщениями о забеге", () => {
+  const flat = (kb: { inline_keyboard: { text: string; url?: string }[][] }) =>
+    kb.inline_keyboard.flat();
+
+  it("всегда даёт маршрут до спота", () => {
+    const buttons = flat(runKeyboard(RUN));
+    expect(buttons.some((b) => b.url === RUN.mapUrl)).toBe(true);
+  });
+
+  it("по умолчанию поддержки нет — она не нужна в напоминании", () => {
+    const buttons = flat(runKeyboard(RUN));
+    expect(buttons.some((b) => b.text === "Служба поддержки")).toBe(false);
+  });
+
+  it("с support: true ведёт в личку поддержки", () => {
+    const support = flat(runKeyboard(RUN, { support: true })).find(
+      (b) => b.text === "Служба поддержки",
+    );
+    expect(support?.url).toBe("https://t.me/meine_nika");
   });
 });
