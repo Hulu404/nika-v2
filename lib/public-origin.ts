@@ -11,10 +11,30 @@
  *   3. Host + схема из NODE_ENV
  *   4. Жёстко зашитый дефолт "https://www.mynika.online"
  */
+/**
+ * Публичный origin из переменной окружения, без запроса.
+ *
+ * Берём ТОЛЬКО scheme+host. На проде NEXT_PUBLIC_APP_URL однажды приехала с
+ * хвостом «/api/telegram/webhook»: вебхук зарегистрировался по задвоенному пути
+ * и Telegram получал 404 на каждый апдейт, а кнопки «Открыть НИКУ» в сообщениях
+ * бота вели в никуда. Нормализация к origin закрывает весь этот класс ошибок.
+ *
+ * null — если переменная не задана или не парсится как URL.
+ */
+export function publicOriginFromEnv(): string | null {
+  const raw = process.env.NEXT_PUBLIC_APP_URL?.trim().replace(/\/$/, "");
+  if (!raw) return null;
+  try {
+    return new URL(raw).origin;
+  } catch {
+    return null;
+  }
+}
+
 export function getPublicOrigin(req: Request | { headers: { get(name: string): string | null } }): string {
-  // 1. Явная переменная окружения
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-  if (appUrl) return appUrl.replace(/\/$/, "");
+  // 1. Явная переменная окружения (нормализованная к origin)
+  const fromEnv = publicOriginFromEnv();
+  if (fromEnv) return fromEnv;
 
   const headers = "headers" in req && typeof (req as { headers: unknown }).headers === "object"
     ? (req as { headers: { get(name: string): string | null } }).headers

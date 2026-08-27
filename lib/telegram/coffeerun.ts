@@ -2,6 +2,7 @@ import { InlineKeyboard } from "grammy";
 import { tgAdmin } from "./supabase";
 import { nextRun, runWhenWhere, type CoffeeRun } from "../coffeerun/run";
 import { normalizeTelegramUsername, formatTelegramUsername } from "../coffeerun/telegram-username";
+import { publicOriginFromEnv } from "../public-origin";
 import type { BotContext } from "./bot";
 
 /**
@@ -103,7 +104,7 @@ export function reminderText(signup: Pick<CoffeeRunSignup, "name">, run: CoffeeR
 /** Кнопки под сообщениями о забеге: маршрут до спота и сайт НИКИ. */
 export function runKeyboard(run: CoffeeRun): InlineKeyboard {
   const kb = new InlineKeyboard().url("Как добраться", run.mapUrl);
-  const site = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  const site = publicOriginFromEnv();
   if (site) kb.row().url("Открыть НИКУ", site);
   return kb;
 }
@@ -180,7 +181,7 @@ async function confirmAndReply(
 
 /** Ссылка на лендинг — единственное, куда можно отправить «потерявшегося». */
 function landingUrl(): string | null {
-  const site = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "");
+  const site = publicOriginFromEnv();
   // Без хвостового слэша: с ним Next отвечает 308 на этот же адрес.
   return site ? `${site}/coffeerunsurfsport` : null;
 }
