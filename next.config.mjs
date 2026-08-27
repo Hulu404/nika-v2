@@ -19,6 +19,12 @@ const securityHeaders = [
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  experimental: {
+    // Включает instrumentation.ts — стартовый хук сервера. В Next 14 он ещё за
+    // флагом. Там регистрируется вебхук Telegram и тикер напоминаний кофе-рана:
+    // приложение запущено — бот на связи, отдельных процессов не нужно.
+    instrumentationHook: true,
+  },
   typescript: {
     ignoreBuildErrors: true,
   },

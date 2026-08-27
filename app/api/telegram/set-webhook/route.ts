@@ -4,7 +4,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * Разовая установка вебхука Telegram. Запускать ОДИН РАЗ после деплоя:
+ * Ручная установка вебхука Telegram.
+ *
+ * В штатном режиме дёргать НЕ нужно: вебхук регистрируется сам при старте
+ * приложения (instrumentation.ts → ensureWebhook). Роут остаётся диагностикой —
+ * переустановить и посмотреть getWebhookInfo, не перезапуская сервер:
  *
  *   curl -H "x-cron-secret: $CRON_SECRET" https://<app>/api/telegram/set-webhook
  *
