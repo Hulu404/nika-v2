@@ -26,6 +26,8 @@ describe("confirmationText — что человек читает после п�
     expect(text).toContain("Имя: Аня");
     expect(text).toContain("Telegram: @annaruns");
     expect(text).toContain("E-mail: anna@mail.ru");
+    // Спот назван прямо: у забегов разные адреса, догадываться человек не должен.
+    expect(text).toContain(`Забег: ${RUN.spotName}`);
     expect(text).toContain("Вы успешно зарегистрированы!");
     expect(text).toContain(RUN.dateLabel);
     expect(text).toContain(RUN.gatherTime);
@@ -60,6 +62,7 @@ describe("reminderText — напоминание накануне", () => {
     const text = reminderText(SIGNUP, RUN);
     expect(text).toContain("Аня");
     expect(text).toContain("завтра");
+    expect(text).toContain(`Твой забег: ${RUN.spotName}`);
     expect(text).toContain(RUN.dateLabel);
     expect(text).toContain(RUN.gatherTime);
     expect(text).toContain(RUN.startTime);

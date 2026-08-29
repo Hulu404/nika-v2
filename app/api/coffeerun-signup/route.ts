@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { nextRun } from "@/lib/coffeerun/run";
+import { runForSignup } from "@/lib/coffeerun/run";
 import { normalizeTelegramUsername } from "@/lib/coffeerun/telegram-username";
 
 export const runtime = "edge";
@@ -15,6 +15,10 @@ function mintToken(): string {
  * Заявка на кофе-ран. Контакт строго телеграм: по нику бот находит заявку, а
  * confirm_token в ответе превращается в кнопку «Подтвердить в Telegram».
  *
+ * Забег определяется парой (spot, run_date) из формы: лендингов теперь два, и
+ * заявка с Лужников не должна лечь на Усачёву. Спот — главный ключ, дата при
+ * расхождении подстраивается под него (см. runForSignup).
+ *
  * Ответ: { ok: true, confirmUrl } — ссылка t.me/<bot>?start=cr_<token>.
  * Если NEXT_PUBLIC_TELEGRAM_BOT_USERNAME не задан, confirmUrl = null: заявка всё
  * равно сохранена, лендинг просто не покажет кнопку.
@@ -27,7 +31,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { name, telegram, contact, email, source, run_date } = body as Record<string, string>;
+  const { name, telegram, contact, email, source, run_date, spot } = body as Record<
+    string,
+    string
+  >;
 
   // contact — совместимость со старой (закешированной) версией страницы.
   const tgUsername = normalizeTelegramUsername(telegram ?? contact);
@@ -53,22 +60,27 @@ export async function POST(req: Request) {
     auth: { persistSession: false },
   });
 
-  // Дата забега: из формы, если пришла валидная YYYY-MM-DD, иначе — ближайший
-  // будущий забег из lib/coffeerun/run (а не default столбца: так API остаётся
-  // верным даже когда закешированный лендинг присылает прошлую дату).
-  const runDate = /^\d{4}-\d{2}-\d{2}$/.test(String(run_date || ""))
-    ? String(run_date)
-    : nextRun().date;
+  // Забег заявки берём из lib/coffeerun/run, а не из того, что прислал браузер:
+  // так API остаётся верным, даже когда закешированный лендинг присылает старую
+  // дату. Спот из формы задаёт, о каком забеге вообще речь, дата уточняет его
+  // внутри спота; нет ни того, ни другого — ближайший будущий забег.
+  const run = runForSignup({
+    spot: typeof spot === "string" ? spot.trim().slice(0, 50) : null,
+    run_date: /^\d{4}-\d{2}-\d{2}$/.test(String(run_date || "")) ? String(run_date) : null,
+  });
 
   const clean = (v: string, max = 200) => String(v).trim().slice(0, max);
 
+  // «Тот же забег» ниже — это спот И дата: на Усачёву и на Лужники один человек
+  // записывается двумя разными заявками, и вторая не должна затирать первую.
   // Повторная отправка формы тем же ником на тот же забег — не плодим строки и,
   // главное, не плодим токены: человек мог потерять первую кнопку.
   const { data: existingRows } = await supabase
     .from("coffee_run_signups")
     .select("id, confirm_token")
     .eq("tg_username", tgUsername)
-    .eq("run_date", runDate)
+    .eq("spot", run.spot)
+    .eq("run_date", run.date)
     .order("created_at", { ascending: false })
     .limit(1);
 
@@ -80,8 +92,9 @@ export async function POST(req: Request) {
     contact: `@${tgUsername}`, // столбец из первой версии формы — сохраняем совместимость
     tg_username: tgUsername,
     email: clean(email),
-    source: clean(source || "coffeerunsurfsport", 100),
-    run_date: runDate,
+    source: clean(source || `coffeerun${run.spot}`, 100),
+    spot: run.spot,
+    run_date: run.date,
     confirm_token: token,
   };
 

@@ -1,6 +1,6 @@
 import { InlineKeyboard } from "grammy";
 import { tgAdmin } from "./supabase";
-import { nextRun, runWhenWhere, type CoffeeRun } from "../coffeerun/run";
+import { runForSignup, runWhenWhere, upcomingRuns, type CoffeeRun } from "../coffeerun/run";
 import { normalizeTelegramUsername, formatTelegramUsername } from "../coffeerun/telegram-username";
 import { publicOriginFromEnv } from "../public-origin";
 import { SUPPORT_LABEL, SUPPORT_URL } from "./cta";
@@ -12,7 +12,11 @@ import type { BotContext } from "./bot";
  * Заявка приходит с лендинга (POST /api/coffeerun-signup) и живёт неподтверждённой,
  * пока человек не нажмёт «Подтвердить в Telegram». Кнопка ведёт на
  * t.me/<bot>?start=cr_<token>, бот находит заявку и отвечает в личку данными
- * участника и деталями ближайшего забега.
+ * участника и деталями его забега.
+ *
+ * Забегов несколько и они от разных спотов, поэтому бот отвечает деталями
+ * ИМЕННО той заявки, которую нашёл (spot + run_date в строке), а не ближайшего
+ * забега вообще: иначе человек с Лужников получил бы адрес Усачёвой.
  *
  * Два пути входа:
  *   1) deep-link с токеном — основной: токен из браузера автора заявки, подделать
@@ -33,11 +37,13 @@ export interface CoffeeRunSignup {
   email: string;
   tg_username: string | null;
   confirmed_at: string | null;
+  /** Слаг спота заявки: с какого лендинга пришёл человек (см. lib/coffeerun/run). */
+  spot: string | null;
   run_date: string | null;
 }
 
 const TABLE = "coffee_run_signups";
-const COLUMNS = "id, name, email, tg_username, confirmed_at, run_date";
+const COLUMNS = "id, name, email, tg_username, confirmed_at, spot, run_date";
 
 /** Токен из payload `/start cr_<token>`; null, если payload не наш. */
 export function parseCoffeeRunToken(payload: string): string | null {
@@ -68,6 +74,9 @@ export function confirmationText(
   lines.push(`Имя: ${signup.name}`);
   if (username) lines.push(`Telegram: ${formatTelegramUsername(username)}`);
   lines.push(`E-mail: ${signup.email}`);
+  // Спот отдельной строкой: у забегов разные адреса и разные дни, и человек
+  // должен видеть свой сразу, а не вычитывать его из абзаца ниже.
+  lines.push(`Забег: ${run.spotName}, ${run.dateLabel} (${run.weekday})`);
 
   // Ник в форме разошёлся с реальным — говорим прямо, какой оставили.
   if (actualUsername && signup.tg_username && actualUsername !== signup.tg_username) {
@@ -95,6 +104,7 @@ export function reminderText(signup: Pick<CoffeeRunSignup, "name">, run: CoffeeR
   return [
     `${signup.name}, завтра бежим!`,
     "",
+    `Твой забег: ${run.spotName}.`,
     `Кофе-ран — ${runWhenWhere(run)}.`,
     `${run.distance} в разговорном темпе, с пейсерами. Кофе на финише.`,
     "",
@@ -135,18 +145,23 @@ async function findByToken(token: string): Promise<CoffeeRunSignup | null> {
 }
 
 /**
- * Неподтверждённая заявка на ближайший забег по нику. Берём самую свежую:
- * если человек заполнил форму дважды, актуальна последняя.
+ * Неподтверждённая заявка по нику — на любой из ещё не прошедших забегов.
+ * Ищем сразу по всем будущим датам, а не по ближайшей: человек мог записаться
+ * на Лужники, пока ближайшим числится забег на Усачёвой, и по одной дате его
+ * заявка бы не нашлась. Берём самую свежую: если форм было несколько,
+ * актуальна последняя.
  */
 async function findUnconfirmedByUsername(
   username: string,
-  runDate: string,
+  runDates: string[],
 ): Promise<CoffeeRunSignup | null> {
+  if (runDates.length === 0) return null;
+
   const { data, error } = await tgAdmin()
     .from(TABLE)
     .select(COLUMNS)
     .eq("tg_username", username)
-    .eq("run_date", runDate)
+    .in("run_date", runDates)
     .is("confirmed_at", null)
     .order("created_at", { ascending: false })
     .limit(1);
@@ -182,7 +197,18 @@ async function confirmAndReply(
 ): Promise<void> {
   const actual = normalizeTelegramUsername(ctx.from?.username ?? null);
   const repeat = signup.confirmed_at !== null;
-  const run = nextRun();
+  // Забег — из самой заявки: подтверждаем то, на что человек записался.
+  const run = runForSignup(signup);
+
+  // runForSignup никогда не падает — при незнакомом споте он откатывается на
+  // забег по дате или на ближайший. Тихо это делать нельзя: человек получит
+  // адрес чужого спота, и без записи в логе причину потом не найти.
+  if (signup.spot && signup.spot !== run.spot) {
+    console.error(
+      `[coffeerun] спот заявки ${signup.id} — «${signup.spot}», ` +
+        `но забег разрешился в «${run.spot}»: спот отсутствует в COFFEE_RUNS?`,
+    );
+  }
 
   await markConfirmed(signup, chatId, actual);
   await ctx.reply(confirmationText(signup, run, actual, repeat), {
@@ -190,16 +216,32 @@ async function confirmAndReply(
   });
 }
 
-/** Ссылка на лендинг — единственное, куда можно отправить «потерявшегося». */
-function landingUrl(): string | null {
+/** Ссылка на лендинг забега — единственное, куда можно отправить «потерявшегося». */
+function landingUrl(run: CoffeeRun): string | null {
   const site = publicOriginFromEnv();
   // Без хвостового слэша: с ним Next отвечает 308 на этот же адрес.
-  return site ? `${site}/coffeerunsurfsport` : null;
+  return site ? `${site}${run.landing}` : null;
 }
 
+/**
+ * Кнопки «записаться» — по одной на каждый будущий забег. Спотов несколько, и
+ * отправлять всех на одну страницу значит терять тех, кому ближе другой спот.
+ * Пока забег один, подпись остаётся прежней: уточнять спот не с чем.
+ */
 export function landingKeyboard(): InlineKeyboard | undefined {
-  const url = landingUrl();
-  return url ? new InlineKeyboard().url("Записаться на кофе-ран", url) : undefined;
+  const runs = upcomingRuns();
+  const kb = new InlineKeyboard();
+  let added = 0;
+
+  for (const run of runs) {
+    const url = landingUrl(run);
+    if (!url) continue;
+    if (added > 0) kb.row();
+    kb.url(runs.length > 1 ? `Кофе-ран · ${run.spotName}` : "Записаться на кофе-ран", url);
+    added++;
+  }
+
+  return added > 0 ? kb : undefined;
 }
 
 /**
@@ -234,7 +276,10 @@ export async function handleCoffeeRunByUsername(ctx: BotContext): Promise<boolea
   const username = normalizeTelegramUsername(ctx.from?.username ?? null);
   if (chatId === undefined || !username) return false;
 
-  const signup = await findUnconfirmedByUsername(username, nextRun().date);
+  const signup = await findUnconfirmedByUsername(
+    username,
+    upcomingRuns().map((r) => r.date),
+  );
   if (!signup) return false;
 
   await confirmAndReply(ctx, signup, chatId);

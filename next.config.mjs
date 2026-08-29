@@ -36,10 +36,16 @@ const nextConfig = {
   },
   async rewrites() {
     return [
-      // /coffeerunsurfsport → /coffeerunsurfsport/index.html (без редиректа)
+      // Лендинги кофе-ранов: /coffeerun<спот> → его index.html, без редиректа.
+      // Кусок пути после «coffeerun» — тот же слаг, что в lib/coffeerun/run.ts
+      // (CoffeeRun.landing): по нему бот собирает ссылку на нужную страницу.
       {
         source: "/coffeerunsurfsport",
         destination: "/coffeerunsurfsport/index.html",
+      },
+      {
+        source: "/coffeerunluzhniki",
+        destination: "/coffeerunluzhniki/index.html",
       },
     ];
   },

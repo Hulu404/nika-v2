@@ -22,7 +22,7 @@ async function tickReminders(): Promise<void> {
     const { dispatchCoffeeRunReminders } = await import("./lib/coffeerun/reminder-dispatch");
     const res = await dispatchCoffeeRunReminders();
     // Логируем только когда реально что-то отправили — иначе тикер зашумит логи.
-    if (res.sent) console.log("[coffeerun-reminder] отправлено:", res.sent, "забег", res.runDate);
+    if (res.sent) console.log("[coffeerun-reminder] отправлено:", res.sent, "забеги", res.runDates?.join(", "));
   } catch (err) {
     console.error(
       "[coffeerun-reminder] тик упал:",
