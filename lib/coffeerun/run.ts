@@ -66,7 +66,7 @@ export const COFFEE_RUNS: CoffeeRun[] = [
     weekday: "воскресенье",
     gatherTime: "9:15",
     startTime: "9:30",
-    address: "Москва, Лужники, 24 стр. 41",
+    address: "Москва, ул. Лужники, 24, стр. 41",
     place: "спот Surf Coffee Лужники",
     distance: "5 км",
     mapUrl:
