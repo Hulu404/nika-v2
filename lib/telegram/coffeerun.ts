@@ -1,5 +1,6 @@
 import { InlineKeyboard } from "grammy";
 import { tgAdmin } from "./supabase";
+import { formatPace, normalizePace } from "../coffeerun/pace";
 import { runForSignup, runWhenWhere, upcomingRuns, type CoffeeRun } from "../coffeerun/run";
 import { normalizeTelegramUsername, formatTelegramUsername } from "../coffeerun/telegram-username";
 import { publicOriginFromEnv } from "../public-origin";
@@ -40,10 +41,12 @@ export interface CoffeeRunSignup {
   /** Слаг спота заявки: с какого лендинга пришёл человек (см. lib/coffeerun/run). */
   spot: string | null;
   run_date: string | null;
+  /** Выбранный темп, мин/км (см. lib/coffeerun/pace). null — заявка без выбора. */
+  pace: string | null;
 }
 
 const TABLE = "coffee_run_signups";
-const COLUMNS = "id, name, email, tg_username, confirmed_at, spot, run_date";
+const COLUMNS = "id, name, email, tg_username, confirmed_at, spot, run_date, pace";
 
 /** Токен из payload `/start cr_<token>`; null, если payload не наш. */
 export function parseCoffeeRunToken(payload: string): string | null {
@@ -61,12 +64,15 @@ export function parseCoffeeRunToken(payload: string): string | null {
  * @param repeat         повторное подтверждение — не пугаем «зарегистрировали дважды»
  */
 export function confirmationText(
-  signup: Pick<CoffeeRunSignup, "name" | "email" | "tg_username">,
+  signup: Pick<CoffeeRunSignup, "name" | "email" | "tg_username" | "pace">,
   run: CoffeeRun,
   actualUsername: string | null,
   repeat = false,
 ): string {
   const username = actualUsername ?? signup.tg_username;
+  // Через канон, а не как есть: в старых строках темпа нет вовсе, и печатать
+  // в личку то, чего мы не узнаём, бот не должен.
+  const pace = normalizePace(signup.pace);
   const lines: string[] = [];
 
   lines.push(repeat ? "Ты уже в списке — всё на месте." : "Заявка на кофе-ран найдена.");
@@ -77,6 +83,9 @@ export function confirmationText(
   // Спот отдельной строкой: у забегов разные адреса и разные дни, и человек
   // должен видеть свой сразу, а не вычитывать его из абзаца ниже.
   lines.push(`Забег: ${run.spotName}, ${run.dateLabel} (${run.weekday})`);
+  // Темп — такой же факт заявки, как имя и почта: человек видит, в какой он
+  // группе, и может написать нам, если передумал.
+  if (pace) lines.push(`Темп: ${formatPace(pace)}`);
 
   // Ник в форме разошёлся с реальным — говорим прямо, какой оставили.
   if (actualUsername && signup.tg_username && actualUsername !== signup.tg_username) {
@@ -89,7 +98,13 @@ export function confirmationText(
 
   lines.push("");
   lines.push(`Вы успешно зарегистрированы! Ждём вас на пробежке ${runWhenWhere(run)}.`);
-  lines.push(`${run.distance} в разговорном темпе, с пейсерами. Кофе на финише.`);
+  // Без выбора темпа остаётся прежняя формулировка: обещать группу, которую
+  // человек не выбирал, нельзя.
+  lines.push(
+    pace
+      ? `${run.distance} с пейсерами, твоя группа — ${formatPace(pace)}. Кофе на финише.`
+      : `${run.distance} в разговорном темпе, с пейсерами. Кофе на финише.`,
+  );
 
   return lines.join("\n");
 }

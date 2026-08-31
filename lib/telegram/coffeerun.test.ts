@@ -3,7 +3,9 @@ import { confirmationText, parseCoffeeRunToken, reminderText, runKeyboard } from
 import { COFFEE_RUNS } from "../coffeerun/run";
 
 const RUN = COFFEE_RUNS[0];
-const SIGNUP = { name: "Аня", email: "anna@mail.ru", tg_username: "annaruns" };
+const SIGNUP = { name: "Аня", email: "anna@mail.ru", tg_username: "annaruns", pace: "7:00" };
+/** Заявка, сделанная до появления выбора темпа — таких в базе большинство. */
+const SIGNUP_NO_PACE = { ...SIGNUP, pace: null };
 
 describe("parseCoffeeRunToken — отделяем deep-link кофе-рана от привязки аккаунта", () => {
   it("достаёт токен из cr_<hex>", () => {
@@ -32,6 +34,25 @@ describe("confirmationText — что человек читает после п�
     expect(text).toContain(RUN.dateLabel);
     expect(text).toContain(RUN.gatherTime);
     expect(text).toContain(RUN.address);
+  });
+
+  it("называет выбранный темп и группу на старте", () => {
+    const text = confirmationText(SIGNUP, RUN, "annaruns");
+    expect(text).toContain("Темп: 7:00 мин/км");
+    expect(text).toContain("твоя группа — 7:00 мин/км");
+  });
+
+  it("без темпа в заявке о группе не обещает — говорит как раньше", () => {
+    const text = confirmationText(SIGNUP_NO_PACE, RUN, "annaruns");
+    expect(text).not.toContain("Темп:");
+    expect(text).not.toContain("твоя группа");
+    expect(text).toContain("в разговорном темпе, с пейсерами");
+  });
+
+  it("незнакомый темп из базы в личку не уезжает", () => {
+    const text = confirmationText({ ...SIGNUP, pace: "5:00" }, RUN, "annaruns");
+    expect(text).not.toContain("5:00");
+    expect(text).toContain("в разговорном темпе, с пейсерами");
   });
 
   it("при расхождении ников говорит, какой оставили", () => {
