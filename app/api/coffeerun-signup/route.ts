@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { normalizePace } from "@/lib/coffeerun/pace";
 import { runForSignup } from "@/lib/coffeerun/run";
 import { normalizeTelegramUsername } from "@/lib/coffeerun/telegram-username";
 
@@ -19,6 +20,9 @@ function mintToken(): string {
  * заявка с Лужников не должна лечь на Усачёву. Спот — главный ключ, дата при
  * расхождении подстраивается под него (см. runForSignup).
  *
+ * Темп (pace) — необязательное поле формы: значение из lib/coffeerun/pace.ts,
+ * по нему на старте разводят по группам с пейсерами. Требует миграции 032.
+ *
  * Ответ: { ok: true, confirmUrl } — ссылка t.me/<bot>?start=cr_<token>.
  * Если NEXT_PUBLIC_TELEGRAM_BOT_USERNAME не задан, confirmUrl = null: заявка всё
  * равно сохранена, лендинг просто не покажет кнопку.
@@ -31,7 +35,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { name, telegram, contact, email, source, run_date, spot } = body as Record<
+  const { name, telegram, contact, email, source, run_date, spot, pace } = body as Record<
     string,
     string
   >;
@@ -71,6 +75,10 @@ export async function POST(req: Request) {
 
   const clean = (v: string, max = 200) => String(v).trim().slice(0, max);
 
+  // Темп необязателен: старая (закешированная) страница без выбора темпа шлёт
+  // заявку без него, и это по-прежнему валидная заявка — просто без группы.
+  const chosenPace = normalizePace(pace);
+
   // «Тот же забег» ниже — это спот И дата: на Усачёву и на Лужники один человек
   // записывается двумя разными заявками, и вторая не должна затирать первую.
   // Повторная отправка формы тем же ником на тот же забег — не плодим строки и,
@@ -96,6 +104,9 @@ export async function POST(req: Request) {
     spot: run.spot,
     run_date: run.date,
     confirm_token: token,
+    // Темп дописываем, только когда он пришёл: повторная отправка со старой
+    // страницы не должна стирать группу, которую человек уже выбрал.
+    ...(chosenPace ? { pace: chosenPace } : {}),
   };
 
   const { error } = existing

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it, expect } from "vitest";
+import { COFFEE_RUN_PACES } from "./pace";
 import { COFFEE_RUNS, runForSignup } from "./run";
 
 /**
@@ -62,6 +63,20 @@ describe("лендинги кофе-рана — какой забег уезж�
       const got = runForSignup({ spot: run.spot, run_date: "2026-08-22" });
       expect(got.spot).toBe(run.spot);
       expect(got.address).toBe(run.address);
+    }
+  });
+
+  it("на каждой странице стоят ровно те темпы, что знает сервер", () => {
+    for (const run of COFFEE_RUNS) {
+      const src = landingSource(run.landing);
+
+      // Значения кнопок — те же строки, что лягут в coffee_run_signups.pace:
+      // разойдутся — сервер молча выбросит выбор человека (normalizePace → null).
+      const values = [...src.matchAll(/name="pace"\s+value="([^"]+)"/g)].map((m) => m[1]);
+      expect(values).toEqual(COFFEE_RUN_PACES.map((p) => p.value));
+
+      // Выбор должен реально уезжать в заявку, а не просто радовать глаз.
+      expect(src).toContain("pace:pc");
     }
   });
 
