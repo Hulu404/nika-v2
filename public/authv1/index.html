@@ -687,11 +687,9 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 
       <!-- первый день -->
       <div class="section freshonly">
-        <div class="head"><div class="lab">С чего начать</div></div>
         <h2 class="disp md">У нас пока <span class="ser">нет истории</span>. Она появится за неделю</h2>
-        <p class="cap" style="margin:12px 0 20px;max-width:300px">Первая практика на три минуты. Её можно сделать прямо сейчас, стоя, без переодевания.</p>
-        <div class="list">
-          <button class="li" data-push="practice"><div class="tx"><b>Перед выходом</b><span>3 минуты · с неё начинают все</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        <div class="list" style="margin-top:20px">
+          <button class="li" data-push="practice"><div class="tx"><b>Заземление</b><span>4 минуты · с неё начинают все</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <button class="li" data-open="nika"><div class="tx"><b>Просто поговорить</b><span>Ника спросит, как ты сегодня</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <button class="li" data-go="diary"><div class="tx"><b>Записать первое</b><span>Одна строка про сегодня</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
@@ -707,8 +705,8 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
         <div class="rail">
           <button class="pract" data-push="practice">
             <div class="art"><svg><use href="#sc-dawn"/></svg></div><div class="shade"></div>
-            <span class="tag">3 минуты</span>
-            <div class="tx"><b>Перед выходом</b><span>Когда уже обулась, но стоишь в коридоре</span></div>
+            <span class="tag">4 мин</span>
+            <div class="tx"><b>Заземление</b><span>Голос, дыхание, тело</span></div>
           </button>
           <button class="pract" data-push="practice">
             <div class="art"><svg><use href="#sc-mist"/></svg></div><div class="shade"></div>
@@ -811,35 +809,33 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 
     <!-- ==================== ПРАКТИКА ==================== -->
     <section class="view" data-view="practice">
+      <audio id="prAudio" preload="metadata" src="/authv1/audio/nika-zazemlenie.mp3"></audio>
       <div class="pheader">
         <svg viewBox="0 0 400 330" preserveAspectRatio="xMidYMid slice"><use href="#sc-dawn"/></svg>
         <div class="fade"></div>
       </div>
       <div class="pbody">
-        <div class="lab" style="margin-bottom:10px">Практика · 3 минуты</div>
-        <h1 class="disp xl">Перед <span class="ser">выходом</span></h1>
-        <p style="margin-top:18px">Это тот момент, когда всё уже решено: одежда на тебе, дверь в двух шагах. И именно здесь чаще всего разворачиваются обратно.</p>
-        <p>Практика не уговаривает выйти. Она возвращает внимание в тело на три минуты, и решение принимаешь уже ты, а не твоя голова в шесть утра.</p>
+        <div class="lab" style="margin-bottom:10px">Практика · 4 минуты</div>
+        <h1 class="disp xl">Заземление <span class="ser">перед бегом</span></h1>
+        <p style="margin-top:18px">Голос Ники ведёт внимание от головы к телу. Четыре с половиной минуты — и ты уже не думаешь о том, выйдешь ли. Ты просто идёшь.</p>
 
-        <h3>Как дышать</h3>
-        <p class="cap">Вдох на четыре, задержка на два, выдох на шесть. Считать не нужно, дуга считает за тебя.</p>
-
-        <div class="dial">
-          <svg viewBox="0 0 340 150" preserveAspectRatio="none">
-            <path class="t" d="M14 132 C58 30 282 30 326 132"/>
-            <path class="a" d="M14 132 C58 30 282 30 326 132" stroke-dasharray="330" stroke-dashoffset="132"/>
-            <circle cx="120" cy="46" r="4" fill="#F4EFE6"/>
-            <text x="14" y="148">вдох 4</text>
-            <text x="150" y="26">задержка 2</text>
-            <text x="288" y="148">выдох 6</text>
+        <div class="breath" id="prBreath" style="margin-top:28px">
+          <svg viewBox="0 0 340 200" preserveAspectRatio="none" id="prBreathSvg" style="touch-action:none;cursor:pointer">
+            <path class="track" id="prArcTrack" d="M14 176 C58 74 282 74 326 176"/>
+            <path class="lit" id="prArcLit" d="M14 176 C58 74 282 74 326 176"/>
+            <circle class="bead" id="prBead" cx="14" cy="176" r="4"/>
           </svg>
+          <div class="core">
+            <div class="phase" id="prPhase">4:52</div>
+            <div class="count" id="prCount" style="display:none"></div>
+          </div>
         </div>
 
         <div class="player">
           <div class="pbar"><i id="pFill"></i></div>
           <div class="prow">
-            <span class="tm" id="pTime">3:00</span>
-            <span class="cap dim" id="pState">Дыши вместе с дугой наверху</span>
+            <span class="tm" id="pTime">4:52</span>
+            <span class="cap dim" id="pState">Загружаю…</span>
           </div>
         </div>
         <button class="pill solid wide" style="margin-top:22px" id="pPlay">Начать</button>
@@ -862,7 +858,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
         <div class="fadeout"></div>
         <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:0 20px 24px">
           <div class="lab" style="margin-bottom:10px">Порог</div>
-          <h2 class="disp">12 из 20 записей</h2>
+          <h2 class="disp" id="diaryHead">0 из 20 записей</h2>
           <p class="cap" style="margin:12px 0 0;max-width:280px">Раньше двадцати я буду просто хранить. И то, что найду потом, будет совпадением, а не доказанной причиной.</p>
         </div>
       </div>
@@ -870,11 +866,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
       <div class="block">
         <div class="toggle">
           <div><b>Пробежка</b><div class="cap dim" style="margin-top:2px">Заполняется сама, если бежала с телефоном</div></div>
-          <div class="sw on" data-sw></div>
-        </div>
-        <div class="duo">
-          <div class="stat"><div><div class="lab">Дистанция</div><b>8,0 км</b></div></div>
-          <div class="stat"><div><div class="lab">Время</div><b>46 мин</b></div></div>
+          <div class="sw" data-sw></div>
         </div>
       </div>
 
@@ -885,24 +877,12 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
         </div>
         <div class="tags" id="tagbox">
           <button class="tag add">+ Добавить</button>
-          <button class="tag on" data-tag>Спала мало <span class="cnt">9</span></button>
-          <button class="tag on" data-tag>Ноги тяжёлые <span class="cnt">4</span></button>
-          <button class="tag" data-tag>Поела за час</button>
-          <button class="tag" data-tag>Кофе перед выходом</button>
-          <button class="tag" data-tag>Бежала утром</button>
-          <button class="tag" data-tag>Бежала не одна</button>
-          <button class="tag on" data-tag>Усилие 7 из 10</button>
         </div>
       </div>
 
       <div class="block">
         <div class="lab" style="margin-bottom:13px">Свободная запись</div>
-        <div id="entries">
-          <div class="entry">
-            <div class="lab">Вчера</div>
-            <p>«Разогналась на третьем километре, зря. Дальше терпела.»</p>
-          </div>
-        </div>
+        <div id="entries"></div>
         <div class="compose">
           <textarea id="entryText" rows="3" placeholder="Что сегодня было с телом и с головой"></textarea>
           <div class="cfoot">
@@ -912,24 +892,6 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
         </div>
       </div>
 
-      <div class="reflect">
-        <div class="glow"></div>
-        <div class="body">
-          <div class="lab" style="margin-bottom:10px">Ника спрашивает</div>
-          <h2 class="disp md">Третий раз за две недели ты <span class="ser">разгоняешься</span> в начале лёгкой</h2>
-          <p>Я пока не делаю из этого вывод, у меня мало записей. Просто отмечаю. Хочешь разобрать, откуда это берётся?</p>
-          <button class="pill" style="margin-top:20px" data-open="nika">Разобрать</button>
-        </div>
-      </div>
-
-      <div class="locked">
-        <div class="lab">Через 8 записей</div>
-        <ul>
-          <li>В какие дни ты чаще переносишь длинную</li>
-          <li>Что общего у трёх лучших пробежек за месяц</li>
-          <li>После чего у тебя тяжёлые тренировки</li>
-        </ul>
-      </div>
     </section>
 
     <!-- ==================== БИБЛИОТЕКА ==================== -->
@@ -937,6 +899,13 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
       <div class="lab" style="margin-bottom:10px">Библиотека</div>
       <h1 class="disp xl">Шестнадцать практик<br>под <span class="ser">конкретный момент</span></h1>
       <p class="cap" style="margin:16px 0 34px;max-width:300px">Не курс на месяц. Каждая отвечает на один момент, в который ты обычно остаёшься одна.</p>
+
+      <div class="section">
+        <div class="head"><div class="lab">Заземление</div></div>
+        <div class="rail">
+          <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-dawn"/></svg></div><div class="shade"></div><span class="tag">4 мин</span><div class="tx"><b>Заземление перед бегом</b><span>Голос, дыхание, тело</span></div></button>
+        </div>
+      </div>
 
       <div class="section">
         <div class="head"><div class="lab">Три минуты</div></div>
@@ -1599,24 +1568,30 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
      здесь она ведёт настоящее.
      ============================================================ */
   (function(){
+    /* ---- shared draw factory ---- */
+    function makeDraw(litEl,trackEl,beadEl){
+      var LEN=trackEl.getTotalLength();
+      litEl.style.setProperty('--arc',LEN);
+      litEl.setAttribute('stroke-dasharray',LEN);
+      return function(p){
+        litEl.setAttribute('stroke-dashoffset',(LEN*(1-p)).toFixed(1));
+        var pt=trackEl.getPointAtLength(LEN*p);
+        beadEl.setAttribute('cx',pt.x.toFixed(1));
+        beadEl.setAttribute('cy',pt.y.toFixed(1));
+        beadEl.setAttribute('r',(3.5+p*2.5).toFixed(2));
+      };
+    }
+
+    /* ---- дыхание (главная) ---- */
     var lit=document.getElementById('arcLit'), track=document.getElementById('arcTrack'),
         bead=document.getElementById('bead'), phase=document.getElementById('phase'),
         count=document.getElementById('count');
     if(!lit) return;
-    var LEN=track.getTotalLength();
-    lit.style.setProperty('--arc',LEN);
-    lit.setAttribute('stroke-dasharray',LEN);
+    var draw=makeDraw(lit,track,bead);
 
     var PH=[{n:'Вдох',d:4000,from:0,to:1},{n:'Задержка',d:2000,from:1,to:1},{n:'Выдох',d:6000,from:1,to:0}];
     var i=0,t0=0,raf=null,lastSec=-1;
 
-    function draw(p){
-      lit.setAttribute('stroke-dashoffset',(LEN*(1-p)).toFixed(1));
-      var pt=track.getPointAtLength(LEN*p);
-      bead.setAttribute('cx',pt.x.toFixed(1));
-      bead.setAttribute('cy',pt.y.toFixed(1));
-      bead.setAttribute('r',(3.5+p*2.5).toFixed(2));
-    }
     function frame(now){
       if(!t0) t0=now;
       var ph=PH[i], e=now-t0;
@@ -1641,6 +1616,51 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
         if(document.hidden){ if(raf) cancelAnimationFrame(raf); raf=null; }
         else if(!raf){ t0=0; raf=requestAnimationFrame(frame); }
       });
+    }
+
+    /* ---- звук (практика) — позиция в треке, бид тянется ---- */
+    var prLit=document.getElementById('prArcLit'), prTrack=document.getElementById('prArcTrack'),
+        prBead=document.getElementById('prBead'), prPhase=document.getElementById('prPhase'),
+        prSvg=document.getElementById('prBreathSvg');
+    if(!prLit||!prTrack||!prBead) return;
+    var prDraw=makeDraw(prLit,prTrack,prBead);
+    prDraw(0);
+
+    var prDragging=false;
+    function fmtLeft(p){
+      var s=Math.round((1-p)*292); s=Math.max(0,s);
+      var m=Math.floor(s/60); s=s%60;
+      return m+':'+(s<10?'0':'')+s;
+    }
+    function prXtoP(e){
+      var r=prSvg.getBoundingClientRect();
+      return Math.max(0,Math.min((e.clientX-r.left)/r.width,1));
+    }
+
+    window.__prArcDraw=function(p){ if(!prDragging) prDraw(p); };
+
+    if(prSvg){
+      var prAudio=document.getElementById('prAudio');
+      prSvg.addEventListener('pointerdown',function(e){
+        prDragging=true;
+        try{ prSvg.setPointerCapture(e.pointerId); }catch(err){}
+        var p=prXtoP(e); prDraw(p);
+        if(prPhase) prPhase.textContent=fmtLeft(p);
+        haptic(6);
+      });
+      prSvg.addEventListener('pointermove',function(e){
+        if(!prDragging) return;
+        var p=prXtoP(e); prDraw(p);
+        if(prPhase) prPhase.textContent=fmtLeft(p);
+      });
+      prSvg.addEventListener('pointerup',function(e){
+        if(!prDragging) return;
+        prDragging=false;
+        var p=prXtoP(e); prDraw(p);
+        if(prAudio&&prAudio.duration) prAudio.currentTime=p*prAudio.duration;
+        haptic(8);
+      });
+      prSvg.addEventListener('pointercancel',function(){ prDragging=false; });
     }
   })();
 
@@ -1939,45 +1959,90 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
   });
 
   /* ============================================================
-     ПЛЕЕР ПРАКТИКИ
+     ПЛЕЕР ПРАКТИКИ — реальный <audio>
      ============================================================ */
   (function(){
     var play=document.getElementById('pPlay'), fill=document.getElementById('pFill'),
-        tm=document.getElementById('pTime'), st=document.getElementById('pState');
-    if(!play) return;
-    var TOTAL=180, left=TOTAL, timer=null, running=false;
-    function fmt(s){ var m=Math.floor(s/60); s=s%60; return m+':'+(s<10?'0':'')+s; }
+        tm=document.getElementById('pTime'), st=document.getElementById('pState'),
+        audio=document.getElementById('prAudio');
+    if(!play||!audio) return;
+    var TOTAL=292; /* 4:52 */
+    var ready=false;
+
+    function fmt(s){
+      s=Math.max(0,Math.round(s));
+      var m=Math.floor(s/60); s=s%60;
+      return m+':'+(s<10?'0':'')+s;
+    }
+    var prPhase=document.getElementById('prPhase');
     function paintP(){
+      var dur=audio.duration||TOTAL;
+      var left=Math.max(0,dur-audio.currentTime);
+      var prog=audio.duration?audio.currentTime/dur:0;
       tm.textContent=fmt(left);
-      fill.style.width=((TOTAL-left)/TOTAL*100).toFixed(2)+'%';
+      fill.style.width=(prog*100).toFixed(2)+'%';
+      if(prPhase) prPhase.textContent=fmt(left);
+      if(window.__prArcDraw) window.__prArcDraw(prog);
     }
-    function tick(){
-      left--;
-      if(left<=0){
-        left=0; paintP(); stop();
-        play.textContent='Пройдена'; play.classList.add('solid');
-        st.textContent='Записала в дневник: практика перед выходом';
-        haptic(16); return;
+
+    audio.addEventListener('canplay',function(){
+      ready=true;
+      if(audio.paused) st.textContent='Дыши вместе с Никой';
+    });
+    audio.addEventListener('error',function(){
+      st.textContent='Не удалось загрузить'; play.disabled=true;
+    });
+    audio.addEventListener('waiting',function(){
+      st.textContent='Загружаю…';
+    });
+    audio.addEventListener('playing',function(){
+      st.textContent='Слушай и дыши';
+    });
+    audio.addEventListener('timeupdate',paintP);
+    audio.addEventListener('ended',function(){
+      play.textContent='Пройдена'; play.classList.add('solid');
+      st.textContent='Записала в дневник';
+      if(window.__bumpDiary) window.__bumpDiary();
+      haptic(16);
+    });
+
+    function startAudio(){
+      audio.play().then(function(){
+        play.textContent='Пауза'; play.classList.remove('solid');
+      }).catch(function(){
+        st.textContent='Нажми ещё раз';
+      });
+      if('mediaSession' in navigator){
+        navigator.mediaSession.metadata=new MediaMetadata({
+          title:'Заземление перед бегом', artist:'Ника'
+        });
+        navigator.mediaSession.setActionHandler('play',function(){ audio.play(); });
+        navigator.mediaSession.setActionHandler('pause',function(){ audio.pause(); });
+        navigator.mediaSession.setActionHandler('stop',function(){ audio.pause(); audio.currentTime=0; });
       }
-      paintP();
-    }
-    function start(){
-      running=true; timer=setInterval(tick,1000);
-      play.textContent='Пауза'; play.classList.remove('solid');
-      st.textContent='Вдох на четыре, задержка на два, выдох на шесть';
       haptic(10);
     }
-    function stop(){ running=false; if(timer){ clearInterval(timer); timer=null; } }
+    function pauseAudio(){
+      audio.pause();
+      play.textContent='Продолжить'; play.classList.add('solid');
+      st.textContent='Пауза'; haptic(6);
+    }
+
     play.addEventListener('click',function(){
-      if(left===0){ left=TOTAL; paintP(); play.textContent='Начать'; play.classList.add('solid');
-        st.textContent='Дыши вместе с дугой наверху'; return; }
-      if(running){ stop(); play.textContent='Продолжить'; play.classList.add('solid');
-        st.textContent='Пауза. Дуга ждёт'; haptic(6); }
-      else start();
+      if(audio.ended){
+        audio.currentTime=0; paintP();
+        play.textContent='Начать'; play.classList.add('solid');
+        st.textContent='Дыши вместе с Никой'; return;
+      }
+      if(audio.paused) startAudio(); else pauseAudio();
     });
+
     paintP();
-    window.__resetPlayer=function(){ stop(); left=TOTAL; paintP();
-      play.textContent='Начать'; play.classList.add('solid'); st.textContent='Дыши вместе с дугой наверху'; };
+    window.__resetPlayer=function(){
+      audio.pause(); audio.currentTime=0; paintP();
+      play.textContent='Начать'; play.classList.add('solid');
+      play.disabled=false; st.textContent='Дыши вместе с Никой';
+    };
   })();
 
   /* ============================================================
@@ -1991,7 +2056,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
         cnt=document.getElementById('jrnCount'), todo=document.getElementById('jrnTodo'),
         pip=document.getElementById('bellPip');
     if(!save) return;
-    var n=12, GOAL=20;
+    var n=0, GOAL=20;
     var head=document.querySelector('[data-view="diary"] .scene .disp'),
         headSub=document.querySelector('[data-view="diary"] .scene .cap'),
         homeHead=document.querySelector('[data-push="diary"] .disp');
@@ -2171,9 +2236,9 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
       anxious:'Тревожно',work:'Тяжёлый день',heat:'Жарко или душно',pain:'Болит что-то'
     };
     var CORRIDOR_MAP={rare:'Почти без нагрузки',low:'1–2 в неделю',mid:'3–4 в неделю',high:'5–7 в неделю'};
-    var BARRIER_PRACTICE={head:'Перед выходом · 3 мин',time:'Перед выходом · 3 мин',
-      tired:'Перед выходом · 3 мин',weather:'В стартовом коридоре · 5 мин',
-      fear:'Про темп · 5 мин',other:'Перед выходом · 3 мин'};
+    var BARRIER_PRACTICE={head:'Заземление · 4 мин',time:'Заземление · 4 мин',
+      tired:'Заземление · 4 мин',weather:'Заземление · 4 мин',
+      fear:'Заземление · 4 мин',other:'Заземление · 4 мин'};
 
     // ── одиночный выбор (intent, barrier, baseline, daypart, cycle) ─
     (function(){
@@ -2351,15 +2416,15 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
         row=document.getElementById('selfrow');
     if(s==='fresh'){
       t.innerHTML='Первый день<br><span class="ser">без плана</span>';
-      sub.textContent='Я пока ничего о тебе не знаю. Сегодня достаточно трёх минут и одной записи вечером.';
-      mark.textContent='Сделать первую практику';
-      ghost.textContent='Осмотреться';
+      sub.textContent='Я пока ничего о тебе не знаю. Начни с Заземления — четыре минуты, и ты уже в теле.';
+      mark.textContent='Заземление · 4 мин';
+      if(ghost) ghost.style.display='none';
       if(row) row.style.display='none';
     }else{
       t.innerHTML='Двадцать минут<br><span class="ser">без темпа</span>';
       sub.textContent='Вчера ты разогналась на третьем километре и написала, что ноги тяжёлые. Сегодня это ещё держится.';
       mark.textContent='Отметить пробежку';
-      ghost.textContent='Не сегодня, перенести';
+      if(ghost){ ghost.textContent='Не сегодня, перенести'; ghost.style.display=''; }
       if(row) row.style.display='';
     }
     if(window.__ann&&current()) window.__ann(current().dataset.view);
