@@ -523,8 +523,23 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 .ostep.on{display:flex;animation:ostepIn .5s cubic-bezier(.32,.72,0,1) both}
 @keyframes ostepIn{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:none}}
 .ostep .otop{position:absolute;top:calc(var(--sat) + 14px);left:22px}
-.ostep .obody{flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:26px}
-.ostep .ofoot{display:flex;flex-direction:column;gap:10px}
+.ostep .obody{flex:1 1 auto;min-height:0;overflow-y:auto;display:flex;flex-direction:column;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding-bottom:0}
+.ostep .oinner{margin-top:auto;padding-bottom:26px}
+.ostep .ofoot{flex:0 0 auto;display:flex;flex-direction:column;gap:10px;position:relative}
+.ostep .ofoot::before{content:'';position:absolute;bottom:100%;left:-22px;right:-22px;
+  height:40px;background:linear-gradient(to bottom,rgba(8,8,10,0),var(--void));
+  pointer-events:none;transition:opacity .25s}
+.ostep.scrolled-end .ofoot::before{opacity:0}
+.ostep .opts{margin-top:24px}
+.opt.dim{opacity:.4;pointer-events:none}
+.obcount{font-size:.78rem;color:var(--ink-3);margin-top:14px;margin-bottom:8px;line-height:1.4}
+.obcount b{color:var(--ink)}
+.ohint{font-size:.78rem;color:var(--ink-3);text-align:center;margin-top:4px;display:none}
+.oother{margin-top:12px;border-bottom:1px solid rgba(244,239,230,.28);padding-bottom:10px;display:none}
+.oother input{width:100%;background:none;border:0;outline:none;font:inherit;
+  color:var(--ink);font-size:.95rem;padding:4px 0}
+.oother input::placeholder{color:var(--ink-3)}
 .pill.ghost{background:transparent;box-shadow:inset 0 0 0 1px rgba(244,239,230,.34)}
 .pill.wide{width:100%}
 .ofield{margin-top:26px;border-bottom:1px solid rgba(244,239,230,.28);padding-bottom:11px}
@@ -873,7 +888,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
           <button class="tag on" data-tag>Спала мало <span class="cnt">9</span></button>
           <button class="tag on" data-tag>Ноги тяжёлые <span class="cnt">4</span></button>
           <button class="tag" data-tag>Поела за час</button>
-          <button class="tag" data-tag>Кофе до бега</button>
+          <button class="tag" data-tag>Кофе перед выходом</button>
           <button class="tag" data-tag>Бежала утром</button>
           <button class="tag" data-tag>Бежала не одна</button>
           <button class="tag on" data-tag>Усилие 7 из 10</button>
@@ -1300,8 +1315,10 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     <div class="ostep on" data-step="0">
       <div class="otop"><span class="wordmark"><span class="my-pre">My </span>NIKA</span></div>
       <div class="obody">
-        <h1 class="disp">Практики, которые делаются <span class="ser">на бегу</span></h1>
-        <p class="cap" style="margin-top:16px;max-width:290px">Не чтобы лечь и расслабиться. Чтобы во время движения чувствовать тело, а не бороться с ним.</p>
+        <div class="oinner">
+          <h1 class="disp">Практики, которые делаются <span class="ser">на бегу</span></h1>
+          <p class="cap" style="margin-top:16px;max-width:290px">Не чтобы лечь и расслабиться. Чтобы во время движения чувствовать тело, а не бороться с ним.</p>
+        </div>
       </div>
       <div class="ofoot">
         <button class="pill solid wide" id="oRegBtn">Создать аккаунт</button>
@@ -1309,14 +1326,15 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
       </div>
     </div>
 
-
     <!-- 1 · регистрация: почта -->
     <div class="ostep" data-step="1">
       <div class="obody">
-        <h1 class="disp">Введи <span class="ser">почту</span></h1>
-        <p class="cap" style="margin-top:14px;max-width:290px">Это твой логин. Никаких писем без твоего запроса.</p>
-        <div class="ofield"><input id="regEmail" type="email" placeholder="Почта" autocomplete="email" inputmode="email"></div>
-        <p class="oerr" id="regEmailErr" style="display:none">Введи корректный адрес почты</p>
+        <div class="oinner">
+          <h1 class="disp">Введи <span class="ser">почту</span></h1>
+          <p class="cap" style="margin-top:14px;max-width:290px">Это твой логин. Никаких писем без твоего запроса.</p>
+          <div class="ofield"><input id="regEmail" type="email" placeholder="Почта" autocomplete="email" inputmode="email"></div>
+          <p class="oerr" id="regEmailErr" style="display:none">Введи корректный адрес почты</p>
+        </div>
       </div>
       <div class="ofoot"><button class="pill solid wide" id="regEmailNext">Дальше</button></div>
     </div>
@@ -1324,10 +1342,12 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     <!-- 2 · регистрация: пароль -->
     <div class="ostep" data-step="8">
       <div class="obody">
-        <h1 class="disp">Придумай <span class="ser">пароль</span></h1>
-        <p class="cap" style="margin-top:14px;max-width:290px">Минимум шесть символов. Лучше не использовать пароль от почты.</p>
-        <div class="ofield"><input id="regPass" type="password" placeholder="Пароль" autocomplete="new-password"></div>
-        <p class="oerr" id="regPassErr" style="display:none">Пароль слишком короткий — нужно минимум шесть символов</p>
+        <div class="oinner">
+          <h1 class="disp">Придумай <span class="ser">пароль</span></h1>
+          <p class="cap" style="margin-top:14px;max-width:290px">Минимум шесть символов. Лучше не использовать пароль от почты.</p>
+          <div class="ofield"><input id="regPass" type="password" placeholder="Пароль" autocomplete="new-password"></div>
+          <p class="oerr" id="regPassErr" style="display:none">Пароль слишком короткий — нужно минимум шесть символов</p>
+        </div>
       </div>
       <div class="ofoot"><button class="pill solid wide" id="regPassNext">Создать аккаунт</button></div>
     </div>
@@ -1335,13 +1355,19 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     <!-- 3 · что привело (intent) -->
     <div class="ostep" data-step="3">
       <div class="obody">
-        <h1 class="disp">Что тебя сюда <span class="ser">привело</span></h1>
-        <p class="cap" style="margin-top:14px;max-width:290px">Один ответ. От него зависит, с чего начнёт Ника.</p>
-        <div class="opts" data-key="intent">
-          <button class="opt" data-val="hard">Тяжело выходить, хотя хочу</button>
-          <button class="opt" data-val="starts">Волнуюсь перед стартами</button>
-          <button class="opt" data-val="return">Возвращаюсь после перерыва</button>
-          <button class="opt" data-val="listen">Хочу слышать тело, а не часы</button>
+        <div class="oinner">
+          <h1 class="disp">Что тебя сюда <span class="ser">привело</span></h1>
+          <p class="cap" style="margin-top:14px;max-width:290px">Один ответ. От него зависит, с чего начнёт Ника.</p>
+          <div class="opts" data-key="intent">
+            <button class="opt" data-val="hard">Тяжело выходить, хотя хочу</button>
+            <button class="opt" data-val="starts">Волнуюсь перед стартами</button>
+            <button class="opt" data-val="return">Возвращаюсь после перерыва</button>
+            <button class="opt" data-val="listen">Хочу слышать тело, а не часы</button>
+            <button class="opt" data-val="other">Другое</button>
+          </div>
+          <div class="oother" id="intentOtherDiv">
+            <input id="intentOtherInput" type="text" maxlength="60" placeholder="Например, устаю от учёбы" class="oother-input">
+          </div>
         </div>
       </div>
       <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
@@ -1350,14 +1376,20 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     <!-- 4 · что мешает (barrier) -->
     <div class="ostep" data-step="4">
       <div class="obody">
-        <h1 class="disp">Что чаще всего <span class="ser">мешает</span></h1>
-        <p class="cap" style="margin-top:14px;max-width:290px">Один ответ. Ника подберёт длительность первой практики.</p>
-        <div class="opts" data-key="barrier">
-          <button class="opt" data-val="head">Голова уговаривает не идти</button>
-          <button class="opt" data-val="time">Не хватает времени</button>
-          <button class="opt" data-val="tired">Устаю на работе</button>
-          <button class="opt" data-val="weather">Погода и темнота</button>
-          <button class="opt" data-val="fear">Страшно, что будет тяжело</button>
+        <div class="oinner">
+          <h1 class="disp">Что чаще всего <span class="ser">мешает</span></h1>
+          <p class="cap" style="margin-top:14px;max-width:290px">Один ответ. Ника подберёт длительность первой практики.</p>
+          <div class="opts" data-key="barrier">
+            <button class="opt" data-val="head">Голова уговаривает не идти</button>
+            <button class="opt" data-val="time">Не хватает времени</button>
+            <button class="opt" data-val="tired">Мало сил к концу дня</button>
+            <button class="opt" data-val="weather">Погода и темнота</button>
+            <button class="opt" data-val="fear">Страшно, что будет тяжело</button>
+            <button class="opt" data-val="other">Другое</button>
+          </div>
+          <div class="oother" id="barrierOtherDiv">
+            <input id="barrierOtherInput" type="text" maxlength="60" placeholder="Например, хочется, но нет сил начать" class="oother-input">
+          </div>
         </div>
       </div>
       <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
@@ -1366,13 +1398,15 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     <!-- 5 · как часто (baseline) -->
     <div class="ostep" data-step="5">
       <div class="obody">
-        <h1 class="disp">Как часто ты сейчас <span class="ser">двигаешься</span></h1>
-        <p class="cap" style="margin-top:14px;max-width:290px">Честно, а не как хотелось бы. Это станет твоим коридором, а не целью.</p>
-        <div class="opts" data-key="baseline">
-          <button class="opt" data-val="rare">Почти не двигаюсь</button>
-          <button class="opt" data-val="low">Один или два раза в неделю</button>
-          <button class="opt" data-val="mid">Три или четыре раза</button>
-          <button class="opt" data-val="high">Пять и больше</button>
+        <div class="oinner">
+          <h1 class="disp">Как часто ты сейчас <span class="ser">двигаешься</span></h1>
+          <p class="cap" style="margin-top:14px;max-width:290px">Честно, а не как хотелось бы. Это станет твоим коридором, а не целью.</p>
+          <div class="opts" data-key="baseline">
+            <button class="opt" data-val="rare">Почти не двигаюсь</button>
+            <button class="opt" data-val="low">Один или два раза в неделю</button>
+            <button class="opt" data-val="mid">Три или четыре раза</button>
+            <button class="opt" data-val="high">Пять и больше</button>
+          </div>
         </div>
       </div>
       <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
@@ -1381,13 +1415,15 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     <!-- 6 · когда получается (daypart) -->
     <div class="ostep" data-step="6">
       <div class="obody">
-        <h1 class="disp">Когда обычно <span class="ser">получается</span></h1>
-        <p class="cap" style="margin-top:14px;max-width:290px">Ника пришлёт одно сообщение в это время. Больше ничего.</p>
-        <div class="opts" data-key="daypart">
-          <button class="opt" data-val="morning">Утром до дел</button>
-          <button class="opt" data-val="noon">В обед или днём</button>
-          <button class="opt" data-val="evening">Вечером</button>
-          <button class="opt" data-val="varies">По-разному</button>
+        <div class="oinner">
+          <h1 class="disp">Когда обычно <span class="ser">получается</span></h1>
+          <p class="cap" style="margin-top:14px;max-width:290px">Ника пришлёт одно сообщение в это время. Больше ничего.</p>
+          <div class="opts" data-key="daypart">
+            <button class="opt" data-val="morning">Утром до дел</button>
+            <button class="opt" data-val="noon">В обед или днём</button>
+            <button class="opt" data-val="evening">Вечером</button>
+            <button class="opt" data-val="varies">По-разному</button>
+          </div>
         </div>
       </div>
       <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
@@ -1396,35 +1432,46 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     <!-- 7 · за чем следить (behaviors) -->
     <div class="ostep" data-step="7">
       <div class="obody">
-        <h1 class="disp">За чем следить <span class="ser">в дневнике</span></h1>
-        <p class="cap" style="margin-top:12px;max-width:300px">Выбери от трёх до пяти. С меньшим числом корреляции путаются, с большим тоже.</p>
-        <div class="opts" data-key="behaviors" data-multi data-min="3" data-max="5" style="margin-top:18px">
-          <button class="opt" data-val="sleep">Спала мало</button>
-          <button class="opt" data-val="run_am">Бежала утром</button>
-          <button class="opt" data-val="run_together">Бежала не одна</button>
-          <button class="opt" data-val="coffee">Кофе до бега</button>
-          <button class="opt" data-val="ate">Ела перед бегом</button>
-          <button class="opt" data-val="heavy_legs">Ноги тяжёлые</button>
-          <button class="opt" data-val="anxious">Тревожно</button>
-          <button class="opt" data-val="work">Много работы</button>
-          <button class="opt" data-val="heat">Жарко или душно</button>
-          <button class="opt" data-val="pain">Болит что-то</button>
+        <div class="oinner">
+          <h1 class="disp">За чем следить <span class="ser">в дневнике</span></h1>
+          <p class="cap" style="margin-top:12px;max-width:300px">Выбери от трёх до пяти. С меньшим числом корреляции путаются, с большим тоже.</p>
+          <p class="obcount" id="behaviorsCount">Выбрано <b>0</b> из 5</p>
+          <div class="opts" data-key="behaviors" data-multi data-min="3" data-max="5">
+            <button class="opt" data-val="sleep">Спала мало</button>
+            <button class="opt" data-val="run_am">Бежала утром</button>
+            <button class="opt" data-val="run_together">Бежала не одна</button>
+            <button class="opt" data-val="coffee">Кофе перед выходом</button>
+            <button class="opt" data-val="ate">Ела перед бегом</button>
+            <button class="opt" data-val="heavy_legs">Ноги тяжёлые</button>
+            <button class="opt" data-val="anxious">Тревожно</button>
+            <button class="opt" data-val="work">Тяжёлый день</button>
+            <button class="opt" data-val="heat">Жарко или душно</button>
+            <button class="opt" data-val="pain">Болит что-то</button>
+            <button class="opt" data-val="other">Другое</button>
+          </div>
+          <div class="oother" id="behaviorsOtherDiv">
+            <input id="behaviorsOtherInput" type="text" maxlength="60" placeholder="Например, слушала музыку" class="oother-input">
+          </div>
+          <p class="cap" style="margin-top:14px;font-size:.78rem;color:var(--ink-3)">Изменить набор можно в любой момент в профиле.</p>
         </div>
-        <p class="cap" style="margin-top:14px;font-size:.78rem;color:var(--ink-3)">Изменить набор можно в любой момент в профиле.</p>
-        <p class="oerr" id="behaviorsErr" style="display:none">Выбери от трёх до пяти</p>
       </div>
-      <div class="ofoot"><button class="pill solid wide" id="behaviorsNext">Дальше</button></div>
+      <div class="ofoot">
+        <button class="pill solid wide" id="behaviorsNext" disabled>Дальше</button>
+        <p class="ohint" id="behaviorsHint">Выбери ещё три</p>
+      </div>
     </div>
 
     <!-- 8 · цикл (cycle) -->
     <div class="ostep" data-step="8">
       <div class="obody">
-        <h1 class="disp">Учитывать <span class="ser">цикл</span></h1>
-        <p class="cap" style="margin-top:14px;max-width:300px">Фаза цикла меняет то, что тело может сегодня. Ника учтёт это вместо того, чтобы записать откат в откат.</p>
-        <div class="opts" style="margin-top:26px" data-key="cycle">
-          <button class="opt" data-val="yes">Да, учитывать</button>
-          <button class="opt" data-val="no">Нет</button>
-          <button class="opt" data-val="later">Расскажу позже</button>
+        <div class="oinner">
+          <h1 class="disp">Учитывать <span class="ser">цикл</span></h1>
+          <p class="cap" style="margin-top:14px;max-width:300px">Фаза цикла меняет то, что тело может сегодня. Ника учтёт это вместо того, чтобы записать откат в откат.</p>
+          <div class="opts" data-key="cycle">
+            <button class="opt" data-val="yes">Да, учитывать</button>
+            <button class="opt" data-val="no">Нет</button>
+            <button class="opt" data-val="later">Расскажу позже</button>
+          </div>
         </div>
       </div>
       <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
@@ -1433,11 +1480,13 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     <!-- 9 · обещания (promises) -->
     <div class="ostep" data-step="9">
       <div class="obody">
-        <h1 class="disp">Три вещи, которые я <span class="ser">обещаю</span></h1>
-        <div class="promise">
-          <div class="pr"><b>Здесь не сравнивают</b><span>Ни с другими, ни с твоей прошлой неделей</span></div>
-          <div class="pr"><b>Сюда можно вернуться</b><span>После двух дней и после двух месяцев одинаково</span></div>
-          <div class="pr"><b>Чувствовать разрешено вслух</b><span>«Сегодня совсем не хотелось» это нормальная запись</span></div>
+        <div class="oinner">
+          <h1 class="disp">Три вещи, которые я <span class="ser">обещаю</span></h1>
+          <div class="promise">
+            <div class="pr"><b>Здесь не сравнивают</b><span>Ни с другими, ни с твоей прошлой неделей</span></div>
+            <div class="pr"><b>Сюда можно вернуться</b><span>После двух дней и после двух месяцев одинаково</span></div>
+            <div class="pr"><b>Чувствовать разрешено вслух</b><span>«Сегодня совсем не хотелось» это нормальная запись</span></div>
+          </div>
         </div>
       </div>
       <div class="ofoot"><button class="pill solid wide" data-onext>Понятно</button></div>
@@ -1445,10 +1494,12 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 
     <!-- 10 · уведомления (notify) -->
     <div class="ostep" data-step="10">
-      <div class="obody" style="justify-content:flex-end;padding-bottom:16px">
-        <h1 class="disp">Одно утреннее <span class="ser">сообщение</span></h1>
-        <p class="cap" style="margin-top:16px;max-width:300px">Ника пишет раз в день, не больше. Ни сторис, ни напоминаний каждый час.</p>
-        <p class="cap" style="margin-top:12px;max-width:300px;color:var(--ink-3)">Разрешить можно сейчас, а отключить в любой момент в настройках телефона.</p>
+      <div class="obody">
+        <div class="oinner" style="padding-bottom:16px">
+          <h1 class="disp">Одно утреннее <span class="ser">сообщение</span></h1>
+          <p class="cap" style="margin-top:16px;max-width:300px">Ника пишет раз в день, не больше. Ни сторис, ни напоминаний каждый час.</p>
+          <p class="cap" style="margin-top:12px;max-width:300px;color:var(--ink-3)">Разрешить можно сейчас, а отключить в любой момент в настройках телефона.</p>
+        </div>
       </div>
       <div class="ofoot">
         <button class="pill solid wide" id="oNotifyYes">Разрешить</button>
@@ -1458,9 +1509,11 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 
     <!-- 11 · финал -->
     <div class="ostep" data-step="11">
-      <div class="obody" style="justify-content:center">
-        <h1 class="disp xl">Ника <span class="ser">рядом</span></h1>
-        <p class="cap" style="margin-top:16px;max-width:290px" id="oFinal">Начнём с первой практики прямо сейчас.</p>
+      <div class="obody">
+        <div class="oinner" style="margin:auto 0">
+          <h1 class="disp xl">Ника <span class="ser">рядом</span></h1>
+          <p class="cap" style="margin-top:16px;max-width:290px" id="oFinal">Начнём с первой практики прямо сейчас.</p>
+        </div>
       </div>
       <div class="ofoot">
         <button class="pill solid wide" id="oFinish">Открыть приложение</button>
@@ -2047,14 +2100,25 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
         back=document.getElementById('oback');
     function show(i){
       cur=Math.max(0,Math.min(i,LAST));
-      steps.forEach(function(s,k){ s.classList.toggle('on',k===cur); });
+      steps.forEach(function(s,k){
+        s.classList.toggle('on',k===cur);
+        if(k===cur){ var ob=s.querySelector('.obody'); if(ob) ob.scrollTop=0; }
+      });
       bar.style.display=cur<3?'none':'flex';
       fill.style.width=(Math.max(0,cur-2)/Math.max(1,LAST-2)*100).toFixed(1)+'%';
       haptic(8);
+      setTimeout(function(){ setupVeil(steps[cur]); },40);
     }
-    onb.querySelectorAll('[data-onext]').forEach(function(b){
-      b.addEventListener('click',function(){ show(cur+1); });
-    });
+    function setupVeil(s){
+      if(!s) return;
+      var ob=s.querySelector('.obody');
+      if(!ob) return;
+      if(ob.__vf) ob.removeEventListener('scroll',ob.__vf);
+      function chk(){ s.classList.toggle('scrolled-end',ob.scrollHeight-ob.scrollTop<=ob.clientHeight+4); }
+      ob.__vf=chk;
+      ob.addEventListener('scroll',chk,{passive:true});
+      setTimeout(chk,40);
+    }
     back.addEventListener('click',function(){ show(cur-1); });
     // ── авторизация ──────────────────────────────────────────
     var ologin=document.getElementById('ologin');
@@ -2097,55 +2161,122 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
       onb.style.display='block'; show(0); showLogin();
     };
 
-    // ── profile ────────────────────────────────────────────
-    var profile={name:'',intent:'',barrier:'',baseline:'',daypart:'',behaviors:[],cycle:'',notify:false};
+    // ── profile ─────────────────────────────────────────────
+    var profile={name:'',intent:'',intentCustom:'',barrier:'',barrierCustom:'',
+      baseline:'',daypart:'',behaviors:[],cycle:'',notify:false};
 
     var BEHAVIOR_LABELS={
       sleep:'Спала мало',run_am:'Бежала утром',run_together:'Бежала не одна',
-      coffee:'Кофе до бега',ate:'Ела перед бегом',heavy_legs:'Ноги тяжёлые',
-      anxious:'Тревожно',work:'Много работы',heat:'Жарко или душно',pain:'Болит что-то'
+      coffee:'Кофе перед выходом',ate:'Ела перед бегом',heavy_legs:'Ноги тяжёлые',
+      anxious:'Тревожно',work:'Тяжёлый день',heat:'Жарко или душно',pain:'Болит что-то'
     };
     var CORRIDOR_MAP={rare:'Почти без нагрузки',low:'1–2 в неделю',mid:'3–4 в неделю',high:'5–7 в неделю'};
     var BARRIER_PRACTICE={head:'Перед выходом · 3 мин',time:'Перед выходом · 3 мин',
-      tired:'Перед выходом · 3 мин',weather:'В стартовом коридоре · 5 мин',fear:'Про темп · 5 мин'};
+      tired:'Перед выходом · 3 мин',weather:'В стартовом коридоре · 5 мин',
+      fear:'Про темп · 5 мин',other:'Перед выходом · 3 мин'};
 
-    // opts: одиночный и мультивыбор → profile
+    // ── одиночный выбор (intent, barrier, baseline, daypart, cycle) ─
     (function(){
-      onb.querySelectorAll('.opts[data-key]').forEach(function(g){
-        var key=g.dataset.key, multi=g.hasAttribute('data-multi');
-        var maxSel=parseInt(g.dataset.max)||99;
+      ['intent','barrier','baseline','daypart','cycle'].forEach(function(key){
+        var g=onb.querySelector('.opts[data-key="'+key+'"]');
+        if(!g) return;
+        var otherDiv=document.getElementById(key+'OtherDiv');
+        var otherInp=document.getElementById(key+'OtherInput');
         g.querySelectorAll('.opt').forEach(function(o){
           o.addEventListener('click',function(){
-            if(multi){
-              var on=o.classList.contains('on');
-              var sel=g.querySelectorAll('.opt.on').length;
-              if(!on&&sel>=maxSel) return;
-              o.classList.toggle('on');
-              profile[key]=Array.from(g.querySelectorAll('.opt.on')).map(function(x){ return x.dataset.val||x.textContent.trim(); });
-            } else {
-              g.querySelectorAll('.opt').forEach(function(x){ x.classList.remove('on'); });
-              o.classList.add('on');
-              profile[key]=o.dataset.val||o.textContent.trim();
-            }
+            g.querySelectorAll('.opt').forEach(function(x){ x.classList.remove('on'); });
+            o.classList.add('on');
+            profile[key]=o.dataset.val;
+            if(otherDiv) otherDiv.style.display=(o.dataset.val==='other')?'':'none';
+            if(o.dataset.val==='other'){ if(otherInp) otherInp.focus(); }
+            else { if(profile[key+'Custom']!==undefined) profile[key+'Custom']=''; }
             haptic(7);
           });
+        });
+        if(otherInp) otherInp.addEventListener('input',function(){
+          profile[key+'Custom']=this.value.trim();
         });
       });
     })();
 
-    // behaviors: проверка 3–5
+    // ── behaviors (мультивыбор 3–5 + Другое) ────────────────
     (function(){
-      var btn=document.getElementById('behaviorsNext');
-      var err=document.getElementById('behaviorsErr');
-      if(!btn) return;
-      btn.addEventListener('click',function(){
+      var g=onb.querySelector('.opts[data-key="behaviors"]');
+      if(!g) return;
+      var maxSel=5, minSel=3;
+      var countEl=document.getElementById('behaviorsCount');
+      var hintEl=document.getElementById('behaviorsHint');
+      var nextBtn=document.getElementById('behaviorsNext');
+      var otherBtn=g.querySelector('[data-val="other"]');
+      var otherDiv=document.getElementById('behaviorsOtherDiv');
+      var otherInp=document.getElementById('behaviorsOtherInput');
+
+      function getVals(){
+        var arr=Array.from(g.querySelectorAll('.opt.on')).map(function(o){ return o.dataset.val; }).filter(function(v){ return v!=='other'; });
+        if(otherBtn&&otherBtn.classList.contains('on')&&otherInp&&otherInp.value.trim())
+          arr.push('c:'+otherInp.value.trim());
+        return arr;
+      }
+
+      function updateUI(){
+        profile.behaviors=getVals();
         var n=profile.behaviors.length;
-        if(n<3||n>5){ err.style.display=''; return; }
-        err.style.display='none'; show(cur+1);
+        if(countEl) countEl.innerHTML='Выбрано <b>'+n+'</b> из '+maxSel;
+        var atMax=(n>=maxSel);
+        g.querySelectorAll('.opt:not(.on)').forEach(function(o){ o.classList.toggle('dim',atMax); });
+        var need=minSel-n;
+        if(need>0){
+          nextBtn.disabled=true;
+          if(hintEl){ hintEl.textContent='Выбери ещё '+(need===1?'одну':need===2?'две':String(need)); hintEl.style.display=''; }
+        } else {
+          nextBtn.disabled=false;
+          if(hintEl) hintEl.style.display='none';
+        }
+      }
+
+      g.querySelectorAll('.opt:not([data-val="other"])').forEach(function(o){
+        o.addEventListener('click',function(){
+          if(!o.classList.contains('on')&&getVals().length>=maxSel) return;
+          o.classList.toggle('on');
+          updateUI(); haptic(7);
+        });
       });
+
+      if(otherBtn) otherBtn.addEventListener('click',function(){
+        var open=otherDiv&&otherDiv.style.display!=='none';
+        if(open){ otherDiv.style.display='none'; otherBtn.classList.remove('on'); }
+        else{ if(otherDiv){ otherDiv.style.display=''; if(otherInp) otherInp.focus(); } }
+        updateUI(); haptic(7);
+      });
+      if(otherInp) otherInp.addEventListener('input',function(){
+        if(this.value.trim()) otherBtn.classList.add('on');
+        else otherBtn.classList.remove('on');
+        updateUI();
+      });
+
+      if(nextBtn) nextBtn.addEventListener('click',function(){ if(!nextBtn.disabled) show(cur+1); });
+      updateUI();
     })();
 
-    // уведомления
+    // ── data-onext с валидацией «Другое» ─────────────────────
+    onb.querySelectorAll('[data-onext]').forEach(function(b){
+      b.addEventListener('click',function(){
+        var step=b.closest('.ostep');
+        if(step){
+          var g=step.querySelector('.opts[data-key]');
+          if(g&&!g.hasAttribute('data-multi')){
+            var sel=g.querySelector('.opt.on');
+            if(sel&&sel.dataset.val==='other'){
+              var inp=document.getElementById(g.dataset.key+'OtherInput');
+              if(!inp||!inp.value.trim()){ if(inp) inp.focus(); return; }
+            }
+          }
+        }
+        show(cur+1);
+      });
+    });
+
+    // ── уведомления ───────────────────────────────────────────
     (function(){
       var yes=document.getElementById('oNotifyYes'), no=document.getElementById('oNotifyNo');
       function next(){ show(cur+1); }
@@ -2179,13 +2310,24 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
           vals.forEach(function(v){
             var b=document.createElement('button');
             b.className='tag'; b.setAttribute('data-tag','');
-            b.textContent=BEHAVIOR_LABELS[v]||v;
+            b.textContent=v.startsWith('c:')?v.slice(2):(BEHAVIOR_LABELS[v]||v);
             b.addEventListener('click',function(){ b.classList.toggle('on'); haptic(6); });
             box.appendChild(b);
           });
           if(addBtn) box.appendChild(addBtn);
         });
       })();
+      // intentCustom/barrierCustom → первое сообщение Ники
+      var custom=profile.intentCustom||profile.barrierCustom;
+      if(custom){
+        var msgsEl=document.getElementById('msgs');
+        if(msgsEl){
+          var bub=document.createElement('div');
+          bub.className='msg from';
+          bub.textContent='Ты написала, что '+custom.charAt(0).toLowerCase()+custom.slice(1)+'. С этого и начнём.';
+          msgsEl.insertBefore(bub,msgsEl.firstChild);
+        }
+      }
     }
 
     document.getElementById('oFinish').addEventListener('click',function(){
@@ -2194,6 +2336,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
       setTimeout(function(){ onb.style.display='none'; onb.style.opacity=''; },520);
       setState('fresh'); go('home'); haptic(16);
     });
+    setupVeil(steps[0]);
     window.__onbReset=function(){ show(0); };
     window.__onbOpen=function(){ onb.style.display='block'; show(0); if(window.__ann) window.__ann('onb'); };
   })();
