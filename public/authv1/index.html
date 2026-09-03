@@ -740,7 +740,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
           <div class="day plan"><div class="dot"></div><i>сб</i></div>
           <div class="day"><div class="dot"></div><i>вс</i></div>
         </div>
-        <div class="cap dim" style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Твой обычный коридор</span><span>3–5 в неделю</span></div>
+        <div class="cap dim" style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Твой обычный коридор</span><span id="corridorLabel">3–5 в неделю</span></div>
         <div class="corridor">
           <div class="rail2"></div><div class="zone" style="left:28%;width:30%"></div>
           <div class="pin" id="corrPin" style="left:34%"></div>
@@ -1141,13 +1141,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
         <div class="block">
           <div class="lab" style="margin-bottom:5px">Метки</div>
           <p class="cap dim" style="margin:0 0 16px">Ника предложила три по вчерашнему разговору. Добавь своё.</p>
-          <div class="tags">
-            <button class="tag on" data-tag>Спала мало <span class="cnt">9</span></button>
-            <button class="tag on" data-tag>Бежала утром</button>
-            <button class="tag" data-tag>Ноги тяжёлые <span class="cnt">4</span></button>
-            <button class="tag" data-tag>Кофе до бега</button>
-            <button class="tag" data-tag>Бежала не одна</button>
-            <button class="tag" data-tag>Жарко</button>
+          <div class="tags" id="prTags">
             <button class="tag add">+ Добавить</button>
           </div>
         </div>
@@ -1226,7 +1220,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
         <svg viewBox="0 0 24 24" fill="none"><path d="M6 4h10.5A1.5 1.5 0 0118 5.5v13a1.5 1.5 0 01-1.5 1.5H6a1.5 1.5 0 01-1.5-1.5v-13A1.5 1.5 0 016 4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 2.6v3M8 9.5h6.5M8 13h6.5M8 16.5h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
         <span>Дневник</span>
       </button>
-      <button class="tab" data-go="rhythm">
+      <button class="tab" id="rhythmTab" data-go="rhythm">
         <svg viewBox="0 0 24 24" fill="none"><path d="M3 12h3.5l2-5.5 3 11 2.5-7 1.8 3.5H21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
         <span>Ритм</span>
       </button>
@@ -1338,64 +1332,106 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
       <div class="ofoot"><button class="pill solid wide" id="regPassNext">Создать аккаунт</button></div>
     </div>
 
-    <!-- 3 · имя (бывш. 1) -->
-    <div class="ostep" data-step="7">
-      <div class="obody">
-        <h1 class="disp">Как тебя <span class="ser">зовут</span></h1>
-        <p class="cap" style="margin-top:14px;max-width:290px">Ника обращается по имени. Больше это имя нигде не появится.</p>
-        <div class="ofield"><input id="oName" type="text" placeholder="Имя" autocomplete="off"></div>
-      </div>
-      <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
-    </div>
-
-    <!-- 2 -->
-    <div class="ostep" data-step="8">
+    <!-- 3 · что привело (intent) -->
+    <div class="ostep" data-step="3">
       <div class="obody">
         <h1 class="disp">Что тебя сюда <span class="ser">привело</span></h1>
-        <p class="cap" style="margin-top:14px;max-width:300px">Можно выбрать несколько. От этого зависит, с чего Ника начнёт.</p>
-        <div class="opts" data-multi>
-          <button class="opt">Тяжело выходить, хотя хочу</button>
-          <button class="opt">Волнуюсь перед стартами</button>
-          <button class="opt">Возвращаюсь после перерыва</button>
-          <button class="opt">Грызу себя за пропуски</button>
-          <button class="opt">Хочу слышать тело, а не часы</button>
+        <p class="cap" style="margin-top:14px;max-width:290px">Один ответ. От него зависит, с чего начнёт Ника.</p>
+        <div class="opts" data-key="intent">
+          <button class="opt" data-val="hard">Тяжело выходить, хотя хочу</button>
+          <button class="opt" data-val="starts">Волнуюсь перед стартами</button>
+          <button class="opt" data-val="return">Возвращаюсь после перерыва</button>
+          <button class="opt" data-val="listen">Хочу слышать тело, а не часы</button>
         </div>
       </div>
       <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
     </div>
 
-    <!-- 3 -->
-    <div class="ostep" data-step="7">
-      <div class="obody">
-        <h1 class="disp">Как часто ты сейчас <span class="ser">двигаешься</span></h1>
-        <p class="cap" style="margin-top:14px;max-width:300px">Честно, а не как хотелось бы. Это станет твоим коридором, а не целью.</p>
-        <div class="opts">
-          <button class="opt">Почти не двигаюсь</button>
-          <button class="opt">Один или два раза в неделю</button>
-          <button class="opt on">Три или четыре раза</button>
-          <button class="opt">Пять и больше</button>
-        </div>
-      </div>
-      <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
-    </div>
-
-    <!-- 4 -->
-    <div class="ostep" data-step="8">
+    <!-- 4 · что мешает (barrier) -->
+    <div class="ostep" data-step="4">
       <div class="obody">
         <h1 class="disp">Что чаще всего <span class="ser">мешает</span></h1>
-        <div class="opts">
-          <button class="opt">Не хватает времени</button>
-          <button class="opt on">Голова уговаривает не идти</button>
-          <button class="opt">Устаю на работе</button>
-          <button class="opt">Погода и темнота</button>
-          <button class="opt">Страшно, что будет тяжело</button>
+        <p class="cap" style="margin-top:14px;max-width:290px">Один ответ. Ника подберёт длительность первой практики.</p>
+        <div class="opts" data-key="barrier">
+          <button class="opt" data-val="head">Голова уговаривает не идти</button>
+          <button class="opt" data-val="time">Не хватает времени</button>
+          <button class="opt" data-val="tired">Устаю на работе</button>
+          <button class="opt" data-val="weather">Погода и темнота</button>
+          <button class="opt" data-val="fear">Страшно, что будет тяжело</button>
         </div>
       </div>
       <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
     </div>
 
-    <!-- 5 -->
+    <!-- 5 · как часто (baseline) -->
+    <div class="ostep" data-step="5">
+      <div class="obody">
+        <h1 class="disp">Как часто ты сейчас <span class="ser">двигаешься</span></h1>
+        <p class="cap" style="margin-top:14px;max-width:290px">Честно, а не как хотелось бы. Это станет твоим коридором, а не целью.</p>
+        <div class="opts" data-key="baseline">
+          <button class="opt" data-val="rare">Почти не двигаюсь</button>
+          <button class="opt" data-val="low">Один или два раза в неделю</button>
+          <button class="opt" data-val="mid">Три или четыре раза</button>
+          <button class="opt" data-val="high">Пять и больше</button>
+        </div>
+      </div>
+      <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
+    </div>
+
+    <!-- 6 · когда получается (daypart) -->
+    <div class="ostep" data-step="6">
+      <div class="obody">
+        <h1 class="disp">Когда обычно <span class="ser">получается</span></h1>
+        <p class="cap" style="margin-top:14px;max-width:290px">Ника пришлёт одно сообщение в это время. Больше ничего.</p>
+        <div class="opts" data-key="daypart">
+          <button class="opt" data-val="morning">Утром до дел</button>
+          <button class="opt" data-val="noon">В обед или днём</button>
+          <button class="opt" data-val="evening">Вечером</button>
+          <button class="opt" data-val="varies">По-разному</button>
+        </div>
+      </div>
+      <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
+    </div>
+
+    <!-- 7 · за чем следить (behaviors) -->
     <div class="ostep" data-step="7">
+      <div class="obody">
+        <h1 class="disp">За чем следить <span class="ser">в дневнике</span></h1>
+        <p class="cap" style="margin-top:12px;max-width:300px">Выбери от трёх до пяти. С меньшим числом корреляции путаются, с большим тоже.</p>
+        <div class="opts" data-key="behaviors" data-multi data-min="3" data-max="5" style="margin-top:18px">
+          <button class="opt" data-val="sleep">Спала мало</button>
+          <button class="opt" data-val="run_am">Бежала утром</button>
+          <button class="opt" data-val="run_together">Бежала не одна</button>
+          <button class="opt" data-val="coffee">Кофе до бега</button>
+          <button class="opt" data-val="ate">Ела перед бегом</button>
+          <button class="opt" data-val="heavy_legs">Ноги тяжёлые</button>
+          <button class="opt" data-val="anxious">Тревожно</button>
+          <button class="opt" data-val="work">Много работы</button>
+          <button class="opt" data-val="heat">Жарко или душно</button>
+          <button class="opt" data-val="pain">Болит что-то</button>
+        </div>
+        <p class="cap" style="margin-top:14px;font-size:.78rem;color:var(--ink-3)">Изменить набор можно в любой момент в профиле.</p>
+        <p class="oerr" id="behaviorsErr" style="display:none">Выбери от трёх до пяти</p>
+      </div>
+      <div class="ofoot"><button class="pill solid wide" id="behaviorsNext">Дальше</button></div>
+    </div>
+
+    <!-- 8 · цикл (cycle) -->
+    <div class="ostep" data-step="8">
+      <div class="obody">
+        <h1 class="disp">Учитывать <span class="ser">цикл</span></h1>
+        <p class="cap" style="margin-top:14px;max-width:300px">Фаза цикла меняет то, что тело может сегодня. Ника учтёт это вместо того, чтобы записать откат в откат.</p>
+        <div class="opts" style="margin-top:26px" data-key="cycle">
+          <button class="opt" data-val="yes">Да, учитывать</button>
+          <button class="opt" data-val="no">Нет</button>
+          <button class="opt" data-val="later">Расскажу позже</button>
+        </div>
+      </div>
+      <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
+    </div>
+
+    <!-- 9 · обещания (promises) -->
+    <div class="ostep" data-step="9">
       <div class="obody">
         <h1 class="disp">Три вещи, которые я <span class="ser">обещаю</span></h1>
         <div class="promise">
@@ -1407,11 +1443,24 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
       <div class="ofoot"><button class="pill solid wide" data-onext>Понятно</button></div>
     </div>
 
-    <!-- 6 -->
-    <div class="ostep" data-step="8">
+    <!-- 10 · уведомления (notify) -->
+    <div class="ostep" data-step="10">
+      <div class="obody" style="justify-content:flex-end;padding-bottom:16px">
+        <h1 class="disp">Одно утреннее <span class="ser">сообщение</span></h1>
+        <p class="cap" style="margin-top:16px;max-width:300px">Ника пишет раз в день, не больше. Ни сторис, ни напоминаний каждый час.</p>
+        <p class="cap" style="margin-top:12px;max-width:300px;color:var(--ink-3)">Разрешить можно сейчас, а отключить в любой момент в настройках телефона.</p>
+      </div>
+      <div class="ofoot">
+        <button class="pill solid wide" id="oNotifyYes">Разрешить</button>
+        <button class="pill ghost wide" id="oNotifyNo">Не сейчас</button>
+      </div>
+    </div>
+
+    <!-- 11 · финал -->
+    <div class="ostep" data-step="11">
       <div class="obody" style="justify-content:center">
         <h1 class="disp xl">Ника <span class="ser">рядом</span></h1>
-        <p class="cap" style="margin-top:16px;max-width:290px" id="oFinal">Начнём с трёх минут. Дальше решай сама.</p>
+        <p class="cap" style="margin-top:16px;max-width:290px" id="oFinal">Начнём с первой практики прямо сейчас.</p>
       </div>
       <div class="ofoot">
         <button class="pill solid wide" id="oFinish">Открыть приложение</button>
@@ -2001,9 +2050,6 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
       steps.forEach(function(s,k){ s.classList.toggle('on',k===cur); });
       bar.style.display=cur<3?'none':'flex';
       fill.style.width=(Math.max(0,cur-2)/Math.max(1,LAST-2)*100).toFixed(1)+'%';
-      var nm=(document.getElementById('oName').value||'').trim();
-      if(cur===LAST) document.getElementById('oFinal').textContent=
-        nm? nm+', начнём с трёх минут. Дальше решай сама.' : 'Начнём с трёх минут. Дальше решай сама.';
       haptic(8);
     }
     onb.querySelectorAll('[data-onext]').forEach(function(b){
@@ -2050,21 +2096,100 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     window.__loginOpen=function(){
       onb.style.display='block'; show(0); showLogin();
     };
-    onb.querySelectorAll('.opts').forEach(function(g){
-      var multi=g.hasAttribute('data-multi');
-      g.querySelectorAll('.opt').forEach(function(o){
-        o.addEventListener('click',function(){
-          if(multi) o.classList.toggle('on');
-          else { g.querySelectorAll('.opt').forEach(function(x){ x.classList.remove('on'); }); o.classList.add('on'); }
-          haptic(7);
+
+    // ── profile ────────────────────────────────────────────
+    var profile={name:'',intent:'',barrier:'',baseline:'',daypart:'',behaviors:[],cycle:'',notify:false};
+
+    var BEHAVIOR_LABELS={
+      sleep:'Спала мало',run_am:'Бежала утром',run_together:'Бежала не одна',
+      coffee:'Кофе до бега',ate:'Ела перед бегом',heavy_legs:'Ноги тяжёлые',
+      anxious:'Тревожно',work:'Много работы',heat:'Жарко или душно',pain:'Болит что-то'
+    };
+    var CORRIDOR_MAP={rare:'Почти без нагрузки',low:'1–2 в неделю',mid:'3–4 в неделю',high:'5–7 в неделю'};
+    var BARRIER_PRACTICE={head:'Перед выходом · 3 мин',time:'Перед выходом · 3 мин',
+      tired:'Перед выходом · 3 мин',weather:'В стартовом коридоре · 5 мин',fear:'Про темп · 5 мин'};
+
+    // opts: одиночный и мультивыбор → profile
+    (function(){
+      onb.querySelectorAll('.opts[data-key]').forEach(function(g){
+        var key=g.dataset.key, multi=g.hasAttribute('data-multi');
+        var maxSel=parseInt(g.dataset.max)||99;
+        g.querySelectorAll('.opt').forEach(function(o){
+          o.addEventListener('click',function(){
+            if(multi){
+              var on=o.classList.contains('on');
+              var sel=g.querySelectorAll('.opt.on').length;
+              if(!on&&sel>=maxSel) return;
+              o.classList.toggle('on');
+              profile[key]=Array.from(g.querySelectorAll('.opt.on')).map(function(x){ return x.dataset.val||x.textContent.trim(); });
+            } else {
+              g.querySelectorAll('.opt').forEach(function(x){ x.classList.remove('on'); });
+              o.classList.add('on');
+              profile[key]=o.dataset.val||o.textContent.trim();
+            }
+            haptic(7);
+          });
         });
       });
-    });
-    document.getElementById('oFinish').addEventListener('click',function(){
-      var nm=(document.getElementById('oName').value||'').trim();
-      if(nm){
-        var w=document.querySelector('.phead .who b'); if(w) w.textContent=nm;
+    })();
+
+    // behaviors: проверка 3–5
+    (function(){
+      var btn=document.getElementById('behaviorsNext');
+      var err=document.getElementById('behaviorsErr');
+      if(!btn) return;
+      btn.addEventListener('click',function(){
+        var n=profile.behaviors.length;
+        if(n<3||n>5){ err.style.display=''; return; }
+        err.style.display='none'; show(cur+1);
+      });
+    })();
+
+    // уведомления
+    (function(){
+      var yes=document.getElementById('oNotifyYes'), no=document.getElementById('oNotifyNo');
+      function next(){ show(cur+1); }
+      if(yes) yes.addEventListener('click',function(){
+        profile.notify=true;
+        if(window.Notification&&Notification.permission==='default'){
+          Notification.requestPermission().then(function(){ next(); }).catch(function(){ next(); });
+        } else { next(); }
+      });
+      if(no) no.addEventListener('click',function(){ profile.notify=false; next(); });
+    })();
+
+    function applyProfile(){
+      var cl=document.getElementById('corridorLabel');
+      if(cl&&profile.baseline) cl.textContent=CORRIDOR_MAP[profile.baseline]||profile.baseline;
+      if(profile.daypart==='evening'){
+        document.querySelectorAll('[data-view="home"] .scene.hero .art use').forEach(function(u){
+          u.setAttribute('href','#sc-dusk');
+        });
       }
+      var mb=document.getElementById('markBtn');
+      if(mb&&profile.barrier&&BARRIER_PRACTICE[profile.barrier]) mb.textContent=BARRIER_PRACTICE[profile.barrier];
+      var rt=document.getElementById('rhythmTab');
+      if(rt) rt.style.display=(profile.cycle==='yes')?'':'none';
+      (function(){
+        var vals=profile.behaviors.length?profile.behaviors:['sleep','run_am','heavy_legs'];
+        [document.getElementById('prTags'),document.getElementById('tagbox')].forEach(function(box){
+          if(!box) return;
+          var addBtn=box.querySelector('.tag.add');
+          box.innerHTML='';
+          vals.forEach(function(v){
+            var b=document.createElement('button');
+            b.className='tag'; b.setAttribute('data-tag','');
+            b.textContent=BEHAVIOR_LABELS[v]||v;
+            b.addEventListener('click',function(){ b.classList.toggle('on'); haptic(6); });
+            box.appendChild(b);
+          });
+          if(addBtn) box.appendChild(addBtn);
+        });
+      })();
+    }
+
+    document.getElementById('oFinish').addEventListener('click',function(){
+      applyProfile();
       onb.style.transition='opacity .5s ease'; onb.style.opacity='0';
       setTimeout(function(){ onb.style.display='none'; onb.style.opacity=''; },520);
       setState('fresh'); go('home'); haptic(16);
