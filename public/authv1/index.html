@@ -1,0 +1,2087 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="robots" content="noindex, nofollow">
+<link rel="manifest" href="/authv1/manifest.webmanifest">
+<meta name="theme-color" content="#08080A">
+<title>НИКА Лайт · интерактивный прототип v6</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Lora:ital,wght@0,400;0,500;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;1,8..60,400&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   НИКА БЕГ
+   Тезис: у Ауры кольцо измеряет тебя. У нас измеряешь ты сам.
+   Поэтому там, где у Ауры дуга шагомера, у нас дуга дыхания.
+   Тёмный холст, полноэкранная иллюстрация, крупный сериф
+   поверх неё, цвет приходит из картинки, а не из палитры.
+   ============================================================ */
+:root{
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --disp:'Playfair Display','Times New Roman',Georgia,serif;
+
+  --ink:#F4EFE6;
+  --ink-2:rgba(244,239,230,.68);
+  --ink-3:rgba(244,239,230,.42);
+  --ink-4:rgba(244,239,230,.16);
+  --void:#0B0B0D;
+  --veil:rgba(255,255,255,.07);
+  --veil-2:rgba(255,255,255,.12);
+  --brand:#D4703F;
+
+  --r-md:16px; --r-lg:22px; --r-pill:999px;
+  --s1:8px; --s2:16px; --s3:24px; --s4:36px;
+
+  /* размер, трекинг и интерлиньяж всегда парами */
+  --d-xl:2.9rem;   --d-ls-xl:-.022em; --d-lh-xl:1.0;
+  --d-lg:2.15rem;  --d-ls-lg:-.016em; --d-lh-lg:1.08;
+  --d-md:1.62rem;  --d-ls-md:-.01em;  --d-lh-md:1.16;
+  --n-hero:3.7rem; --n-ls:-.036em;
+  --t-body:.95rem; --t-ls-body:-.002em; --t-lh-body:1.56;
+  --t-cap:.82rem;  --t-lh-cap:1.45;
+  --t-lab:.665rem; --t-ls-lab:.17em;
+}
+
+*,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{font-size:100%}
+html,body{margin:0;padding:0;height:100%}
+body{font-family:var(--sans);font-size:var(--t-body);line-height:var(--t-lh-body);letter-spacing:var(--t-ls-body);
+  color:var(--ink);background:#08080A;font-optical-sizing:auto;font-variant-numeric:tabular-nums;
+  display:flex;align-items:center;justify-content:center;min-height:100dvh;overflow:hidden}
+button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:pointer;color:inherit;text-align:left;
+  touch-action:manipulation;letter-spacing:inherit}
+:focus-visible{outline:1.5px solid var(--ink);outline-offset:3px;border-radius:6px}
+
+.stage{width:100%;height:100dvh;display:flex;align-items:center;justify-content:center;gap:34px;background:#111114}
+.device{position:relative;width:393px;height:852px;border-radius:56px;background:#000;padding:11px;
+  box-shadow:0 0 0 2px #26262A,0 40px 90px -30px rgba(0,0,0,.8);flex:none}
+.app{position:relative;width:100%;height:100%;border-radius:46px;overflow:hidden;isolation:isolate;background:var(--void)}
+
+/* ---------- типографические роли ---------- */
+.disp{font-family:var(--sans);font-weight:300;font-size:var(--d-lg);letter-spacing:var(--d-ls-lg);
+  line-height:var(--d-lh-lg);margin:0}
+/* сериф это акцент на одном-двух словах, а не режим всего заголовка */
+.ser{font-family:var(--disp);font-weight:400;letter-spacing:.002em}
+.disp .ser{font-size:1.06em;line-height:.9}
+.disp.xl{font-size:var(--d-xl);letter-spacing:var(--d-ls-xl);line-height:var(--d-lh-xl)}
+.disp.md{font-size:var(--d-md);letter-spacing:var(--d-ls-md);line-height:var(--d-lh-md)}
+.lab{font-size:var(--t-lab);letter-spacing:var(--t-ls-lab);text-transform:uppercase;color:var(--ink-3);font-weight:500}
+.cap{font-size:var(--t-cap);line-height:var(--t-lh-cap);color:var(--ink-2)}
+.dim{color:var(--ink-3)}
+
+.is-pressed{transform:scale(var(--ps,.97))}
+[data-press]{transition:transform .13s cubic-bezier(.32,.72,0,1)}
+
+/* ============================================================
+   ПОЛНОЭКРАННЫЕ СЦЕНЫ
+   Каждый раздел ленты это своя сцена с иллюстрацией на всю
+   ширину. Карточек с рамками нет вообще.
+   ============================================================ */
+.scene{position:relative;margin:0 -20px var(--s4);padding:0 20px;overflow:hidden}
+.scene .art{position:absolute;inset:0;z-index:0;pointer-events:none}
+.scene .art svg{width:100%;height:100%;display:block}
+.scene .body{position:relative;z-index:2}
+.scene .fadeout{position:absolute;left:0;right:0;bottom:0;height:74%;z-index:1;pointer-events:none;
+  background:linear-gradient(to bottom,transparent 0%,rgba(11,11,13,.38) 34%,rgba(11,11,13,.82) 66%,var(--void) 94%)}
+
+/* ---------- герой ---------- */
+.hero{min-height:620px;margin-bottom:var(--s3);display:flex;flex-direction:column}
+.hero .body{flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:98px}
+
+/* дуга дыхания: подпись сверху дуги, как у Ауры на шагах */
+.breath{position:relative;width:100%;height:196px;margin-bottom:var(--s2);z-index:2}
+.breath svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.breath .track{fill:none;stroke:rgba(244,239,230,.22);stroke-width:1.5;stroke-linecap:round}
+.breath .lit{fill:none;stroke:var(--ink);stroke-width:2.5;stroke-linecap:round;
+  stroke-dasharray:var(--arc);stroke-dashoffset:var(--arc)}
+.breath .bead{fill:var(--ink)}
+.breath .end{fill:rgba(244,239,230,.5);font-family:var(--sans);font-size:11px;letter-spacing:.04em}
+.breath .core{position:absolute;left:50%;top:104px;transform:translateX(-50%);text-align:center;width:100%}
+.breath .phase{font-size:var(--t-lab);letter-spacing:var(--t-ls-lab);text-transform:uppercase;color:var(--ink-3);font-weight:500}
+.breath .count{font-size:var(--n-hero);letter-spacing:var(--n-ls);font-weight:300;line-height:1;margin-top:6px;
+  font-variant-numeric:tabular-nums}
+
+.pill{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:46px;padding:0 24px;
+  border-radius:var(--r-pill);background:rgba(255,255,255,.13);color:var(--ink);font-size:.92rem;font-weight:500;
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  transition:transform .13s cubic-bezier(.32,.72,0,1),background .25s}
+.pill.solid{background:var(--ink);color:#111}
+.pill.wide{display:flex;width:100%}
+.textbtn{display:inline-flex;align-items:center;gap:6px;font-size:var(--t-cap);color:var(--ink-3);padding:12px 2px}
+
+/* ---------- строка самоотчёта ---------- */
+.selfrow{display:flex;gap:10px;overflow-x:auto;padding:0 20px var(--s1);margin:0 -20px;scrollbar-width:none;
+  scroll-snap-type:x proximity;overscroll-behavior-x:contain}
+.selfrow::-webkit-scrollbar{display:none}
+.self{flex:none;width:78px;text-align:center;scroll-snap-align:center}
+.self .ring{width:70px;height:70px;margin:0 auto 8px;border-radius:50%;display:grid;place-items:center;position:relative;
+  background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+.self .ring b{font-size:1.4rem;font-weight:300;letter-spacing:-.02em}
+.self .ring.empty b{color:var(--ink-4);font-weight:400}
+.self .ring svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.self .ring circle{fill:none;stroke-width:2;stroke-linecap:round}
+.self i{font-style:normal;font-size:var(--t-cap);color:var(--ink-3);display:block}
+
+/* ---------- панель приложения ---------- */
+.statusbar{position:absolute;top:0;left:0;right:0;height:52px;z-index:92;display:flex;align-items:center;
+  justify-content:space-between;padding:15px 26px 0;font-size:.87rem;font-weight:500;pointer-events:none;color:var(--ink)}
+.sb-r{display:flex;align-items:center;gap:6px}
+.appbar{position:absolute;top:52px;left:0;right:0;height:48px;z-index:60;display:flex;align-items:center;
+  justify-content:space-between;padding:0 18px;pointer-events:none}
+.appbar>*{pointer-events:auto}
+.wordmark{position:absolute;left:50%;transform:translateX(-50%);font-family:var(--disp);font-size:1.12rem;
+  letter-spacing:.34em;text-indent:.34em;font-weight:400;color:var(--ink)}
+.ib{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;flex:none;position:relative;color:var(--ink)}
+.ib .pip{position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:50%;background:var(--brand);
+  box-shadow:0 0 0 2px var(--void)}
+.avatar{width:30px;height:30px;border-radius:50%;background-size:cover;background-position:center;
+  background-image:radial-gradient(circle at 32% 26%,#E8B694,transparent 58%),linear-gradient(150deg,#D4703F,#8C3A22 74%)}
+
+.topveil{position:absolute;top:0;left:0;right:0;height:126px;z-index:55;pointer-events:none;
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  background:linear-gradient(to bottom,rgba(11,11,13,.88) 0%,rgba(11,11,13,.62) 46%,rgba(11,11,13,.12) 84%,transparent 100%);
+  -webkit-mask:linear-gradient(to bottom,#000 0 62%,transparent 98%);mask:linear-gradient(to bottom,#000 0 62%,transparent 98%)}
+.botveil{position:absolute;left:0;right:0;bottom:0;height:130px;z-index:45;pointer-events:none;
+  background:linear-gradient(to top,var(--void) 4%,rgba(11,11,13,.7) 42%,transparent 100%)}
+
+.scroll{position:absolute;inset:0;z-index:10;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
+  padding:100px 20px 150px;scrollbar-width:none;overscroll-behavior:contain}
+.scroll::-webkit-scrollbar{display:none}
+.behind{position:absolute;inset:0;z-index:10;transform-origin:50% 24%;will-change:transform}
+
+/* ---------- список-ряд ---------- */
+.rail{display:flex;gap:12px;overflow-x:auto;margin:0 -20px;padding:0 20px 10px;scrollbar-width:none;
+  scroll-snap-type:x proximity;overscroll-behavior-x:contain}
+.rail::-webkit-scrollbar{display:none}
+.pract{flex:none;width:196px;height:250px;border-radius:var(--r-lg);overflow:hidden;position:relative;
+  scroll-snap-align:start;display:flex;flex-direction:column;justify-content:flex-end;padding:16px}
+.pract .art{position:absolute;inset:0;z-index:0}
+.pract .art svg{width:100%;height:100%;display:block}
+.pract .shade{position:absolute;inset:0;z-index:1;background:linear-gradient(to top,rgba(6,6,8,.92) 4%,rgba(6,6,8,.55) 40%,rgba(6,6,8,.06) 76%)}
+.pract .tx{position:relative;z-index:2}
+.pract .tx b{display:block;font-family:var(--disp);font-weight:400;font-size:1.24rem;letter-spacing:-.008em;line-height:1.16}
+.pract .tx span{display:block;font-size:var(--t-cap);color:var(--ink-3);margin-top:5px}
+.pract .tag{position:absolute;top:14px;left:14px;z-index:2;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;
+  font-weight:500;color:var(--ink);background:rgba(255,255,255,.16);padding:4px 8px;border-radius:6px;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+
+/* ---------- бледные строки списка ---------- */
+.list{margin:0 -4px}
+.li{display:flex;align-items:center;gap:14px;padding:16px 4px;width:100%;text-align:left;
+  border-bottom:1px solid var(--ink-4)}
+.list .li:last-child{border-bottom:0}
+.li .tx{flex:1;min-width:0}
+.li .tx b{display:block;font-size:.94rem;font-weight:500;letter-spacing:-.006em}
+.li .tx span{display:block;font-size:var(--t-cap);color:var(--ink-3);margin-top:2px}
+.li .n{font-size:1.5rem;font-weight:300;letter-spacing:-.024em;color:var(--ink-2);flex:none}
+.chev{color:var(--ink-3);flex:none}
+
+.section{margin-bottom:var(--s4)}
+.section .head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:var(--s2)}
+
+/* ---------- неделя ---------- */
+.days{display:flex;justify-content:space-between;margin:var(--s3) 0 var(--s2)}
+.day{display:flex;flex-direction:column;align-items:center;gap:9px;flex:1}
+.dot{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;color:transparent;
+  box-shadow:inset 0 0 0 1.5px var(--ink-4);will-change:transform}
+.day.done .dot{background:var(--ink);color:#111;box-shadow:none}
+.day.plan .dot{box-shadow:inset 0 0 0 1.5px var(--ink-2)}
+.day.moved .dot{box-shadow:inset 0 0 0 1.5px var(--ink-3);color:var(--ink-3)}
+.day i{font-style:normal;font-size:.63rem;letter-spacing:.1em;color:var(--ink-3);text-transform:uppercase}
+.corridor{position:relative;height:16px;margin-top:var(--s2)}
+.corridor .rail2{position:absolute;left:0;right:0;top:7px;height:2px;background:var(--ink-4);border-radius:1px}
+.corridor .zone{position:absolute;top:4px;height:8px;border-radius:4px;background:rgba(244,239,230,.16)}
+.corridor .pin{position:absolute;top:1px;width:2px;height:14px;border-radius:1px;background:var(--ink)}
+
+/* ---------- прогресс дневника ---------- */
+.meter{height:2px;background:var(--ink-4);border-radius:1px;overflow:hidden;margin:var(--s2) 0}
+.meter span{display:block;height:100%;background:var(--ink);width:0;transition:width .9s cubic-bezier(.22,1,.36,1)}
+
+/* ============================================================
+   ДНЕВНИК
+   ============================================================ */
+.datepager{display:flex;gap:0;overflow-x:auto;margin:0 -20px var(--s3);padding:0 calc(50% - 62px);
+  scrollbar-width:none;scroll-snap-type:x mandatory;overscroll-behavior-x:contain}
+.datepager::-webkit-scrollbar{display:none}
+.dp{flex:none;width:124px;text-align:center;padding:8px 0 12px;scroll-snap-align:center;color:var(--ink-3);
+  font-size:1.02rem;font-weight:400;position:relative}
+.dp.on{color:var(--ink)}
+.dp.on::after{content:'';position:absolute;left:50%;bottom:0;transform:translateX(-50%);width:74px;height:1.5px;background:var(--ink)}
+
+.block{border-top:1px solid var(--ink-4);padding:var(--s3) 0}
+.block:first-of-type{border-top:0}
+.toggle{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:14px 0}
+.toggle b{font-size:.96rem;font-weight:500}
+.sw{width:48px;height:29px;border-radius:var(--r-pill);background:var(--ink-4);position:relative;flex:none;
+  transition:background .25s cubic-bezier(.32,.72,0,1)}
+.sw::after{content:'';position:absolute;top:2.5px;left:2.5px;width:24px;height:24px;border-radius:50%;background:var(--ink);
+  transition:transform .25s cubic-bezier(.32,.72,0,1)}
+.sw.on{background:var(--brand)}
+.sw.on::after{transform:translateX(19px)}
+
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:var(--s2)}
+.tag{font-size:var(--t-cap);padding:9px 15px;border-radius:var(--r-pill);background:var(--veil);color:var(--ink-2);
+  display:inline-flex;align-items:center;gap:9px;transition:background .2s,color .2s}
+.tag.on{background:rgba(212,112,63,.2);color:var(--ink)}
+.tag.add{background:transparent;box-shadow:inset 0 0 0 1px var(--ink-4);color:var(--ink-2)}
+.tag .cnt{background:rgba(255,255,255,.14);border-radius:var(--r-pill);padding:1px 8px;font-size:.72rem;margin:-2px -7px -2px 0}
+
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:var(--s2)}
+.stat{background:var(--veil);border-radius:var(--r-md);padding:16px;display:flex;align-items:flex-end;
+  justify-content:space-between;gap:8px}
+.stat .lab{margin-bottom:8px}
+.stat b{display:block;font-size:1.34rem;font-weight:300;letter-spacing:-.02em}
+
+.reflect{border-radius:var(--r-lg);padding:var(--s3) 20px;margin-top:var(--s3);position:relative;overflow:hidden;
+  background:linear-gradient(155deg,#3A2118,#1A1210 78%)}
+.reflect .glow{position:absolute;width:230px;height:230px;right:-70px;top:-100px;border-radius:50%;
+  background:radial-gradient(circle,rgba(212,112,63,.42),transparent 68%)}
+.reflect .body{position:relative}
+.reflect p{margin:12px 0 0;font-size:var(--t-cap);line-height:var(--t-lh-cap);color:var(--ink-2)}
+
+.locked{border:1px dashed var(--ink-4);border-radius:var(--r-lg);padding:20px;margin-top:var(--s3)}
+.locked ul{margin:14px 0 0;padding:0;list-style:none;display:flex;flex-direction:column;gap:11px}
+.locked li{font-size:var(--t-cap);color:var(--ink-3);display:flex;gap:11px;line-height:1.4}
+.locked li::before{content:'';width:4px;height:4px;border-radius:50%;background:var(--ink-4);flex:none;margin-top:8px}
+
+/* ============================================================
+   ПРАКТИКА
+   ============================================================ */
+.pheader{position:relative;height:330px;margin:-100px -20px var(--s3);overflow:hidden}
+.pheader svg{width:100%;height:100%;display:block}
+.pheader .fade{position:absolute;left:0;right:0;bottom:0;height:52%;
+  background:linear-gradient(to bottom,transparent,var(--void) 92%)}
+.pbody p{margin:0 0 var(--s2);font-size:var(--t-body);line-height:var(--t-lh-body);color:var(--ink-2)}
+.pbody h3{margin:var(--s4) 0 var(--s2);font-size:1.14rem;font-weight:500;letter-spacing:-.012em}
+.dial{position:relative;height:150px;margin-top:var(--s3)}
+.dial svg{width:100%;height:100%;overflow:visible}
+.dial .t{fill:none;stroke:var(--ink-4);stroke-width:1.5}
+.dial .a{fill:none;stroke:var(--ink);stroke-width:2;stroke-linecap:round}
+.dial text{fill:rgba(244,239,230,.5);font-family:var(--sans);font-size:11px;letter-spacing:.03em}
+
+.backbar{position:absolute;top:52px;left:0;right:0;height:48px;z-index:60;display:flex;align-items:center;
+  justify-content:center;padding:0 18px;pointer-events:none}
+.backbar>*{pointer-events:auto}
+.backbar .t{font-size:.96rem;font-weight:500}
+.backbar .ib{position:absolute;left:14px}
+
+/* ---------- таб-бар ---------- */
+.tabzone{position:absolute;left:16px;right:16px;bottom:24px;z-index:70;display:flex;align-items:center;gap:10px}
+.tabs{flex:1;height:58px;border-radius:var(--r-pill);display:flex;align-items:center;padding:0 4px;
+  background:rgba(30,30,34,.62);
+  -webkit-backdrop-filter:blur(26px) saturate(160%);backdrop-filter:blur(26px) saturate(160%);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.1),0 16px 34px -14px rgba(0,0,0,.8)}
+.tab{display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 2px;border-radius:18px;color:var(--ink-3);
+  transition:color .22s;flex:1;text-align:center}
+.tab svg{width:20px;height:20px}
+.tab span{font-size:.63rem;font-weight:500;letter-spacing:.014em}
+.tab.on{color:var(--ink)}
+.fab{width:58px;height:58px;border-radius:50%;flex:none;display:grid;place-items:center;position:relative;
+  background:var(--brand);color:#1A0E08;box-shadow:0 12px 26px -10px rgba(212,112,63,.8)}
+.fab.on{box-shadow:0 0 0 3px rgba(212,112,63,.28),0 12px 26px -10px rgba(212,112,63,.8)}
+.fab .pip{position:absolute;top:3px;right:3px;width:9px;height:9px;border-radius:50%;background:var(--void)}
+.homebar{position:absolute;bottom:9px;left:50%;transform:translateX(-50%);width:140px;height:5px;border-radius:3px;
+  background:rgba(255,255,255,.28);z-index:96;pointer-events:none}
+
+/* ---------- страницы ---------- */
+.view{display:none}
+.view.on{display:block}
+.view.pushing{animation:pushIn .32s cubic-bezier(.16,1,.3,1)}
+.view.popping{animation:popOut .26s cubic-bezier(.7,0,.84,1) forwards}
+@keyframes pushIn{from{opacity:0;transform:translate3d(22px,0,0)}to{opacity:1;transform:none}}
+@keyframes popOut{from{opacity:1;transform:none}to{opacity:0;transform:translate3d(22px,0,0)}}
+
+/* ---------- лист Ники ---------- */
+.scrim{position:absolute;inset:0;z-index:72;background:#000;opacity:0;pointer-events:none;will-change:opacity}
+.sheet{position:absolute;top:58px;left:0;right:0;bottom:0;z-index:75;display:flex;flex-direction:column;visibility:hidden;
+  will-change:transform;transform:translate3d(0,100%,0);background:#141417;
+  border-radius:26px 26px 0 0;box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 -20px 50px -18px rgba(0,0,0,.9)}
+.grab{position:absolute;top:0;left:0;right:0;height:26px;z-index:6;display:flex;align-items:center;justify-content:center;
+  touch-action:none;cursor:grab}
+.grab i{width:36px;height:4px;border-radius:2px;background:var(--ink-4)}
+.nhead{position:relative;z-index:5;padding:26px 18px 12px;display:flex;align-items:center;gap:12px;touch-action:none;
+  border-bottom:1px solid var(--ink-4)}
+.nback{width:32px;height:32px;border-radius:50%;display:grid;place-items:center;flex:none;background:var(--veil)}
+.nhead b{display:block;font-size:.96rem;font-weight:500}
+.nhead span{display:block;font-size:var(--t-cap);color:#7FB08C;margin-top:1px}
+.msgs{position:relative;z-index:5;flex:1;overflow-y:auto;padding:16px 18px 8px;display:flex;flex-direction:column;gap:10px;
+  scrollbar-width:none;overscroll-behavior:contain;touch-action:pan-y}
+.msgs::-webkit-scrollbar{display:none}
+.stamp{align-self:center;font-size:var(--t-cap);color:var(--ink-3);margin:4px 0}
+.msg{max-width:84%;padding:12px 15px;border-radius:16px;font-size:var(--t-body);line-height:var(--t-lh-body)}
+.msg.n{background:var(--veil);border-bottom-left-radius:5px}
+.msg.u{background:var(--ink);color:#131316;align-self:flex-end;border-bottom-right-radius:5px}
+.chips{position:relative;z-index:5;display:flex;gap:7px;overflow-x:auto;padding:4px 18px;scrollbar-width:none}
+.chips::-webkit-scrollbar{display:none}
+.chip{flex:none;padding:9px 14px;border-radius:var(--r-pill);font-size:var(--t-cap);white-space:nowrap;
+  background:var(--veil);color:var(--ink-2)}
+.ninput{position:relative;z-index:5;display:flex;gap:8px;align-items:center;
+  padding:10px 18px calc(22px + env(safe-area-inset-bottom,0px))}
+.ninput .f{flex:1;height:46px;border-radius:var(--r-pill);padding:0 18px;display:flex;align-items:center;
+  font-size:.9rem;color:var(--ink-3);background:var(--veil)}
+.send{width:46px;height:46px;border-radius:50%;background:var(--ink);color:#131316;display:grid;place-items:center;flex:none}
+
+/* ---------- заставка ---------- */
+.splash{position:absolute;inset:0;z-index:200;display:grid;place-items:center;background:var(--void);overflow:hidden;
+  transition:opacity .5s ease}
+.splash.gone{opacity:0;pointer-events:none}
+.splash .art{position:absolute;inset:0}
+.splash .art svg{width:100%;height:100%;display:block}
+.splash .lock{position:relative;text-align:center;z-index:2}
+.splash .w{font-family:var(--disp);font-size:2rem;letter-spacing:.36em;text-indent:.36em;font-weight:400;color:var(--ink);
+  opacity:0;animation:rise .6s .08s cubic-bezier(.16,1,.3,1) forwards}
+.splash .s{margin-top:12px;font-size:var(--t-cap);color:var(--ink-3);letter-spacing:.02em;
+  opacity:0;animation:rise .7s .24s cubic-bezier(.16,1,.3,1) forwards}
+@keyframes rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+
+/* ---------- демо ---------- */
+.demo{position:absolute;top:0;right:-206px;width:186px;z-index:5}
+.demo h6{margin:0 0 10px;font-size:.66rem;letter-spacing:.16em;text-transform:uppercase;color:rgba(255,255,255,.4);font-weight:500}
+.seg{display:flex;background:rgba(255,255,255,.07);border-radius:12px;padding:4px;margin-bottom:14px}
+.seg button{flex:1;padding:8px 0;border-radius:9px;font-size:.8rem;font-weight:500;color:rgba(255,255,255,.5);text-align:center;transition:.2s}
+.seg button.on{background:rgba(255,255,255,.14);color:#fff}
+.demo .hint{font-size:.72rem;line-height:1.55;color:rgba(255,255,255,.36)}
+
+@media (max-width:900px){
+  .stage{gap:0}
+  .device{width:100%;height:100dvh;border-radius:0;padding:0;box-shadow:none;background:transparent}
+  .app{border-radius:0}
+  .statusbar{padding-top:calc(env(safe-area-inset-top,14px) + 3px);height:auto}
+  .appbar,.backbar{top:calc(env(safe-area-inset-top,14px) + 40px)}
+  .scroll{padding-top:104px;padding-bottom:calc(154px + env(safe-area-inset-bottom,0px))}
+  .pheader{margin-top:-104px}
+  .tabzone{bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+  .homebar{display:none}
+  .sheet{top:calc(env(safe-area-inset-top,14px) + 46px)}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .view.pushing{animation:fadeIn .16s linear}
+  .view.popping{animation:fadeOut .14s linear forwards}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes fadeOut{from{opacity:1}to{opacity:0}}
+  .splash .w,.splash .s{animation:none;opacity:1}
+  .is-pressed{transform:none;opacity:.66}
+}
+@media (prefers-reduced-transparency:reduce){
+  .tabs{background:#1C1C20;-webkit-backdrop-filter:none;backdrop-filter:none}
+  .pill{-webkit-backdrop-filter:none;backdrop-filter:none;background:rgba(255,255,255,.18)}
+}
+@media (prefers-contrast:more){
+  :root{--ink-2:rgba(244,239,230,.88);--ink-3:rgba(244,239,230,.68);--ink-4:rgba(244,239,230,.36)}
+}
+
+
+/* ============================================================
+   ПРОФИЛЬ И ВНЕШНИЙ ВИД
+   ============================================================ */
+.phead{display:flex;align-items:center;gap:15px;margin-bottom:8px}
+.phead .av{width:58px;height:58px;border-radius:50%;flex:none;
+  background:radial-gradient(circle at 32% 28%,#E4A87C,#B85C34 62%,#7C3A20);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.16)}
+.phead .who b{display:block;font-family:var(--disp);font-size:1.5rem;letter-spacing:-.014em;font-weight:400}
+.phead .who span{display:block;font-size:.79rem;color:var(--ink-3);margin-top:3px}
+
+.rank{display:inline-flex;align-items:center;gap:8px;height:31px;padding:0 13px;border-radius:var(--r-pill);
+  background:rgba(212,112,63,.15);border:1px solid rgba(212,112,63,.32);color:#F0A87C;
+  font-size:.735rem;letter-spacing:.01em;font-weight:500;margin-bottom:30px}
+.rank i{width:5px;height:5px;border-radius:50%;background:var(--brand);flex:none}
+
+.setgroup{border-top:1px solid var(--ink-4);padding:var(--s3) 0 var(--s2)}
+.setgroup>.lab{margin-bottom:15px}
+.setgroup .why{font-size:.775rem;line-height:1.55;color:var(--ink-3);margin:-7px 0 16px}
+
+/* выбор шрифта: список с живым образцом, как в настройках Клода */
+.fontlist{display:flex;flex-direction:column;gap:9px}
+.fontrow{display:flex;align-items:center;gap:14px;width:100%;padding:14px 15px;border-radius:var(--r-md);
+  background:rgba(255,255,255,.045);border:1px solid transparent;text-align:left;
+  transition:background .2s cubic-bezier(.32,.72,0,1),border-color .2s cubic-bezier(.32,.72,0,1)}
+.fontrow:hover{background:rgba(255,255,255,.075)}
+.fontrow.on{background:rgba(255,255,255,.085);border-color:rgba(244,239,230,.24)}
+.fontrow .prev{flex:1;min-width:0}
+.fontrow .prev b{display:block;font-size:1.32rem;line-height:1.2;letter-spacing:-.016em;font-weight:400;
+  color:var(--ink);margin-bottom:3px}
+.fontrow .prev span{display:block;font-size:.735rem;color:var(--ink-3);line-height:1.4}
+.fontrow .tick{width:21px;height:21px;border-radius:50%;flex:none;border:1.5px solid var(--ink-4);
+  display:grid;place-items:center;transition:border-color .2s,background .2s}
+.fontrow.on .tick{border-color:var(--ink);background:var(--ink)}
+.fontrow .tick svg{opacity:0;transform:scale(.5);transition:opacity .2s,transform .24s cubic-bezier(.32,.72,0,1)}
+.fontrow.on .tick svg{opacity:1;transform:none}
+
+.seg2{display:flex;gap:5px;padding:4px;border-radius:var(--r-pill);background:rgba(255,255,255,.055)}
+.seg2 button{flex:1;height:37px;border-radius:var(--r-pill);font-size:.815rem;font-weight:500;
+  color:var(--ink-3);text-align:center;justify-content:center;display:flex;align-items:center;
+  transition:background .22s cubic-bezier(.32,.72,0,1),color .22s}
+.seg2 button.on{background:rgba(255,255,255,.14);color:var(--ink)}
+
+.skyrow{display:flex;gap:11px}
+.skysw{flex:1;border-radius:14px;overflow:hidden;position:relative;height:82px;
+  border:1.5px solid transparent;transition:border-color .22s cubic-bezier(.32,.72,0,1)}
+.skysw.on{border-color:var(--ink)}
+.skysw svg{position:absolute;inset:0;width:100%;height:100%}
+.skysw i{position:absolute;left:0;right:0;bottom:0;padding:5px 7px;font-style:normal;font-size:.665rem;
+  letter-spacing:.01em;color:#fff;text-shadow:0 1px 5px rgba(0,0,0,.75);
+  background:linear-gradient(transparent,rgba(0,0,0,.42))}
+
+/* повышенный контраст */
+.app[data-contrast="high"]{--ink-2:rgba(244,239,230,.86);--ink-3:rgba(244,239,230,.64);--ink-4:rgba(244,239,230,.3)}
+.app[data-contrast="high"] .cap{color:var(--ink-2)}
+
+/* ============================================================
+   ДНЕВНИК: ввод записи
+   ============================================================ */
+.compose{border:1px solid var(--ink-4);border-radius:var(--r-lg);padding:15px 16px;margin-top:6px;
+  transition:border-color .24s cubic-bezier(.32,.72,0,1)}
+.compose:focus-within{border-color:rgba(244,239,230,.34)}
+.compose textarea{width:100%;min-height:74px;resize:none;border:0;outline:0;background:none;color:var(--ink);
+  font-family:var(--sans);font-size:var(--t-body);line-height:1.56;letter-spacing:var(--t-ls-body)}
+.compose textarea::placeholder{color:var(--ink-3)}
+.compose .cfoot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:11px}
+.compose .cfoot .cap{margin:0}
+.entry{padding:15px 0;border-bottom:1px solid var(--ink-4)}
+.entry .lab{margin-bottom:7px}
+.entry p{margin:0;padding-left:14px;border-left:1px solid var(--ink-4);font-style:italic;
+  font-size:.9rem;line-height:1.55;color:var(--ink-2)}
+.entry.fresh{animation:entIn .5s cubic-bezier(.32,.72,0,1) both}
+@keyframes entIn{from{opacity:0;transform:translateY(-7px)}to{opacity:1;transform:none}}
+
+/* ============================================================
+   ПЛЕЕР ПРАКТИКИ
+   ============================================================ */
+.player{margin-top:26px}
+.player .pbar{height:2px;border-radius:2px;background:var(--ink-4);overflow:hidden;margin-bottom:13px}
+.player .pbar i{display:block;height:100%;width:0;background:var(--brand);border-radius:2px;
+  transition:width .28s linear}
+.player .prow{display:flex;align-items:baseline;justify-content:space-between;gap:16px}
+.player .prow .cap{text-align:right;flex:1;min-width:0;line-height:1.45}
+.player .tm{flex:none}
+.player .tm{font-variant-numeric:tabular-nums;font-size:.8rem;color:var(--ink-3);letter-spacing:.02em}
+
+/* клуб */
+.club{border-radius:var(--r-lg);border:1px solid var(--ink-4);padding:20px;margin-bottom:var(--s4)}
+.club .kicker{font-size:.665rem;letter-spacing:.19em;text-transform:uppercase;color:var(--brand);
+  font-weight:500;margin-bottom:11px}
+.club h3{margin:0 0 9px;font-family:var(--disp);font-size:1.34rem;line-height:1.2;letter-spacing:-.014em;font-weight:400}
+.club .cwhen{display:flex;align-items:center;gap:9px;margin:14px 0 17px;font-size:.8rem;color:var(--ink-2)}
+.club .cwhen i{width:4px;height:4px;border-radius:50%;background:var(--ink-4);font-style:normal;flex:none}
+
+/* печатает */
+.typing{display:inline-flex;gap:4px;align-items:center;padding:13px 15px}
+.typing i{width:6px;height:6px;border-radius:50%;background:var(--ink-3);animation:tdot 1.25s infinite ease-in-out}
+.typing i:nth-child(2){animation-delay:.16s}
+.typing i:nth-child(3){animation-delay:.32s}
+@keyframes tdot{0%,62%,100%{opacity:.3;transform:translateY(0)}31%{opacity:1;transform:translateY(-3px)}}
+
+
+.ninput .f{outline:0}
+.ninput .f:empty::before{content:attr(data-ph);color:var(--ink-3);pointer-events:none}
+.msg.typing{padding:13px 15px}
+.tab span{font-size:.615rem;letter-spacing:-.005em;white-space:nowrap}
+.tab svg{width:21px;height:21px}
+
+.newsitem{padding:22px 0;border-top:1px solid var(--ink-4);position:relative}
+.newsitem .nmeta{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.newsitem .nmeta i{width:3px;height:3px;border-radius:50%;background:var(--ink-4);flex:none}
+.newsitem h3{margin:0 0 9px}
+.newsitem.unread::before{content:'';position:absolute;left:-11px;top:29px;width:5px;height:5px;
+  border-radius:50%;background:var(--brand)}
+.scaleset{display:flex;flex-direction:column;gap:17px}
+.scale .sname{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px;
+  font-size:.875rem;color:var(--ink-2)}
+.scale .sname span{font-variant-numeric:tabular-nums;font-size:.8rem;color:var(--ink-3)}
+.scale .dots{display:flex;gap:5px}
+.scale .dots button{flex:1;height:26px;border-radius:7px;background:rgba(255,255,255,.06);
+  transition:background .18s cubic-bezier(.32,.72,0,1)}
+.scale .dots button.on{background:rgba(212,112,63,.72)}
+.scale .dots button.on.dim{background:rgba(212,112,63,.3)}
+
+/* ============================================================
+   ОНБОРДИНГ
+   Полноэкранная иллюстрация, крупный светлый заголовок сансом,
+   сериф на одном слове. Кнопка всегда внизу и всегда одна главная.
+   ============================================================ */
+.onb{position:absolute;inset:0;z-index:190;overflow:hidden;background:var(--void)}
+.onb .osky{position:absolute;inset:0}
+.onb .osky svg{width:100%;height:100%;display:block}
+.onb .oveil{position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(8,8,10,.34) 0%,rgba(8,8,10,.1) 26%,rgba(8,8,10,.72) 62%,rgba(8,8,10,.95) 100%)}
+.obar{position:absolute;top:56px;left:18px;right:18px;z-index:4;display:flex;align-items:center;gap:14px}
+.oprog{flex:1;height:2px;border-radius:2px;background:rgba(255,255,255,.16);overflow:hidden}
+.oprog i{display:block;height:100%;width:0;background:var(--ink);border-radius:2px;
+  transition:width .5s cubic-bezier(.32,.72,0,1)}
+.ostep{position:absolute;inset:0;z-index:3;display:none;flex-direction:column;
+  padding:112px 22px calc(30px + env(safe-area-inset-bottom,0px))}
+.ostep.on{display:flex;animation:ostepIn .5s cubic-bezier(.32,.72,0,1) both}
+@keyframes ostepIn{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:none}}
+.ostep .otop{position:absolute;top:56px;left:22px}
+.ostep .obody{flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:26px}
+.ostep .ofoot{display:flex;flex-direction:column;gap:10px}
+.pill.ghost{background:transparent;box-shadow:inset 0 0 0 1px rgba(244,239,230,.34)}
+.pill.wide{width:100%}
+.ofield{margin-top:26px;border-bottom:1px solid rgba(244,239,230,.28);padding-bottom:11px}
+.ofield input{width:100%;border:0;outline:0;background:none;color:var(--ink);font-family:var(--sans);
+  font-size:1.22rem;letter-spacing:-.014em}
+.ofield input::placeholder{color:var(--ink-3)}
+.opts{display:flex;flex-direction:column;gap:9px;margin-top:26px}
+.opt{display:flex;align-items:center;min-height:52px;padding:13px 17px;border-radius:15px;width:100%;
+  background:rgba(255,255,255,.075);box-shadow:inset 0 0 0 1px rgba(244,239,230,.1);
+  font-size:.92rem;color:var(--ink-2);
+  transition:background .2s cubic-bezier(.32,.72,0,1),box-shadow .2s,color .2s}
+.opt.on{background:rgba(255,255,255,.18);color:var(--ink);box-shadow:inset 0 0 0 1.5px rgba(244,239,230,.6)}
+.promise{margin-top:28px;display:flex;flex-direction:column;gap:20px}
+.promise .pr b{display:block;font-family:var(--sans);font-weight:400;font-size:1.02rem;margin-bottom:5px}
+.promise .pr span{display:block;font-size:.83rem;line-height:1.5;color:var(--ink-3)}
+.oclub{text-align:center;margin-top:14px;font-size:.635rem;letter-spacing:.19em;text-transform:uppercase;
+  color:var(--ink-3)}
+.splash .lock .s{text-transform:uppercase;letter-spacing:.2em}
+
+.app[data-state="fresh"] .regonly{display:none!important}
+.app[data-state="regular"] .freshonly{display:none!important}
+
+
+.ostep .otop .wordmark{position:static;transform:none;display:inline-block}
+.ostep .disp{font-size:2.28rem;letter-spacing:-.026em;line-height:1.1}
+.ostep .disp.xl{font-size:2.72rem;line-height:1.06}
+.disp .ser{font-size:1.04em;line-height:inherit}
+@media (max-width:900px){
+  .stage{padding:0;background:var(--void)}
+  .device{width:100%;height:100dvh;border-radius:0;padding:0;box-shadow:none;background:var(--void)}
+  .app{border-radius:0}
+  .statusbar{display:none}
+  .homebar{display:none}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+  <linearGradient id="skDusk" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#14263C"/><stop offset=".30" stop-color="#2C4155"/>
+    <stop offset=".47" stop-color="#5C6862"/><stop offset=".55" stop-color="#9E8F63"/>
+    <stop offset=".60" stop-color="#CDA472"/></linearGradient>
+  <linearGradient id="skDawn" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#281F3E"/><stop offset=".30" stop-color="#4C3357"/>
+    <stop offset=".47" stop-color="#95607A"/><stop offset=".55" stop-color="#C8867A"/>
+    <stop offset=".60" stop-color="#EAAC7E"/></linearGradient>
+  <linearGradient id="skNight" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#0A0B1C"/><stop offset=".40" stop-color="#171331"/>
+    <stop offset=".60" stop-color="#35213E"/></linearGradient>
+  <linearGradient id="skMist" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#1B2831"/><stop offset=".40" stop-color="#33505E"/>
+    <stop offset=".60" stop-color="#8FA6A6"/></linearGradient>
+  <radialGradient id="sun"><stop offset="0" stop-color="#FCDCA9"/><stop offset=".6" stop-color="#F0AA68"/>
+    <stop offset="1" stop-color="#DE8B4E"/></radialGradient>
+  <radialGradient id="moon"><stop offset="0" stop-color="#EFE9DE"/><stop offset="1" stop-color="#BAB2A3"/></radialGradient>
+  <radialGradient id="halo"><stop offset="0" stop-color="rgba(242,176,110,.5)"/><stop offset="1" stop-color="rgba(242,176,110,0)"/></radialGradient>
+  <radialGradient id="haloC"><stop offset="0" stop-color="rgba(198,214,232,.38)"/><stop offset="1" stop-color="rgba(198,214,232,0)"/></radialGradient>
+
+  <symbol id="sc-dusk" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">
+    <rect width="400" height="800" fill="url(#skDusk)"/>
+    <circle cx="306" cy="498" r="146" fill="url(#halo)"/>
+    <circle cx="306" cy="498" r="42" fill="url(#sun)" opacity=".92"/>
+    <path d="M0 486 C70 448 132 480 202 470 C274 460 332 484 400 468 L400 800 L0 800Z" fill="#6C7A3F"/>
+    <path d="M0 548 C86 516 146 546 220 534 C292 522 342 548 400 532 L400 800 L0 800Z" fill="#42501F"/>
+    <path d="M0 614 C98 588 162 614 236 604 C302 594 350 612 400 602 L400 800 L0 800Z" fill="#1E2712"/>
+    <rect y="700" width="400" height="100" fill="#12180C"/>
+  </symbol>
+
+  <symbol id="sc-dawn" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">
+    <rect width="400" height="800" fill="url(#skDawn)"/>
+    <circle cx="196" cy="486" r="170" fill="url(#halo)"/>
+    <circle cx="196" cy="488" r="58" fill="url(#sun)"/>
+    <path d="M0 492 C64 456 128 490 200 478 C274 466 334 492 400 474 L400 800 L0 800Z" fill="#26382C"/>
+    <path d="M0 556 C88 524 148 554 224 542 C292 532 344 556 400 542 L400 800 L0 800Z" fill="#15231A"/>
+    <path d="M0 620 C104 596 168 620 240 610 C302 602 352 618 400 610 L400 800 L0 800Z" fill="#0B120E"/>
+    <rect y="700" width="400" height="100" fill="#080D0A"/>
+  </symbol>
+
+  <symbol id="sc-night" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">
+    <rect width="400" height="800" fill="url(#skNight)"/>
+    <circle cx="126" cy="230" r="106" fill="url(#haloC)"/>
+    <circle cx="126" cy="228" r="21" fill="url(#moon)"/>
+    <circle cx="296" cy="182" r="1.6" fill="#E8E2D4" opacity=".8"/>
+    <circle cx="332" cy="268" r="1.2" fill="#E8E2D4" opacity=".6"/>
+    <circle cx="252" cy="300" r="1.1" fill="#E8E2D4" opacity=".5"/>
+    <circle cx="70" cy="356" r="1.3" fill="#E8E2D4" opacity=".55"/>
+    <path d="M0 502 C70 466 132 498 202 488 C276 477 334 502 400 486 L400 800 L0 800Z" fill="#1B1730"/>
+    <path d="M0 562 C90 532 152 562 226 550 C294 540 346 562 400 550 L400 800 L0 800Z" fill="#11101E"/>
+    <path d="M0 624 C102 602 168 626 240 616 C300 608 354 622 400 616 L400 800 L0 800Z" fill="#090811"/>
+    <rect y="700" width="400" height="100" fill="#07060D"/>
+  </symbol>
+
+  <symbol id="sc-mist" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">
+    <rect width="400" height="800" fill="url(#skMist)"/>
+    <ellipse cx="176" cy="500" rx="260" ry="44" fill="rgba(222,234,232,.2)"/>
+    <ellipse cx="252" cy="542" rx="240" ry="32" fill="rgba(222,234,232,.15)"/>
+    <path d="M0 496 C74 460 132 492 204 482 C276 470 334 496 400 478 L400 800 L0 800Z" fill="#2C3E37"/>
+    <path d="M0 558 C86 526 148 556 224 544 C292 534 344 558 400 544 L400 800 L0 800Z" fill="#1A2622"/>
+    <path d="M0 622 C100 600 166 624 238 614 C300 606 352 620 400 614 L400 800 L0 800Z" fill="#0E1714"/>
+    <rect y="700" width="400" height="100" fill="#0A1210"/>
+  </symbol>
+</defs>
+</svg>
+
+<div class="stage">
+<div class="device">
+<div class="app" id="app" data-plan="free" data-state="regular">
+
+  <div class="behind" id="behind">
+  <div class="scroll" id="scroll">
+
+    <!-- ==================== СЕГОДНЯ ==================== -->
+    <section class="view on" data-view="home">
+
+      <div class="scene hero" style="margin-top:-100px;padding-top:100px;min-height:706px">
+        <div class="art"><svg><use href="#sc-dusk"/></svg></div>
+        <div class="fadeout"></div>
+        <div class="body">
+
+          <div class="selfrow" id="selfrow">
+            <div class="self"><div class="ring" id="self1"><svg viewBox="0 0 70 70"><circle cx="35" cy="35" r="33" stroke="rgba(255,255,255,.14)"/><circle cx="35" cy="35" r="33" stroke="#F4EFE6" stroke-dasharray="207" stroke-dashoffset="83"/></svg><b>6</b></div><i>Сон</i></div>
+            <div class="self"><div class="ring" id="self2"><svg viewBox="0 0 70 70"><circle cx="35" cy="35" r="33" stroke="rgba(255,255,255,.14)"/><circle cx="35" cy="35" r="33" stroke="#F4EFE6" stroke-dasharray="207" stroke-dashoffset="145"/></svg><b>3</b></div><i>Ноги</i></div>
+            <div class="self"><div class="ring" id="self3"><svg viewBox="0 0 70 70"><circle cx="35" cy="35" r="33" stroke="rgba(255,255,255,.14)"/><circle cx="35" cy="35" r="33" stroke="#F4EFE6" stroke-dasharray="207" stroke-dashoffset="62"/></svg><b>7</b></div><i>Настрой</i></div>
+            <div class="self"><div class="ring empty"><b>—</b></div><i>Желание</i></div>
+            <div class="self"><div class="ring empty"><b>—</b></div><i>Боль</i></div>
+          </div>
+
+          <div style="flex:1"></div>
+
+          <div class="breath" id="breath">
+            <svg viewBox="0 0 340 200" preserveAspectRatio="none" id="breathSvg">
+              <path class="track" id="arcTrack" d="M14 176 C58 74 282 74 326 176"/>
+              <path class="lit" id="arcLit" d="M14 176 C58 74 282 74 326 176"/>
+              <circle class="bead" id="bead" cx="14" cy="176" r="4"/>
+            </svg>
+            <div class="core">
+              <div class="phase" id="phase">Вдох</div>
+              <div class="count" id="count">4</div>
+            </div>
+          </div>
+
+          <div class="lab" style="margin-bottom:12px">Сегодня, среда</div>
+          <h1 class="disp xl" id="heroTitle">Двадцать минут<br><span class="ser">без темпа</span></h1>
+          <p class="cap" style="margin:14px 0 22px;max-width:300px" id="heroSub">Вчера ты разогналась на третьем километре и написала, что ноги тяжёлые. Сегодня это ещё держится.</p>
+
+          <button class="pill solid wide" id="markBtn">Отметить пробежку</button>
+          <button class="textbtn" id="ghostBtn">Не сегодня, перенести</button>
+        </div>
+      </div>
+
+      <!-- первый день -->
+      <div class="section freshonly">
+        <div class="head"><div class="lab">С чего начать</div></div>
+        <h2 class="disp md">У нас пока <span class="ser">нет истории</span>. Она появится за неделю</h2>
+        <p class="cap" style="margin:12px 0 20px;max-width:300px">Первая практика на три минуты. Её можно сделать прямо сейчас, стоя, без переодевания.</p>
+        <div class="list">
+          <button class="li" data-push="practice"><div class="tx"><b>Перед выходом</b><span>3 минуты · с неё начинают все</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="li" data-open="nika"><div class="tx"><b>Просто поговорить</b><span>Ника спросит, как ты сегодня</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="li" data-go="diary"><div class="tx"><b>Записать первое</b><span>Одна строка про сегодня</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+      </div>
+      <!-- ПРАКТИКИ: главное в этой версии -->
+      <div class="section">
+        <div class="head">
+          <div class="lab">Практики</div>
+          <button class="textbtn" data-push="library">Все шестнадцать
+            <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <div class="rail">
+          <button class="pract" data-push="practice">
+            <div class="art"><svg><use href="#sc-dawn"/></svg></div><div class="shade"></div>
+            <span class="tag">3 минуты</span>
+            <div class="tx"><b>Перед выходом</b><span>Когда уже обулась, но стоишь в коридоре</span></div>
+          </button>
+          <button class="pract" data-push="practice">
+            <div class="art"><svg><use href="#sc-mist"/></svg></div><div class="shade"></div>
+            <span class="tag">3 минуты</span>
+            <div class="tx"><b>В стартовом коридоре</b><span>За десять минут до выстрела</span></div>
+          </button>
+          <button class="pract" data-push="practice">
+            <div class="art"><svg><use href="#sc-night"/></svg></div><div class="shade"></div>
+            <span class="tag">9 минут</span>
+            <div class="tx"><b>После сорванной</b><span>Пока не начала себя грызть</span></div>
+          </button>
+          <button class="pract" data-push="practice">
+            <div class="art"><svg><use href="#sc-dusk"/></svg></div><div class="shade"></div>
+            <span class="tag">Курс · 8</span>
+            <div class="tx"><b>Слушать тело</b><span>Ты на третьем занятии</span></div>
+          </button>
+        </div>
+      </div>
+
+      <!-- Манифест -->
+      <div class="scene" style="min-height:430px;border-radius:22px;margin-bottom:36px">
+        <div class="art"><svg><use href="#sc-dawn"/></svg></div>
+        <div class="fadeout"></div>
+        <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:0 20px 26px">
+          <h2 class="disp" style="max-width:280px">Тело уже всё сказало.<br>Осталось <span class="ser">услышать</span>.</h2>
+          <p class="cap" style="margin:14px 0 20px;max-width:290px">Ника не считает пульс и не смотрит на часы. Она спрашивает, а выводы делаешь ты. Оказывается, этого хватает.</p>
+          <div><button class="pill">Как это устроено</button></div>
+        </div>
+      </div>
+
+      <!-- Неделя -->
+      <div class="section regonly">
+        <div class="head">
+          <div class="lab">Неделя</div>
+          <span class="cap" id="weekLine">Назначено 4, сделано 2</span>
+        </div>
+        <h2 class="disp md">Ты держишь своё <span class="ser">намерение</span> вторую неделю подряд</h2>
+        <div class="days" id="days">
+          <div class="day done"><div class="dot"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><i>пн</i></div>
+          <div class="day done"><div class="dot"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><i>вт</i></div>
+          <div class="day plan" id="dayToday"><div class="dot"></div><i>ср</i></div>
+          <div class="day moved"><div class="dot"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8h9M9 5l3 3-3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div><i>чт</i></div>
+          <div class="day"><div class="dot"></div><i>пт</i></div>
+          <div class="day plan"><div class="dot"></div><i>сб</i></div>
+          <div class="day"><div class="dot"></div><i>вс</i></div>
+        </div>
+        <div class="cap dim" style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Твой обычный коридор</span><span>3–5 в неделю</span></div>
+        <div class="corridor">
+          <div class="rail2"></div><div class="zone" style="left:28%;width:30%"></div>
+          <div class="pin" id="corrPin" style="left:34%"></div>
+        </div>
+      </div>
+
+      <!-- Дневник -->
+      <button class="section regonly" style="width:100%;text-align:left;display:block" data-go="diary">
+        <div class="head">
+          <div class="lab">Дневник</div>
+          <span class="cap" id="jrnCount">12 из 20</span>
+        </div>
+        <h2 class="disp md">Ещё восемь записей, и я начну показывать, что на тебя влияет</h2>
+        <div class="meter"><span id="jrnBar"></span></div>
+        <div class="cap dim" id="jrnTodo">Сегодня ещё не записано</div>
+      </button>
+
+      <!-- Ритм -->
+      <div class="section regonly">
+        <div class="head"><div class="lab">Мой ритм</div></div>
+        <div class="list">
+          <button class="li" data-go="rhythm">
+            <div class="tx"><b>До месячных 11 дней</b><span>Неделя уже пересобрана под фазу</span></div>
+            <svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+          <button class="li" data-open="nika">
+            <div class="tx"><b>Не хочу выходить</b><span>Разобрать, что за этим стоит</span></div>
+            <svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Клуб -->
+      <div class="club">
+        <div class="kicker">You'll never move alone</div>
+        <h3>Кофе-ран в субботу</h3>
+        <p class="cap" style="margin:0;max-width:290px">Пять километров в любом темпе, потом кофе. Практика перед стартом на всех, вслух, в наушниках.</p>
+        <div class="cwhen"><span>Сб, 6 сентября · 9:00</span><i></i><span>Surf Coffee, Усачёва 67</span></div>
+        <button class="pill" id="rsvpBtn">Приду</button>
+      </div>
+      <!-- Pro -->
+      <div class="scene freeonly" style="min-height:380px;border-radius:22px;margin-bottom:12px">
+        <div class="art"><svg><use href="#sc-night"/></svg></div>
+        <div class="fadeout"></div>
+        <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:0 20px 26px">
+          <div class="lab" style="margin-bottom:10px">НИКА Про</div>
+          <h2 class="disp">Дневник, который начинает <span class="ser">отвечать</span></h2>
+          <p class="cap" style="margin:14px 0 20px;max-width:290px">Месячный разбор, вся библиотека, память между разговорами. То, что у тебя сейчас, останется бесплатным навсегда.</p>
+          <button class="pill solid" style="align-self:flex-start" data-goPro>Что входит в Про</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ==================== ПРАКТИКА ==================== -->
+    <section class="view" data-view="practice">
+      <div class="pheader">
+        <svg viewBox="0 0 400 330" preserveAspectRatio="xMidYMid slice"><use href="#sc-dawn"/></svg>
+        <div class="fade"></div>
+      </div>
+      <div class="pbody">
+        <div class="lab" style="margin-bottom:10px">Практика · 3 минуты</div>
+        <h1 class="disp xl">Перед <span class="ser">выходом</span></h1>
+        <p style="margin-top:18px">Это тот момент, когда всё уже решено: одежда на тебе, дверь в двух шагах. И именно здесь чаще всего разворачиваются обратно.</p>
+        <p>Практика не уговаривает выйти. Она возвращает внимание в тело на три минуты, и решение принимаешь уже ты, а не твоя голова в шесть утра.</p>
+
+        <h3>Как дышать</h3>
+        <p class="cap">Вдох на четыре, задержка на два, выдох на шесть. Считать не нужно, дуга считает за тебя.</p>
+
+        <div class="dial">
+          <svg viewBox="0 0 340 150" preserveAspectRatio="none">
+            <path class="t" d="M14 132 C58 30 282 30 326 132"/>
+            <path class="a" d="M14 132 C58 30 282 30 326 132" stroke-dasharray="330" stroke-dashoffset="132"/>
+            <circle cx="120" cy="46" r="4" fill="#F4EFE6"/>
+            <text x="14" y="148">вдох 4</text>
+            <text x="150" y="26">задержка 2</text>
+            <text x="288" y="148">выдох 6</text>
+          </svg>
+        </div>
+
+        <div class="player">
+          <div class="pbar"><i id="pFill"></i></div>
+          <div class="prow">
+            <span class="tm" id="pTime">3:00</span>
+            <span class="cap dim" id="pState">Дыши вместе с дугой наверху</span>
+          </div>
+        </div>
+        <button class="pill solid wide" style="margin-top:22px" id="pPlay">Начать</button>
+        <button class="textbtn" style="width:100%;justify-content:center" data-pop="home" id="pLater">Позже</button>
+      </div>
+    </section>
+
+    <!-- ==================== ДНЕВНИК ==================== -->
+    <section class="view" data-view="diary">
+      <div class="datepager" id="datepager">
+        <button class="dp">пн, 24</button>
+        <button class="dp">вт, 25</button>
+        <button class="dp on">ср, 26</button>
+        <button class="dp">чт, 27</button>
+        <button class="dp">пт, 28</button>
+      </div>
+
+      <div class="scene" style="min-height:336px;border-radius:22px;margin-bottom:28px">
+        <div class="art"><svg><use href="#sc-mist"/></svg></div>
+        <div class="fadeout"></div>
+        <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:0 20px 24px">
+          <div class="lab" style="margin-bottom:10px">Порог</div>
+          <h2 class="disp">12 из 20 записей</h2>
+          <p class="cap" style="margin:12px 0 0;max-width:280px">Раньше двадцати я буду просто хранить. И то, что найду потом, будет совпадением, а не доказанной причиной.</p>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="toggle">
+          <div><b>Пробежка</b><div class="cap dim" style="margin-top:2px">Заполняется сама, если бежала с телефоном</div></div>
+          <div class="sw on" data-sw></div>
+        </div>
+        <div class="duo">
+          <div class="stat"><div><div class="lab">Дистанция</div><b>8,0 км</b></div></div>
+          <div class="stat"><div><div class="lab">Время</div><b>46 мин</b></div></div>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="toggle">
+          <div><b>Метки и ощущения</b><div class="cap dim" style="margin-top:2px">Ника ставит их из разговора, можно поправить</div></div>
+          <div class="sw on" data-sw></div>
+        </div>
+        <div class="tags" id="tagbox">
+          <button class="tag add">+ Добавить</button>
+          <button class="tag on" data-tag>Спала мало <span class="cnt">9</span></button>
+          <button class="tag on" data-tag>Ноги тяжёлые <span class="cnt">4</span></button>
+          <button class="tag" data-tag>Поела за час</button>
+          <button class="tag" data-tag>Кофе до бега</button>
+          <button class="tag" data-tag>Бежала утром</button>
+          <button class="tag" data-tag>Бежала не одна</button>
+          <button class="tag on" data-tag>Усилие 7 из 10</button>
+        </div>
+      </div>
+
+      <div class="block">
+        <div class="lab" style="margin-bottom:13px">Свободная запись</div>
+        <div id="entries">
+          <div class="entry">
+            <div class="lab">Вчера</div>
+            <p>«Разогналась на третьем километре, зря. Дальше терпела.»</p>
+          </div>
+        </div>
+        <div class="compose">
+          <textarea id="entryText" rows="3" placeholder="Что сегодня было с телом и с головой"></textarea>
+          <div class="cfoot">
+            <span class="cap dim" id="entryHint">Ника прочитает и поставит метки сама</span>
+            <button class="pill" id="entrySave">Записать</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="reflect">
+        <div class="glow"></div>
+        <div class="body">
+          <div class="lab" style="margin-bottom:10px">Ника спрашивает</div>
+          <h2 class="disp md">Третий раз за две недели ты <span class="ser">разгоняешься</span> в начале лёгкой</h2>
+          <p>Я пока не делаю из этого вывод, у меня мало записей. Просто отмечаю. Хочешь разобрать, откуда это берётся?</p>
+          <button class="pill" style="margin-top:20px" data-open="nika">Разобрать</button>
+        </div>
+      </div>
+
+      <div class="locked">
+        <div class="lab">Через 8 записей</div>
+        <ul>
+          <li>В какие дни ты чаще переносишь длинную</li>
+          <li>Что общего у трёх лучших пробежек за месяц</li>
+          <li>После чего у тебя тяжёлые тренировки</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- ==================== БИБЛИОТЕКА ==================== -->
+    <section class="view" data-view="library">
+      <div class="lab" style="margin-bottom:10px">Библиотека</div>
+      <h1 class="disp xl">Шестнадцать практик<br>под <span class="ser">конкретный момент</span></h1>
+      <p class="cap" style="margin:16px 0 34px;max-width:300px">Не курс на месяц. Каждая отвечает на один момент, в который ты обычно остаёшься одна.</p>
+
+      <div class="section">
+        <div class="head"><div class="lab">Три минуты</div></div>
+        <div class="rail">
+          <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-dawn"/></svg></div><div class="shade"></div><span class="tag">SOS</span><div class="tx"><b>Перед выходом</b><span>Стоишь в коридоре</span></div></button>
+          <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-mist"/></svg></div><div class="shade"></div><span class="tag">SOS</span><div class="tx"><b>В стартовом коридоре</b><span>Десять минут до выстрела</span></div></button>
+          <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-night"/></svg></div><div class="shade"></div><span class="tag">SOS</span><div class="tx"><b>Пульс не падает</b><span>После финиша</span></div></button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="head"><div class="lab">Под момент</div></div>
+        <div class="list">
+          <button class="li" data-push="practice"><div class="tx"><b>После сорванной тренировки</b><span>9 минут</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="li" data-push="practice"><div class="tx"><b>Когда объём упал и колотит</b><span>7 минут, для тейпера</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="li" data-push="practice"><div class="tx"><b>Ночь перед стартом</b><span>12 минут, можно засыпать</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="li" data-push="practice"><div class="tx"><b>Бок, колено, сбилось дыхание</b><span>Гид, 4 минуты чтения</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="head"><div class="lab">Курс под этап</div></div>
+        <div class="list">
+          <button class="li" data-push="practice"><div class="tx"><b>Слушать тело</b><span>Восемь занятий, ты на третьем</span></div><span class="n">3/8</span></button>
+          <button class="li proonly" data-push="practice"><div class="tx"><b>Набор объёма</b><span>Восемь занятий</span></div><span class="n">0/8</span></button>
+        </div>
+      </div>
+      <button class="textbtn" style="width:100%;justify-content:center;margin-top:8px" data-pop="home">Назад</button>
+    </section>
+
+    <!-- ==================== РИТМ ==================== -->
+    <section class="view" data-view="rhythm">
+      <div class="scene" style="margin-top:-100px;padding-top:100px;min-height:520px;margin-bottom:28px">
+        <div class="art"><svg><use href="#sc-night"/></svg></div>
+        <div class="fadeout"></div>
+        <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:20px">
+          <div class="lab" style="margin-bottom:12px">Мой ритм · день 18</div>
+          <h1 class="disp xl">Лютеиновая фаза,<br>одиннадцать дней</h1>
+          <p class="cap" style="margin:14px 0 0;max-width:290px">В эти дни тебе обычно тяжелее держать темп. Это фаза, а не откат, и это не повод сравнивать себя с прошлой неделей.</p>
+        </div>
+      </div>
+      <div class="section">
+        <div class="head"><div class="lab">Неделя пересобрана</div></div>
+        <div class="list">
+          <div class="li"><div class="tx"><b>Длинную перенесли на пятницу</b><span>В среду бежать будет легче</span></div></div>
+          <div class="li"><div class="tx"><b>Держим лёгкость, а не скорость</b><span>Никаких интервалов до конца недели</span></div></div>
+        </div>
+      </div>
+      <div class="section">
+        <div class="head"><div class="lab">Под эту фазу</div></div>
+        <div class="rail">
+          <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-mist"/></svg></div><div class="shade"></div><span class="tag">8 минут</span><div class="tx"><b>Тело сегодня</b><span>Без сравнений</span></div></button>
+          <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-dawn"/></svg></div><div class="shade"></div><span class="tag">6 минут</span><div class="tx"><b>Мягкое дыхание</b><span>Когда всё раздражает</span></div></button>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ==================== ПРОФИЛЬ ==================== -->
+    <section class="view" data-view="profile">
+      <div class="phead">
+        <div class="av"></div>
+        <div class="who"><b>Аня</b><span>С Никой четвёртый месяц</span></div>
+      </div>
+      <div class="rank"><i></i>Первая сотня · номер 47</div>
+
+      <div class="setgroup">
+        <div class="lab">Уровень</div>
+        <div class="li" style="border-bottom:0;padding-left:0;padding-right:0">
+          <div class="tx"><b class="freeonly">Бесплатный, бессрочно</b><b class="proonly">Про</b>
+          <span class="freeonly">Практики под момент, дневник, разговор с Никой</span>
+          <span class="proonly">Вся библиотека, память между разговорами, месячный разбор</span></div>
+        </div>
+        <p class="why freeonly" style="margin-top:12px">Бесплатный уровень не заканчивается. SOS открыт всегда: помощь в остром моменте не продаётся.</p>
+        <button class="pill wide freeonly" style="margin-top:10px" data-goPro>Что даёт Про</button>
+      </div>
+
+      <div class="setgroup">
+        <div class="lab">Шрифт</div>
+        <p class="why">Практики читают на ходу и в темноте. Выбери начертание, которое тебе легче ловить глазом.</p>
+        <div class="fontlist" id="fontlist">
+          <button class="fontrow on" data-font="nika">
+            <div class="prev"><b style="font-family:'Playfair Display',serif">Двадцать минут без темпа</b><span>Ника · по умолчанию</span></div>
+            <span class="tick"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8.4l3.2 3.2L13 4.8" stroke="#0B0B0D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <button class="fontrow" data-font="tikhaya">
+            <div class="prev"><b style="font-family:'Lora',serif">Двадцать минут без темпа</b><span>Тихая · мягче и круглее</span></div>
+            <span class="tick"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8.4l3.2 3.2L13 4.8" stroke="#0B0B0D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <button class="fontrow" data-font="kniga">
+            <div class="prev"><b style="font-family:'Source Serif 4',serif">Двадцать минут без темпа</b><span>Книга · для длинных текстов</span></div>
+            <span class="tick"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8.4l3.2 3.2L13 4.8" stroke="#0B0B0D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <button class="fontrow" data-font="golos">
+            <div class="prev"><b style="font-family:'Golos Text',sans-serif;letter-spacing:-.025em">Двадцать минут без темпа</b><span>Голос · русский гротеск, без засечек</span></div>
+            <span class="tick"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8.4l3.2 3.2L13 4.8" stroke="#0B0B0D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+          <button class="fontrow" data-font="pryamaya">
+            <div class="prev"><b style="font-family:'Inter',sans-serif;letter-spacing:-.03em">Двадцать минут без темпа</b><span>Прямая · один шрифт на всё</span></div>
+            <span class="tick"><svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M3 8.4l3.2 3.2L13 4.8" stroke="#0B0B0D" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="setgroup">
+        <div class="lab">Размер текста</div>
+        <div class="seg2" id="sizeSeg">
+          <button data-size="94">Мельче</button>
+          <button class="on" data-size="100">Обычный</button>
+          <button data-size="108">Крупнее</button>
+          <button data-size="118">Максимум</button>
+        </div>
+      </div>
+
+      <div class="setgroup">
+        <div class="lab">Небо</div>
+        <p class="why">Фон главного экрана. Он же определяет, в каком свете ты видишь Нику каждое утро.</p>
+        <div class="skyrow" id="skyrow">
+          <button class="skysw" data-sky="sc-dawn"><svg viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice"><use href="#sc-dawn"/></svg><i>Рассвет</i></button>
+          <button class="skysw on" data-sky="sc-dusk"><svg viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice"><use href="#sc-dusk"/></svg><i>Сумерки</i></button>
+          <button class="skysw" data-sky="sc-night"><svg viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice"><use href="#sc-night"/></svg><i>Ночь</i></button>
+          <button class="skysw" data-sky="sc-mist"><svg viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice"><use href="#sc-mist"/></svg><i>Туман</i></button>
+        </div>
+      </div>
+
+      <div class="setgroup">
+        <div class="lab">Читаемость</div>
+        <div class="toggle">
+          <div><b>Повышенный контраст</b><div class="cap dim" style="margin-top:2px">Второстепенный текст станет ярче</div></div>
+          <div class="sw" id="swContrast"></div>
+        </div>
+        <div class="toggle">
+          <div><b>Меньше движения</b><div class="cap dim" style="margin-top:2px">Дуга дыхания продолжит считать, остальное замрёт</div></div>
+          <div class="sw" id="swMotion"></div>
+        </div>
+      </div>
+
+      <div class="setgroup">
+        <div class="lab">Как со мной говорить</div>
+        <div class="toggle">
+          <div><b>Ника задаёт вопросы сама</b><div class="cap dim" style="margin-top:2px">Одно короткое сообщение утром</div></div>
+          <div class="sw on" data-sw></div>
+        </div>
+        <div class="toggle">
+          <div><b>Ставить метки из разговора</b><div class="cap dim" style="margin-top:2px">Иначе дневник заполняется только вручную</div></div>
+          <div class="sw on" data-sw></div>
+        </div>
+      </div>
+
+      <div class="setgroup">
+        <div class="lab">Клуб</div>
+        <div class="list">
+          <button class="li" data-open="nika"><div class="tx"><b>YOU'LL NEVER MOVE ALONE</b><span>Чат клуба и ближайшие встречи</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div class="li"><div class="tx"><b>Здесь не сравнивают</b><span>Ни с другими, ни с твоей прошлой неделей</span></div></div>
+        </div>
+      </div>
+
+      <p class="cap dim" style="margin:30px 0 10px">НИКА · практики, которые делаются на бегу</p>
+    </section>
+
+
+    <!-- ==================== НОВОСТИ ==================== -->
+    <section class="view" data-view="news">
+      <div class="lab" style="margin-bottom:10px">Новости</div>
+      <h1 class="disp xl">Что нового<br>у <span class="ser">Ники</span></h1>
+      <p class="cap" style="margin:16px 0 32px;max-width:300px">Обновления приложения и встречи клуба. Ничего про твои результаты: это живёт в дневнике.</p>
+
+      <div class="newsitem unread">
+        <div class="nmeta"><span class="lab">Клуб</span><i></i><span class="cap dim">вчера</span></div>
+        <h3 class="disp md">Кофе-ран в субботу, Усачёва 67</h3>
+        <p class="cap">Пять километров в любом темпе, потом кофе. Практика перед стартом на всех, вслух, в наушниках.</p>
+        <button class="pill" style="margin-top:14px" data-go="home">Посмотреть</button>
+      </div>
+
+      <div class="newsitem unread">
+        <div class="nmeta"><span class="lab">Практики</span><i></i><span class="cap dim">три дня назад</span></div>
+        <h3 class="disp md">Четыре новые практики под <span class="ser">тейпер</span></h3>
+        <p class="cap">Для недель перед стартом, когда объём падает и от этого колотит. Самая короткая на семь минут.</p>
+        <button class="pill" style="margin-top:14px" data-go="library">Открыть</button>
+      </div>
+
+      <div class="newsitem">
+        <div class="nmeta"><span class="lab">Продукт</span><i></i><span class="cap dim">неделю назад</span></div>
+        <h3 class="disp md">Дневник заполняется из разговора</h3>
+        <p class="cap">Раньше метки ставились руками. Теперь Ника читает то, что ты написала, и предлагает метки сама. Поправить можно всегда.</p>
+      </div>
+
+      <div class="newsitem">
+        <div class="nmeta"><span class="lab">Клуб</span><i></i><span class="cap dim">две недели назад</span></div>
+        <h3 class="disp md">Открыт набор в Первую сотню</h3>
+        <p class="cap">Первые сто участников получают пожизненный доступ к платному уровню и предмет с номером. Осталось пятьдесят три места.</p>
+      </div>
+    </section>
+
+    <!-- ==================== ПОСЛЕ ПРОБЕЖКИ ==================== -->
+    <section class="view" data-view="postrun">
+      <div id="prForm">
+        <div class="lab" style="margin-bottom:10px">Только что</div>
+        <h1 class="disp">Пять километров<br><span class="ser">позади</span></h1>
+        <div class="duo" style="margin-top:24px">
+          <div class="stat"><div><div class="lab">Дистанция</div><b>5,02 км</b></div></div>
+          <div class="stat"><div><div class="lab">Время</div><b>27:41</b></div></div>
+        </div>
+        <p class="cap dim" style="margin:12px 0 0">Подтянулось само. Если бежала без телефона, поправь цифры вручную.</p>
+
+        <div class="block">
+          <div class="lab" style="margin-bottom:5px">Как это было</div>
+          <p class="cap dim" style="margin:0 0 18px">Одно касание на каждую строку. Пропустить можно любую.</p>
+          <div class="scaleset" id="scaleset">
+            <div class="scale" data-scale="Усилие"><div class="sname">Усилие<span></span></div><div class="dots"></div></div>
+            <div class="scale" data-scale="Ноги"><div class="sname">Ноги<span></span></div><div class="dots"></div></div>
+            <div class="scale" data-scale="Дыхание"><div class="sname">Дыхание<span></span></div><div class="dots"></div></div>
+            <div class="scale" data-scale="Настрой"><div class="sname">Настрой<span></span></div><div class="dots"></div></div>
+          </div>
+        </div>
+
+        <div class="block">
+          <div class="lab" style="margin-bottom:5px">Метки</div>
+          <p class="cap dim" style="margin:0 0 16px">Ника предложила три по вчерашнему разговору. Добавь своё.</p>
+          <div class="tags">
+            <button class="tag on" data-tag>Спала мало <span class="cnt">9</span></button>
+            <button class="tag on" data-tag>Бежала утром</button>
+            <button class="tag" data-tag>Ноги тяжёлые <span class="cnt">4</span></button>
+            <button class="tag" data-tag>Кофе до бега</button>
+            <button class="tag" data-tag>Бежала не одна</button>
+            <button class="tag" data-tag>Жарко</button>
+            <button class="tag add">+ Добавить</button>
+          </div>
+        </div>
+
+        <div class="block">
+          <div class="lab" style="margin-bottom:13px">Что скажешь</div>
+          <div class="compose">
+            <textarea id="prText" rows="3" placeholder="Одной строкой: как голова и как тело"></textarea>
+            <div class="cfoot">
+              <span class="cap dim">Можно оставить пустым</span>
+            </div>
+          </div>
+        </div>
+
+        <button class="pill solid wide" style="margin-top:8px" id="prSave">Записать пробежку</button>
+        <button class="textbtn" style="width:100%;justify-content:center" data-go="home">Потом</button>
+      </div>
+
+      <div id="prDone" style="display:none">
+        <div class="lab" style="margin-bottom:10px">Готово</div>
+        <h1 class="disp">Записано в <span class="ser">дневник</span></h1>
+        <p class="cap" style="margin:16px 0 28px;max-width:300px">Пробежка, четыре оценки и метки ушли в дневник. Осталось семь записей до первого разбора.</p>
+        <div class="meter" style="margin-bottom:30px"><span style="width:65%"></span></div>
+
+        <div class="reflect">
+          <div class="glow"></div>
+          <div class="body">
+            <div class="lab" style="margin-bottom:10px">Ника отвечает</div>
+            <h2 class="disp md">Ты бежала на <span class="ser">недосыпе</span> и всё равно держала ровно</h2>
+            <p>Отмечаю, вывод пока не делаю. Если хочешь, разберём, чем это обошлось телу.</p>
+            <button class="pill" style="margin-top:20px" data-open="nika">Разобрать</button>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="head"><div class="lab">Дальше</div></div>
+          <div class="list">
+            <button class="li" data-push="practice"><div class="tx"><b>Пульс не падает</b><span>3 минуты, прямо сейчас</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="li" data-go="diary"><div class="tx"><b>Открыть дневник</b><span>Поправить метки или дописать</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="li" data-go="home"><div class="tx"><b>Вернуться на сегодня</b><span>Неделя уже пересчитана</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div><!-- /scroll -->
+
+  <div class="topveil"></div>
+  <div class="botveil"></div>
+
+  <div class="appbar" id="appbar">
+    <button class="ib" id="menuBtn" aria-label="Профиль"><span class="avatar" id="avatar"></span></button>
+    <span class="wordmark">НИКА</span>
+    <button class="ib" id="bellBtn" aria-label="Новости">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M12 3.2a5.6 5.6 0 015.6 5.6c0 4.2 1.2 5.7 1.9 6.4.4.4.1 1.1-.5 1.1H5c-.6 0-.9-.7-.5-1.1.7-.7 1.9-2.2 1.9-6.4A5.6 5.6 0 0112 3.2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10.2 19.2a1.9 1.9 0 003.6 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      <span class="pip" id="bellPip"></span>
+    </button>
+  </div>
+
+  <div class="backbar" id="backbar" style="display:none">
+    <button class="ib" id="backBtn" aria-label="Назад"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    <span class="t" id="backTitle"></span>
+  </div>
+
+  <div class="tabzone">
+    <nav class="tabs">
+      <button class="tab on" data-go="home">
+        <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.4" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.6V12l3 1.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span>Сегодня</span>
+      </button>
+      <button class="tab" data-go="library">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M4 15c3-4 6-4 8-2s5 2 8-2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M4 19c3-4 6-4 8-2s5 2 8-2" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" opacity=".5"/><circle cx="12" cy="6" r="2.6" stroke="currentColor" stroke-width="1.7"/></svg>
+        <span>Практики</span>
+      </button>
+      <button class="tab" data-go="diary">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M6 4h10.5A1.5 1.5 0 0118 5.5v13a1.5 1.5 0 01-1.5 1.5H6a1.5 1.5 0 01-1.5-1.5v-13A1.5 1.5 0 016 4z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 2.6v3M8 9.5h6.5M8 13h6.5M8 16.5h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        <span>Дневник</span>
+      </button>
+      <button class="tab" data-go="rhythm">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M3 12h3.5l2-5.5 3 11 2.5-7 1.8 3.5H21" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span>Ритм</span>
+      </button>
+    </nav>
+    <button class="fab" id="fab" aria-label="Ника">
+      <span class="pip"></span>
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 6.5A2.5 2.5 0 016.5 4h11A2.5 2.5 0 0120 6.5v7a2.5 2.5 0 01-2.5 2.5H10l-4.5 4v-4H6.5A2.5 2.5 0 014 13.5v-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+    </button>
+  </div>
+
+  </div><!-- /behind -->
+
+  <div class="scrim" id="scrim"></div>
+  <div class="sheet" id="sheet">
+    <div class="grab" id="grab"><i></i></div>
+    <div class="nhead" id="nhead">
+      <button class="nback" id="nback" aria-label="Закрыть"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div><b>Ника</b><span id="nikaStatus">рядом</span></div>
+    </div>
+    <div class="msgs" id="msgs">
+      <div class="stamp">Сегодня, 07:12</div>
+      <div class="msg n">Вчера ты написала, что разогналась на третьем километре и дальше терпела. Как ноги сегодня?</div>
+      <div class="msg u">Тяжёлые. И спала мало.</div>
+      <div class="msg n">Тогда сегодня без темпа. Двадцать минут в любом ритме.</div>
+      <div class="msg n proonly">Это третий раз за две недели, когда ты разгоняешься в начале лёгкой. Вывод пока не делаю, просто отмечаю.</div>
+      <div class="msg n">Записала в дневник: спала мало, ноги тяжёлые. Больше ничего спрашивать не буду.</div>
+    </div>
+    <div class="chips">
+      <button class="chip">Не хочу выходить</button>
+      <button class="chip">Пропустила два дня</button>
+      <button class="chip">Перед стартом</button>
+    </div>
+    <div class="ninput">
+      <div class="f" id="nfield" data-ph="Написать Нике"></div>
+      <button class="send" aria-label="Отправить"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M10 16V4M10 4L5 9M10 4l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+    </div>
+  </div>
+
+  <div class="statusbar">
+    <div>9:41</div>
+    <div class="sb-r">
+      <svg width="16" height="10" viewBox="0 0 17 11" fill="none"><rect y="7" width="3" height="4" rx="1" fill="currentColor"/><rect x="4.5" y="5" width="3" height="6" rx="1" fill="currentColor"/><rect x="9" y="2.5" width="3" height="8.5" rx="1" fill="currentColor"/><rect x="13.5" width="3" height="11" rx="1" fill="currentColor" opacity=".35"/></svg>
+      <svg width="15" height="10" viewBox="0 0 16 12" fill="none"><path d="M8 10.2l1.9-2.1a2.7 2.7 0 00-3.8 0L8 10.2z" fill="currentColor"/><path d="M3.7 5.4a6.4 6.4 0 018.6 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M1.2 2.8a10 10 0 0113.6 0" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+      <svg width="24" height="11" viewBox="0 0 25 12" fill="none"><rect x=".6" y=".6" width="21" height="10.8" rx="3.2" stroke="currentColor" stroke-opacity=".4" stroke-width="1.1"/><rect x="2.2" y="2.2" width="17.8" height="7.6" rx="2" fill="currentColor"/><path d="M23.2 4.2v3.6c.9-.35 1.3-.95 1.3-1.8s-.4-1.45-1.3-1.8z" fill="currentColor" fill-opacity=".4"/></svg>
+    </div>
+  </div>
+  <div class="homebar"></div>
+
+  <div class="onb" id="onb" style="display:none">
+    <div class="osky"><svg viewBox="0 0 400 852" preserveAspectRatio="xMidYMid slice"><use href="#sc-dawn"/></svg></div>
+    <div class="oveil"></div>
+
+    <div class="obar" id="obar" style="display:none">
+      <button class="ib" id="oback" aria-label="Назад"><svg width="17" height="17" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      <div class="oprog"><i id="oprogFill"></i></div>
+    </div>
+
+    <!-- 0 -->
+    <div class="ostep on" data-step="0">
+      <div class="otop"><span class="wordmark">НИКА</span></div>
+      <div class="obody">
+        <h1 class="disp">Практики, которые делаются <span class="ser">на бегу</span></h1>
+        <p class="cap" style="margin-top:16px;max-width:290px">Не чтобы лечь и расслабиться. Чтобы во время движения чувствовать тело, а не бороться с ним.</p>
+      </div>
+      <div class="ofoot">
+        <button class="pill solid wide" data-onext>Начать</button>
+        <button class="pill ghost wide" data-onext>У меня уже есть аккаунт</button>
+      </div>
+    </div>
+
+    <!-- 1 -->
+    <div class="ostep" data-step="1">
+      <div class="obody">
+        <h1 class="disp">Как тебя <span class="ser">зовут</span></h1>
+        <p class="cap" style="margin-top:14px;max-width:290px">Ника обращается по имени. Больше это имя нигде не появится.</p>
+        <div class="ofield"><input id="oName" type="text" placeholder="Имя" autocomplete="off"></div>
+      </div>
+      <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
+    </div>
+
+    <!-- 2 -->
+    <div class="ostep" data-step="2">
+      <div class="obody">
+        <h1 class="disp">Что тебя сюда <span class="ser">привело</span></h1>
+        <p class="cap" style="margin-top:14px;max-width:300px">Можно выбрать несколько. От этого зависит, с чего Ника начнёт.</p>
+        <div class="opts" data-multi>
+          <button class="opt">Тяжело выходить, хотя хочу</button>
+          <button class="opt">Волнуюсь перед стартами</button>
+          <button class="opt">Возвращаюсь после перерыва</button>
+          <button class="opt">Грызу себя за пропуски</button>
+          <button class="opt">Хочу слышать тело, а не часы</button>
+        </div>
+      </div>
+      <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
+    </div>
+
+    <!-- 3 -->
+    <div class="ostep" data-step="3">
+      <div class="obody">
+        <h1 class="disp">Как часто ты сейчас <span class="ser">двигаешься</span></h1>
+        <p class="cap" style="margin-top:14px;max-width:300px">Честно, а не как хотелось бы. Это станет твоим коридором, а не целью.</p>
+        <div class="opts">
+          <button class="opt">Почти не двигаюсь</button>
+          <button class="opt">Один или два раза в неделю</button>
+          <button class="opt on">Три или четыре раза</button>
+          <button class="opt">Пять и больше</button>
+        </div>
+      </div>
+      <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
+    </div>
+
+    <!-- 4 -->
+    <div class="ostep" data-step="4">
+      <div class="obody">
+        <h1 class="disp">Что чаще всего <span class="ser">мешает</span></h1>
+        <div class="opts">
+          <button class="opt">Не хватает времени</button>
+          <button class="opt on">Голова уговаривает не идти</button>
+          <button class="opt">Устаю на работе</button>
+          <button class="opt">Погода и темнота</button>
+          <button class="opt">Страшно, что будет тяжело</button>
+        </div>
+      </div>
+      <div class="ofoot"><button class="pill solid wide" data-onext>Дальше</button></div>
+    </div>
+
+    <!-- 5 -->
+    <div class="ostep" data-step="5">
+      <div class="obody">
+        <h1 class="disp">Три вещи, которые я <span class="ser">обещаю</span></h1>
+        <div class="promise">
+          <div class="pr"><b>Здесь не сравнивают</b><span>Ни с другими, ни с твоей прошлой неделей</span></div>
+          <div class="pr"><b>Сюда можно вернуться</b><span>После двух дней и после двух месяцев одинаково</span></div>
+          <div class="pr"><b>Чувствовать разрешено вслух</b><span>«Сегодня совсем не хотелось» это нормальная запись</span></div>
+        </div>
+      </div>
+      <div class="ofoot"><button class="pill solid wide" data-onext>Понятно</button></div>
+    </div>
+
+    <!-- 6 -->
+    <div class="ostep" data-step="6">
+      <div class="obody" style="justify-content:center">
+        <h1 class="disp xl">Ника <span class="ser">рядом</span></h1>
+        <p class="cap" style="margin-top:16px;max-width:290px" id="oFinal">Начнём с трёх минут. Дальше решай сама.</p>
+      </div>
+      <div class="ofoot">
+        <button class="pill solid wide" id="oFinish">Открыть приложение</button>
+        <div class="oclub">NIKA · YOU’LL NEVER MOVE ALONE</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="splash" id="splash">
+    <div class="art"><svg viewBox="0 0 400 852" preserveAspectRatio="xMidYMid slice"><use href="#sc-dawn"/></svg></div>
+    <div class="lock"><div class="w">НИКА</div><div class="s">you’ll never move alone</div></div>
+  </div>
+
+
+</div></div>
+</div>
+
+<script>
+(function(){
+  'use strict';
+  var app=document.getElementById('app'), scroll=document.getElementById('scroll'),
+      splash=document.getElementById('splash'), sheet=document.getElementById('sheet'),
+      scrim=document.getElementById('scrim'), behind=document.getElementById('behind'),
+      msgs=document.getElementById('msgs'), grab=document.getElementById('grab'),
+      nhead=document.getElementById('nhead'), fab=document.getElementById('fab'),
+      appbar=document.getElementById('appbar'), backbar=document.getElementById('backbar'),
+      backTitle=document.getElementById('backTitle');
+
+  var mq=window.matchMedia('(prefers-reduced-motion: reduce)');
+  function reduced(){ return mq.matches; }
+  function haptic(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms||8); }catch(e){} }
+
+  /* ---------- пружина ---------- */
+  function makeSpring(o){
+    o=o||{};
+    var x=o.from||0,v=0,target=o.from||0,eps=o.precision||0.05,
+        onUpdate=o.onUpdate,onRest=o.onRest,k=0,c=0,raf=null,last=0;
+    function conf(d,r){ var w=2*Math.PI/r; k=w*w; c=2*d*w; }
+    conf(o.damping==null?1:o.damping,o.response||0.4);
+    function frame(t){
+      if(!last) last=t;
+      var dt=Math.min((t-last)/1000,1/24); last=t;
+      var n=Math.max(1,Math.ceil(dt*240)),h=dt/n,i;
+      for(i=0;i<n;i++){ var a=-k*(x-target)-c*v; v+=a*h; x+=v*h; }
+      if(Math.abs(x-target)<eps&&Math.abs(v)<eps*8){ x=target;v=0;raf=null;last=0;onUpdate(x);if(onRest)onRest(x);return; }
+      onUpdate(x); raf=requestAnimationFrame(frame);
+    }
+    function start(){ if(!raf){ last=0; raf=requestAnimationFrame(frame); } }
+    return {
+      to:function(t,vel,d,r){ if(d!=null) conf(d,r||0.4); target=t; if(vel!=null) v=vel;
+        if(reduced()){ x=t;v=0;onUpdate(x); if(onRest)onRest(x); return; } start(); },
+      seize:function(){ if(raf){ cancelAnimationFrame(raf); raf=null; last=0; } return {x:x,v:v}; },
+      set:function(val){ x=val; v=0; },
+      get value(){ return x; }, get running(){ return raf!==null; }
+    };
+  }
+  function project(v,r){ r=r||0.998; return (v/1000)*r/(1-r); }
+  function rubberband(o,d,c){ c=c||0.55; return (o*d*c)/(d+c*Math.abs(o)); }
+
+  /* ---------- нажатие ---------- */
+  (function(){
+    var SEL='button,[data-press]',cur=null,ox=0,oy=0,TOL=12;
+    function sc(el){ var r=el.getBoundingClientRect(),a=Math.max(r.width,r.height);
+      return a>240?0.987:(a>90?0.972:0.94); }
+    document.addEventListener('pointerdown',function(e){
+      var el=e.target.closest&&e.target.closest(SEL); if(!el) return;
+      cur=el; ox=e.clientX; oy=e.clientY;
+      el.setAttribute('data-press',''); el.style.setProperty('--ps',sc(el)); el.classList.add('is-pressed');
+    },{passive:true});
+    document.addEventListener('pointermove',function(e){
+      if(!cur) return; cur.classList.toggle('is-pressed',Math.hypot(e.clientX-ox,e.clientY-oy)<=TOL);
+    },{passive:true});
+    function end(){ if(cur){ cur.classList.remove('is-pressed'); cur=null; } }
+    document.addEventListener('pointerup',end,{passive:true});
+    document.addEventListener('pointercancel',end,{passive:true});
+  })();
+
+  /* ============================================================
+     ДУГА ДЫХАНИЯ
+     Единственная громкая вещь в макете. Считает вместо человека,
+     идёт по той же дуге, что у Ауры отмеряет шаги. Разница
+     принципиальная: там дуга показывает прошлое, снятое датчиком,
+     здесь она ведёт настоящее.
+     ============================================================ */
+  (function(){
+    var lit=document.getElementById('arcLit'), track=document.getElementById('arcTrack'),
+        bead=document.getElementById('bead'), phase=document.getElementById('phase'),
+        count=document.getElementById('count');
+    if(!lit) return;
+    var LEN=track.getTotalLength();
+    lit.style.setProperty('--arc',LEN);
+    lit.setAttribute('stroke-dasharray',LEN);
+
+    var PH=[{n:'Вдох',d:4000,from:0,to:1},{n:'Задержка',d:2000,from:1,to:1},{n:'Выдох',d:6000,from:1,to:0}];
+    var i=0,t0=0,raf=null,lastSec=-1;
+
+    function draw(p){
+      lit.setAttribute('stroke-dashoffset',(LEN*(1-p)).toFixed(1));
+      var pt=track.getPointAtLength(LEN*p);
+      bead.setAttribute('cx',pt.x.toFixed(1));
+      bead.setAttribute('cy',pt.y.toFixed(1));
+      bead.setAttribute('r',(3.5+p*2.5).toFixed(2));
+    }
+    function frame(now){
+      if(!t0) t0=now;
+      var ph=PH[i], e=now-t0;
+      if(e>=ph.d){ t0=now; i=(i+1)%PH.length; ph=PH[i]; e=0; lastSec=-1; phase.textContent=ph.n; }
+      var k=e/ph.d;
+      /* плавность на входе и выходе фазы, чтобы дуга не дёргалась на стыке */
+      var s=k<.5?2*k*k:1-Math.pow(-2*k+2,2)/2;
+      draw(ph.from+(ph.to-ph.from)*s);
+      var left=Math.ceil((ph.d-e)/1000);
+      if(left!==lastSec){ lastSec=left; count.textContent=left; }
+      raf=requestAnimationFrame(frame);
+    }
+    if(reduced()){
+      phase.textContent='Вдох 4, задержка 2, выдох 6';
+      phase.style.letterSpacing='.06em';
+      count.style.display='none';
+      draw(0.62);
+    } else {
+      phase.textContent=PH[0].n;
+      raf=requestAnimationFrame(frame);
+      document.addEventListener('visibilitychange',function(){
+        if(document.hidden){ if(raf) cancelAnimationFrame(raf); raf=null; }
+        else if(!raf){ t0=0; raf=requestAnimationFrame(frame); }
+      });
+    }
+  })();
+
+  /* ---------- план ---------- */
+  function setPlan(p){
+    var pro=p==='pro';
+    app.dataset.plan=p;
+    document.querySelectorAll('.proonly').forEach(function(e){ e.style.display=pro?'':'none'; });
+    document.querySelectorAll('.freeonly').forEach(function(e){ e.style.display=pro?'none':''; });
+    document.getElementById('nikaStatus').textContent=pro?'помнит твой спринт':'рядом';
+    document.querySelectorAll('#planSeg button').forEach(function(b){ b.classList.toggle('on',b.dataset.plan===p); });
+  }
+  document.querySelectorAll('#planSeg button').forEach(function(b){
+    b.addEventListener('click',function(){ setPlan(b.dataset.plan); haptic(); });
+  });
+
+  /* ---------- навигация ---------- */
+  var centerPager=null;
+  var TABS={home:1,library:1,rhythm:1,diary:1};
+  var TITLE={practice:'Практика',library:'Практики',profile:'Профиль',news:'Новости',postrun:'Пробежка'};
+  function view(v){ return document.querySelector('.view[data-view="'+v+'"]'); }
+  function current(){ return document.querySelector('.view.on'); }
+  function chrome(){
+    var v=current().dataset.view, deep=!TABS[v];
+    appbar.style.display=deep?'none':'flex';
+    backbar.style.display=deep?'flex':'none';
+    backTitle.textContent=TITLE[v]||'';
+    document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('on',t.dataset.go===v); });
+    if(v==='diary'&&centerPager) centerPager();
+    if(v!=='practice'&&window.__resetPlayer) window.__resetPlayer();
+    if(v!=='postrun'&&window.__resetPostrun) window.__resetPostrun();
+    if(window.__ann) window.__ann(v);
+  }
+  var stack=['home'];
+  function go(v){
+    var next=view(v),cur=current();
+    stack=[v];
+    if(cur===next){ scroll.scrollTop=0; closeSheet(); return; }
+    if(cur) cur.classList.remove('on','pushing','popping');
+    next.classList.add('on'); scroll.scrollTop=0; chrome(); closeSheet();
+  }
+  function push(v){
+    var next=view(v),cur=current();
+    if(cur===next) return;
+    stack.push(v);
+    if(cur) cur.classList.remove('on','pushing','popping');
+    next.classList.add('on','pushing');
+    next.addEventListener('animationend',function h(){ next.classList.remove('pushing'); next.removeEventListener('animationend',h); });
+    scroll.scrollTop=0; chrome();
+  }
+  function pop(){
+    var cur=current();
+    if(stack.length<2) return;
+    stack.pop();
+    var next=view(stack[stack.length-1]);
+    cur.classList.add('popping');
+    cur.addEventListener('animationend',function h(){
+      cur.classList.remove('on','popping'); cur.removeEventListener('animationend',h);
+      next.classList.add('on'); scroll.scrollTop=0; chrome();
+    });
+  }
+  document.querySelectorAll('[data-go]').forEach(function(b){ b.addEventListener('click',function(){ go(b.dataset.go); }); });
+  document.querySelectorAll('[data-push]').forEach(function(b){ b.addEventListener('click',function(){ push(b.dataset.push); }); });
+  document.querySelectorAll('[data-pop]').forEach(function(b){ b.addEventListener('click',pop); });
+  document.getElementById('backBtn').addEventListener('click',pop);
+  document.getElementById('bellBtn').addEventListener('click',function(){ push('news'); });
+  document.getElementById('menuBtn').addEventListener('click',function(){ push('profile'); haptic(); });
+
+  /* ---------- лист Ники ---------- */
+  var SH=790,sy=null,opened=false;
+  function measure(){ SH=sheet.offsetHeight||790; }
+  measure();
+  window.addEventListener('resize',function(){ var w=opened; measure(); if(sy){ sy.set(w?0:SH); paint(w?0:SH); } });
+  function paint(y){
+    var p=1-Math.min(Math.max(y/SH,0),1);
+    sheet.style.transform='translate3d(0,'+y.toFixed(2)+'px,0)';
+    scrim.style.opacity=(p*0.55).toFixed(3);
+    if(!reduced()) behind.style.transform='scale('+(1-0.05*p).toFixed(4)+') translate3d(0,'+(-14*p).toFixed(2)+'px,0)';
+  }
+  sy=makeSpring({from:SH,damping:1,response:0.4,onUpdate:paint,onRest:function(x){
+    var open=x<SH/2;
+    sheet.style.visibility=open?'visible':'hidden';
+    scrim.style.pointerEvents=open?'auto':'none';
+    fab.classList.toggle('on',open); opened=open;
+    if(open) msgs.scrollTop=msgs.scrollHeight;
+    haptic(open?10:6);
+  }});
+  paint(SH);
+  function openSheet(){
+    sheet.style.visibility='visible'; scrim.style.pointerEvents='auto';
+    fab.classList.add('on'); opened=true; msgs.scrollTop=msgs.scrollHeight;
+    if(window.__ann) window.__ann('nika');
+    sy.to(0,null,1,0.44);
+  }
+  function closeSheet(){
+    if(!opened&&!sy.running) return;
+    opened=false; fab.classList.remove('on'); scrim.style.pointerEvents='none';
+    if(window.__ann&&current()) window.__ann(current().dataset.view);
+    sy.to(SH,null,1,0.4);
+  }
+  fab.addEventListener('click',function(){ opened?closeSheet():openSheet(); });
+  document.getElementById('nback').addEventListener('click',closeSheet);
+  scrim.addEventListener('click',closeSheet);
+  document.querySelectorAll('[data-open="nika"]').forEach(function(b){ b.addEventListener('click',openSheet); });
+
+  var drag=null,HYST=10;
+  function velocity(h){
+    var now=performance.now(),b=h[h.length-1],a=null,i;
+    if(now-b.t>90) return 0;
+    for(i=h.length-1;i>=0;i--){ if(b.t-h[i].t>=40){ a=h[i]; break; } }
+    if(!a) a=h[0];
+    var dt=(b.t-a.t)/1000;
+    return dt>0.001?(b.y-a.y)/dt:0;
+  }
+  function down(e){
+    if(e.pointerType==='mouse'&&e.button!==0) return;
+    /* захват указателя перенаправляет click на лист, поэтому кнопки
+       внутри шапки и поле ввода жест не начинают */
+    if(e.target.closest&&e.target.closest('button,[contenteditable],input,textarea')) return;
+    var inList=!!(e.target.closest&&e.target.closest('.msgs'));
+    if(inList&&msgs.scrollTop>0) return;
+    var s=sy.seize();
+    drag={id:e.pointerId,y0:e.clientY,base:s.x,live:false,inList:inList,hist:[{t:performance.now(),y:e.clientY}]};
+    try{ sheet.setPointerCapture(e.pointerId); }catch(err){}
+  }
+  function move(e){
+    if(!drag||e.pointerId!==drag.id) return;
+    var dy=e.clientY-drag.y0;
+    if(!drag.live){
+      if(Math.abs(dy)<HYST) return;
+      if(drag.inList&&dy<0){ drag=null; return; }
+      drag.live=true; drag.y0=e.clientY; dy=0; sheet.classList.add('dragging');
+    }
+    var y=drag.base+dy;
+    if(y<0) y=-rubberband(-y,SH);
+    drag.hist.push({t:performance.now(),y:e.clientY});
+    if(drag.hist.length>7) drag.hist.shift();
+    sy.set(y); paint(y);
+    if(e.cancelable) e.preventDefault();
+  }
+  function up(e){
+    if(!drag||e.pointerId!==drag.id) return;
+    var live=drag.live,hist=drag.hist;
+    sheet.classList.remove('dragging'); drag=null;
+    if(!live) return;
+    var v=velocity(hist),cur=sy.value;
+    var target=(cur+project(v))>SH/2?SH:0, flick=Math.abs(v)>320;
+    opened=target===0;
+    sy.to(target,v,flick?0.82:1,flick?0.36:0.42);
+  }
+  [grab,nhead,msgs].forEach(function(el){ el.addEventListener('pointerdown',down,{passive:true}); });
+  sheet.addEventListener('pointermove',move,{passive:false});
+  sheet.addEventListener('pointerup',up,{passive:true});
+  sheet.addEventListener('pointercancel',up,{passive:true});
+
+  /* ---------- метки дневника ---------- */
+  document.querySelectorAll('[data-tag]').forEach(function(t){
+    t.addEventListener('click',function(){ t.classList.toggle('on'); haptic(6); });
+  });
+  document.querySelectorAll('[data-sw]').forEach(function(s){
+    s.addEventListener('click',function(){ s.classList.toggle('on'); haptic(6); });
+  });
+
+  /* ---------- дневник: страничный выбор дня ---------- */
+  (function(){
+    var dp=document.getElementById('datepager');
+    if(!dp) return;
+    var raf2=null;
+    function mark(){
+      raf2=null;
+      var mid=dp.scrollLeft+dp.clientWidth/2, best=null, bd=1e9;
+      dp.querySelectorAll('.dp').forEach(function(b){
+        var c=b.offsetLeft+b.offsetWidth/2, d=Math.abs(c-mid);
+        if(d<bd){ bd=d; best=b; }
+      });
+      dp.querySelectorAll('.dp').forEach(function(b){ b.classList.toggle('on',b===best); });
+    }
+    function center(b,smooth){
+      dp.scrollTo({left:b.offsetLeft+b.offsetWidth/2-dp.clientWidth/2,behavior:smooth?'smooth':'auto'});
+    }
+    centerPager=function(){
+      var cur=dp.querySelector('.dp.on')||dp.querySelectorAll('.dp')[2];
+      requestAnimationFrame(function(){ center(cur,false); mark(); });
+    };
+    dp.addEventListener('scroll',function(){ if(!raf2) raf2=requestAnimationFrame(mark); },{passive:true});
+    dp.querySelectorAll('.dp').forEach(function(b){
+      b.addEventListener('click',function(){
+        center(b,!reduced()); haptic(6);
+      });
+    });
+  })();
+
+  /* ---------- отметить пробежку, обратимо ---------- */
+  var marked=false,
+      btn=document.getElementById('markBtn'), ghost=document.getElementById('ghostBtn'),
+      heroTitle=document.getElementById('heroTitle'), heroSub=document.getElementById('heroSub'),
+      weekLine=document.getElementById('weekLine'), dayToday=document.getElementById('dayToday'),
+      jrnTodo=document.getElementById('jrnTodo'), diaryPip=document.getElementById('diaryPip'),
+      corrPin=document.getElementById('corrPin');
+  var T={
+    off:{t:'Двадцать минут<br>без темпа',
+      s:'Вчера ты разогналась на третьем километре и написала, что ноги тяжёлые. Сегодня это ещё держится.',
+      c:'Отметить пробежку',g:'Не сегодня, перенести',w:'Назначено 4, сделано 2',j:'Сегодня ещё не записано',p:'34%'},
+    on:{t:'Сделано.<br>Осталась длинная',
+      s:'Расскажи вечером, как оно шло, и я закрою день в дневнике. Длинная в субботу, до неё два свободных дня.',
+      c:'Отмечено',g:'Отменить отметку',w:'Назначено 4, сделано 3',j:'Ника спросит вечером',p:'46%'}
+  };
+  var dotSpring=makeSpring({from:1,damping:0.62,response:0.34,precision:0.004,onUpdate:function(x){
+    if(dayToday) dayToday.querySelector('.dot').style.transform='scale('+x.toFixed(3)+')';
+  }});
+  function setMarked(on){
+    marked=on;
+    var d=on?T.on:T.off;
+    heroTitle.innerHTML=d.t; heroSub.textContent=d.s;
+    btn.textContent=d.c; ghost.textContent=d.g;
+    weekLine.textContent=d.w; jrnTodo.textContent=d.j;
+    diaryPip.style.display=on?'none':'';
+    corrPin.style.left=d.p;
+    if(dayToday){
+      dayToday.classList.toggle('done',on); dayToday.classList.toggle('plan',!on);
+      dayToday.querySelector('.dot').innerHTML=on
+        ?'<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':'';
+    }
+    if(on){ dotSpring.set(0.35); dotSpring.to(1); }
+    haptic(on?14:6);
+  }
+  btn.addEventListener('click',function(){ if(!marked) setMarked(true); });
+  ghost.addEventListener('click',function(){ if(marked) setMarked(false); });
+
+  /* ---------- заставка ---------- */
+  var timer=setTimeout(hide,1000);
+  function hide(){ clearTimeout(timer); splash.classList.add('gone');
+    document.getElementById('jrnBar').style.width='60%'; }
+  splash.addEventListener('pointerdown',hide,{passive:true});
+
+  setPlan('free');
+  chrome();
+
+  /* ============================================================
+     ВНЕШНИЙ ВИД
+     Настройка применяется на нажатии, без кнопки «сохранить».
+     Человек видит результат на том же экране, где выбирает.
+     ============================================================ */
+  var FONTS={
+    nika:     {disp:"'Playfair Display','Times New Roman',Georgia,serif", sans:"'Inter',-apple-system,system-ui,sans-serif", ls:'-.036em'},
+    tikhaya:  {disp:"'Lora',Georgia,serif",                               sans:"'Inter',-apple-system,system-ui,sans-serif", ls:'-.03em'},
+    kniga:    {disp:"'Source Serif 4',Georgia,serif",                     sans:"'Inter',-apple-system,system-ui,sans-serif", ls:'-.032em'},
+    golos:    {disp:"'Golos Text',-apple-system,system-ui,sans-serif",    sans:"'Golos Text',-apple-system,system-ui,sans-serif", ls:'-.042em'},
+    pryamaya: {disp:"'Inter',-apple-system,system-ui,sans-serif",         sans:"'Inter',-apple-system,system-ui,sans-serif", ls:'-.045em'}
+  };
+  function setFont(k){
+    var f=FONTS[k]; if(!f) return;
+    var r=app.style;
+    r.setProperty('--disp',f.disp);
+    r.setProperty('--sans',f.sans);
+    r.setProperty('--n-ls',f.ls);
+    document.querySelectorAll('#fontlist .fontrow').forEach(function(b){ b.classList.toggle('on',b.dataset.font===k); });
+    haptic(7);
+  }
+  document.querySelectorAll('#fontlist .fontrow').forEach(function(b){
+    b.addEventListener('click',function(){ setFont(b.dataset.font); });
+  });
+
+  function setSize(px){
+    app.style.fontSize=px+'%';
+    document.querySelectorAll('#sizeSeg button').forEach(function(b){ b.classList.toggle('on',b.dataset.size===String(px)); });
+    haptic(7);
+  }
+  document.querySelectorAll('#sizeSeg button').forEach(function(b){
+    b.addEventListener('click',function(){ setSize(+b.dataset.size); });
+  });
+
+  function setSky(id){
+    document.querySelectorAll('[data-view="home"] .scene.hero .art use').forEach(function(u){
+      u.setAttribute('href','#'+id);
+    });
+    document.querySelectorAll('.splash .art use').forEach(function(u){ u.setAttribute('href','#'+id); });
+    document.querySelectorAll('#skyrow .skysw').forEach(function(b){ b.classList.toggle('on',b.dataset.sky===id); });
+    haptic(7);
+  }
+  document.querySelectorAll('#skyrow .skysw').forEach(function(b){
+    b.addEventListener('click',function(){ setSky(b.dataset.sky); });
+  });
+
+  var swC=document.getElementById('swContrast'), swM=document.getElementById('swMotion');
+  swC.addEventListener('click',function(){
+    var on=!swC.classList.contains('on');
+    swC.classList.toggle('on',on);
+    app.dataset.contrast=on?'high':'normal'; haptic(7);
+  });
+  var forceCalm=false;
+  swM.addEventListener('click',function(){
+    forceCalm=!swM.classList.contains('on');
+    swM.classList.toggle('on',forceCalm);
+    app.dataset.calm=forceCalm?'1':'0'; haptic(7);
+  });
+
+  /* ============================================================
+     ПЛЕЕР ПРАКТИКИ
+     ============================================================ */
+  (function(){
+    var play=document.getElementById('pPlay'), fill=document.getElementById('pFill'),
+        tm=document.getElementById('pTime'), st=document.getElementById('pState');
+    if(!play) return;
+    var TOTAL=180, left=TOTAL, timer=null, running=false;
+    function fmt(s){ var m=Math.floor(s/60); s=s%60; return m+':'+(s<10?'0':'')+s; }
+    function paintP(){
+      tm.textContent=fmt(left);
+      fill.style.width=((TOTAL-left)/TOTAL*100).toFixed(2)+'%';
+    }
+    function tick(){
+      left--;
+      if(left<=0){
+        left=0; paintP(); stop();
+        play.textContent='Пройдена'; play.classList.add('solid');
+        st.textContent='Записала в дневник: практика перед выходом';
+        haptic(16); return;
+      }
+      paintP();
+    }
+    function start(){
+      running=true; timer=setInterval(tick,1000);
+      play.textContent='Пауза'; play.classList.remove('solid');
+      st.textContent='Вдох на четыре, задержка на два, выдох на шесть';
+      haptic(10);
+    }
+    function stop(){ running=false; if(timer){ clearInterval(timer); timer=null; } }
+    play.addEventListener('click',function(){
+      if(left===0){ left=TOTAL; paintP(); play.textContent='Начать'; play.classList.add('solid');
+        st.textContent='Дыши вместе с дугой наверху'; return; }
+      if(running){ stop(); play.textContent='Продолжить'; play.classList.add('solid');
+        st.textContent='Пауза. Дуга ждёт'; haptic(6); }
+      else start();
+    });
+    paintP();
+    window.__resetPlayer=function(){ stop(); left=TOTAL; paintP();
+      play.textContent='Начать'; play.classList.add('solid'); st.textContent='Дыши вместе с дугой наверху'; };
+  })();
+
+  /* ============================================================
+     ДНЕВНИК: запись двигает порог
+     Порог из Whoop: до двадцати записей выводы не показываем.
+     Счётчик тут не украшение, он объясняет, почему пока тихо.
+     ============================================================ */
+  (function(){
+    var save=document.getElementById('entrySave'), ta=document.getElementById('entryText'),
+        box=document.getElementById('entries'), bar=document.getElementById('jrnBar'),
+        cnt=document.getElementById('jrnCount'), todo=document.getElementById('jrnTodo'),
+        pip=document.getElementById('bellPip');
+    if(!save) return;
+    var n=12, GOAL=20;
+    var head=document.querySelector('[data-view="diary"] .scene .disp'),
+        headSub=document.querySelector('[data-view="diary"] .scene .cap'),
+        homeHead=document.querySelector('[data-push="diary"] .disp');
+    function sync(){
+      var pc=Math.min(n/GOAL,1)*100;
+      if(bar) bar.style.width=pc.toFixed(1)+'%';
+      if(cnt) cnt.textContent=n+' из '+GOAL;
+      if(head) head.innerHTML=n+' из '+GOAL+' <span class="ser">записей</span>';
+      var leftN=Math.max(GOAL-n,0);
+      if(homeHead) homeHead.innerHTML=leftN>0
+        ? 'Ещё '+leftN+' '+plural(leftN,'запись','записи','записей')+', и я начну показывать, <span class="ser">что на тебя влияет</span>'
+        : 'Записей хватает. Первый <span class="ser">разбор готов</span>';
+      if(headSub) headSub.textContent=leftN>0
+        ? 'Раньше двадцати я буду просто хранить. То, что найду сейчас, будет совпадением, а не причиной.'
+        : 'Теперь выводы опираются на твои записи, а не на догадку.';
+    }
+    function plural(k,a,b,c){ var m=k%100; if(m>=11&&m<=14) return c; m=k%10;
+      return m===1?a:(m>=2&&m<=4?b:c); }
+    save.addEventListener('click',function(){
+      var t=(ta.value||'').trim();
+      if(!t){ ta.focus(); return; }
+      var el=document.createElement('div');
+      el.className='entry fresh';
+      el.innerHTML='<div class="lab">Только что</div><p></p>';
+      el.querySelector('p').textContent='«'+t+'»';
+      box.insertBefore(el,box.firstChild);
+      ta.value=''; n++; sync();
+      if(todo) todo.textContent='Сегодня записано';
+
+      document.getElementById('entryHint').textContent='Записала. Метки поставлю из текста';
+      haptic(12);
+    });
+    sync();
+    window.__bumpDiary=function(){ n++; sync(); };
+  })();
+
+  /* ============================================================
+     РАЗГОВОР С НИКОЙ
+     Ответ идёт с задержкой и с индикатором. Мгновенный ответ
+     читается как подстановка, пауза читается как внимание.
+     ============================================================ */
+  (function(){
+    var field=document.getElementById('nfield'), send=document.querySelector('.ninput .send');
+    if(!field) return;
+    field.setAttribute('contenteditable','true');
+    field.setAttribute('role','textbox');
+    var REPLY={
+      'не хочу выходить':'Это может быть тело, а может быть голова. Что сегодня тяжелее: встать или начать?',
+      'пропустила два дня':'Хорошо, что ты тут. Два дня это не откат, это два дня. Пойдём коротко и без темпа?',
+      'перед стартом':'До выстрела ещё есть время. Три минуты на дыхание, и мы вернём внимание в тело.',
+      '':'Слышу. Расскажи чуть подробнее, что сейчас происходит.'
+    };
+    function bubble(cls,text){
+      var m=document.createElement('div'); m.className='msg '+cls; m.textContent=text;
+      msgs.appendChild(m); msgs.scrollTop=msgs.scrollHeight; return m;
+    }
+    function answer(q){
+      var t=document.createElement('div');
+      t.className='msg n typing'; t.innerHTML='<i></i><i></i><i></i>';
+      msgs.appendChild(t); msgs.scrollTop=msgs.scrollHeight;
+      document.getElementById('nikaStatus').textContent='печатает';
+      setTimeout(function(){
+        t.remove();
+        document.getElementById('nikaStatus').textContent=app.dataset.plan==='pro'?'помнит твой спринт':'рядом';
+        bubble('n',REPLY[q.toLowerCase()]||REPLY['']);
+        haptic(8);
+      },1150);
+    }
+    function push(text){
+      if(!text) return;
+      bubble('u',text); answer(text); haptic(9);
+    }
+    send.addEventListener('click',function(){ var v=field.textContent.trim(); field.textContent=''; push(v); });
+    field.addEventListener('keydown',function(e){
+      if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); var v=field.textContent.trim(); field.textContent=''; push(v); }
+    });
+    document.querySelectorAll('.chips .chip').forEach(function(c){
+      c.addEventListener('click',function(){ push(c.textContent.trim()); });
+    });
+  })();
+
+  /* приду на кофе-ран */
+  (function(){
+    var b=document.getElementById('rsvpBtn'); if(!b) return;
+    b.addEventListener('click',function(){
+      var on=b.classList.toggle('solid');
+      b.textContent=on?'Буду. Записала':'Приду';
+      haptic(12);
+    });
+  })();
+
+  /* переход к Про из профиля и с главной */
+  document.querySelectorAll('[data-goPro]').forEach(function(b){
+    b.addEventListener('click',function(){ setPlan('pro'); haptic(14); });
+  });
+
+
+  /* ============================================================
+     ОНБОРДИНГ
+     ============================================================ */
+  var onb=document.getElementById('onb');
+  (function(){
+    if(!onb) return;
+    var steps=onb.querySelectorAll('.ostep'), LAST=steps.length-1, cur=0,
+        bar=document.getElementById('obar'), fill=document.getElementById('oprogFill'),
+        back=document.getElementById('oback');
+    function show(i){
+      cur=Math.max(0,Math.min(i,LAST));
+      steps.forEach(function(s,k){ s.classList.toggle('on',k===cur); });
+      bar.style.display=cur===0?'none':'flex';
+      fill.style.width=(cur/LAST*100).toFixed(1)+'%';
+      var nm=(document.getElementById('oName').value||'').trim();
+      if(cur===LAST) document.getElementById('oFinal').textContent=
+        nm? nm+', начнём с трёх минут. Дальше решай сама.' : 'Начнём с трёх минут. Дальше решай сама.';
+      haptic(8);
+    }
+    onb.querySelectorAll('[data-onext]').forEach(function(b){
+      b.addEventListener('click',function(){ show(cur+1); });
+    });
+    back.addEventListener('click',function(){ show(cur-1); });
+    onb.querySelectorAll('.opts').forEach(function(g){
+      var multi=g.hasAttribute('data-multi');
+      g.querySelectorAll('.opt').forEach(function(o){
+        o.addEventListener('click',function(){
+          if(multi) o.classList.toggle('on');
+          else { g.querySelectorAll('.opt').forEach(function(x){ x.classList.remove('on'); }); o.classList.add('on'); }
+          haptic(7);
+        });
+      });
+    });
+    document.getElementById('oFinish').addEventListener('click',function(){
+      var nm=(document.getElementById('oName').value||'').trim();
+      if(nm){
+        var w=document.querySelector('.phead .who b'); if(w) w.textContent=nm;
+      }
+      onb.style.transition='opacity .5s ease'; onb.style.opacity='0';
+      setTimeout(function(){ onb.style.display='none'; onb.style.opacity=''; },520);
+      setState('fresh'); go('home'); haptic(16);
+    });
+    window.__onbReset=function(){ show(0); };
+    window.__onbOpen=function(){ onb.style.display='block'; show(0); if(window.__ann) window.__ann('onb'); };
+  })();
+
+  /* ============================================================
+     СОСТОЯНИЕ АККАУНТА
+     ============================================================ */
+  function setState(s){
+    app.dataset.state=s;
+    var t=document.getElementById('heroTitle'), sub=document.getElementById('heroSub'),
+        mark=document.getElementById('markBtn'), ghost=document.getElementById('ghostBtn'),
+        row=document.getElementById('selfrow');
+    if(s==='fresh'){
+      t.innerHTML='Первый день<br><span class="ser">без плана</span>';
+      sub.textContent='Я пока ничего о тебе не знаю. Сегодня достаточно трёх минут и одной записи вечером.';
+      mark.textContent='Сделать первую практику';
+      ghost.textContent='Осмотреться';
+      if(row) row.style.display='none';
+    }else{
+      t.innerHTML='Двадцать минут<br><span class="ser">без темпа</span>';
+      sub.textContent='Вчера ты разогналась на третьем километре и написала, что ноги тяжёлые. Сегодня это ещё держится.';
+      mark.textContent='Отметить пробежку';
+      ghost.textContent='Не сегодня, перенести';
+      if(row) row.style.display='';
+    }
+    if(window.__ann&&current()) window.__ann(current().dataset.view);
+  }
+  document.getElementById('markBtn').addEventListener('click',function(){
+    if(app.dataset.state==='fresh') push('practice'); else push('postrun');
+    haptic(11);
+  });
+
+  /* ============================================================
+     ПОСЛЕ ПРОБЕЖКИ: оценки и запись
+     ============================================================ */
+  (function(){
+    var set=document.getElementById('scaleset'); if(!set) return;
+    set.querySelectorAll('.scale').forEach(function(sc){
+      var dots=sc.querySelector('.dots'), out=sc.querySelector('.sname span'), i;
+      for(i=1;i<=10;i++){
+        var b=document.createElement('button'); b.dataset.v=i; b.setAttribute('aria-label',i+' из 10');
+        dots.appendChild(b);
+      }
+      dots.addEventListener('click',function(e){
+        var b=e.target.closest('button'); if(!b) return;
+        var v=+b.dataset.v;
+        dots.querySelectorAll('button').forEach(function(x){
+          var on=+x.dataset.v<=v;
+          x.classList.toggle('on',on);
+          x.classList.toggle('dim',on&&+x.dataset.v<v);
+        });
+        out.textContent=v+' из 10';
+        haptic(6);
+      });
+    });
+    var save=document.getElementById('prSave');
+    save.addEventListener('click',function(){
+      document.getElementById('prForm').style.display='none';
+      document.getElementById('prDone').style.display='';
+      scroll.scrollTop=0;
+      if(window.__bumpDiary) window.__bumpDiary();
+      haptic(16);
+    });
+    window.__resetPostrun=function(){
+      document.getElementById('prForm').style.display='';
+      document.getElementById('prDone').style.display='none';
+    };
+  })();
+
+  /* ============================================================
+     СЦЕНАРИИ СТЕНДА
+     ============================================================ */
+  window.__scenario=function(k){
+    app.dataset.scen=k;
+    closeSheet();
+    if(window.__resetPostrun) window.__resetPostrun();
+    if(k==='onb'){ if(window.__onbOpen) window.__onbOpen(); return; }
+    if(onb) onb.style.display='none';
+    if(k==='fresh'){ setState('fresh'); setPlan('free'); go('home'); }
+    if(k==='day'){ setState('regular'); go('home'); }
+    if(k==='run'){ setState('regular'); go('home'); push('postrun'); }
+    haptic(10);
+  };
+
+  (function(){
+    var s=new URLSearchParams(location.search).get('s');
+    if(s&&['onb','fresh','day','run'].indexOf(s)>=0){
+      setTimeout(function(){ window.__scenario(s); }, 60);
+    }
+  })();
+
+})();
+</script>
+</body>
+</html>

@@ -32,7 +32,17 @@ const nextConfig = {
     ignoreDuringBuilds: true,
   },
   async headers() {
-    return [{ source: "/:path*", headers: securityHeaders }];
+    return [
+      { source: "/:path*", headers: securityHeaders },
+      // /authv1 — прототип, не индексировать, не кешировать
+      {
+        source: "/authv1/:path*",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+          { key: "Cache-Control", value: "no-store, must-revalidate" },
+        ],
+      },
+    ];
   },
   async rewrites() {
     return [
@@ -46,6 +56,11 @@ const nextConfig = {
       {
         source: "/coffeerunluzhniki",
         destination: "/coffeerunluzhniki/index.html",
+      },
+      // /authv1 → /authv1/index.html (прототип НИКА Лайт)
+      {
+        source: "/authv1",
+        destination: "/authv1/index.html",
       },
     ];
   },

@@ -1,0 +1,10 @@
+{
+  "name": "НИКА Лайт",
+  "short_name": "НИКА",
+  "start_url": "/authv1",
+  "scope": "/authv1",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#08080A",
+  "theme_color": "#08080A"
+}
