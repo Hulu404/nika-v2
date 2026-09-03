@@ -2,13 +2,14 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,interactive-widget=resizes-content" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="robots" content="noindex, nofollow">
 <link rel="manifest" href="/authv1/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/authv1/icons/apple-touch-icon.png">
 <meta name="theme-color" content="#08080A">
-<title>НИКА Лайт · интерактивный прототип v6</title>
+<title>My NIKA</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Lora:ital,wght@0,400;0,500;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;1,8..60,400&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
@@ -44,6 +45,8 @@
   --t-body:.95rem; --t-ls-body:-.002em; --t-lh-body:1.56;
   --t-cap:.82rem;  --t-lh-cap:1.45;
   --t-lab:.665rem; --t-ls-lab:.17em;
+  /* safe-area + layout rhythm */
+  --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px); --bar-h: 48px;
 }
 
 *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -130,18 +133,19 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 .statusbar{position:absolute;top:0;left:0;right:0;height:52px;z-index:92;display:flex;align-items:center;
   justify-content:space-between;padding:15px 26px 0;font-size:.87rem;font-weight:500;pointer-events:none;color:var(--ink)}
 .sb-r{display:flex;align-items:center;gap:6px}
-.appbar{position:absolute;top:52px;left:0;right:0;height:48px;z-index:60;display:flex;align-items:center;
+.appbar{position:absolute;top:calc(var(--sat) + 8px);left:0;right:0;height:var(--bar-h);z-index:60;display:flex;align-items:center;
   justify-content:space-between;padding:0 18px;pointer-events:none}
 .appbar>*{pointer-events:auto}
 .wordmark{position:absolute;left:50%;transform:translateX(-50%);font-family:var(--disp);font-size:1.12rem;
-  letter-spacing:.34em;text-indent:.34em;font-weight:400;color:var(--ink)}
+  letter-spacing:.16em;text-indent:.16em;font-weight:400;color:var(--ink)}
+.wordmark .my-pre{font-family:var(--sans);font-size:.6em;font-weight:400;letter-spacing:.06em;color:var(--ink-2);vertical-align:.1em;margin-right:.04em}
 .ib{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;flex:none;position:relative;color:var(--ink)}
 .ib .pip{position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:50%;background:var(--brand);
   box-shadow:0 0 0 2px var(--void)}
 .avatar{width:30px;height:30px;border-radius:50%;background-size:cover;background-position:center;
   background-image:radial-gradient(circle at 32% 26%,#E8B694,transparent 58%),linear-gradient(150deg,#D4703F,#8C3A22 74%)}
 
-.topveil{position:absolute;top:0;left:0;right:0;height:126px;z-index:55;pointer-events:none;
+.topveil{position:absolute;top:0;left:0;right:0;height:calc(var(--sat) + 104px);z-index:55;pointer-events:none;
   -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
   background:linear-gradient(to bottom,rgba(11,11,13,.88) 0%,rgba(11,11,13,.62) 46%,rgba(11,11,13,.12) 84%,transparent 100%);
   -webkit-mask:linear-gradient(to bottom,#000 0 62%,transparent 98%);mask:linear-gradient(to bottom,#000 0 62%,transparent 98%)}
@@ -149,7 +153,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
   background:linear-gradient(to top,var(--void) 4%,rgba(11,11,13,.7) 42%,transparent 100%)}
 
 .scroll{position:absolute;inset:0;z-index:10;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
-  padding:100px 20px 150px;scrollbar-width:none;overscroll-behavior:contain}
+  padding:calc(var(--sat) + var(--bar-h) + 22px) 20px calc(var(--sab) + 132px);scrollbar-width:none;overscroll-behavior:contain}
 .scroll::-webkit-scrollbar{display:none}
 .behind{position:absolute;inset:0;z-index:10;transform-origin:50% 24%;will-change:transform}
 
@@ -263,14 +267,14 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 .dial .a{fill:none;stroke:var(--ink);stroke-width:2;stroke-linecap:round}
 .dial text{fill:rgba(244,239,230,.5);font-family:var(--sans);font-size:11px;letter-spacing:.03em}
 
-.backbar{position:absolute;top:52px;left:0;right:0;height:48px;z-index:60;display:flex;align-items:center;
+.backbar{position:absolute;top:calc(var(--sat) + 8px);left:0;right:0;height:var(--bar-h);z-index:60;display:flex;align-items:center;
   justify-content:center;padding:0 18px;pointer-events:none}
 .backbar>*{pointer-events:auto}
 .backbar .t{font-size:.96rem;font-weight:500}
 .backbar .ib{position:absolute;left:14px}
 
 /* ---------- таб-бар ---------- */
-.tabzone{position:absolute;left:16px;right:16px;bottom:24px;z-index:70;display:flex;align-items:center;gap:10px}
+.tabzone{position:absolute;left:16px;right:16px;bottom:calc(var(--sab) + 14px);z-index:70;display:flex;align-items:center;gap:10px}
 .tabs{flex:1;height:58px;border-radius:var(--r-pill);display:flex;align-items:center;padding:0 4px;
   background:rgba(30,30,34,.62);
   -webkit-backdrop-filter:blur(26px) saturate(160%);backdrop-filter:blur(26px) saturate(160%);
@@ -297,7 +301,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 
 /* ---------- лист Ники ---------- */
 .scrim{position:absolute;inset:0;z-index:72;background:#000;opacity:0;pointer-events:none;will-change:opacity}
-.sheet{position:absolute;top:58px;left:0;right:0;bottom:0;z-index:75;display:flex;flex-direction:column;visibility:hidden;
+.sheet{position:absolute;top:calc(var(--sat) + 10px);left:0;right:0;bottom:0;z-index:75;display:flex;flex-direction:column;visibility:hidden;
   will-change:transform;transform:translate3d(0,100%,0);background:#141417;
   border-radius:26px 26px 0 0;box-shadow:inset 0 1px 0 rgba(255,255,255,.09),0 -20px 50px -18px rgba(0,0,0,.9)}
 .grab{position:absolute;top:0;left:0;right:0;height:26px;z-index:6;display:flex;align-items:center;justify-content:center;
@@ -332,7 +336,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 .splash .art{position:absolute;inset:0}
 .splash .art svg{width:100%;height:100%;display:block}
 .splash .lock{position:relative;text-align:center;z-index:2}
-.splash .w{font-family:var(--disp);font-size:2rem;letter-spacing:.36em;text-indent:.36em;font-weight:400;color:var(--ink);
+.splash .w{font-family:var(--disp);font-size:2rem;letter-spacing:.16em;text-indent:.16em;font-weight:400;color:var(--ink);
   opacity:0;animation:rise .6s .08s cubic-bezier(.16,1,.3,1) forwards}
 .splash .s{margin-top:12px;font-size:var(--t-cap);color:var(--ink-3);letter-spacing:.02em;
   opacity:0;animation:rise .7s .24s cubic-bezier(.16,1,.3,1) forwards}
@@ -347,18 +351,17 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 .demo .hint{font-size:.72rem;line-height:1.55;color:rgba(255,255,255,.36)}
 
 @media (max-width:900px){
-  .stage{gap:0}
-  .device{width:100%;height:100dvh;border-radius:0;padding:0;box-shadow:none;background:transparent}
+  .stage{gap:0;padding:0;background:var(--void)}
+  .device{width:100%;height:100dvh;border-radius:0;padding:0;box-shadow:none;background:var(--void)}
   .app{border-radius:0}
-  .statusbar{padding-top:calc(env(safe-area-inset-top,14px) + 3px);height:auto}
-  .appbar,.backbar{top:calc(env(safe-area-inset-top,14px) + 40px)}
-  .scroll{padding-top:104px;padding-bottom:calc(154px + env(safe-area-inset-bottom,0px))}
-  .pheader{margin-top:-104px}
-  .tabzone{bottom:calc(18px + env(safe-area-inset-bottom,0px))}
+  .statusbar{display:none}
   .homebar{display:none}
-  .sheet{top:calc(env(safe-area-inset-top,14px) + 46px)}
+  .tabzone{position:fixed;left:16px;right:16px}
 }
 
+@media (min-width:901px){
+  .device{--sat:44px;--sab:12px}
+}
 @media (prefers-reduced-motion:reduce){
   .view.pushing{animation:fadeIn .16s linear}
   .view.popping{animation:fadeOut .14s linear forwards}
@@ -504,12 +507,14 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
    Полноэкранная иллюстрация, крупный светлый заголовок сансом,
    сериф на одном слове. Кнопка всегда внизу и всегда одна главная.
    ============================================================ */
+.ologin{position:absolute;inset:0;z-index:195;display:flex;flex-direction:column;background:var(--void);padding:112px 22px calc(30px + env(safe-area-inset-bottom,0px));animation:ostepIn .4s cubic-bezier(.32,.72,0,1) both}
+.oerr{font-size:.8rem;color:#E07050;margin-top:10px;padding-left:4px;line-height:1.45}
 .onb{position:absolute;inset:0;z-index:190;overflow:hidden;background:var(--void)}
 .onb .osky{position:absolute;inset:0}
 .onb .osky svg{width:100%;height:100%;display:block}
 .onb .oveil{position:absolute;inset:0;
   background:linear-gradient(180deg,rgba(8,8,10,.34) 0%,rgba(8,8,10,.1) 26%,rgba(8,8,10,.72) 62%,rgba(8,8,10,.95) 100%)}
-.obar{position:absolute;top:56px;left:18px;right:18px;z-index:4;display:flex;align-items:center;gap:14px}
+.obar{position:absolute;top:calc(var(--sat) + 14px);left:18px;right:18px;z-index:4;display:flex;align-items:center;gap:14px}
 .oprog{flex:1;height:2px;border-radius:2px;background:rgba(255,255,255,.16);overflow:hidden}
 .oprog i{display:block;height:100%;width:0;background:var(--ink);border-radius:2px;
   transition:width .5s cubic-bezier(.32,.72,0,1)}
@@ -517,7 +522,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
   padding:112px 22px calc(30px + env(safe-area-inset-bottom,0px))}
 .ostep.on{display:flex;animation:ostepIn .5s cubic-bezier(.32,.72,0,1) both}
 @keyframes ostepIn{from{opacity:0;transform:translateY(13px)}to{opacity:1;transform:none}}
-.ostep .otop{position:absolute;top:56px;left:22px}
+.ostep .otop{position:absolute;top:calc(var(--sat) + 14px);left:22px}
 .ostep .obody{flex:1;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:26px}
 .ostep .ofoot{display:flex;flex-direction:column;gap:10px}
 .pill.ghost{background:transparent;box-shadow:inset 0 0 0 1px rgba(244,239,230,.34)}
@@ -547,13 +552,6 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 .ostep .disp{font-size:2.28rem;letter-spacing:-.026em;line-height:1.1}
 .ostep .disp.xl{font-size:2.72rem;line-height:1.06}
 .disp .ser{font-size:1.04em;line-height:inherit}
-@media (max-width:900px){
-  .stage{padding:0;background:var(--void)}
-  .device{width:100%;height:100dvh;border-radius:0;padding:0;box-shadow:none;background:var(--void)}
-  .app{border-radius:0}
-  .statusbar{display:none}
-  .homebar{display:none}
-}
 </style>
 </head>
 <body>
@@ -636,7 +634,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     <!-- ==================== СЕГОДНЯ ==================== -->
     <section class="view on" data-view="home">
 
-      <div class="scene hero" style="margin-top:-100px;padding-top:100px;min-height:706px">
+      <div class="scene hero" style="margin-top:-100px;padding-top:100px;min-height:78dvh">
         <div class="art"><svg><use href="#sc-dusk"/></svg></div>
         <div class="fadeout"></div>
         <div class="body">
@@ -716,7 +714,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
       </div>
 
       <!-- Манифест -->
-      <div class="scene" style="min-height:430px;border-radius:22px;margin-bottom:36px">
+      <div class="scene" style="border-radius:22px;margin-bottom:36px">
         <div class="art"><svg><use href="#sc-dawn"/></svg></div>
         <div class="fadeout"></div>
         <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:0 20px 26px">
@@ -784,7 +782,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
         <button class="pill" id="rsvpBtn">Приду</button>
       </div>
       <!-- Pro -->
-      <div class="scene freeonly" style="min-height:380px;border-radius:22px;margin-bottom:12px">
+      <div class="scene freeonly" style="border-radius:22px;margin-bottom:12px">
         <div class="art"><svg><use href="#sc-night"/></svg></div>
         <div class="fadeout"></div>
         <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:0 20px 26px">
@@ -844,7 +842,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
         <button class="dp">пт, 28</button>
       </div>
 
-      <div class="scene" style="min-height:336px;border-radius:22px;margin-bottom:28px">
+      <div class="scene" style="border-radius:22px;margin-bottom:28px">
         <div class="art"><svg><use href="#sc-mist"/></svg></div>
         <div class="fadeout"></div>
         <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:0 20px 24px">
@@ -956,7 +954,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 
     <!-- ==================== РИТМ ==================== -->
     <section class="view" data-view="rhythm">
-      <div class="scene" style="margin-top:-100px;padding-top:100px;min-height:520px;margin-bottom:28px">
+      <div class="scene" style="margin-top:-100px;padding-top:100px;min-height:58dvh;margin-bottom:28px">
         <div class="art"><svg><use href="#sc-night"/></svg></div>
         <div class="fadeout"></div>
         <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:20px">
@@ -1202,7 +1200,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 
   <div class="appbar" id="appbar">
     <button class="ib" id="menuBtn" aria-label="Профиль"><span class="avatar" id="avatar"></span></button>
-    <span class="wordmark">НИКА</span>
+    <span class="wordmark"><span class="my-pre">My </span>NIKA</span>
     <button class="ib" id="bellBtn" aria-label="Новости">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M12 3.2a5.6 5.6 0 015.6 5.6c0 4.2 1.2 5.7 1.9 6.4.4.4.1 1.1-.5 1.1H5c-.6 0-.9-.7-.5-1.1.7-.7 1.9-2.2 1.9-6.4A5.6 5.6 0 0112 3.2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10.2 19.2a1.9 1.9 0 003.6 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
       <span class="pip" id="bellPip"></span>
@@ -1286,21 +1284,62 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
       <div class="oprog"><i id="oprogFill"></i></div>
     </div>
 
-    <!-- 0 -->
+
+    <!-- LOGIN OVERLAY -->
+    <div class="ologin" id="ologin" style="display:none">
+      <div class="otop"><span class="wordmark"><span class="my-pre">My </span>NIKA</span></div>
+      <div class="obody" style="justify-content:flex-end;padding-bottom:16px">
+        <h1 class="disp">Добро<br><span class="ser">пожаловать</span></h1>
+        <p class="cap" style="margin-top:14px;max-width:290px">Введи почту и пароль, которые указывал при регистрации.</p>
+        <div class="ofield"><input id="loginEmail" type="email" placeholder="Почта" autocomplete="email" inputmode="email"></div>
+        <div class="ofield"><input id="loginPass" type="password" placeholder="Пароль" autocomplete="current-password"></div>
+        <p class="oerr" id="loginErr" style="display:none">Проверь почту и пароль</p>
+      </div>
+      <div class="ofoot">
+        <button class="pill solid wide" id="loginSubmit">Войти</button>
+        <button class="pill ghost wide" id="loginForgot">Забыли пароль?</button>
+        <button style="margin-top:4px;font-size:.82rem;color:var(--ink-3);text-align:center;width:100%;padding:10px 0" id="loginBack">← Назад</button>
+      </div>
+    </div>
+
+    <!-- 0 →  приветствие -->
     <div class="ostep on" data-step="0">
-      <div class="otop"><span class="wordmark">НИКА</span></div>
+      <div class="otop"><span class="wordmark"><span class="my-pre">My </span>NIKA</span></div>
       <div class="obody">
         <h1 class="disp">Практики, которые делаются <span class="ser">на бегу</span></h1>
         <p class="cap" style="margin-top:16px;max-width:290px">Не чтобы лечь и расслабиться. Чтобы во время движения чувствовать тело, а не бороться с ним.</p>
       </div>
       <div class="ofoot">
-        <button class="pill solid wide" data-onext>Начать</button>
-        <button class="pill ghost wide" data-onext>У меня уже есть аккаунт</button>
+        <button class="pill solid wide" id="oRegBtn">Создать аккаунт</button>
+        <button class="pill ghost wide" id="oLoginBtn">Войти</button>
       </div>
     </div>
 
-    <!-- 1 -->
+
+    <!-- 1 · регистрация: почта -->
     <div class="ostep" data-step="1">
+      <div class="obody">
+        <h1 class="disp">Введи <span class="ser">почту</span></h1>
+        <p class="cap" style="margin-top:14px;max-width:290px">Это твой логин. Никаких писем без твоего запроса.</p>
+        <div class="ofield"><input id="regEmail" type="email" placeholder="Почта" autocomplete="email" inputmode="email"></div>
+        <p class="oerr" id="regEmailErr" style="display:none">Введи корректный адрес почты</p>
+      </div>
+      <div class="ofoot"><button class="pill solid wide" id="regEmailNext">Дальше</button></div>
+    </div>
+
+    <!-- 2 · регистрация: пароль -->
+    <div class="ostep" data-step="8">
+      <div class="obody">
+        <h1 class="disp">Придумай <span class="ser">пароль</span></h1>
+        <p class="cap" style="margin-top:14px;max-width:290px">Минимум шесть символов. Лучше не использовать пароль от почты.</p>
+        <div class="ofield"><input id="regPass" type="password" placeholder="Пароль" autocomplete="new-password"></div>
+        <p class="oerr" id="regPassErr" style="display:none">Пароль слишком короткий — нужно минимум шесть символов</p>
+      </div>
+      <div class="ofoot"><button class="pill solid wide" id="regPassNext">Создать аккаунт</button></div>
+    </div>
+
+    <!-- 3 · имя (бывш. 1) -->
+    <div class="ostep" data-step="7">
       <div class="obody">
         <h1 class="disp">Как тебя <span class="ser">зовут</span></h1>
         <p class="cap" style="margin-top:14px;max-width:290px">Ника обращается по имени. Больше это имя нигде не появится.</p>
@@ -1310,7 +1349,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     </div>
 
     <!-- 2 -->
-    <div class="ostep" data-step="2">
+    <div class="ostep" data-step="8">
       <div class="obody">
         <h1 class="disp">Что тебя сюда <span class="ser">привело</span></h1>
         <p class="cap" style="margin-top:14px;max-width:300px">Можно выбрать несколько. От этого зависит, с чего Ника начнёт.</p>
@@ -1326,7 +1365,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     </div>
 
     <!-- 3 -->
-    <div class="ostep" data-step="3">
+    <div class="ostep" data-step="7">
       <div class="obody">
         <h1 class="disp">Как часто ты сейчас <span class="ser">двигаешься</span></h1>
         <p class="cap" style="margin-top:14px;max-width:300px">Честно, а не как хотелось бы. Это станет твоим коридором, а не целью.</p>
@@ -1341,7 +1380,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     </div>
 
     <!-- 4 -->
-    <div class="ostep" data-step="4">
+    <div class="ostep" data-step="8">
       <div class="obody">
         <h1 class="disp">Что чаще всего <span class="ser">мешает</span></h1>
         <div class="opts">
@@ -1356,7 +1395,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     </div>
 
     <!-- 5 -->
-    <div class="ostep" data-step="5">
+    <div class="ostep" data-step="7">
       <div class="obody">
         <h1 class="disp">Три вещи, которые я <span class="ser">обещаю</span></h1>
         <div class="promise">
@@ -1369,7 +1408,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     </div>
 
     <!-- 6 -->
-    <div class="ostep" data-step="6">
+    <div class="ostep" data-step="8">
       <div class="obody" style="justify-content:center">
         <h1 class="disp xl">Ника <span class="ser">рядом</span></h1>
         <p class="cap" style="margin-top:16px;max-width:290px" id="oFinal">Начнём с трёх минут. Дальше решай сама.</p>
@@ -1383,7 +1422,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 
   <div class="splash" id="splash">
     <div class="art"><svg viewBox="0 0 400 852" preserveAspectRatio="xMidYMid slice"><use href="#sc-dawn"/></svg></div>
-    <div class="lock"><div class="w">НИКА</div><div class="s">you’ll never move alone</div></div>
+    <div class="lock"><div class="w"><span class="my-pre">My </span>NIKA</div><div class="s">you’ll never move alone</div></div>
   </div>
 
 
@@ -1960,8 +1999,8 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     function show(i){
       cur=Math.max(0,Math.min(i,LAST));
       steps.forEach(function(s,k){ s.classList.toggle('on',k===cur); });
-      bar.style.display=cur===0?'none':'flex';
-      fill.style.width=(cur/LAST*100).toFixed(1)+'%';
+      bar.style.display=cur<3?'none':'flex';
+      fill.style.width=(Math.max(0,cur-2)/Math.max(1,LAST-2)*100).toFixed(1)+'%';
       var nm=(document.getElementById('oName').value||'').trim();
       if(cur===LAST) document.getElementById('oFinal').textContent=
         nm? nm+', начнём с трёх минут. Дальше решай сама.' : 'Начнём с трёх минут. Дальше решай сама.';
@@ -1971,6 +2010,46 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
       b.addEventListener('click',function(){ show(cur+1); });
     });
     back.addEventListener('click',function(){ show(cur-1); });
+    // ── авторизация ──────────────────────────────────────────
+    var ologin=document.getElementById('ologin');
+    function showLogin(){
+      if(ologin){ ologin.style.display='flex'; ologin.style.animation='ostepIn .4s cubic-bezier(.32,.72,0,1) both'; }
+      haptic(7);
+    }
+    function hideLogin(){
+      if(ologin) ologin.style.display='none';
+    }
+    document.getElementById('oRegBtn').addEventListener('click',function(){ show(1); haptic(7); });
+    document.getElementById('oLoginBtn').addEventListener('click',showLogin);
+    document.getElementById('loginBack').addEventListener('click',function(){ hideLogin(); show(0); haptic(7); });
+    document.getElementById('loginForgot').addEventListener('click',function(){ haptic(7); });
+    document.getElementById('loginSubmit').addEventListener('click',function(){
+      var email=(document.getElementById('loginEmail').value||'').trim();
+      var pass=document.getElementById('loginPass').value||'';
+      var err=document.getElementById('loginErr');
+      if(!email||email.indexOf('@')<1||pass.length<6){ err.style.display=''; return; }
+      err.style.display='none';
+      hideLogin();
+      onb.style.transition='opacity .4s ease'; onb.style.opacity='0';
+      setTimeout(function(){ onb.style.display='none'; onb.style.opacity=''; onb.style.transition=''; },450);
+      setState('regular'); go('home'); haptic(16);
+    });
+    // ── регистрация ───────────────────────────────────────────
+    document.getElementById('regEmailNext').addEventListener('click',function(){
+      var v=(document.getElementById('regEmail').value||'').trim();
+      var err=document.getElementById('regEmailErr');
+      if(!v||v.indexOf('@')<1){ err.style.display=''; return; }
+      err.style.display='none'; show(2);
+    });
+    document.getElementById('regPassNext').addEventListener('click',function(){
+      var v=document.getElementById('regPass').value||'';
+      var err=document.getElementById('regPassErr');
+      if(v.length<6){ err.style.display=''; return; }
+      err.style.display='none'; show(3);
+    });
+    window.__loginOpen=function(){
+      onb.style.display='block'; show(0); showLogin();
+    };
     onb.querySelectorAll('.opts').forEach(function(g){
       var multi=g.hasAttribute('data-multi');
       g.querySelectorAll('.opt').forEach(function(o){
@@ -2067,6 +2146,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
     closeSheet();
     if(window.__resetPostrun) window.__resetPostrun();
     if(k==='onb'){ if(window.__onbOpen) window.__onbOpen(); return; }
+    if(k==='login'){ if(window.__loginOpen) window.__loginOpen(); return; }
     if(onb) onb.style.display='none';
     if(k==='fresh'){ setState('fresh'); setPlan('free'); go('home'); }
     if(k==='day'){ setState('regular'); go('home'); }
@@ -2076,7 +2156,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 
   (function(){
     var s=new URLSearchParams(location.search).get('s');
-    if(s&&['onb','fresh','day','run'].indexOf(s)>=0){
+    if(s&&['onb','fresh','day','run','login'].indexOf(s)>=0){
       setTimeout(function(){ window.__scenario(s); }, 60);
     }
   })();
