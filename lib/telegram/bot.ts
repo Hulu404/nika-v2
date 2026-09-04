@@ -14,6 +14,8 @@ import {
   landingKeyboard,
 } from "./coffeerun";
 import { POLL_CALLBACK_RE } from "./poll-copy";
+import { MOVED_CALLBACK_RE } from "./moved-copy";
+import { handleMovedCommand, handleMovedCallback } from "./coffeerun-moved";
 import {
   handleCoffeeRunPollAnswer,
   handlePollAdminCommand,
@@ -126,6 +128,8 @@ function registerHandlers(bot: Bot<BotContext>): void {
   bot.command("pollsend", (ctx) => handlePollSendCommand(ctx));
   bot.command("poll", (ctx) => handlePollSummaryCommand(ctx));
   bot.command("pollstop", (ctx) => handlePollStopCommand(ctx));
+  // Перенос старта на другое время того же дня — в два шага, с предпросмотром.
+  bot.command("moved", (ctx) => handleMovedCommand(ctx));
   bot.command("help", async (ctx) => {
     await ctx.reply(
       `${BOT_ROLE}\n\nКоманды:\n` +
@@ -141,6 +145,8 @@ function registerHandlers(bot: Bot<BotContext>): void {
   // Опрос по погоде («завтра дождь — побежишь?»): ответ ложится в заявку, id
   // которой вшит в кнопку. См. lib/telegram/coffeerun-poll.ts.
   bot.callbackQuery(POLL_CALLBACK_RE, (ctx) => handleCoffeeRunPollAnswer(ctx));
+  // Подтверждение рассылки о переносе («Разослать» / «Отмена») — для организатора.
+  bot.callbackQuery(MOVED_CALLBACK_RE, (ctx) => handleMovedCallback(ctx));
   // pure-push: интерактивного чек-ина больше нет. Хендлер оставлен пустым
   // «ловцом» — на случай устаревших сообщений с кнопками ans_* в проде: мягко
   // гасим «часик», НИЧЕГО не пишем (никаких answer/answered_at из Telegram).

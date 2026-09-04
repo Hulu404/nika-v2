@@ -4,7 +4,9 @@ import {
   addAdminChat,
   adminChats,
   alreadyAsked,
+  alreadyNotified,
   isAdminChat,
+  markNotified,
   markSent,
   pollRunDate,
   pollSummary,
@@ -98,5 +100,30 @@ describe("доступ организатора", () => {
 
     removeAdminChat(777);
     expect(isAdminChat(777)).toBe(false);
+  });
+});
+
+describe("разовые объявления (перенос старта)", () => {
+  it("не отправляет одно и то же объявление дважды", () => {
+    const key = "moved:2026-09-05:18:00";
+    expect(alreadyNotified(key, 1)).toBe(false);
+
+    markNotified(key, 1);
+    expect(alreadyNotified(key, 1)).toBe(true);
+    expect(alreadyNotified(key, 2)).toBe(false);
+  });
+
+  it("новое время — новое объявление, уходит всем заново", () => {
+    markNotified("moved:2026-09-05:18:00", 1);
+    expect(alreadyNotified("moved:2026-09-05:19:00", 1)).toBe(false);
+  });
+
+  it("переживает запуск опроса по другому забегу", () => {
+    const key = "moved:2026-09-05:18:00";
+    markNotified(key, 1);
+
+    startPoll("2026-09-06");
+
+    expect(alreadyNotified(key, 1)).toBe(true);
   });
 });

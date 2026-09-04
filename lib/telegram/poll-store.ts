@@ -47,18 +47,34 @@ interface PollState {
   sent: Map<number, PollRecipient>;
   /** Ответы: chatId → голос. */
   votes: Map<number, PollVote>;
+  /**
+   * Разовые объявления (перенос старта и подобное): ключ объявления → кому уже
+   * ушло. Отдельно от опроса: объявлений за день может быть несколько, и
+   * «перенос на 18:00» не должен мешать повторно объявить «на 19:00».
+   */
+  notices: Map<string, Set<number>>;
 }
 
 const KEY = Symbol.for("nika.coffeerun.poll.state");
 
 function empty(runDate: string): PollState {
-  return { runDate, adminChatIds: [], sent: new Map(), votes: new Map() };
+  return {
+    runDate,
+    adminChatIds: [],
+    sent: new Map(),
+    votes: new Map(),
+    // Объявления переживают смену забега: их ключ и так включает дату.
+    notices: new Map(),
+  };
 }
 
 function state(): PollState {
   const g = globalThis as unknown as Record<symbol, PollState | undefined>;
   if (!g[KEY]) g[KEY] = empty("");
-  return g[KEY];
+  // Состояние могло быть создано версией кода без notices (dev, hot-reload).
+  const s = g[KEY];
+  if (!s.notices) s.notices = new Map();
+  return s;
 }
 
 /**
@@ -67,9 +83,9 @@ function state(): PollState {
  * переживает смену — он про людей, а не про забег.
  */
 export function startPoll(runDate: string): void {
-  const admins = state().adminChatIds;
+  const { adminChatIds, notices } = state();
   const g = globalThis as unknown as Record<symbol, PollState | undefined>;
-  g[KEY] = { ...empty(runDate), adminChatIds: admins };
+  g[KEY] = { ...empty(runDate), adminChatIds, notices };
 }
 
 /** Текущий забег опроса ("" — опрос ещё ни разу не запускали). */
@@ -126,6 +142,22 @@ export function recordVote(
   };
   s.votes.set(chatId, vote);
   return vote;
+}
+
+/**
+ * Разовые объявления: кому уже отправляли сообщение с этим ключом. Ключ задаёт
+ * вызывающий (например, "moved:2026-09-05:18:00"), чтобы повторная команда не
+ * задвоила рассылку, а новое объявление ушло всем заново.
+ */
+export function alreadyNotified(key: string, chatId: number): boolean {
+  return state().notices.get(key)?.has(chatId) ?? false;
+}
+
+export function markNotified(key: string, chatId: number): void {
+  const s = state();
+  const set = s.notices.get(key) ?? new Set<number>();
+  set.add(chatId);
+  s.notices.set(key, set);
 }
 
 export interface PollSummary {
