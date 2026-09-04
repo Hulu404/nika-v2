@@ -13,6 +13,14 @@ import {
   handleCoffeeRunByUsername,
   landingKeyboard,
 } from "./coffeerun";
+import { POLL_CALLBACK_RE } from "./poll-copy";
+import {
+  handleCoffeeRunPollAnswer,
+  handlePollAdminCommand,
+  handlePollSendCommand,
+  handlePollStopCommand,
+  handlePollSummaryCommand,
+} from "./coffeerun-poll";
 import { siteKeyboard, supportKeyboard, SUPPORT_LABEL, SUPPORT_URL } from "./cta";
 
 /**
@@ -109,6 +117,15 @@ function registerHandlers(bot: Bot<BotContext>): void {
   // /reset остаётся рабочим для приложения, но в /help не рекламируется —
   // снаружи бот про мероприятия.
   bot.command(["reset", "password"], (ctx) => handleResetCommand(ctx));
+
+  // ── Опрос про погоду (только для организатора) ─────────────────────────────
+  // Снаружи этих команд не видно: /help про них молчит, а незнакомому чату они
+  // не отвечают вовсе. Вход — /admin <ключ> (ADMIN_SECRET). Подробности —
+  // lib/telegram/coffeerun-poll.ts.
+  bot.command("admin", (ctx) => handlePollAdminCommand(ctx));
+  bot.command("pollsend", (ctx) => handlePollSendCommand(ctx));
+  bot.command("poll", (ctx) => handlePollSummaryCommand(ctx));
+  bot.command("pollstop", (ctx) => handlePollStopCommand(ctx));
   bot.command("help", async (ctx) => {
     await ctx.reply(
       `${BOT_ROLE}\n\nКоманды:\n` +
@@ -121,6 +138,9 @@ function registerHandlers(bot: Bot<BotContext>): void {
 
   // ── Инлайн-ответы уведомлений ───────────────────────────────────────────────
   bot.callbackQuery(/^optin_(yes|no)$/, (ctx) => handleOptIn(ctx, ctx.match[1] === "yes"));
+  // Опрос по погоде («завтра дождь — побежишь?»): ответ ложится в заявку, id
+  // которой вшит в кнопку. См. lib/telegram/coffeerun-poll.ts.
+  bot.callbackQuery(POLL_CALLBACK_RE, (ctx) => handleCoffeeRunPollAnswer(ctx));
   // pure-push: интерактивного чек-ина больше нет. Хендлер оставлен пустым
   // «ловцом» — на случай устаревших сообщений с кнопками ans_* в проде: мягко
   // гасим «часик», НИЧЕГО не пишем (никаких answer/answered_at из Telegram).
