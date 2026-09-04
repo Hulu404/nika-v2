@@ -46,7 +46,10 @@ export async function handlePollAdminCommand(ctx: BotContext): Promise<void> {
   const chatId = ctx.chat?.id;
   if (chatId === undefined) return;
 
-  const secret = process.env.ADMIN_SECRET;
+  // trim с обеих сторон: значение из панели хостинга легко скопировать с
+  // хвостовым пробелом или переводом строки, и тогда совпадения не будет
+  // никогда — а выглядит это как «бот меня не пускает».
+  const secret = (process.env.ADMIN_SECRET ?? "").trim();
   if (!secret) {
     await ctx.reply(
       "Ключ администратора не настроен на сервере (переменная ADMIN_SECRET) — " +
@@ -56,6 +59,12 @@ export async function handlePollAdminCommand(ctx: BotContext): Promise<void> {
   }
 
   const entered = (ctx.match ?? "").toString().trim();
+  // Пустой аргумент — не попытка подобрать ключ, а непонятый формат команды.
+  // Это самая частая причина «не узнала ключ», поэтому отвечаем по-человечески.
+  if (!entered) {
+    await ctx.reply("Пришли ключ одной строкой через пробел: /admin твой-ключ");
+    return;
+  }
   if (entered !== secret) {
     // Не подсказываем, что именно не так: перебирающему знать нечего.
     await ctx.reply("Не узнала ключ.");
