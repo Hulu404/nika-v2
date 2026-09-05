@@ -21,7 +21,8 @@ import {
   removeAdminChat,
   startPoll,
 } from "./poll-store";
-import { parseTime } from "./moved-copy";
+import { parseTime } from "./notice-copy";
+import { cancelledWarning } from "./coffeerun-notice";
 import { runByDate, nextRun } from "../coffeerun/run";
 import { dispatchCoffeeRunPoll } from "../coffeerun/poll-dispatch";
 import type { BotContext } from "./bot";
@@ -90,6 +91,7 @@ export async function handlePollAdminCommand(ctx: BotContext): Promise<void> {
       "/rollcall — перекличка «кто придёт сегодня»; время беру из последнего переноса " +
         "(/rollcall 19:00 — своё время)",
       "/moved — перенести старт на 18:00 сегодня (/moved 19:00 дождь — своё время и причина)",
+      "/cancel — отменить забег (/cancel гроза — с причиной)",
       "/pollsend — вопрос про дождь накануне забега",
       "/poll — сводка: кто придёт, кто нет, кто молчит",
       "/pollstop — перестать присылать ответы в этот чат",
@@ -214,8 +216,11 @@ export async function handleRollcallCommand(ctx: BotContext): Promise<void> {
     return;
   }
 
+  // Перекличка по отменённому забегу — почти наверняка ошибка, но решает
+  // организатор: он мог отменить утренний старт и звать людей заново.
   await ctx.reply(
-    rollcallPreviewText(run, start, preview.wouldSend ?? 0, startTime === null && moved !== null),
+    cancelledWarning(run.date) +
+      rollcallPreviewText(run, start, preview.wouldSend ?? 0, startTime === null && moved !== null),
     { reply_markup: rollcallConfirmKeyboard(run.date, start) },
   );
 }

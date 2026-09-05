@@ -14,8 +14,13 @@ import {
   landingKeyboard,
 } from "./coffeerun";
 import { POLL_CALLBACK_RE, ROLLCALL_CALLBACK_RE } from "./poll-copy";
-import { MOVED_CALLBACK_RE } from "./moved-copy";
-import { handleMovedCommand, handleMovedCallback } from "./coffeerun-moved";
+import { CANCEL_CALLBACK_RE, MOVED_CALLBACK_RE } from "./notice-copy";
+import {
+  handleCancelCallback,
+  handleCancelCommand,
+  handleMovedCallback,
+  handleMovedCommand,
+} from "./coffeerun-notice";
 import {
   handleCoffeeRunPollAnswer,
   handleRollcallCallback,
@@ -134,6 +139,8 @@ function registerHandlers(bot: Bot<BotContext>): void {
   bot.command("rollcall", (ctx) => handleRollcallCommand(ctx));
   // Перенос старта на другое время того же дня — в два шага, с предпросмотром.
   bot.command("moved", (ctx) => handleMovedCommand(ctx));
+  // Отмена забега — единственное объявление, которое нельзя переиграть.
+  bot.command("cancel", (ctx) => handleCancelCommand(ctx));
   bot.command("help", async (ctx) => {
     await ctx.reply(
       `${BOT_ROLE}\n\nКоманды:\n` +
@@ -151,6 +158,7 @@ function registerHandlers(bot: Bot<BotContext>): void {
   bot.callbackQuery(POLL_CALLBACK_RE, (ctx) => handleCoffeeRunPollAnswer(ctx));
   // Подтверждение рассылки о переносе («Разослать» / «Отмена») — для организатора.
   bot.callbackQuery(MOVED_CALLBACK_RE, (ctx) => handleMovedCallback(ctx));
+  bot.callbackQuery(CANCEL_CALLBACK_RE, (ctx) => handleCancelCallback(ctx));
   // Подтверждение рассылки переклички — для организатора.
   bot.callbackQuery(ROLLCALL_CALLBACK_RE, (ctx) => handleRollcallCallback(ctx));
   // pure-push: интерактивного чек-ина больше нет. Хендлер оставлен пустым

@@ -1,15 +1,21 @@
 import { describe, it, expect } from "vitest";
 import {
+  CANCEL_CALLBACK_RE,
   MOVED_CALLBACK_RE,
+  cancelConfirmKeyboard,
+  cancelKeyboard,
+  cancelPreviewText,
+  cancelText,
   gatherFor,
   movedConfirmKeyboard,
   movedPreviewText,
-  movedReportText,
+  noticeReportText,
   movedText,
+  parseCancelCallback,
   parseMovedCallback,
   parseTime,
-} from "./moved-copy";
-import { parseMovedArgs } from "./coffeerun-moved";
+} from "./notice-copy";
+import { parseCancelArgs, parseMovedArgs } from "./coffeerun-notice";
 import { COFFEE_RUNS } from "../coffeerun/run";
 
 const RUN = COFFEE_RUNS[0];
@@ -141,7 +147,78 @@ describe("кнопки подтверждения", () => {
 
 describe("отчёт о рассылке", () => {
   it("считает отправленные и предупреждает про остаток", () => {
-    expect(movedReportText({ sent: 29, blocked: 1, failed: 0 })).toContain("29");
-    expect(movedReportText({ sent: 60, hasMore: true })).toContain("повтори команду");
+    expect(noticeReportText({ sent: 29, blocked: 1, failed: 0 }, "перенос")).toContain("29");
+    expect(noticeReportText({ sent: 60, hasMore: true }, "отмену")).toContain("повтори команду");
+  });
+});
+
+describe("отмена забега", () => {
+  const text = cancelText({ name: "Аня" }, RUN, "гроза");
+
+  it("говорит про отмену в первой строке — её видно в превью чата", () => {
+    const first = text.split("\n")[0];
+    expect(first).toContain("отменяем");
+    expect(first).toContain("Аня");
+  });
+
+  it("называет причину, забег и прямо говорит не приходить", () => {
+    expect(text).toContain("Причина: гроза");
+    expect(text).toContain(RUN.spotName);
+    expect(text).toContain("Приходить не нужно");
+  });
+
+  it("без причины строку про причину не печатает", () => {
+    expect(cancelText({ name: "Аня" }, RUN, null)).not.toContain("Причина");
+  });
+
+  it("не зовёт прийти позже: для переноса есть /moved", () => {
+    expect(text).not.toContain("Сбор в");
+    expect(text).not.toContain(RUN.gatherTime);
+  });
+
+  it("обещает сохранить место на следующем забеге", () => {
+    expect(text).toContain("следующем забеге");
+  });
+
+  it("в кнопках нет маршрута и нет самого отменённого забега", () => {
+    const kb = cancelKeyboard(RUN);
+    const labels = kb.inline_keyboard.flat().map((b) => b.text);
+    expect(labels.join(" ")).not.toContain("Как добраться");
+    expect(labels.some((l) => l.includes(RUN.dateLabel))).toBe(false);
+  });
+
+  it("предпросмотр предупреждает, что отозвать нельзя", () => {
+    const preview = cancelPreviewText(RUN, "гроза", 35);
+    expect(preview).toContain("ОТМЕНА");
+    expect(preview).toContain("35 чел.");
+    expect(preview).toContain("нельзя");
+  });
+
+  it("кнопки подтверждения разбираются обратно и не путаются с переносом", () => {
+    const kb = cancelConfirmKeyboard(RUN.date);
+    const data = kb.inline_keyboard
+      .flat()
+      .map((b) => ("callback_data" in b ? b.callback_data : null));
+    expect(data).toContain(`cx_go_${RUN.date}`);
+
+    expect(parseCancelCallback(`cx_go_${RUN.date}`)).toEqual({
+      action: "send",
+      runDate: RUN.date,
+    });
+    expect(parseCancelCallback("cx_no")).toEqual({ action: "cancel" });
+    expect(parseCancelCallback("mv_no")).toBeNull();
+    expect(CANCEL_CALLBACK_RE.test(`mv_go_${RUN.date}_18:00`)).toBe(false);
+  });
+
+  it("аргументы: дата и причина в любом порядке", () => {
+    expect(parseCancelArgs("")).toEqual({ runDate: null, reason: null });
+    expect(parseCancelArgs("гроза и ливень")).toEqual({
+      runDate: null,
+      reason: "гроза и ливень",
+    });
+    expect(parseCancelArgs("2026-09-06 гроза")).toEqual({
+      runDate: "2026-09-06",
+      reason: "гроза",
+    });
   });
 });

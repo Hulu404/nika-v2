@@ -1,7 +1,12 @@
 import { tgAdmin } from "../telegram/supabase";
 import { sendBotMessage } from "../telegram/send";
-import { movedText, movedKeyboard } from "../telegram/moved-copy";
-import { alreadyNotified, markMoved, markNotified } from "../telegram/poll-store";
+import { cancelText, cancelKeyboard, movedText, movedKeyboard } from "../telegram/notice-copy";
+import {
+  alreadyNotified,
+  markCancelled,
+  markMoved,
+  markNotified,
+} from "../telegram/poll-store";
 import { runByDate, type CoffeeRun } from "./run";
 
 /**
@@ -62,6 +67,11 @@ export interface MovedDispatchResult {
 /** Ключ объявления: дата забега + новое время. */
 export function movedKey(runDate: string, newStart: string): string {
   return `moved:${runDate}:${newStart}`;
+}
+
+/** Ключ отмены: она по забегу одна, времени в ключе нет. */
+export function cancelKey(runDate: string): string {
+  return `cancel:${runDate}`;
 }
 
 /** Подтвердившие участие в забеге — единственное, что читаем из базы. */
@@ -126,6 +136,77 @@ export async function dispatchCoffeeRunMoved(
     }
 
     // Помечаем и доставленных, и заблокировавших бота: второй попытки не будет.
+    markNotified(key, row.tg_chat_id);
+
+    await sleep(THROTTLE_MS);
+  }
+
+  return { ok: true, confirmed: confirmed.length, sent, blocked, failed, hasMore, ...base };
+}
+
+export interface CancelDispatchOptions {
+  /** Забег (YYYY-MM-DD). */
+  runDate: string;
+  /** Причина одной строкой («гроза») или null. */
+  reason?: string | null;
+  /** Только посчитать, ничего не отправляя. */
+  dryRun?: boolean;
+}
+
+/**
+ * Рассылка отмены забега.
+ *
+ * Отличие от переноса только в словах и в ключе дедупа: отмена по забегу одна,
+ * второй раз отменить то же самое нельзя — повторная команда никого не
+ * побеспокоит. Отменить отмену бот не умеет и не должен: сообщение уже у людей,
+ * и «мы передумали» решается новым забегом, а не правкой старого.
+ */
+export async function dispatchCoffeeRunCancel(
+  opts: CancelDispatchOptions,
+): Promise<MovedDispatchResult> {
+  const run = runByDate(opts.runDate);
+  if (!run) return { ok: false, error: `нет забега с датой ${opts.runDate}` };
+
+  const key = cancelKey(run.date);
+  const base = { runDate: run.date };
+
+  const confirmed = await confirmedFor(run);
+  const pending = confirmed.filter((r) => !alreadyNotified(key, r.tg_chat_id));
+  const due = pending.slice(0, MAX_SENDS);
+  const hasMore = pending.length > MAX_SENDS;
+
+  if (opts.dryRun) {
+    return {
+      ok: true,
+      dryRun: true,
+      confirmed: confirmed.length,
+      wouldSend: due.length,
+      hasMore,
+      ...base,
+    };
+  }
+
+  // Помечаем забег отменённым сразу: даже если рассылка оборвётся на середине,
+  // /moved и /rollcall уже предупредят организатора, что звать людям некуда.
+  markCancelled(run.date);
+
+  const reason = opts.reason ?? null;
+  const keyboard = cancelKeyboard(run);
+  let sent = 0;
+  let blocked = 0;
+  let failed = 0;
+
+  for (const row of due) {
+    const res = await sendBotMessage(row.tg_chat_id, cancelText(row, run, reason), keyboard);
+
+    if (res.ok) sent++;
+    else if (res.blocked) blocked++;
+    else {
+      // Транзиентная ошибка (429 и прочее): НЕ помечаем — заберём следующим запуском.
+      failed++;
+      continue;
+    }
+
     markNotified(key, row.tg_chat_id);
 
     await sleep(THROTTLE_MS);

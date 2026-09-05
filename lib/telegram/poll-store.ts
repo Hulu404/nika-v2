@@ -71,6 +71,8 @@ interface PollState {
    * способ собрать неверные ответы.
    */
   moved: Map<string, string>;
+  /** Забеги, по которым разослана отмена: дата → когда объявили (ISO). */
+  cancelled: Map<string, string>;
 }
 
 const KEY = Symbol.for("nika.coffeerun.poll.state");
@@ -86,6 +88,7 @@ function empty(runDate: string, kind: PollKind = "rain", startTime: string | nul
     // Объявления и переносы переживают смену опроса: их ключ и так с датой.
     notices: new Map(),
     moved: new Map(),
+    cancelled: new Map(),
   };
 }
 
@@ -96,6 +99,7 @@ function state(): PollState {
   const s = g[KEY];
   if (!s.notices) s.notices = new Map();
   if (!s.moved) s.moved = new Map();
+  if (!s.cancelled) s.cancelled = new Map();
   if (!s.kind) s.kind = "rain";
   return s;
 }
@@ -111,9 +115,9 @@ export function startPoll(
   kind: PollKind = "rain",
   startTime: string | null = null,
 ): void {
-  const { adminChatIds, notices, moved } = state();
+  const { adminChatIds, notices, moved, cancelled } = state();
   const g = globalThis as unknown as Record<symbol, PollState | undefined>;
-  g[KEY] = { ...empty(runDate, kind, startTime), adminChatIds, notices, moved };
+  g[KEY] = { ...empty(runDate, kind, startTime), adminChatIds, notices, moved, cancelled };
 }
 
 /** Текущий забег опроса ("" — опрос ещё ни разу не запускали). */
@@ -139,6 +143,19 @@ export function markMoved(runDate: string, newStart: string): void {
 /** Во сколько по последнему объявлению стартует забег; null — переносов не было. */
 export function movedStartFor(runDate: string): string | null {
   return state().moved.get(runDate) ?? null;
+}
+
+/**
+ * Забег отменён — объявление разослано. Отменить отмену бот не умеет: сообщение
+ * уже у людей, и «мы передумали» решается новым забегом, а не правкой старого.
+ */
+export function markCancelled(runDate: string): void {
+  state().cancelled.set(runDate, new Date().toISOString());
+}
+
+/** Когда объявили отмену (ISO); null — забег не отменяли. */
+export function cancelledAt(runDate: string): string | null {
+  return state().cancelled.get(runDate) ?? null;
 }
 
 /** Запомнить чат организатора: сюда полетят ответы и сводка. */
