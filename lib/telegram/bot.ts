@@ -13,11 +13,13 @@ import {
   handleCoffeeRunByUsername,
   landingKeyboard,
 } from "./coffeerun";
-import { POLL_CALLBACK_RE } from "./poll-copy";
+import { POLL_CALLBACK_RE, ROLLCALL_CALLBACK_RE } from "./poll-copy";
 import { MOVED_CALLBACK_RE } from "./moved-copy";
 import { handleMovedCommand, handleMovedCallback } from "./coffeerun-moved";
 import {
   handleCoffeeRunPollAnswer,
+  handleRollcallCallback,
+  handleRollcallCommand,
   handlePollAdminCommand,
   handlePollSendCommand,
   handlePollStopCommand,
@@ -128,6 +130,8 @@ function registerHandlers(bot: Bot<BotContext>): void {
   bot.command("pollsend", (ctx) => handlePollSendCommand(ctx));
   bot.command("poll", (ctx) => handlePollSummaryCommand(ctx));
   bot.command("pollstop", (ctx) => handlePollStopCommand(ctx));
+  // Перекличка в день забега: «кто придёт сегодня в 18:00».
+  bot.command("rollcall", (ctx) => handleRollcallCommand(ctx));
   // Перенос старта на другое время того же дня — в два шага, с предпросмотром.
   bot.command("moved", (ctx) => handleMovedCommand(ctx));
   bot.command("help", async (ctx) => {
@@ -147,6 +151,8 @@ function registerHandlers(bot: Bot<BotContext>): void {
   bot.callbackQuery(POLL_CALLBACK_RE, (ctx) => handleCoffeeRunPollAnswer(ctx));
   // Подтверждение рассылки о переносе («Разослать» / «Отмена») — для организатора.
   bot.callbackQuery(MOVED_CALLBACK_RE, (ctx) => handleMovedCallback(ctx));
+  // Подтверждение рассылки переклички — для организатора.
+  bot.callbackQuery(ROLLCALL_CALLBACK_RE, (ctx) => handleRollcallCallback(ctx));
   // pure-push: интерактивного чек-ина больше нет. Хендлер оставлен пустым
   // «ловцом» — на случай устаревших сообщений с кнопками ans_* в проде: мягко
   // гасим «часик», НИЧЕГО не пишем (никаких answer/answered_at из Telegram).

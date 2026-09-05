@@ -1,7 +1,10 @@
 import { sendBotMessage } from "./send";
 import {
   parsePollCallback,
+  parseRollcallCallback,
   pollReplyText,
+  rollcallConfirmKeyboard,
+  rollcallPreviewText,
   summaryText,
   voteLine,
 } from "./poll-copy";
@@ -9,22 +12,30 @@ import {
   addAdminChat,
   adminChats,
   isAdminChat,
+  movedStartFor,
+  pollKind,
+  pollRunDate,
+  pollStartTime,
   pollSummary,
   recordVote,
   removeAdminChat,
+  startPoll,
 } from "./poll-store";
+import { parseTime } from "./moved-copy";
 import { runByDate, nextRun } from "../coffeerun/run";
 import { dispatchCoffeeRunPoll } from "../coffeerun/poll-dispatch";
 import type { BotContext } from "./bot";
 
 /**
- * Опрос «завтра дождь — побежишь?» целиком внутри Telegram.
+ * Опросы участников забега целиком внутри Telegram: перекличка «придёшь
+ * сегодня?» и вопрос про дождь накануне. Механика общая, отличаются словами
+ * (PollKind в poll-store).
  *
  * Как это выглядит для организатора:
  *   /admin <ключ>  — один раз: бот запоминает этот чат как «мой»;
- *   /pollsend      — разослать вопрос подтвердившим участникам ближайшего забега
- *                    (/pollsend 2026-09-06 — по конкретной дате);
- *   ответы         — прилетают сюда же по одному: «Аня (@anya) — ПОБЕЖИТ, итого …»;
+ *   /rollcall      — перекличка на сегодня (время — из последнего переноса);
+ *   /pollsend      — вопрос про дождь накануне;
+ *   ответы         — прилетают сюда же по одному: «Аня (@anya) — ПРИДЁТ, итого …»;
  *   /poll          — сводка со списками в любой момент;
  *   /pollstop      — перестать присылать ответы в этот чат.
  *
@@ -74,12 +85,13 @@ export async function handlePollAdminCommand(ctx: BotContext): Promise<void> {
   addAdminChat(chatId);
   await ctx.reply(
     [
-      "Готово — буду присылать ответы на опрос сюда.",
+      "Готово — буду присылать ответы сюда.",
       "",
-      "/pollsend — разослать вопрос про дождь участникам ближайшего забега",
-      "/pollsend 2026-09-06 — то же по конкретной дате",
-      "/poll — сводка: кто побежит, кто нет, кто молчит",
+      "/rollcall — перекличка «кто придёт сегодня» (время возьму из последнего переноса)",
+      "/rollcall 18:00 — своё время старта",
       "/moved — перенести старт на 18:00 сегодня (/moved 19:00 дождь — своё время и причина)",
+      "/pollsend — вопрос про дождь накануне забега",
+      "/poll — сводка: кто придёт, кто нет, кто молчит",
       "/pollstop — перестать присылать ответы в этот чат",
       "",
       "Сообщение с ключом лучше удали из переписки.",
@@ -159,6 +171,118 @@ export async function handlePollSendCommand(ctx: BotContext): Promise<void> {
     });
 }
 
+/**
+ * /rollcall [время] [дата] — перекличка «кто придёт сегодня».
+ *
+ * Время по умолчанию берём из последнего объявленного переноса: если утром
+ * разослали «бежим в 18:00», спрашивать «придёшь в 9:30?» нельзя. Переносов не
+ * было — берём штатное время забега.
+ *
+ * Как и /moved, всегда в два шага: сначала предпросмотр с числом получателей и
+ * дословным текстом, рассылка — только по кнопке.
+ */
+export async function handleRollcallCommand(ctx: BotContext): Promise<void> {
+  const chatId = ctx.chat?.id;
+  if (chatId === undefined || !isAdminChat(chatId)) return;
+
+  const { runDate, startTime } = parseRollcallArgs((ctx.match ?? "").toString());
+  const run = runDate ? runByDate(runDate) : nextRun();
+  if (!run) {
+    await ctx.reply(`Не знаю забега с датой ${runDate}. Забеги задаются в lib/coffeerun/run.ts.`);
+    return;
+  }
+
+  const moved = movedStartFor(run.date);
+  const start = startTime ?? moved ?? run.startTime;
+
+  const preview = await dispatchCoffeeRunPoll({
+    runDate: run.date,
+    kind: "rollcall",
+    startTime: start,
+    dryRun: true,
+    limit: SEND_BATCH,
+  });
+  if (!preview.ok) {
+    await ctx.reply(`Не получилось: ${preview.error ?? "неизвестная ошибка"}`);
+    return;
+  }
+  if (!preview.wouldSend) {
+    await ctx.reply(
+      `Некому отправлять: в забеге ${run.spotName}, ${run.dateLabel} подтвердили участие ` +
+        `${preview.confirmed ?? 0} чел., и все уже получили перекличку. Сводка — /poll.`,
+    );
+    return;
+  }
+
+  await ctx.reply(
+    rollcallPreviewText(run, start, preview.wouldSend ?? 0, startTime === null && moved !== null),
+    { reply_markup: rollcallConfirmKeyboard(run.date, start) },
+  );
+}
+
+/** Аргументы /rollcall: время и дата в любом порядке, оба необязательны. */
+export function parseRollcallArgs(raw: string): {
+  runDate: string | null;
+  startTime: string | null;
+} {
+  let runDate: string | null = null;
+  let startTime: string | null = null;
+
+  for (const part of raw.trim().split(/\s+/).filter(Boolean)) {
+    if (!runDate && /^\d{4}-\d{2}-\d{2}$/.test(part)) {
+      runDate = part;
+      continue;
+    }
+    if (!startTime) startTime = parseTime(part);
+  }
+
+  return { runDate, startTime };
+}
+
+/** Кнопки под предпросмотром переклички. Рассылка идёт в фоне. */
+export async function handleRollcallCallback(ctx: BotContext): Promise<void> {
+  const chatId = ctx.chat?.id;
+  const parsed = parseRollcallCallback(ctx.callbackQuery?.data ?? "");
+
+  if (chatId === undefined || !parsed || !isAdminChat(chatId)) {
+    await ctx.answerCallbackQuery().catch(() => {});
+    return;
+  }
+
+  // Кнопки убираем в любом случае: решение принято.
+  await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+
+  if (parsed.action === "cancel") {
+    await ctx.answerCallbackQuery({ text: "Отменила" }).catch(() => {});
+    await ctx.reply("Отменила — никому ничего не отправляла.");
+    return;
+  }
+
+  await ctx.answerCallbackQuery({ text: "Рассылаю" }).catch(() => {});
+  await ctx.reply(
+    `Рассылаю перекличку на ${parsed.startTime}. Ответы буду присылать сюда, сводка — /poll.`,
+  );
+
+  void dispatchCoffeeRunPoll({
+    runDate: parsed.runDate,
+    kind: "rollcall",
+    startTime: parsed.startTime,
+    limit: SEND_BATCH,
+  })
+    .then((res) => {
+      const tail = res.hasMore ? " Остались неотправленные — запусти /rollcall ещё раз." : "";
+      return sendBotMessage(
+        chatId,
+        `Разослала перекличку: ${res.sent ?? 0}. Заблокировали бота: ${res.blocked ?? 0}. ` +
+          `Не дошло: ${res.failed ?? 0}.${tail}`,
+      );
+    })
+    .catch((err) => {
+      console.error("[coffeerun-poll] rollcall:", err instanceof Error ? err.message : err);
+      return sendBotMessage(chatId, "Рассылка упала — смотри логи сервера.");
+    });
+}
+
 /** Разослать строку ленты во все админ-чаты. */
 async function notifyAdmins(text: string): Promise<void> {
   for (const chatId of adminChats()) {
@@ -182,26 +306,50 @@ export async function handleCoffeeRunPollAnswer(ctx: BotContext): Promise<void> 
     return;
   }
 
-  const vote = recordVote(chatId, parsed.answer, {
+  // Активного опроса нет — значит процесс перезапускали, а человек нажал кнопку
+  // из уже разосланного сообщения. Поднимаем опрос из самой кнопки: потерять
+  // ответ хуже, чем начать сводку с середины.
+  if (pollRunDate() === "") startPoll(parsed.runDate, parsed.kind);
+
+  // Идёт другой опрос (началась перекличка, а нажали старую кнопку про дождь):
+  // в сводку такой ответ не кладём — он про прошлый вопрос, — но организатору
+  // всё равно показываем, только с пометкой.
+  const stale = pollRunDate() !== parsed.runDate || pollKind() !== parsed.kind;
+
+  const person = {
     // Запасное имя, если карточка рассылки не пережила перезапуск: как человек
     // подписан в Telegram.
     name: [ctx.from?.first_name, ctx.from?.last_name].filter(Boolean).join(" ") || "участник",
     username: ctx.from?.username ?? null,
-  });
+  };
 
   await ctx
     .answerCallbackQuery({ text: parsed.answer === "yes" ? "Ждём тебя!" : "Записала, спасибо" })
     .catch(() => {});
 
-  const summary = pollSummary();
-  await notifyAdmins(voteLine(vote, { yes: summary.yes.length, no: summary.no.length }));
+  if (stale) {
+    const label = parsed.kind === "rollcall" ? "перекличка" : "дождь";
+    const verdict = parsed.answer === "yes" ? "ДА" : "нет";
+    await notifyAdmins(
+      `${person.username ? `${person.name} (@${person.username})` : person.name} — ${verdict} ` +
+        `(ответ на прошлый вопрос: ${label}, ${parsed.runDate}). В сводку не считаю.`,
+    );
+  } else {
+    const vote = recordVote(chatId, parsed.answer, person);
+    const summary = pollSummary();
+    await notifyAdmins(
+      voteLine(vote, { yes: summary.yes.length, no: summary.no.length }, summary.kind),
+    );
+  }
 
   // Кнопки убираем: вопрос закрыт, а «побегу/не побегу» под уже отвеченным
   // сообщением путает.
   await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
 
   const run = runByDate(parsed.runDate) ?? nextRun();
-  await ctx.reply(pollReplyText(parsed.answer, run)).catch((err) => {
-    console.error("[coffeerun-poll] reply:", err instanceof Error ? err.message : err);
-  });
+  await ctx
+    .reply(pollReplyText(parsed.answer, run, parsed.kind, stale ? null : pollStartTime()))
+    .catch((err) => {
+      console.error("[coffeerun-poll] reply:", err instanceof Error ? err.message : err);
+    });
 }

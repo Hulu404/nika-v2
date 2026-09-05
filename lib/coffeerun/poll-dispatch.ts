@@ -1,11 +1,20 @@
 import { tgAdmin } from "../telegram/supabase";
 import { sendBotMessage } from "../telegram/send";
 import { pollText, pollKeyboard } from "../telegram/poll-copy";
-import { alreadyAsked, markSent, pollRunDate, startPoll } from "../telegram/poll-store";
+import {
+  alreadyAsked,
+  markSent,
+  pollKind,
+  pollRunDate,
+  pollStartTime,
+  startPoll,
+  type PollKind,
+} from "../telegram/poll-store";
 import { nextRun, runByDate, type CoffeeRun } from "./run";
 
 /**
- * Рассылка опроса «завтра дождь — побежишь?».
+ * Рассылка опроса участникам забега: «завтра дождь — побежишь?» (kind rain) или
+ * перекличка «придёшь сегодня в 18:00?» (kind rollcall).
  *
  * Отличие от напоминания за сутки принципиальное: напоминание уходит само по
  * расписанию, а опрос — РУЧНОЕ решение организатора. Дождь не в календаре, и
@@ -48,6 +57,10 @@ export interface PollDispatchOptions {
   dryRun?: boolean;
   /** Сколько сообщений максимум за этот проход (по умолчанию 25). */
   limit?: number;
+  /** Какой вопрос задаём (по умолчанию — про дождь). */
+  kind?: PollKind;
+  /** Время старта для переклички; null — штатное время забега. */
+  startTime?: string | null;
 }
 
 export interface PollDispatchResult {
@@ -56,6 +69,7 @@ export interface PollDispatchResult {
   dryRun?: boolean;
   runDate?: string;
   spot?: string;
+  kind?: PollKind;
   /** Подтвердивших участие всего в этом забеге. */
   confirmed?: number;
   /** Кого ещё не спрашивали — столько уйдёт за этот проход (не больше limit). */
@@ -94,15 +108,21 @@ export async function dispatchCoffeeRunPoll(
   const run = opts.runDate ? runByDate(opts.runDate) : nextRun();
   if (!run) return { ok: false, error: `нет забега с датой ${opts.runDate}` };
 
-  const base = { runDate: run.date, spot: run.spot };
+  const kind: PollKind = opts.kind ?? "rain";
+  const startTime = opts.startTime ?? null;
+  const base = { runDate: run.date, spot: run.spot, kind };
 
-  // Первый запуск по этому забегу — начинаем опрос заново: сводка не должна
-  // складывать субботние ответы с воскресными.
-  if (!opts.dryRun && pollRunDate() !== run.date) startPoll(run.date);
+  // Новый забег или новый вопрос — начинаем опрос заново: сводка переклички не
+  // должна складываться с утренним «побежишь под дождём».
+  const fresh = pollRunDate() !== run.date || pollKind() !== kind;
+  if (!opts.dryRun && fresh) startPoll(run.date, kind, startTime);
 
   const limit = opts.limit ?? MAX_SENDS_PER_TICK;
   const confirmed = await confirmedFor(run);
-  const pending = confirmed.filter((r) => !alreadyAsked(r.tg_chat_id));
+  // При смене вопроса «уже спрошенные» — из прошлого опроса, и спрашивать надо
+  // всех заново. Важно и для dryRun: иначе предпросмотр переклички после
+  // утреннего опроса показал бы «некому отправлять».
+  const pending = confirmed.filter((r) => fresh || !alreadyAsked(r.tg_chat_id));
   const due = pending.slice(0, limit);
   const hasMore = pending.length > limit;
 
@@ -122,7 +142,13 @@ export async function dispatchCoffeeRunPoll(
   let failed = 0;
 
   for (const row of due) {
-    const res = await sendBotMessage(row.tg_chat_id, pollText(row, run), pollKeyboard(run.date));
+    // Время берём из уже начатого опроса: так добивка второй порцией не разойдётся
+    // с первой, даже если команду повторили без аргумента.
+    const res = await sendBotMessage(
+      row.tg_chat_id,
+      pollText(row, run, kind, pollStartTime() ?? startTime),
+      pollKeyboard(run.date, kind),
+    );
 
     if (res.ok) sent++;
     else if (res.blocked) blocked++;

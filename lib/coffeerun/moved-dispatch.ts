@@ -1,7 +1,7 @@
 import { tgAdmin } from "../telegram/supabase";
 import { sendBotMessage } from "../telegram/send";
 import { movedText, movedKeyboard } from "../telegram/moved-copy";
-import { alreadyNotified, markNotified } from "../telegram/poll-store";
+import { alreadyNotified, markMoved, markNotified } from "../telegram/poll-store";
 import { runByDate, type CoffeeRun } from "./run";
 
 /**
@@ -100,6 +100,10 @@ export async function dispatchCoffeeRunMoved(
   if (opts.dryRun) {
     return { ok: true, dryRun: true, confirmed: confirmed.length, wouldSend: due.length, hasMore, ...base };
   }
+
+  // Запоминаем объявленное время: перекличка (/rollcall) возьмёт его по
+  // умолчанию, чтобы не спросить «придёшь в 9:30?» после переноса на 18:00.
+  markMoved(run.date, opts.newStart);
 
   const reason = opts.reason ?? null;
   let sent = 0;

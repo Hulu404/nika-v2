@@ -22,6 +22,14 @@
 
 export type PollAnswer = "yes" | "no";
 
+/**
+ * Какой именно вопрос сейчас задан:
+ *   rain     — «завтра дождь, побежишь?» (накануне, про погоду);
+ *   rollcall — перекличка «придёшь сегодня к такому-то времени?».
+ * Вид определяет и текст вопроса, и подписи в сводке.
+ */
+export type PollKind = "rain" | "rollcall";
+
 export interface PollRecipient {
   chatId: number;
   /** Имя из заявки — оно человечнее ника в Telegram. */
@@ -41,6 +49,10 @@ export interface PollVote {
 interface PollState {
   /** Забег, про который идёт опрос (YYYY-MM-DD); "" — опрос ещё не запускали. */
   runDate: string;
+  /** Вопрос, который сейчас задан. */
+  kind: PollKind;
+  /** Время старта в вопросе переклички («18:00»); null — штатное время забега. */
+  startTime: string | null;
   /** Чаты, которым бот шлёт ленту ответов и сводку (команда /admin <ключ>). */
   adminChatIds: number[];
   /** Кому вопрос уже ушёл: chatId → карточка участника. */
@@ -53,44 +65,80 @@ interface PollState {
    * «перенос на 18:00» не должен мешать повторно объявить «на 19:00».
    */
   notices: Map<string, Set<number>>;
+  /**
+   * Последний объявленный перенос: дата забега → новое время. Нужен перекличке:
+   * спрашивать «придёшь в 9:30?» после того, как всем объявили 18:00, — прямой
+   * способ собрать неверные ответы.
+   */
+  moved: Map<string, string>;
 }
 
 const KEY = Symbol.for("nika.coffeerun.poll.state");
 
-function empty(runDate: string): PollState {
+function empty(runDate: string, kind: PollKind = "rain", startTime: string | null = null): PollState {
   return {
     runDate,
+    kind,
+    startTime,
     adminChatIds: [],
     sent: new Map(),
     votes: new Map(),
-    // Объявления переживают смену забега: их ключ и так включает дату.
+    // Объявления и переносы переживают смену опроса: их ключ и так с датой.
     notices: new Map(),
+    moved: new Map(),
   };
 }
 
 function state(): PollState {
   const g = globalThis as unknown as Record<symbol, PollState | undefined>;
   if (!g[KEY]) g[KEY] = empty("");
-  // Состояние могло быть создано версией кода без notices (dev, hot-reload).
+  // Состояние могло быть создано прошлой версией кода (dev, hot-reload).
   const s = g[KEY];
   if (!s.notices) s.notices = new Map();
+  if (!s.moved) s.moved = new Map();
+  if (!s.kind) s.kind = "rain";
   return s;
 }
 
 /**
- * Переключить опрос на другой забег. Ответы при этом стираются: сводка «побегут
- * завтра» не должна складываться с прошлым воскресеньем. Список админ-чатов
- * переживает смену — он про людей, а не про забег.
+ * Начать опрос: другой забег или другой вопрос. Ответы стираются — сводка
+ * переклички не должна складываться с утренним «побежишь под дождём». Список
+ * админ-чатов, объявления и переносы переживают смену: они про людей и про
+ * забег, а не про конкретный вопрос.
  */
-export function startPoll(runDate: string): void {
-  const { adminChatIds, notices } = state();
+export function startPoll(
+  runDate: string,
+  kind: PollKind = "rain",
+  startTime: string | null = null,
+): void {
+  const { adminChatIds, notices, moved } = state();
   const g = globalThis as unknown as Record<symbol, PollState | undefined>;
-  g[KEY] = { ...empty(runDate), adminChatIds, notices };
+  g[KEY] = { ...empty(runDate, kind, startTime), adminChatIds, notices, moved };
 }
 
 /** Текущий забег опроса ("" — опрос ещё ни разу не запускали). */
 export function pollRunDate(): string {
   return state().runDate;
+}
+
+/** Какой вопрос сейчас задан. */
+export function pollKind(): PollKind {
+  return state().kind;
+}
+
+/** Время старта в вопросе переклички; null — штатное время забега. */
+export function pollStartTime(): string | null {
+  return state().startTime;
+}
+
+/** Запомнить объявленный перенос — перекличка возьмёт это время по умолчанию. */
+export function markMoved(runDate: string, newStart: string): void {
+  state().moved.set(runDate, newStart);
+}
+
+/** Во сколько по последнему объявлению стартует забег; null — переносов не было. */
+export function movedStartFor(runDate: string): string | null {
+  return state().moved.get(runDate) ?? null;
 }
 
 /** Запомнить чат организатора: сюда полетят ответы и сводка. */
@@ -162,6 +210,9 @@ export function markNotified(key: string, chatId: number): void {
 
 export interface PollSummary {
   runDate: string;
+  kind: PollKind;
+  /** Время старта переклички; null — штатное время забега. */
+  startTime: string | null;
   yes: PollVote[];
   no: PollVote[];
   /** Спросили, но человек ещё не нажал ни одной кнопки. */
@@ -174,6 +225,8 @@ export function pollSummary(): PollSummary {
   const votes = [...s.votes.values()];
   return {
     runDate: s.runDate,
+    kind: s.kind,
+    startTime: s.startTime,
     yes: votes.filter((v) => v.answer === "yes"),
     no: votes.filter((v) => v.answer === "no"),
     silent: [...s.sent.values()].filter((r) => !s.votes.has(r.chatId)),
