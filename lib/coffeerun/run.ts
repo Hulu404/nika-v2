@@ -43,21 +43,6 @@ export interface CoffeeRun {
  */
 export const COFFEE_RUNS: CoffeeRun[] = [
   {
-    spot: "usachevo",
-    landing: "/coffeerunsurfsport",
-    spotName: "Surf Coffee® × Sport, Усачёва",
-    date: "2026-09-05",
-    dateLabel: "5 сентября",
-    weekday: "суббота",
-    gatherTime: "9:15",
-    startTime: "9:30",
-    address: "Москва, ул. Усачёва, 62",
-    place: "спот Surf Coffee × Sport",
-    distance: "5 км",
-    mapUrl:
-      "https://yandex.ru/maps/?text=%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B0%2C%20%D1%83%D0%BB%D0%B8%D1%86%D0%B0%20%D0%A3%D1%81%D0%B0%D1%87%D1%91%D0%B2%D0%B0%2C%2062",
-  },
-  {
     spot: "luzhniki",
     landing: "/coffeerunluzhniki",
     spotName: "Surf Coffee® Лужники",
@@ -71,6 +56,21 @@ export const COFFEE_RUNS: CoffeeRun[] = [
     distance: "5 км",
     mapUrl:
       "https://yandex.ru/maps/?text=%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B0%2C%20%D0%9B%D1%83%D0%B6%D0%BD%D0%B8%D0%BA%D0%B8%2C%2024%2C%20%D1%81%D1%82%D1%80%D0%BE%D0%B5%D0%BD%D0%B8%D0%B5%2041",
+  },
+  {
+    spot: "usachevo",
+    landing: "/coffeerunsurfsport",
+    spotName: "Surf Coffee® × Sport, Усачёва",
+    date: "2026-09-12",
+    dateLabel: "12 сентября",
+    weekday: "суббота",
+    gatherTime: "9:30",
+    startTime: "10:00",
+    address: "Москва, ул. Усачёва, 62",
+    place: "спот Surf Coffee × Sport",
+    distance: "5 км",
+    mapUrl:
+      "https://yandex.ru/maps/?text=%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B0%2C%20%D1%83%D0%BB%D0%B8%D1%86%D0%B0%20%D0%A3%D1%81%D0%B0%D1%87%D1%91%D0%B2%D0%B0%2C%2062",
   },
 ];
 
