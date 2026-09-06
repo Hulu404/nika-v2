@@ -116,14 +116,15 @@ describe("подтверждение записи — бот отвечает п
 
   it("строка со спотом, которого нет в COFFEE_RUNS, не выдаёт чужой адрес молча", async () => {
     // Такое возможно, если спот переименовали в коде, а строки в базе остались.
-    row = signupRow("спота-больше-нет", "2026-09-06");
+    // Дата берём из самих COFFEE_RUNS: забеги переезжают, тест — про спот.
+    const known = COFFEE_RUNS[0];
+    row = signupRow("спота-больше-нет", known.date);
     const { ctx, replies } = makeCtx();
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await handleCoffeeRunStart(ctx as any, TOKEN);
 
     // Дата в строке всё ещё опознаётся — по ней и отвечаем.
-    const byDate = COFFEE_RUNS.find((r) => r.date === "2026-09-06")!;
-    expect(replies[0]).toContain(byDate.address);
+    expect(replies[0]).toContain(known.address);
   });
 });
