@@ -704,6 +704,172 @@ export interface Database {
         };
         Relationships: [];
       };
+      analytics_events: {
+        Row: {
+          id: number;
+          event: string;
+          occurred_at: string;
+          anon_id: string | null;
+          user_id: string | null;
+          session_id: string | null;
+          source: string | null;
+          first_source: string | null;
+          path: string | null;
+          props: Json;
+          platform: "web" | "telegram" | "server" | null;
+          ua_browser: string | null;
+          ua_device: "mobile" | "tablet" | "desktop" | "bot" | "unknown" | null;
+          is_bot: boolean;
+        };
+        Insert: {
+          /** generated always as identity — на вставке не задаётся. */
+          id?: number;
+          event: string;
+          occurred_at?: string;
+          anon_id?: string | null;
+          user_id?: string | null;
+          session_id?: string | null;
+          source?: string | null;
+          first_source?: string | null;
+          path?: string | null;
+          props?: Json;
+          platform?: "web" | "telegram" | "server" | null;
+          ua_browser?: string | null;
+          ua_device?: "mobile" | "tablet" | "desktop" | "bot" | "unknown" | null;
+          is_bot?: boolean;
+        };
+        Update: {
+          id?: number;
+          event?: string;
+          occurred_at?: string;
+          anon_id?: string | null;
+          user_id?: string | null;
+          session_id?: string | null;
+          source?: string | null;
+          first_source?: string | null;
+          path?: string | null;
+          props?: Json;
+          platform?: "web" | "telegram" | "server" | null;
+          ua_browser?: string | null;
+          ua_device?: "mobile" | "tablet" | "desktop" | "bot" | "unknown" | null;
+          is_bot?: boolean;
+        };
+        Relationships: [];
+      };
+      link_codes: {
+        Row: {
+          code: string;
+          label: string;
+          destination: string;
+          channel: string | null;
+          utm_source: string | null;
+          utm_medium: string | null;
+          utm_campaign: string | null;
+          utm_content: string | null;
+          owner_user_id: string | null;
+          grants_promo: boolean;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: {
+          code: string;
+          label: string;
+          destination?: string;
+          channel?: string | null;
+          utm_source?: string | null;
+          utm_medium?: string | null;
+          utm_campaign?: string | null;
+          utm_content?: string | null;
+          owner_user_id?: string | null;
+          grants_promo?: boolean;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          code?: string;
+          label?: string;
+          destination?: string;
+          channel?: string | null;
+          utm_source?: string | null;
+          utm_medium?: string | null;
+          utm_campaign?: string | null;
+          utm_content?: string | null;
+          owner_user_id?: string | null;
+          grants_promo?: boolean;
+          is_active?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      link_clicks: {
+        Row: {
+          id: string;
+          code: string;
+          clicked_at: string;
+          anon_id: string | null;
+          ip_hash: string | null;
+          user_agent: string | null;
+          referer: string | null;
+          ua_browser: string | null;
+          ua_device: string | null;
+          is_bot: boolean;
+        };
+        Insert: {
+          id?: string;
+          code: string;
+          clicked_at?: string;
+          anon_id?: string | null;
+          ip_hash?: string | null;
+          user_agent?: string | null;
+          referer?: string | null;
+          ua_browser?: string | null;
+          ua_device?: string | null;
+          is_bot?: boolean;
+        };
+        Update: {
+          id?: string;
+          code?: string;
+          clicked_at?: string;
+          anon_id?: string | null;
+          ip_hash?: string | null;
+          user_agent?: string | null;
+          referer?: string | null;
+          ua_browser?: string | null;
+          ua_device?: string | null;
+          is_bot?: boolean;
+        };
+        Relationships: [];
+      };
+      user_attribution: {
+        Row: {
+          user_id: string;
+          first_source: string | null;
+          first_seen_at: string | null;
+          last_source: string | null;
+          last_seen_at: string | null;
+          anon_id: string | null;
+          signup_at: string;
+        };
+        Insert: {
+          user_id: string;
+          first_source?: string | null;
+          first_seen_at?: string | null;
+          last_source?: string | null;
+          last_seen_at?: string | null;
+          anon_id?: string | null;
+          signup_at?: string;
+        };
+        Update: {
+          user_id?: string;
+          first_source?: string | null;
+          first_seen_at?: string | null;
+          last_source?: string | null;
+          last_seen_at?: string | null;
+          anon_id?: string | null;
+          signup_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: { [_ in never]: never };
     Functions: {
@@ -714,6 +880,13 @@ export interface Database {
           p_window_seconds: number;
         };
         Returns: boolean;
+      };
+      attach_anon_to_user: {
+        Args: {
+          p_anon_id: string;
+          p_user_id: string;
+        };
+        Returns: void;
       };
     };
     Enums: {
@@ -751,6 +924,10 @@ export type CheckinRow = Tables["checkins"]["Row"];
 export type NotificationPrefsRow = Tables["notification_prefs"]["Row"];
 export type NotificationsLogRow = Tables["notifications_log"]["Row"];
 export type NotificationsLogInsert = Tables["notifications_log"]["Insert"];
+export type AnalyticsEventRow = Tables["analytics_events"]["Row"];
+export type LinkCodeRow = Tables["link_codes"]["Row"];
+export type LinkClickRow = Tables["link_clicks"]["Row"];
+export type UserAttributionRow = Tables["user_attribution"]["Row"];
 
 /** Типы для вставки. */
 export type UserInsert = Tables["users"]["Insert"];
@@ -759,6 +936,9 @@ export type ConversationInsert = Tables["conversations"]["Insert"];
 export type RunInsert = Tables["runs"]["Insert"];
 export type SubscriptionInsert = Tables["subscriptions"]["Insert"];
 export type PersonalTipInsert = Tables["personal_tips"]["Insert"];
+export type AnalyticsEventInsert = Tables["analytics_events"]["Insert"];
+export type LinkClickInsert = Tables["link_clicks"]["Insert"];
+export type UserAttributionInsert = Tables["user_attribution"]["Insert"];
 
 /** Типы для обновления. */
 export type UserUpdate = Tables["users"]["Update"];
