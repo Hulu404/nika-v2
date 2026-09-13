@@ -704,6 +704,27 @@ export interface Database {
         };
         Relationships: [];
       };
+      coffee_run_invites: {
+        Row: {
+          spot: string;
+          run_date: string;
+          chat_id: number;
+          sent_at: string;
+        };
+        Insert: {
+          spot: string;
+          run_date: string;
+          chat_id: number;
+          sent_at?: string;
+        };
+        Update: {
+          spot?: string;
+          run_date?: string;
+          chat_id?: number;
+          sent_at?: string;
+        };
+        Relationships: [];
+      };
       analytics_events: {
         Row: {
           id: number;
@@ -928,6 +949,7 @@ export type AnalyticsEventRow = Tables["analytics_events"]["Row"];
 export type LinkCodeRow = Tables["link_codes"]["Row"];
 export type LinkClickRow = Tables["link_clicks"]["Row"];
 export type UserAttributionRow = Tables["user_attribution"]["Row"];
+export type CoffeeRunInviteRow = Tables["coffee_run_invites"]["Row"];
 
 /** Типы для вставки. */
 export type UserInsert = Tables["users"]["Insert"];
@@ -939,6 +961,7 @@ export type PersonalTipInsert = Tables["personal_tips"]["Insert"];
 export type AnalyticsEventInsert = Tables["analytics_events"]["Insert"];
 export type LinkClickInsert = Tables["link_clicks"]["Insert"];
 export type UserAttributionInsert = Tables["user_attribution"]["Insert"];
+export type CoffeeRunInviteInsert = Tables["coffee_run_invites"]["Insert"];
 
 /** Типы для обновления. */
 export type UserUpdate = Tables["users"]["Update"];
