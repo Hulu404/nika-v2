@@ -8,6 +8,8 @@ import {
   runForSignup,
   runsDueForReminder,
   runWhenWhere,
+  SPOT_NAMES,
+  spotName,
   upcomingRuns,
 } from "./run";
 
@@ -159,5 +161,22 @@ describe("runWhenWhere — строка «когда и где»", () => {
     const lines = COFFEE_RUNS.map(runWhenWhere);
     expect(new Set(lines).size).toBe(lines.length);
     for (const run of COFFEE_RUNS) expect(runWhenWhere(run)).toContain(run.address);
+  });
+});
+
+describe("SPOT_NAMES — имена спотов переживают чистку расписания", () => {
+  it("у каждого запланированного забега имя спота совпадает со справочником", () => {
+    // Иначе история покажет одно имя, а карточка ближайшего забега — другое,
+    // и это разъедется тихо: оба текста по отдельности выглядят правильными.
+    for (const run of COFFEE_RUNS) {
+      expect(SPOT_NAMES[run.spot], `нет имени для спота ${run.spot}`).toBe(run.spotName);
+    }
+  });
+
+  it("незнакомый слаг отдаём как есть, а не пустой строкой", () => {
+    // Спот, который закрылся, из справочника однажды уберут — история по нему
+    // должна остаться читаемой, пусть и слагом.
+    expect(spotName("sokolniki")).toBe("sokolniki");
+    expect(spotName("luzhniki")).toBe(SPOT_NAMES.luzhniki);
   });
 });

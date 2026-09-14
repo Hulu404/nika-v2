@@ -47,6 +47,24 @@ async function tickInvites(): Promise<void> {
   }
 }
 
+/**
+ * Сводки команде: накануне забега — как отработали напоминания, утром в день
+ * старта — сколько людей и по каким группам темпа. Окно проверяет сама, дедуп
+ * держит таблица team_digests (та же причина, что у приглашений: тикер делает
+ * первый проход на каждом деплое).
+ */
+async function tickTeamDigests(): Promise<void> {
+  try {
+    const { dispatchTeamDigests } = await import("./lib/team/digest");
+    const res = await dispatchTeamDigests();
+    if (res.sent?.length) {
+      console.log("[team-digest] отправлено:", res.sent.join(", "), "получателей", res.recipients);
+    }
+  } catch (err) {
+    console.error("[team-digest] тик упал:", err instanceof Error ? err.message : String(err));
+  }
+}
+
 async function tickReminders(): Promise<void> {
   try {
     const { dispatchCoffeeRunReminders } = await import("./lib/coffeerun/reminder-dispatch");
@@ -69,13 +87,22 @@ export async function register(): Promise<void> {
   const res = await ensureWebhook();
   console.log(`[telegram] webhook: ${res.status}${res.detail ? ` — ${res.detail}` : ""}`);
 
+  // Внутренний бот команды — тем же правилом «работает сайт = работает бот».
+  // Без TEAM_BOT_TOKEN тихо пропускается: в окружении, где его нет, второго
+  // бота просто не существует, и падать из-за этого приложению незачем.
+  const { ensureTeamWebhook } = await import("./lib/team/ensure-webhook");
+  const team = await ensureTeamWebhook();
+  console.log(`[team] webhook: ${team.status}${team.detail ? ` — ${team.detail}` : ""}`);
+
   // Первый проход сразу после старта: если деплой пришёлся на окно рассылки,
   // напоминание уйдёт не через 15 минут, а тут же.
   void tickReminders();
   void tickInvites();
+  void tickTeamDigests();
   const timer = setInterval(() => {
     void tickReminders();
     void tickInvites();
+    void tickTeamDigests();
   }, REMINDER_TICK_MS);
   // Не держим процесс живым только ради тикера.
   timer.unref?.();
@@ -83,6 +110,6 @@ export async function register(): Promise<void> {
   // потому, что о незапущенном слушателе нигде не было сказано.
   console.log(
     `[coffeerun] тикер запущен, интервал ${REMINDER_TICK_MS / 60000} мин ` +
-      "(напоминания накануне + приглашения по понедельникам)",
+      "(напоминания накануне + приглашения по понедельникам + сводки команде)",
   );
 }

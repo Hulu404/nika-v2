@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "test": "vitest run",
-    "bot:dev": "tsx scripts/bot-dev.ts"
+    "bot:dev": "tsx scripts/bot-dev.ts",
+    "team:dev": "tsx scripts/team-bot-dev.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",
