@@ -1,5 +1,6 @@
 import { cb } from "./callback";
 import { escapeHtml } from "./html";
+import { formatMskTime } from "./format";
 import { mskDayMonth, mskTime } from "./time";
 import { REPORTS, ZONES, type InlineButton, type ReportId, type Screen, type Section, type Zone } from "./types";
 
@@ -142,6 +143,115 @@ export function helpText(zone: Zone, available: readonly Section[], commands: re
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Каркас ответа (ТЗ 4.10)
+// ─────────────────────────────────────────────────────────────────────────────
+// Первая строка — сам ответ (цифра, объект, дата или период). Дальше не больше
+// восьми строк подробностей, каждая — отдельный пункт, чтобы читалось с
+// телефона. Если у раздела есть слепые зоны — одна строка о них. Последняя
+// строка — «Данные на 14:32 МСК». Длинное сообщение делится на страницы.
+
+export const MAX_DETAIL_LINES = 8;
+/** Лимит Telegram на текст сообщения. */
+export const MAX_MESSAGE_CHARS = 4096;
+
+export const MORE_BUTTON = "Ещё";
+
+const NL = "\n";
+
+/** «Данные на 14:32 МСК» — последняя строка каждого ответа с цифрами. */
+export function dataAtLine(at: Date): string {
+  return `Данные на ${formatMskTime(at)}`;
+}
+
+/**
+ * Сравнение всегда подписано, с чем сравниваем: «214 (неделей раньше 168)».
+ * Прошлое значение null — сравнивать не с чем, подписи нет.
+ */
+export function withComparison(current: string, previous: string | null, label: string): string {
+  return previous === null ? current : `${current} (${label} ${previous})`;
+}
+
+export interface Answer {
+  /** Первая строка — сам ответ. Уже HTML: динамику экранирует вызывающий. */
+  headline: string;
+  /** Подробности, не больше восьми строк. */
+  details?: readonly string[];
+  /** Слепая зона раздела — одной строкой, если есть. */
+  blindSpot?: string | null;
+  /** Когда посчитаны данные. */
+  at: Date;
+}
+
+/**
+ * Текст ответа по каркасу. Больше восьми строк подробностей — ошибка в коде
+ * раздела (бросаем): резать молча значило бы терять цифры незаметно. Длинные
+ * списки идут не сюда, а в paginate.
+ */
+export function answerText(a: Answer): string {
+  const details = a.details ?? [];
+  if (details.length > MAX_DETAIL_LINES) {
+    throw new Error(`ответ: ${details.length} строк подробностей, можно не больше ${MAX_DETAIL_LINES}`);
+  }
+  const lines = [a.headline, ...details];
+  if (a.blindSpot) lines.push(a.blindSpot);
+  lines.push(dataAtLine(a.at));
+  return lines.join(NL);
+}
+
+/**
+ * Деление длинного текста на страницы не длиннее max символов — по строкам,
+ * чтобы не рвать пункт посередине. Строка длиннее max режется по символам:
+ * лучше некрасиво, чем Telegram откажет в отправке. header повторяется на
+ * каждой странице (например, «Персональные данные участников. Не пересылать»).
+ */
+export function paginate(lines: readonly string[], opts: { max?: number; header?: string } = {}): string[] {
+  const max = opts.max ?? MAX_MESSAGE_CHARS;
+  const header = opts.header ?? "";
+  const budget = max - (header ? header.length + 1 : 0);
+  if (budget <= 0) throw new Error("paginate: заголовок длиннее страницы");
+
+  const pieces: string[] = [];
+  for (const line of lines) {
+    if (line.length <= budget) pieces.push(line);
+    else for (let i = 0; i < line.length; i += budget) pieces.push(line.slice(i, i + budget));
+  }
+
+  const pages: string[] = [];
+  let current: string[] = [];
+  let size = 0;
+  for (const piece of pieces) {
+    const add = (current.length ? 1 : 0) + piece.length;
+    if (current.length && size + add > budget) {
+      pages.push(current.join(NL));
+      current = [];
+      size = 0;
+    }
+    size += (current.length ? 1 : 0) + piece.length;
+    current.push(piece);
+  }
+  if (current.length || pages.length === 0) pages.push(current.join(NL));
+  return header ? pages.map((p) => header + NL + p) : pages;
+}
+
+/**
+ * Одна страница с кнопкой «Ещё», если дальше есть что показать. moreData —
+ * callback_data следующей страницы: раздел пересчитывает ответ и отдаёт
+ * нужную страницу, состояния между нажатиями бот не держит.
+ */
+export function pageScreen(
+  pages: readonly string[],
+  page: number,
+  moreData: (nextPage: number) => string,
+  extraButtons: InlineButton[][] = [],
+): Screen {
+  const index = Math.min(Math.max(page, 0), Math.max(pages.length - 1, 0));
+  const buttons: InlineButton[][] = [];
+  if (index < pages.length - 1) buttons.push([{ text: MORE_BUTTON, data: moreData(index + 1) }]);
+  buttons.push(...extraButtons);
+  return { text: pages[index] ?? "", buttons: buttons.length ? buttons : undefined };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Команда
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -213,7 +323,7 @@ export interface TeamMemberView {
 const BACK = "Назад";
 
 function dataAt(now: Date): string {
-  return `Данные на ${mskTime(now)} МСК`;
+  return dataAtLine(now);
 }
 
 function visitText(iso: string | null): string {

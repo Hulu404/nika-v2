@@ -17,6 +17,7 @@ import {
   menuText,
   welcomeText,
 } from "./copy";
+import { classifyDbError } from "./data/errors";
 import type { DatabotStore } from "./data/store";
 import { SECTION_HANDLERS } from "./handlers";
 import { parseIntent } from "./intent";
@@ -127,7 +128,7 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
     // База не ответила: это не «чужой» и не ноль.
     logError("members", err);
     await send(ctx, { text: DB_DOWN_TEXT });
-    await audit({ zone: null, intent: parsedIntent, report: parsedIntent?.report ?? "no_member", ok: false, error: "db_error" });
+    await audit({ zone: null, intent: parsedIntent, report: parsedIntent?.report ?? "no_member", ok: false, error: classifyDbError(err) });
     return;
   }
 
@@ -215,7 +216,7 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
   } catch (err) {
     logError(report, err);
     await send(ctx, { text: DB_DOWN_TEXT }, keyboard);
-    await audit({ zone: subject.zone, intent, ok: false, error: "db_error" });
+    await audit({ zone: subject.zone, intent, ok: false, error: classifyDbError(err) });
     return;
   }
 
