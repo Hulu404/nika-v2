@@ -1,4 +1,5 @@
 import type { SectionHandler } from "./section";
+import { handleKb } from "./sections/kb";
 import { handleRuns } from "./sections/runs";
 import { handleTeam } from "./sections/team";
 import type { Section } from "./types";
@@ -9,5 +10,6 @@ import type { Section } from "./types";
  */
 export const SECTION_HANDLERS: Partial<Record<Section, SectionHandler>> = {
   run: handleRuns,
+  kb: handleKb,
   tm: handleTeam,
 };

@@ -35,6 +35,11 @@ export type SectionOutcome =
       consumeButton?: boolean;
     }
   /** Кнопку уже нельзя выполнить (человек убран, приглашение пропало). */
-  | { kind: "stale" };
+  | { kind: "stale" }
+  /**
+   * Отказ, который видно только по данным: статья справочника не для этой
+   * зоны. Конвейер отвечает так же, как на закрытый раздел, и пишет отказ.
+   */
+  | { kind: "forbidden" };
 
 export type SectionHandler = (req: SectionRequest) => Promise<SectionOutcome>;

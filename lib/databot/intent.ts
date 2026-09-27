@@ -3,7 +3,7 @@ import { sectionByLabel } from "./copy";
 import { inviteTokenFromStart } from "./invite";
 import { SECTION_COMMAND, SECTION_HOME_REPORT } from "./sections";
 import type { Intent, Section } from "./types";
-import { isChatId, isIsoDate, isPage, isSpotSlug, isZone } from "./validate";
+import { isChatId, isIsoDate, isKbSlug, isPage, isSpotSlug, isZone } from "./validate";
 
 /**
  * Разбор апдейта в Intent: кнопка постоянной клавиатуры, команда или
@@ -96,6 +96,7 @@ function parseCallbackIntent(data: string): ParseResult {
 
   if (section === "tm") return parseTeamCallback(action, params);
   if (section === "run") return parseRunCallback(action, params);
+  if (section === "kb") return parseKbCallback(action, params);
 
   // Остальные разделы подключаются своими промтами; до тех пор их кнопок
   // быть не может, и любая такая кнопка — устаревшая.
@@ -177,6 +178,44 @@ function parseRunCallback(action: string, params: string[]): ParseResult {
       }
       return run("run.people", "people", { spot, date, page });
     }
+    default:
+      return stale;
+  }
+}
+
+/**
+ * «Справочник»:
+ *   d:kb:list · d:kb:art:<slug> · d:kb:edit:<slug> · d:kb:save ·
+ *   d:kb:restore:<slug> · d:kb:del:<slug>[:ok] · d:kb:new · d:kb:z:<zone> ·
+ *   d:kb:zsave · d:kb:cancel
+ * Статья — kb.article (зоны статьи проверяет обработчик), всё остальное —
+ * kb.edit (совет).
+ */
+function parseKbCallback(action: string, params: string[]): ParseResult {
+  const stale: ParseResult = { kind: "stale", section: "kb" };
+  const kb = (report: Intent["report"], act: string, p: Record<string, string> = {}) =>
+    intent({ report, section: "kb", action: act, source: "button", params: p });
+  const [a, b, ...extra] = params;
+
+  switch (action) {
+    case "list":
+      return params.length === 0 ? kb("kb.list", "list") : stale;
+    case "art":
+      return params.length === 1 && isKbSlug(a) ? kb("kb.article", "art", { slug: a }) : stale;
+    case "edit":
+    case "restore":
+      return params.length === 1 && isKbSlug(a) ? kb("kb.edit", action, { slug: a }) : stale;
+    case "del":
+      if (!a || !isKbSlug(a) || extra.length) return stale;
+      if (b === undefined) return kb("kb.edit", "del", { slug: a });
+      return b === "ok" ? kb("kb.edit", "del", { slug: a, confirm: "ok" }) : stale;
+    case "z":
+      return params.length === 1 && isZone(a) ? kb("kb.edit", "z", { zone: a }) : stale;
+    case "new":
+    case "save":
+    case "zsave":
+    case "cancel":
+      return params.length === 0 ? kb("kb.edit", action) : stale;
     default:
       return stale;
   }

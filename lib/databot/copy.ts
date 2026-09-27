@@ -111,6 +111,12 @@ export function forbiddenText(audience: Audience, available: readonly Section[])
   return `${head}. Тебе доступны: ${sectionList(available)}.`;
 }
 
+/** Отказ по данным: статья справочника не для этой зоны. */
+export function itemForbiddenText(available: readonly Section[]): string {
+  if (available.length === 0) return "Это закрыто для твоей зоны.";
+  return `Это закрыто для твоей зоны. Тебе доступны: ${sectionList(available)}.`;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Вход, меню, помощь
 // ─────────────────────────────────────────────────────────────────────────────
@@ -838,4 +844,177 @@ export function runsCsv(rows: readonly RunsTableLine[]): string {
 /** Имя по правилу команды «дата_что»: 2026-09-27_забеги.csv. */
 export function runsCsvFilename(today: string): string {
   return `${today}_забеги.csv`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Справочник
+// ─────────────────────────────────────────────────────────────────────────────
+// Тексты статей в репозитории не живут (он публичный) — здесь только рамка:
+// список, подпись «обновлено 27.09, Али», шаги правки и живые статьи.
+
+export const KB_TITLE_MAX = 80;
+export const KB_BODY_MAX = 3500;
+
+export const KB_EDIT_ASK = `Пришли новый текст одним сообщением, до ${KB_BODY_MAX} знаков. Отмена — /cancel`;
+export const KB_NEW_TITLE_ASK = `Пришли заголовок новой статьи одним сообщением, до ${KB_TITLE_MAX} знаков. Отмена — /cancel`;
+export const KB_NEW_BODY_ASK = `Теперь текст статьи одним сообщением, до ${KB_BODY_MAX} знаков. Отмена — /cancel`;
+export const KB_PREVIEW_INTRO = "Так статью увидят все:";
+export const KB_ZONES_ASK = "Кому видна статья? Нажми зоны и «Сохранить».";
+export const KB_CHANGED_TEXT = "Статью успели изменить или удалить — открой её заново";
+export const KB_EMPTY_TEXT = "Пусто. Пришли текст статьи одним сообщением или /cancel";
+
+export function kbTooLongText(length: number, max: number): string {
+  return `Слишком длинно: ${length} знаков, можно до ${max}. Пришли покороче или /cancel`;
+}
+
+export function kbTitleBadText(): string {
+  return `Заголовок — от 2 до ${KB_TITLE_MAX} знаков. Пришли ещё раз или /cancel`;
+}
+
+export function kbSavedText(title: string): string {
+  return `Сохранила «${escapeHtml(title)}».`;
+}
+
+export function kbRestoredText(title: string): string {
+  return `Вернула прошлую версию «${escapeHtml(title)}». Вернуть обратно — той же кнопкой.`;
+}
+
+export function kbDeletedText(title: string): string {
+  return `Удалила «${escapeHtml(title)}».`;
+}
+
+/** «обновлено 27.09, Али»; автора нет — только дата. */
+export function kbSignature(updatedAt: string, authorName: string | null): string {
+  return authorName ? `обновлено ${mskDayMonth(updatedAt)}, ${escapeHtml(authorName)}` : `обновлено ${mskDayMonth(updatedAt)}`;
+}
+
+/**
+ * Текст статьи — ровно так её видят все (и так же в предпросмотре).
+ * body уже санитизирован; title — обычный текст, экранируется.
+ */
+export function kbArticleText(title: string, body: string, signature: string | null): string {
+  const parts = [`<b>${escapeHtml(title)}</b>`, body];
+  if (signature) parts.push(`<i>${signature}</i>`);
+  return parts.join("\n\n");
+}
+
+export function kbListScreen(items: ReadonlyArray<{ slug: string; title: string }>, canEdit: boolean): Screen {
+  const buttons: InlineButton[][] = items.map((a) => [{ text: a.title, data: cb("kb", "art", a.slug) }]);
+  if (canEdit) buttons.push([{ text: "Новая статья", data: cb("kb", "new") }]);
+  buttons.push([{ text: BACK, data: cb("kb", "home") }]);
+  return { text: items.length ? "<b>Справочник</b>" : "<b>Справочник</b>\nСтатей пока нет.", buttons };
+}
+
+export function kbArticleScreen(args: {
+  slug: string;
+  title: string;
+  body: string;
+  signature: string | null;
+  canEdit: boolean;
+  hasPrev: boolean;
+}): Screen {
+  const buttons: InlineButton[][] = [];
+  if (args.canEdit) {
+    const row: InlineButton[] = [{ text: "Заменить текст", data: cb("kb", "edit", args.slug) }];
+    if (args.hasPrev) row.push({ text: "Вернуть прошлую версию", data: cb("kb", "restore", args.slug) });
+    buttons.push(row);
+    buttons.push([{ text: "Удалить", data: cb("kb", "del", args.slug) }]);
+  }
+  buttons.push([{ text: "К списку", data: cb("kb", "list") }]);
+  return { text: kbArticleText(args.title, args.body, args.signature), buttons };
+}
+
+/** Предпросмотр — тот же текст, что увидят все, и кнопки «Сохранить» / «Отмена». */
+export function kbPreviewScreens(title: string, body: string, saveData: string): Screen[] {
+  return [
+    { text: KB_PREVIEW_INTRO },
+    {
+      text: kbArticleText(title, body, null),
+      buttons: [[{ text: "Сохранить", data: saveData }, { text: "Отмена", data: cb("kb", "cancel") }]],
+    },
+  ];
+}
+
+export function kbZonesScreen(selected: readonly Zone[]): Screen {
+  return {
+    text: KB_ZONES_ASK,
+    buttons: [
+      ZONES.map((z) => ({ text: `${selected.includes(z) ? "✓ " : ""}${ZONE_LABEL[z]}`, data: cb("kb", "z", z) })),
+      [
+        { text: "Сохранить", data: cb("kb", "zsave") },
+        { text: "Отмена", data: cb("kb", "cancel") },
+      ],
+    ],
+  };
+}
+
+export function kbDeleteConfirmScreen(slug: string, title: string): Screen {
+  return {
+    text: `Удалить «${escapeHtml(title)}»? Вернуть её будет нельзя.`,
+    buttons: [[
+      { text: "Удалить", data: cb("kb", "del", slug, "ok") },
+      { text: "Отмена", data: cb("kb", "art", slug) },
+    ]],
+  };
+}
+
+/** Живая статья «Расписание кофе-ранов»: ближайшие со сбором и адресом, потом недавние. */
+export function kbScheduleBody(
+  upcoming: ReadonlyArray<{ date: string; spotName: string; when: string | null }>,
+  recent: ReadonlyArray<{ date: string; spotName: string }>,
+): string {
+  const lines: string[] = [];
+  if (upcoming.length === 0) lines.push("Ближайших забегов в расписании нет.");
+  for (const r of upcoming) {
+    lines.push(`${formatDayDate(r.date)} · ${escapeHtml(r.spotName)}${r.when ? `\n${escapeHtml(r.when)}` : ""}`);
+  }
+  if (recent.length) {
+    lines.push("", "Недавно прошли:");
+    for (const r of recent) lines.push(`${formatDayDate(r.date)} · ${escapeHtml(r.spotName)}`);
+  }
+  return lines.join("\n");
+}
+
+const CHANNEL_LABEL: Record<string, string> = {
+  instagram: "Instagram",
+  telegram: "Telegram",
+  vk: "ВКонтакте",
+  offline: "Офлайн",
+  partner: "Партнёры",
+  other: "Другое",
+};
+
+/** Живая статья «Метки и ссылки»: активные метки по каналам с короткими ссылками. */
+export function kbLinksBody(codes: ReadonlyArray<{ code: string; label: string; channel: string | null }>, origin: string): string {
+  if (codes.length === 0) return "Активных меток пока нет.";
+  const byChannel = new Map<string, typeof codes[number][]>();
+  for (const c of codes) {
+    const key = c.channel ?? "other";
+    byChannel.set(key, [...(byChannel.get(key) ?? []), c]);
+  }
+  const order = ["instagram", "telegram", "vk", "offline", "partner", "other"];
+  const blocks: string[] = [];
+  for (const channel of [...byChannel.keys()].sort((a, b) => order.indexOf(a) - order.indexOf(b))) {
+    const lines = byChannel.get(channel)!.map(
+      (c) => `<code>${escapeHtml(c.code)}</code> — ${escapeHtml(c.label)}\n${escapeHtml(`${origin}/s/${c.code}`)}`,
+    );
+    blocks.push([`<b>${CHANNEL_LABEL[channel] ?? escapeHtml(channel)}</b>`, ...lines].join("\n"));
+  }
+  blocks.push("Ставь короткую ссылку вместо прямой, иначе переход не посчитается.");
+  return blocks.join("\n\n");
+}
+
+/** Живая статья «Кто в боте»: участники по зонам — имя и ник. */
+export function kbMembersBody(members: ReadonlyArray<{ name: string; username: string | null; zone: Zone }>): string {
+  const blocks: string[] = [];
+  for (const zone of ZONES) {
+    const list = members.filter((m) => m.zone === zone);
+    if (list.length === 0) continue;
+    const lines = list.map((m) => {
+      const nick = m.username && m.name !== `@${m.username}` ? ` @${escapeHtml(m.username)}` : "";
+      return `${escapeHtml(m.name)}${nick}`;
+    });
+    blocks.push([`<b>${ZONE_LABEL[zone]}</b>`, ...lines].join("\n"));
+  }
+  return blocks.length ? blocks.join("\n\n") : "В боте пока никого нет.";
 }

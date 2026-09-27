@@ -14,11 +14,15 @@ import type { ReportId, Section } from "./types";
 export const FORM_TTL_MS = 10 * 60 * 1000;
 
 /** Какая форма ждёт ответа. Каждая — отчёт каталога, чтобы зона проверялась как у кнопок. */
-export type FormKind = "run.plan";
+export type FormKind = "run.plan" | "kb.edit" | "kb.new";
+const FORM_KINDS: readonly FormKind[] = ["run.plan", "kb.edit", "kb.new"];
 
 /** Куда уходит ответ формы: тот же отчёт и раздел, что у кнопки, — зона проверяется так же. */
 export const FORM_ROUTE: Record<FormKind, { report: ReportId; section: Section; action: string }> = {
   "run.plan": { report: "run.plan.set", section: "run", action: "plan_submit" },
+  // Правка и новая статья — оба шага идут одним отчётом kb.edit (совет).
+  "kb.edit": { report: "kb.edit", section: "kb", action: "edit_text" },
+  "kb.new": { report: "kb.edit", section: "kb", action: "new_text" },
 };
 
 export interface FormState {
@@ -41,7 +45,7 @@ export function formExpired(form: FormState, now: Date): boolean {
 export function asFormState(value: unknown): FormState | null {
   const v = value as Partial<FormState> | null;
   if (!v || typeof v !== "object") return null;
-  if (v.kind !== "run.plan") return null;
+  if (!v.kind || !FORM_KINDS.includes(v.kind)) return null;
   if (typeof v.expiresAt !== "string" || !v.params || typeof v.params !== "object") return null;
   return { kind: v.kind, params: v.params as Record<string, string>, expiresAt: v.expiresAt };
 }

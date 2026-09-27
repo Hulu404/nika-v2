@@ -14,6 +14,7 @@ import {
   STRANGER_TEXT,
   UNKNOWN_TEXT,
   forbiddenText,
+  itemForbiddenText,
   helpText,
   inviteExpiredText,
   menuText,
@@ -22,6 +23,9 @@ import {
 import { classifyDbError } from "./data/errors";
 import type { DatabotStore } from "./data/store";
 import { FORM_ROUTE, formExpired } from "./form";
+import { messageToKbHtml } from "./kb-html";
+import { interimTextRoute } from "./router/interim";
+import { welcomeKbArticle } from "./sections/kb";
 import { SECTION_HANDLERS } from "./handlers";
 import { parseIntent } from "./intent";
 import { REMOVE_KEYBOARD, commandsFor, menuButtons, replyKeyboard, setChatCommands } from "./menu";
@@ -146,8 +150,23 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
 
   if (joined) {
     await effects.setCommands(chatId, subject.zone);
-    // Статья «Кто за что отвечает» добавится сюда, когда появится справочник (Промты 7–8).
     await send(ctx, { text: welcomeText(subject.zone, visible) }, keyboard);
+    // Статья «Кто за что отвечает», если она уже есть в справочнике и видна
+    // зоне. Сбой справочника вход не портит: человек уже внутри.
+    try {
+      const article = await welcomeKbArticle({
+        subject,
+        member,
+        intent: { report: "kb.article", section: "kb", action: "art", params: {}, source: "command" },
+        store,
+        effects,
+        now,
+        botUsername: ctx.me.username,
+      });
+      if (article) await send(ctx, article);
+    } catch (err) {
+      logError("welcome", err);
+    }
     await audit({ zone: subject.zone, intent: parsedIntent, report: "start", ok: true });
     return;
   }
@@ -175,7 +194,14 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
         report: route.report,
         section: route.section,
         action: route.action,
-        params: { ...form.params, value: messageText.trim() },
+        // value — как есть; value_html — с форматированием Telegram (жирный,
+        // курсив, ссылка) для текстов справочника. В журнал не попадает ни то,
+        // ни другое: этих ключей нет в AUDIT_PARAM_KEYS.
+        params: {
+          ...form.params,
+          value: messageText.trim(),
+          value_html: messageToKbHtml(messageText, ctx.message?.entities),
+        },
         source: "text",
         form: true,
       };
@@ -232,10 +258,34 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
       }
       await audit({ zone: subject.zone, intent, ok: true });
       return;
-    case "unknown":
+    case "unknown": {
+      // Временный маршрутизатор (router/interim.ts) до Промта 14: пока текст
+      // ищется только в справочнике среди статей зоны.
+      if (intent.source === "text" && intent.rawText) {
+        try {
+          const found = await interimTextRoute(
+            { subject, member, intent, store, effects, now, botUsername: ctx.me.username },
+            intent.rawText,
+          );
+          if (found) {
+            await sendScreens(ctx, found.screens, keyboard, false);
+            const routed: Intent = found.slug
+              ? { report: "kb.article", section: "kb", action: "art", params: { slug: found.slug }, source: "text" }
+              : { report: "clarify", section: "kb", action: "clarify", params: {}, source: "text" };
+            await audit({ zone: subject.zone, intent: routed, ok: true });
+            return;
+          }
+        } catch (err) {
+          logError("interim", err);
+          await send(ctx, { text: DB_DOWN_TEXT }, keyboard);
+          await audit({ zone: subject.zone, intent, ok: false, error: classifyDbError(err) });
+          return;
+        }
+      }
       await send(ctx, { text: UNKNOWN_TEXT }, keyboard);
       await audit({ zone: subject.zone, intent, ok: true });
       return;
+    }
   }
 
   // Отчёт раздела.
@@ -246,7 +296,11 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
   const target = intent.params.target ? Number(intent.params.target) : undefined;
   // Дата забега — для окна списка участников и «только будущие» у плана явки.
   const accessCtx = { targetChatId: target, runDate: intent.params.date, today: mskToday(now) };
-  if (!can(subject, report, accessCtx)) {
+  // Зоны статьи справочника — это данные: здесь проверяем только, что зоне
+  // справочник открыт, а видна ли сама статья, решает обработчик (kb.ts) по
+  // той же матрице — до того, как текст статьи уйдёт человеку.
+  const allowed = report === "kb.article" ? zoneCan(subject, report) : can(subject, report, accessCtx);
+  if (!allowed) {
     if (report === "run.people" && zoneCan(subject, report)) {
       // Зоне список положен, но забег вне окна −3…+14 дней.
       await send(ctx, { text: PEOPLE_WINDOW_TEXT }, keyboard);
@@ -286,6 +340,11 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
   if (outcome.kind === "stale") {
     await replyStale(ctx, subject, section, keyboard, store, effects, now);
     await audit({ zone: subject.zone, intent, report: "stale", ok: true });
+    return;
+  }
+  if (outcome.kind === "forbidden") {
+    await send(ctx, { text: itemForbiddenText(allowedVisible(subject)) }, keyboard);
+    await audit({ zone: subject.zone, intent, ok: false, error: "forbidden" });
     return;
   }
 

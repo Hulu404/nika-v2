@@ -13,7 +13,7 @@ export const SECTION_READY: Record<Section, boolean> = {
   tr: false,
   pro: false,
   prd: false,
-  kb: false,
+  kb: true,
   tm: true,
 };
 
