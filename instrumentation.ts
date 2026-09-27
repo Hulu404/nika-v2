@@ -94,6 +94,17 @@ export async function register(): Promise<void> {
   const team = await ensureTeamWebhook();
   console.log(`[team] webhook: ${team.status}${team.detail ? ` — ${team.detail}` : ""}`);
 
+  // Бот данных команды — то же правило. Без DATABOT_TOKEN ни строки в логе:
+  // бота в этом окружении просто нет. Сбой регистрации приложение не роняет.
+  try {
+    const { ensureDatabotWebhook } = await import("./lib/databot/ensure-webhook");
+    const data = await ensureDatabotWebhook();
+    if (data.status === "registered") console.log("[databot] webhook: registered");
+    else if (data.status !== "absent") console.error(`[databot] webhook: ${data.status} — ${data.detail ?? ""}`);
+  } catch (err) {
+    console.error("[databot] webhook: failed —", err instanceof Error ? err.message : String(err));
+  }
+
   // Первый проход сразу после старта: если деплой пришёлся на окно рассылки,
   // напоминание уйдёт не через 15 минут, а тут же.
   void tickReminders();

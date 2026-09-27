@@ -9,10 +9,12 @@
     "lint": "next lint",
     "test": "vitest run",
     "bot:dev": "tsx scripts/bot-dev.ts",
-    "team:dev": "tsx scripts/team-bot-dev.ts"
+    "team:dev": "tsx scripts/team-bot-dev.ts",
+    "databot:dev": "tsx scripts/databot-dev.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.65.0",
+    "@grammyjs/auto-retry": "^2.0.2",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.45.4",
     "clsx": "^2.1.1",
