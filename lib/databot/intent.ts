@@ -3,7 +3,7 @@ import { sectionByLabel } from "./copy";
 import { inviteTokenFromStart } from "./invite";
 import { SECTION_COMMAND, SECTION_HOME_REPORT } from "./sections";
 import type { Intent, Section } from "./types";
-import { isChatId, isZone } from "./validate";
+import { isChatId, isIsoDate, isPage, isSpotSlug, isZone } from "./validate";
 
 /**
  * Разбор апдейта в Intent: кнопка постоянной клавиатуры, команда или
@@ -58,6 +58,12 @@ function parseTextIntent(raw: string): ParseResult {
     if (command === "cancel") return intent({ report: "menu", section: null, action: "cancel", source: "command" });
 
     const section = COMMAND_TO_SECTION.get(command);
+    // «/runs 03.10», «/runs лужники» — найти забег по тексту. Текст не
+    // проверяется валидаторами: его разбирают dates.ts и pickRun, а в журнал
+    // он не попадает (ключа q нет в AUDIT_PARAM_KEYS).
+    if (section === "run" && payload.trim()) {
+      return intent({ report: "run.section", section, action: "list", source: "command", params: { q: payload.trim() } });
+    }
     if (section) return sectionHome(section, "command");
 
     return intent({ report: "unknown", section: null, action: "unknown", source: "command", rawText: text });
@@ -85,6 +91,7 @@ function parseCallbackIntent(data: string): ParseResult {
   if (action === "open" && params.length === 0) return sectionHome(section, "button");
 
   if (section === "tm") return parseTeamCallback(action, params);
+  if (section === "run") return parseRunCallback(action, params);
 
   // Остальные разделы подключаются своими промтами; до тех пор их кнопок
   // быть не может, и любая такая кнопка — устаревшая.
@@ -120,6 +127,45 @@ function parseTeamCallback(action: string, params: string[]): ParseResult {
       if (!target || !isChatId(target) || extra.length) return stale;
       if (confirm === undefined) return tm("tm.remove", "remove", { target });
       return confirm === "ok" ? tm("tm.remove", "remove", { target, confirm }) : stale;
+    }
+    default:
+      return stale;
+  }
+}
+
+/**
+ * «Забеги»:
+ *   d:run:list · d:run:card:<spot>:<date> · d:run:past · d:run:spot:<spot> ·
+ *   d:run:table · d:run:people:<spot>:<date>:<page> · d:run:plan:<spot>:<date>
+ */
+function parseRunCallback(action: string, params: string[]): ParseResult {
+  const stale: ParseResult = { kind: "stale", section: "run" };
+  const run = (report: Intent["report"], act: string, p: Record<string, string> = {}) =>
+    intent({ report, section: "run", action: act, source: "button", params: p });
+  const spotDate = (spot: string | undefined, date: string | undefined) =>
+    !!spot && !!date && isSpotSlug(spot) && isIsoDate(date);
+
+  switch (action) {
+    case "list":
+      return params.length === 0 ? run("run.section", "list") : stale;
+    case "past":
+      return params.length === 0 ? run("run.past", "past") : stale;
+    case "table":
+      return params.length === 0 ? run("run.table", "table") : stale;
+    case "spot":
+      return params.length === 1 && isSpotSlug(params[0]) ? run("run.past", "spot", { spot: params[0] }) : stale;
+    case "card": {
+      const [spot, date, ...extra] = params;
+      return spotDate(spot, date) && !extra.length ? run("run.card", "card", { spot, date }) : stale;
+    }
+    case "plan": {
+      const [spot, date, ...extra] = params;
+      return spotDate(spot, date) && !extra.length ? run("run.plan.set", "plan", { spot, date }) : stale;
+    }
+    case "people": {
+      const [spot, date, page, ...extra] = params;
+      if (!spotDate(spot, date) || extra.length || !page || !isPage(page)) return stale;
+      return run("run.people", "people", { spot, date, page });
     }
     default:
       return stale;

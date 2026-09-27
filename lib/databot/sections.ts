@@ -9,7 +9,7 @@ import { SECTIONS, type ReportId, type Section, type Subject } from "./types";
  * Включают: run — Промт 5, kb — Промт 7, tr — Промт 12, pro и prd — Промт 13.
  */
 export const SECTION_READY: Record<Section, boolean> = {
-  run: false,
+  run: true,
   tr: false,
   pro: false,
   prd: false,

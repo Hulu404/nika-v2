@@ -1,6 +1,6 @@
 import { cb } from "./callback";
 import { escapeHtml } from "./html";
-import { formatMskTime } from "./format";
+import { formatDayDate, formatDdMm, formatMskTime } from "./format";
 import { mskDayMonth, mskTime } from "./time";
 import { REPORTS, ZONES, type InlineButton, type ReportId, type Screen, type Section, type Zone } from "./types";
 
@@ -468,4 +468,207 @@ export function teamRemoveConfirmScreen(target: { chatId: number; name: string }
 
 export function teamRemovedText(name: string): string {
   return `Убрала <b>${escapeHtml(name)}</b>.`;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Забеги
+// ─────────────────────────────────────────────────────────────────────────────
+// Цифры приходят уже посчитанными функциями lib/team и SQL-функциями 037 —
+// здесь только вёрстка, поэтому карточка проверяется тестом без базы.
+
+/** Точка в предложном падеже — для «по двум прошлым забегам в Лужниках». */
+const SPOT_WHERE: Record<string, string> = {
+  luzhniki: "в Лужниках",
+  usachevo: "на Усачёва",
+};
+
+export function spotWhere(spot: string, name: string): string {
+  return SPOT_WHERE[spot] ?? `на точке «${name}»`;
+}
+
+/** Кнопка забега: «Surf Coffee® Лужники · сб 03.10». */
+export function runButtonText(spotName: string, date: string): string {
+  return `${spotName} · ${formatDayDate(date)}`;
+}
+
+export interface RunRef {
+  spot: string;
+  date: string;
+  spotName: string;
+}
+
+const RUNS_BACK: InlineButton = { text: BACK, data: cb("run", "list") };
+
+/** Экран раздела: до четырёх ближайших забегов, прошедшие, таблица. */
+export function runsSectionScreen(upcoming: readonly RunRef[]): Screen {
+  const text =
+    upcoming.length === 0
+      ? "<b>Забеги</b>\nБлижайших забегов в расписании нет. Новый появится здесь, как только его добавят в расписание."
+      : "<b>Забеги</b>\nБлижайшие — кнопками ниже.";
+  const buttons: InlineButton[][] = upcoming.map((r) => [
+    { text: runButtonText(r.spotName, r.date), data: cb("run", "card", r.spot, r.date) },
+  ]);
+  buttons.push([
+    { text: "Прошедшие", data: cb("run", "past") },
+    { text: "Все забеги таблицей", data: cb("run", "table") },
+  ]);
+  buttons.push([{ text: BACK, data: cb("run", "home") }]);
+  return { text, buttons };
+}
+
+/** Список забегов кнопками: прошедшие вообще или одной точки. */
+export function runsListScreen(title: string, runs: readonly RunRef[], empty: string): Screen {
+  const buttons: InlineButton[][] = runs.map((r) => [
+    { text: runButtonText(r.spotName, r.date), data: cb("run", "card", r.spot, r.date) },
+  ]);
+  buttons.push([RUNS_BACK]);
+  return { text: runs.length ? `<b>${escapeHtml(title)}</b>` : escapeHtml(empty), buttons };
+}
+
+/** На дату два забега и больше — «Уточни:» и кнопки спотов. */
+export function runsClarifyScreen(runs: readonly RunRef[]): Screen {
+  return {
+    text: "Уточни:",
+    buttons: [
+      ...runs.map((r) => [{ text: runButtonText(r.spotName, r.date), data: cb("run", "card", r.spot, r.date) }]),
+      [RUNS_BACK],
+    ],
+  };
+}
+
+/** На дату забегов нет — «На 04.10 забегов нет. Ближайшие:». */
+export function runsNoneOnDateScreen(date: string, upcoming: readonly RunRef[]): Screen {
+  const text = upcoming.length
+    ? `На ${formatDdMm(date)} забегов нет. Ближайшие:`
+    : `На ${formatDdMm(date)} забегов нет. Ближайших в расписании тоже нет.`;
+  return {
+    text,
+    buttons: [
+      ...upcoming.map((r) => [{ text: runButtonText(r.spotName, r.date), data: cb("run", "card", r.spot, r.date) }]),
+      [RUNS_BACK],
+    ],
+  };
+}
+
+export const RUN_ATTENDANCE_UNKNOWN = "Явку база не знает: сколько людей дошло, смотрим в строке цифр ведущей";
+export const RUN_PLAN_UNSET = "План явки не задан";
+export const RUN_TOPUP_LINE = "Ниже 60 % плана: по регламенту включаем добор";
+/** Порог добора по регламенту точки и окно «за 1–3 дня до старта». */
+export const RUN_TOPUP_PERCENT = 60;
+export const RUN_TOPUP_DAYS = { min: 1, max: 3 } as const;
+
+export interface RunCardModel {
+  spot: string;
+  date: string;
+  spotName: string;
+  past: boolean;
+  /** Из расписания; у прошедшего забега вне расписания — null. */
+  schedule: { gatherTime: string; startTime: string; address: string } | null;
+  total: number;
+  confirmed: number;
+  reminded: number;
+  /** Показывать ли напоминания: окно рассылки уже наступило. */
+  reminderWindowOpen: boolean;
+  last24h: number;
+  newPeople: number;
+  returningPeople: number;
+  /** В порядке lib/coffeerun/pace.ts, «без темпа» — последним (null). */
+  byPace: ReadonlyArray<{ pace: string | null; count: number }>;
+  /** Код метки или "none" → заявок. */
+  byLink: Readonly<Record<string, number>>;
+  plan: number | null;
+  /** Московских дней до старта; null — забег прошёл. */
+  daysBefore: number | null;
+  /** Строка динамики формулировками lib/team; null — сравнивать не с чем. */
+  dynamics: string | null;
+  /** Строка прогноза из forecast.ts; null — строки нет. */
+  forecast: string | null;
+  canPeople: boolean;
+  canPlan: boolean;
+  at: Date;
+}
+
+function paceLine(byPace: RunCardModel["byPace"]): string | null {
+  if (!byPace.some((b) => b.count > 0)) return null;
+  return `Темп: ${byPace.map((b) => `${b.pace ?? "без темпа"} — ${b.count}`).join(", ")}`;
+}
+
+/** Строка меток — только если хоть одна заявка пришла по метке. */
+function linkLine(byLink: RunCardModel["byLink"]): string | null {
+  const coded = Object.entries(byLink).filter(([code]) => code !== "none");
+  if (coded.length === 0) return null;
+  coded.sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  const parts = coded.map(([code, n]) => `${escapeHtml(code)} — ${n}`);
+  if (byLink.none) parts.push(`без метки — ${byLink.none}`);
+  return `По меткам: ${parts.join(", ")}`;
+}
+
+/** Процент заявок от плана — целым, как в примере «92 % от плана». */
+export function planPercent(total: number, plan: number): number {
+  return Math.round((total / plan) * 100);
+}
+
+/** Добор по регламенту: до старта 1–3 дня и заявок меньше 60 % плана. */
+export function needsTopUp(m: Pick<RunCardModel, "total" | "plan" | "daysBefore">): boolean {
+  if (m.plan === null || m.daysBefore === null) return false;
+  if (m.daysBefore < RUN_TOPUP_DAYS.min || m.daysBefore > RUN_TOPUP_DAYS.max) return false;
+  return planPercent(m.total, m.plan) < RUN_TOPUP_PERCENT;
+}
+
+/**
+ * Карточка забега по 4.4, порядок строк как в примере 4.10. Шапка (название,
+ * а у будущего — ещё сбор, старт и адрес) идёт первой строкой ответа; дальше
+ * не больше восьми строк подробностей.
+ */
+export function runCardScreen(m: RunCardModel): Screen {
+  const title = `Кофе-ран · ${escapeHtml(m.spotName)} · ${formatDayDate(m.date)}`;
+  const headline =
+    !m.past && m.schedule
+      ? `${title}\nСбор ${escapeHtml(m.schedule.gatherTime)}, старт ${escapeHtml(m.schedule.startTime)} · ${escapeHtml(m.schedule.address)}`
+      : title;
+
+  const details: string[] = [];
+  if (m.total === 0) {
+    details.push(m.past ? "Итог: заявок не было" : "Заявок пока нет");
+  } else {
+    const parts = [`${m.past ? "Итог: заявок" : "Заявок"} ${m.total}`, `подтвердили в боте ${m.confirmed}`];
+    if (m.reminderWindowOpen) parts.push(`напоминание ушло ${m.reminded}`);
+    if (!m.past) parts.push(`за сутки +${m.last24h}`);
+    details.push(parts.join(", "));
+    details.push(`Новых среди заявок ${m.newPeople}, записывались раньше ${m.returningPeople}`);
+    const pace = paceLine(m.byPace);
+    if (pace) details.push(pace);
+    const links = linkLine(m.byLink);
+    if (links) details.push(links);
+  }
+
+  if (m.plan !== null) {
+    details.push(`План явки ${m.plan}, заявок ${planPercent(m.total, m.plan)} % от плана`);
+    if (!m.past && needsTopUp(m)) details.push(RUN_TOPUP_LINE);
+  } else if (!m.past) {
+    details.push(RUN_PLAN_UNSET);
+  }
+
+  if (!m.past) {
+    if (m.dynamics) details.push(escapeHtml(m.dynamics));
+    if (m.forecast) details.push(escapeHtml(m.forecast));
+  }
+
+  const text = answerText({
+    headline,
+    details,
+    blindSpot: m.past ? RUN_ATTENDANCE_UNKNOWN : null,
+    at: m.at,
+  });
+
+  const buttons: InlineButton[][] = [];
+  const row: InlineButton[] = [];
+  if (m.canPeople) row.push({ text: "Список участников", data: cb("run", "people", m.spot, m.date, 1) });
+  if (m.canPlan && !m.past) row.push({ text: "План явки", data: cb("run", "plan", m.spot, m.date) });
+  if (row.length) buttons.push(row);
+  buttons.push([
+    { text: "Прошлые забеги этой точки", data: cb("run", "spot", m.spot) },
+    { text: "Все забеги", data: cb("run", "list") },
+  ]);
+  return { text, buttons };
 }

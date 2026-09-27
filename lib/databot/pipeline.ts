@@ -24,6 +24,7 @@ import { parseIntent } from "./intent";
 import { REMOVE_KEYBOARD, commandsFor, menuButtons, replyKeyboard, setChatCommands } from "./menu";
 import type { DatabotEffects, SectionOutcome } from "./section";
 import { SECTION_COMMAND, SECTION_HOME_REPORT, SECTION_READY, allowedSections, visibleSections } from "./sections";
+import { mskToday } from "./time";
 import type { AnyReport, Intent, MemberRow, ReportId, Screen, Section, Subject } from "./types";
 
 /**
@@ -189,7 +190,9 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
 
   // Шаг 6. Зона — до обращения к данным.
   const target = intent.params.target ? Number(intent.params.target) : undefined;
-  if (!can(subject, report, { targetChatId: target })) {
+  // Дата забега — для окна списка участников и «только будущие» у плана явки.
+  const accessCtx = { targetChatId: target, runDate: intent.params.date, today: mskToday(now) };
+  if (!can(subject, report, accessCtx)) {
     if (target !== undefined && subject.isOwner && (isEnvOwner(target) || target === chatId)) {
       await send(ctx, { text: OWNER_PROTECTED_TEXT }, keyboard);
     } else if (isCallback) {

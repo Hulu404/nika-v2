@@ -149,7 +149,7 @@ describe("владелец из env", () => {
     expect(row).toMatchObject({ zone: "council", is_owner: true, is_active: true });
     const cmds = commandsSetFor(calls, OWNER)!;
     expect(cmds.method).toBe("setMyCommands");
-    expect((cmds.payload.commands as { command: string }[]).map((c) => c.command)).toEqual(["team", "help"]);
+    expect((cmds.payload.commands as { command: string }[]).map((c) => c.command)).toEqual(["runs", "team", "help"]);
     const welcome = calls.find((c) => c.method === "sendMessage")!;
     expect(welcome.payload.reply_markup).toMatchObject({ is_persistent: true, resize_keyboard: true });
     expect(JSON.stringify(welcome.payload.reply_markup)).toContain("Команда");
@@ -270,8 +270,8 @@ describe("разделы и разбор", () => {
   it("неготовый раздел из доступных — «ещё собираю»", async () => {
     const t = setup();
     await t.text(OWNER, "/start");
-    expect(texts(await t.text(OWNER, "/runs"))).toEqual([NOT_READY_TEXT]);
-    expect(texts(await t.text(OWNER, "Забеги"))).toEqual([NOT_READY_TEXT]);
+    expect(texts(await t.text(OWNER, "/kb"))).toEqual([NOT_READY_TEXT]);
+    expect(texts(await t.text(OWNER, "Справочник"))).toEqual([NOT_READY_TEXT]);
   });
 
   it("чужой раздел командой — отказ с доступными разделами", async () => {
