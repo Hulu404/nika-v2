@@ -136,6 +136,11 @@ export interface InlineButton {
 export interface Screen {
   text: string;
   buttons?: InlineButton[][];
-  /** Запретить пересылку (списки участников). */
+  /**
+   * Запретить пересылку (списки участников). Такой экран ВСЕГДА уходит новым
+   * сообщением: у отредактированного сообщения protect_content не ставится.
+   */
   protect?: boolean;
+  /** Файл документом вместо текста (CSV). text — подпись к файлу. */
+  document?: { filename: string; content: string };
 }

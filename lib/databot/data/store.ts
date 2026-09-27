@@ -1,3 +1,4 @@
+import type { FormState } from "../form";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 
 /**
@@ -66,6 +67,16 @@ export interface DatabotStore {
 
   /** Стереть состояние форм человека (tg_sessions, ключ data:<chat_id>). */
   clearSession(chatId: number): Promise<void>;
+
+  /**
+   * Активная форма человека (tg_sessions, data:<chat_id>). null — формы нет.
+   * Сбой базы бросает: текст, который должен был уйти в форму, нельзя молча
+   * принять за вопрос.
+   */
+  getForm(chatId: number): Promise<FormState | null>;
+
+  /** Открыть или обновить форму. Сбой бросает — человек должен узнать, что форма не открылась. */
+  setForm(chatId: number, form: FormState, now: Date): Promise<void>;
 
   /**
    * check_rate_limit: true — можно. Fail-open, как lib/rate-limit.ts: сбой

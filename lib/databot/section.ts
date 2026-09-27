@@ -25,7 +25,15 @@ export interface SectionRequest {
 
 export type SectionOutcome =
   /** Экран. Первый заменяет сообщение с кнопкой (если запрос — callback), остальные — новыми. */
-  | { kind: "screens"; screens: Screen[] }
+  | {
+      kind: "screens";
+      screens: Screen[];
+      /**
+       * Снять кнопки с сообщения, которое нажали («Ещё» у защищённого списка):
+       * второе нажатие той же кнопки не пришлёт ту же страницу повторно.
+       */
+      consumeButton?: boolean;
+    }
   /** Кнопку уже нельзя выполнить (человек убран, приглашение пропало). */
   | { kind: "stale" };
 

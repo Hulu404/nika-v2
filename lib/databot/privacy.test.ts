@@ -51,6 +51,8 @@ const ALLOWED_RPC = new Set([
   "check_rate_limit",
   "databot_run_people", "databot_runs_table", "databot_traffic", "databot_traffic_since",
   "databot_pro", "databot_product", "databot_person_key", "databot_is_team",
+  // Список участников (Промт 6): имя, ник, темп, статус — без телефона и email.
+  "databot_run_roster",
 ]);
 
 /**

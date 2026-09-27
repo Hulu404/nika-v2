@@ -15,8 +15,12 @@ import { isChatId, isIsoDate, isPage, isSpotSlug, isZone } from "./validate";
  */
 export type ParseResult =
   | { kind: "intent"; intent: Intent }
-  /** Кнопку уже нельзя выполнить; section — куда вернуть человека. */
-  | { kind: "stale"; section: Section | null };
+  /**
+   * Кнопку уже нельзя выполнить; section — куда вернуть человека. report —
+   * какой отчёт пытались открыть: битая кнопка списка участников пишется в
+   * журнал как run.people с ok = false, а не как безликий stale.
+   */
+  | { kind: "stale"; section: Section | null; report?: Intent["report"] };
 
 const COMMAND_TO_SECTION = new Map<string, Section>(
   (Object.entries(SECTION_COMMAND) as [Section, string][]).map(([s, c]) => [c, s]),
@@ -136,7 +140,8 @@ function parseTeamCallback(action: string, params: string[]): ParseResult {
 /**
  * «Забеги»:
  *   d:run:list · d:run:card:<spot>:<date> · d:run:past · d:run:spot:<spot> ·
- *   d:run:table · d:run:people:<spot>:<date>:<page> · d:run:plan:<spot>:<date>
+ *   d:run:table[:<page>] · d:run:csv · d:run:people:<spot>:<date>:<page> ·
+ *   d:run:plan:<spot>:<date>
  */
 function parseRunCallback(action: string, params: string[]): ParseResult {
   const stale: ParseResult = { kind: "stale", section: "run" };
@@ -151,7 +156,10 @@ function parseRunCallback(action: string, params: string[]): ParseResult {
     case "past":
       return params.length === 0 ? run("run.past", "past") : stale;
     case "table":
-      return params.length === 0 ? run("run.table", "table") : stale;
+      if (params.length === 0) return run("run.table", "table");
+      return params.length === 1 && isPage(params[0]) ? run("run.table", "table", { page: params[0] }) : stale;
+    case "csv":
+      return params.length === 0 ? run("run.table.csv", "csv") : stale;
     case "spot":
       return params.length === 1 && isSpotSlug(params[0]) ? run("run.past", "spot", { spot: params[0] }) : stale;
     case "card": {
@@ -164,7 +172,9 @@ function parseRunCallback(action: string, params: string[]): ParseResult {
     }
     case "people": {
       const [spot, date, page, ...extra] = params;
-      if (!spotDate(spot, date) || extra.length || !page || !isPage(page)) return stale;
+      if (!spotDate(spot, date) || extra.length || !page || !isPage(page)) {
+        return { kind: "stale", section: "run", report: "run.people" };
+      }
       return run("run.people", "people", { spot, date, page });
     }
     default:

@@ -1,6 +1,6 @@
 import { cb } from "./callback";
 import { escapeHtml } from "./html";
-import { formatDayDate, formatDdMm, formatMskTime } from "./format";
+import { WORDS, countWord, formatDayDate, formatDdMm, formatMskTime } from "./format";
 import { mskDayMonth, mskTime } from "./time";
 import { REPORTS, ZONES, type InlineButton, type ReportId, type Screen, type Section, type Zone } from "./types";
 
@@ -671,4 +671,171 @@ export function runCardScreen(m: RunCardModel): Screen {
     { text: "Все забеги", data: cb("run", "list") },
   ]);
   return { text, buttons };
+}
+
+// ── Список участников ────────────────────────────────────────────────────────
+// Самый строгий режим приватности во всём боте: имя, @ник, темп и «впервые» —
+// больше ничего; каждая часть — новым сообщением с protect_content.
+
+export const PEOPLE_HEADER = "Персональные данные участников. Не пересылать";
+export const PEOPLE_WINDOW_TEXT = "Список открыт с 14 дней до забега до 3 дней после него";
+export const PEOPLE_PAGE_SIZE = 30;
+
+/** Значки и смысл — как в lib/team/copy.ts; порядок групп — как в viewSignups. */
+export const PEOPLE_ICON = { unconfirmed: "⚠️", waiting: "⏳", reminded: "✅" } as const;
+export const PEOPLE_GROUP = {
+  unconfirmed: "не подтвердил участие",
+  waiting: "ждёт напоминания",
+  reminded: "напоминание ушло",
+} as const;
+export type PeopleStatus = keyof typeof PEOPLE_ICON;
+
+export interface PeopleRow {
+  status: PeopleStatus;
+  name: string;
+  nick: string | null;
+  pace: string | null;
+  isNew: boolean;
+}
+
+function personLine(p: PeopleRow): string {
+  const parts = [`${PEOPLE_ICON[p.status]} ${escapeHtml(p.name)}`];
+  if (p.nick) parts[0] += ` @${escapeHtml(p.nick)}`;
+  if (p.pace) parts.push(escapeHtml(p.pace));
+  if (p.isNew) parts.push("впервые");
+  return parts.join(" · ");
+}
+
+/**
+ * Одна страница списка (page с 1). rows уже в порядке групп и времени заявки.
+ * Шапка приватности — на каждой странице: страницу могут открыть отдельно.
+ */
+export function peoplePageScreen(args: {
+  spot: string;
+  date: string;
+  spotName: string;
+  rows: readonly PeopleRow[];
+  page: number;
+}): Screen {
+  const pages = Math.max(1, Math.ceil(args.rows.length / PEOPLE_PAGE_SIZE));
+  const page = Math.min(Math.max(1, args.page), pages);
+  const slice = args.rows.slice((page - 1) * PEOPLE_PAGE_SIZE, page * PEOPLE_PAGE_SIZE);
+
+  const counts = { unconfirmed: 0, waiting: 0, reminded: 0 };
+  for (const r of args.rows) counts[r.status]++;
+
+  const lines = [
+    `<b>${PEOPLE_HEADER}</b>`,
+    `Кофе-ран · ${escapeHtml(args.spotName)} · ${formatDayDate(args.date)} · ${countWord(args.rows.length, WORDS.signup)}` +
+      (pages > 1 ? ` · часть ${page} из ${pages}` : ""),
+  ];
+  if (args.rows.length === 0) {
+    lines.push("Заявок пока нет.");
+  } else {
+    if (page === 1) {
+      lines.push(
+        (Object.keys(PEOPLE_ICON) as PeopleStatus[])
+          .map((s) => `${PEOPLE_ICON[s]} ${PEOPLE_GROUP[s]} — ${counts[s]}`)
+          .join("\n"),
+      );
+    }
+    lines.push(slice.map(personLine).join("\n"));
+  }
+
+  const buttons: InlineButton[][] = [];
+  if (page < pages) buttons.push([{ text: MORE_BUTTON, data: cb("run", "people", args.spot, args.date, page + 1) }]);
+  buttons.push([{ text: "К забегу", data: cb("run", "card", args.spot, args.date) }]);
+  return { text: lines.join("\n\n"), buttons, protect: true };
+}
+
+// ── План явки ────────────────────────────────────────────────────────────────
+
+export const PLAN_MIN = 5;
+export const PLAN_MAX = 200;
+export const PLAN_ASK = `Сколько человек считаем полной точкой? Пришли число от ${PLAN_MIN} до ${PLAN_MAX}. Отмена — /cancel`;
+export const PLAN_RETRY = `Нужно целое число от ${PLAN_MIN} до ${PLAN_MAX}. Пришли ещё раз или /cancel`;
+export const PLAN_PAST_TEXT = "План явки задаётся только будущим забегам";
+export const FORM_EXPIRED_TEXT = "Форма устарела. Открой её заново кнопкой";
+
+export function planSavedText(target: number): string {
+  return `Записала план явки: ${target}.`;
+}
+
+// ── Все забеги таблицей и CSV ────────────────────────────────────────────────
+
+/** Короткое имя точки для узкой строки таблицы. */
+const SPOT_SHORT: Record<string, string> = { luzhniki: "Лужники", usachevo: "Усачёва" };
+
+export function spotShort(spot: string, fallback: string): string {
+  return SPOT_SHORT[spot] ?? fallback;
+}
+
+export interface RunsTableLine {
+  spot: string;
+  spotName: string;
+  runDate: string;
+  total: number;
+  confirmed: number;
+  reminded: number;
+  newPeople: number;
+}
+
+/** «сб 03.10 · Лужники · заявок 23 · подтв. 17 · новых 15» — узко, для телефона. */
+export function runsTableLine(r: RunsTableLine): string {
+  return (
+    `${formatDayDate(r.runDate)} · ${escapeHtml(spotShort(r.spot, r.spotName))} · ` +
+    `заявок ${r.total} · подтв. ${r.confirmed} · новых ${r.newPeople}`
+  );
+}
+
+export function runsTablePages(rows: readonly RunsTableLine[], at: Date): string[] {
+  const header = "<b>Все забеги</b> · свежие сверху";
+  const lines = rows.length ? rows.map(runsTableLine) : ["Забегов в базе пока нет."];
+  // Строка времени — последней на каждой странице, как у любого ответа с цифрами.
+  const footer = dataAtLine(at);
+  return paginate(lines, { header, max: MAX_MESSAGE_CHARS - footer.length - 1 }).map((p) => p + NL + footer);
+}
+
+export function runsTableScreen(rows: readonly RunsTableLine[], page: number, at: Date): Screen {
+  const pages = runsTablePages(rows, at);
+  return pageScreen(pages, page - 1, (next) => cb("run", "table", next + 1), [
+    [
+      { text: "CSV", data: cb("run", "csv") },
+      { text: BACK, data: cb("run", "list") },
+    ],
+  ]);
+}
+
+const CSV_SEP = ";";
+const BOM = "﻿";
+
+function csvCell(value: string | number): string {
+  const s = String(value);
+  return /[";\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+/**
+ * CSV «Все забеги»: только агрегаты, ни одного имени. UTF-8 с BOM, чтобы Excel
+ * открыл кириллицу; разделитель «;» — русский Excel ждёт именно его.
+ */
+export function runsCsv(rows: readonly RunsTableLine[]): string {
+  const head = ["Дата", "Точка", "Заявок", "Подтвердили", "Напоминание ушло", "Новых"];
+  const body = rows.map((r) =>
+    [
+      `${r.runDate.slice(8, 10)}.${r.runDate.slice(5, 7)}.${r.runDate.slice(0, 4)}`,
+      spotShort(r.spot, r.spotName),
+      r.total,
+      r.confirmed,
+      r.reminded,
+      r.newPeople,
+    ]
+      .map(csvCell)
+      .join(CSV_SEP),
+  );
+  return BOM + [head.join(CSV_SEP), ...body].join("\r\n") + "\r\n";
+}
+
+/** Имя по правилу команды «дата_что»: 2026-09-27_забеги.csv. */
+export function runsCsvFilename(today: string): string {
+  return `${today}_забеги.csv`;
 }

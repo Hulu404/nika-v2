@@ -16,3 +16,15 @@ export async function fetchRunPlan(spot: string, date: string): Promise<number |
   if (error) throw new DatabotDataError(classifyDbError(error), `databot_run_plans: ${error.message}`);
   return data ? toNumOrNull(data.target, "target") : null;
 }
+
+/** Задать план явки: новое число заменяет старое (ключ — спот и дата). */
+export async function setRunPlan(spot: string, date: string, target: number, setBy: number, now: Date): Promise<void> {
+  const { error } = await db()
+    .from("databot_run_plans")
+    .upsert(
+      { spot, run_date: date, target, set_by: setBy, set_at: now.toISOString() },
+      { onConflict: "spot,run_date" },
+    )
+    .abortSignal(dbTimeout());
+  if (error) throw new DatabotDataError(classifyDbError(error), `databot_run_plans: ${error.message}`);
+}

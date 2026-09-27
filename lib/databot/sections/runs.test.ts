@@ -82,6 +82,9 @@ function deps(over: Partial<RunsDeps> & { archive: ArchiveRow[]; signups?: Signu
       over.fetchRunPeople ??
       (async (): Promise<RunPeople> => ({ total: 0, newPeople: 0, returningPeople: 0, byLink: {} })),
     fetchRunPlan: over.fetchRunPlan ?? (async () => null),
+    fetchRunRoster: over.fetchRunRoster ?? (async () => []),
+    setRunPlan: over.setRunPlan ?? (async () => {}),
+    fetchRunsTable: over.fetchRunsTable ?? (async () => []),
   };
 }
 

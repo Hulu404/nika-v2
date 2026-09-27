@@ -1,10 +1,12 @@
-import type { Context, Keyboard, MiddlewareFn } from "grammy";
+import { InputFile, type Context, type Keyboard, type MiddlewareFn } from "grammy";
 import type { InlineKeyboardMarkup, ReplyKeyboardRemove } from "grammy/types";
-import { audienceOf, can, isEnvOwner } from "./access";
+import { audienceOf, can, isEnvOwner, zoneCan } from "./access";
 import { buildAuditEntry, recordAudit } from "./audit";
 import {
   CANCEL_TEXT,
   DB_DOWN_TEXT,
+  FORM_EXPIRED_TEXT,
+  PEOPLE_WINDOW_TEXT,
   NOT_READY_TEXT,
   OWNER_PROTECTED_TEXT,
   RATE_LIMIT_TEXT,
@@ -19,6 +21,7 @@ import {
 } from "./copy";
 import { classifyDbError } from "./data/errors";
 import type { DatabotStore } from "./data/store";
+import { FORM_ROUTE, formExpired } from "./form";
 import { SECTION_HANDLERS } from "./handlers";
 import { parseIntent } from "./intent";
 import { REMOVE_KEYBOARD, commandsFor, menuButtons, replyKeyboard, setChatCommands } from "./menu";
@@ -149,14 +152,65 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
     return;
   }
 
-  // Шаг 5. Разбор уже сделан; кнопка, которую нельзя выполнить, — устарела.
-  if (parsed.kind === "stale") {
-    await replyStale(ctx, subject, parsed.section, keyboard, store, effects, now);
-    await audit({ zone: subject.zone, intent: null, report: "stale", ok: true });
-    return;
-  }
-  const intent = parsed.intent;
   const isCallback = !!ctx.callbackQuery;
+
+  // Шаг 4½. Форма (form.ts): пока она открыта, текст человека идёт в неё, а не
+  // в разбор вопроса. Любая команда форму закрывает (/cancel ответит
+  // «Отменила» ниже), кнопки её не трогают.
+  let formIntent: Intent | null = null;
+  const messageText = ctx.message?.text;
+  if (messageText !== undefined && !isCallback) {
+    let form;
+    try {
+      form = await store.getForm(chatId);
+    } catch (err) {
+      logError("form", err);
+      await send(ctx, { text: DB_DOWN_TEXT }, keyboard);
+      await audit({ zone: subject.zone, intent: parsedIntent, ok: false, error: classifyDbError(err) });
+      return;
+    }
+    if (form) {
+      const route = FORM_ROUTE[form.kind];
+      const asIntent: Intent = {
+        report: route.report,
+        section: route.section,
+        action: route.action,
+        params: { ...form.params, value: messageText.trim() },
+        source: "text",
+        form: true,
+      };
+      if (messageText.trim().startsWith("/")) {
+        await store.clearSession(chatId);
+      } else if (formExpired(form, now)) {
+        await store.clearSession(chatId);
+        await send(ctx, { text: FORM_EXPIRED_TEXT }, keyboard);
+        await audit({ zone: subject.zone, intent: asIntent, ok: false, error: "form_expired" });
+        return;
+      } else {
+        formIntent = asIntent;
+      }
+    }
+  }
+
+  // Шаг 5. Разбор уже сделан; кнопка, которую нельзя выполнить, — устарела.
+  let intent: Intent;
+  if (formIntent) {
+    intent = formIntent;
+  } else if (parsed.kind === "stale") {
+    await replyStale(ctx, subject, parsed.section, keyboard, store, effects, now);
+    // Битая кнопка известного отчёта (список участников) — это отказ по
+    // этому отчёту, а не безликий stale: каждое открытие списка в журнале.
+    await audit({
+      zone: subject.zone,
+      intent: null,
+      report: parsed.report ?? "stale",
+      ok: !parsed.report,
+      error: parsed.report ? "bad_params" : null,
+    });
+    return;
+  } else {
+    intent = parsed.intent;
+  }
 
   switch (intent.report) {
     case "start":
@@ -193,6 +247,12 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
   // Дата забега — для окна списка участников и «только будущие» у плана явки.
   const accessCtx = { targetChatId: target, runDate: intent.params.date, today: mskToday(now) };
   if (!can(subject, report, accessCtx)) {
+    if (report === "run.people" && zoneCan(subject, report)) {
+      // Зоне список положен, но забег вне окна −3…+14 дней.
+      await send(ctx, { text: PEOPLE_WINDOW_TEXT }, keyboard);
+      await audit({ zone: subject.zone, intent, ok: false, error: "window" });
+      return;
+    }
     if (target !== undefined && subject.isOwner && (isEnvOwner(target) || target === chatId)) {
       await send(ctx, { text: OWNER_PROTECTED_TEXT }, keyboard);
     } else if (isCallback) {
@@ -229,6 +289,11 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
     return;
   }
 
+  if (outcome.consumeButton && ctx.callbackQuery?.message) {
+    // Снимаем кнопки с нажатого сообщения ДО отправки: второе нажатие того же
+    // «Ещё» уже не найдёт кнопку и не пришлёт ту же страницу ещё раз.
+    await ctx.editMessageReplyMarkup({ reply_markup: { inline_keyboard: [] } }).catch(() => {});
+  }
   await sendScreens(ctx, outcome.screens, keyboard, isCallback);
   // Шаг 9. Журнал — после отправки: latency_ms до ответа.
   await audit({ zone: subject.zone, intent, ok: true });
@@ -353,7 +418,16 @@ async function send(ctx: Context, screen: Screen, keyboard?: ReplyMarkup, edit =
     link_preview_options: { is_disabled: true },
   };
 
-  if (edit && ctx.callbackQuery?.message) {
+  if (screen.document) {
+    // CSV и прочие файлы — документом в личку; текст экрана — подпись.
+    const file = new InputFile(Buffer.from(screen.document.content, "utf8"), screen.document.filename);
+    await ctx.replyWithDocument(file, { caption: screen.text, parse_mode: "HTML", protect_content: screen.protect || undefined });
+    return;
+  }
+
+  // Защищённый экран — только новым сообщением: у отредактированного
+  // сообщения protect_content не появляется.
+  if (edit && !screen.protect && ctx.callbackQuery?.message) {
     try {
       await ctx.editMessageText(screen.text, { ...base, reply_markup: inline });
       return;

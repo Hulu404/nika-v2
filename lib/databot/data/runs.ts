@@ -58,3 +58,38 @@ export function parseRunsTable(raw: unknown): RunsTableRow[] {
 export async function fetchRunsTable(fromYmd: string, toYmd: string): Promise<RunsTableRow[]> {
   return parseRunsTable(await callRpc("databot_runs_table", { p_from: fromYmd, p_to: toYmd }));
 }
+
+/**
+ * Строка списка участников (databot_run_roster). Ни телефона, ни email, ни
+ * chat_id: только то, что попадает в строку списка, и поля для signupStatus.
+ */
+export interface RosterRow {
+  name: string;
+  /** Ник без «@» или null. */
+  nick: string | null;
+  pace: string | null;
+  createdAt: string;
+  confirmedAt: string | null;
+  reminderSentAt: string | null;
+  /** Есть ли у заявки чат с ботом участников — вместо самого chat_id. */
+  tgLinked: boolean;
+  isNew: boolean;
+}
+
+export function parseRoster(raw: unknown): RosterRow[] {
+  const str = (v: unknown) => (v === null || v === undefined ? null : String(v));
+  return asRows(raw, "databot_run_roster").map((r) => ({
+    name: String(r.name ?? ""),
+    nick: str(r.nick),
+    pace: str(r.pace),
+    createdAt: String(r.created_at),
+    confirmedAt: str(r.confirmed_at),
+    reminderSentAt: str(r.reminder_sent_at),
+    tgLinked: r.tg_linked === true,
+    isNew: r.is_new === true,
+  }));
+}
+
+export async function fetchRunRoster(spot: string, date: string): Promise<RosterRow[]> {
+  return parseRoster(await callRpc("databot_run_roster", { p_spot: spot, p_date: date }));
+}

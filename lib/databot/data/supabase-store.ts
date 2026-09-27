@@ -1,5 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { tgAdmin } from "../../telegram/supabase";
+import { asFormState, type FormState } from "../form";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 import type { DatabotStore } from "./store";
 
@@ -284,6 +285,27 @@ class SupabaseStore implements DatabotStore {
     } catch (err) {
       console.error("[databot] clearSession:", err instanceof Error ? err.message : String(err));
     }
+  }
+
+  async getForm(chatId: number): Promise<FormState | null> {
+    const { data, error } = await this.db
+      .from("tg_sessions")
+      .select("value")
+      .eq("key", `data:${chatId}`)
+      .abortSignal(timeout())
+      .maybeSingle();
+    if (error) fail("getForm", error.message);
+    return data ? asFormState(data.value) : null;
+  }
+
+  async setForm(chatId: number, form: FormState, now: Date): Promise<void> {
+    // updated_at ставим явно: триггера на tg_sessions нет (аудит, п. 5), а по
+    // нему ежедневная уборка стирает брошенные формы старше суток.
+    const { error } = await this.db
+      .from("tg_sessions")
+      .upsert({ key: `data:${chatId}`, value: form, updated_at: now.toISOString() }, { onConflict: "key" })
+      .abortSignal(timeout());
+    if (error) fail("setForm", error.message);
   }
 
   async checkRateLimit(key: string, limit: number, windowSeconds: number): Promise<boolean> {

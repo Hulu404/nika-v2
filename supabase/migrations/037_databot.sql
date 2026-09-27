@@ -816,6 +816,60 @@ $$;
 comment on function public.databot_product(timestamptz, timestamptz) is
   'Продукт за [p_from, p_to) без команды; nsm = null до user_day_facts (Фаза 0)';
 
+-- 8.9 Список участников забега (Промт 6, ТЗ 4.4 «Список участников»).
+-- Отдельная функция, а не select из coffee_run_signups в коде: список — самые
+-- чувствительные данные бота, и телефона и email в нём не должно быть даже в
+-- выборке. Функция отдаёт только то, что попадает в строку списка:
+--   name, nick       — имя и ник без «@»: tg_username, а если он пуст и contact
+--                      начинается с «@», — ник из contact (как в
+--                      databot_person_key); телефон из contact не отдаётся;
+--   pace, created_at — темп и время заявки (порядок внутри группы);
+--   confirmed_at, reminder_sent_at, tg_linked — ровно то, что нужно
+--                      signupStatus из lib/team/stats.ts; вместо tg_chat_id —
+--                      только признак «чат есть», сам chat_id не отдаётся;
+--   is_new           — «впервые»: то же определение, что new_people в
+--                      databot_run_people.
+create or replace function public.databot_run_roster(p_spot text, p_date date)
+returns table (
+  name text, nick text, pace text, created_at timestamptz,
+  confirmed_at timestamptz, reminder_sent_at timestamptz, tg_linked boolean, is_new boolean
+)
+language sql stable security invoker
+set search_path = public
+as $$
+  with run as (
+    select cs.name, cs.tg_username, cs.contact, cs.pace, cs.created_at,
+           cs.confirmed_at, cs.reminder_sent_at, cs.tg_chat_id,
+           public.databot_person_key(cs.tg_username, cs.contact, cs.email) as pkey
+      from public.coffee_run_signups cs
+     where cs.spot = p_spot
+       and cs.run_date = p_date
+  )
+  select r.name,
+         coalesce(
+           nullif(lower(ltrim(btrim(r.tg_username), '@')), ''),
+           case when btrim(r.contact) like '@%'
+                then nullif(lower(ltrim(btrim(r.contact), '@')), '')
+           end
+         ) as nick,
+         r.pace,
+         r.created_at,
+         r.confirmed_at,
+         r.reminder_sent_at,
+         r.tg_chat_id is not null as tg_linked,
+         not (r.pkey is not null and exists (
+           select 1
+             from public.coffee_run_signups e
+            where e.run_date < p_date
+              and public.databot_person_key(e.tg_username, e.contact, e.email) = r.pkey
+         )) as is_new
+    from run r
+   order by r.created_at;
+$$;
+
+comment on function public.databot_run_roster(text, date) is
+  'Список участников забега без телефона и email: имя, ник, темп, поля статуса, is_new';
+
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 9. Права на функции
 -- ─────────────────────────────────────────────────────────────────────────────
@@ -830,6 +884,7 @@ revoke execute on function public.databot_traffic(timestamptz, timestamptz)     
 revoke execute on function public.databot_traffic_since()                        from public, anon, authenticated;
 revoke execute on function public.databot_pro(timestamptz, timestamptz)          from public, anon, authenticated;
 revoke execute on function public.databot_product(timestamptz, timestamptz)      from public, anon, authenticated;
+revoke execute on function public.databot_run_roster(text, date)                 from public, anon, authenticated;
 
 grant execute on function public.databot_is_team(uuid)                           to service_role;
 grant execute on function public.databot_person_key(text, text, text)            to service_role;
@@ -839,6 +894,7 @@ grant execute on function public.databot_traffic(timestamptz, timestamptz)      
 grant execute on function public.databot_traffic_since()                         to service_role;
 grant execute on function public.databot_pro(timestamptz, timestamptz)           to service_role;
 grant execute on function public.databot_product(timestamptz, timestamptz)       to service_role;
+grant execute on function public.databot_run_roster(text, date)                  to service_role;
 
 -- ─────────────────────────────────────────────────────────────────────────────
 -- 10. Гранты на таблицы

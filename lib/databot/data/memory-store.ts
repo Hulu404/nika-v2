@@ -1,3 +1,4 @@
+import { asFormState, type FormState } from "../form";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 import type { DatabotStore } from "./store";
 
@@ -140,6 +141,16 @@ export class MemoryStore implements DatabotStore {
 
   async clearSession(chatId: number): Promise<void> {
     this.sessions.delete(`data:${chatId}`);
+  }
+
+  async getForm(chatId: number): Promise<FormState | null> {
+    this.maybeFail("getForm");
+    return asFormState(this.sessions.get(`data:${chatId}`));
+  }
+
+  async setForm(chatId: number, form: FormState): Promise<void> {
+    this.maybeFail("setForm");
+    this.sessions.set(`data:${chatId}`, { ...form });
   }
 
   async checkRateLimit(key: string): Promise<boolean> {

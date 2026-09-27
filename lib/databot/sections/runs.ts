@@ -2,11 +2,20 @@ import { REMINDER_HOUR_MSK, dayBefore, spotName } from "../../coffeerun/run";
 import { dynamicsLines } from "../../team/copy";
 import { daysUntilStart, dynamicsFor, fetchArchive, runKeysFrom, type ArchiveRow, type Dynamics } from "../../team/history";
 import { defaultRun, mergeRuns, pickRun, type TeamRun } from "../../team/runs";
-import { fetchRunSignups, summarizeSignups, type SignupRow } from "../../team/stats";
+import { fetchRunSignups, summarizeSignups, viewSignups, type SignupRow, type SignupView } from "../../team/stats";
 import { can } from "../access";
 import {
-  NOT_READY_TEXT,
+  PLAN_ASK,
+  PLAN_MAX,
+  PLAN_MIN,
+  PLAN_PAST_TEXT,
+  PLAN_RETRY,
+  peoplePageScreen,
+  planSavedText,
   runCardScreen,
+  runsCsv,
+  runsCsvFilename,
+  runsTableScreen,
   runsClarifyScreen,
   runsListScreen,
   runsNoneOnDateScreen,
@@ -14,9 +23,16 @@ import {
   spotWhere,
   type RunRef,
 } from "../copy";
-import { cb } from "../callback";
-import { fetchRunPlan } from "../data/plans";
-import { fetchRunPeople, type RunPeople } from "../data/runs";
+import { fetchRunPlan, setRunPlan } from "../data/plans";
+import {
+  fetchRunPeople,
+  fetchRunRoster,
+  fetchRunsTable,
+  type RosterRow,
+  type RunPeople,
+  type RunsTableRow,
+} from "../data/runs";
+import { openForm } from "../form";
 import { parseRunDate } from "../dates";
 import { forecast, forecastText } from "../forecast";
 import type { SectionHandler, SectionOutcome, SectionRequest } from "../section";
@@ -38,9 +54,46 @@ export interface RunsDeps {
   fetchRunSignups: (run: { spot: string; date: string }) => Promise<SignupRow[]>;
   fetchRunPeople: (spot: string, date: string) => Promise<RunPeople>;
   fetchRunPlan: (spot: string, date: string) => Promise<number | null>;
+  fetchRunRoster: (spot: string, date: string) => Promise<RosterRow[]>;
+  setRunPlan: (spot: string, date: string, target: number, setBy: number, now: Date) => Promise<void>;
+  fetchRunsTable: (fromYmd: string, toYmd: string) => Promise<RunsTableRow[]>;
 }
 
-const DEFAULT_DEPS: RunsDeps = { fetchArchive, fetchRunSignups, fetchRunPeople, fetchRunPlan };
+const DEFAULT_DEPS: RunsDeps = {
+  fetchArchive,
+  fetchRunSignups,
+  fetchRunPeople,
+  fetchRunPlan,
+  fetchRunRoster,
+  setRunPlan,
+  fetchRunsTable,
+};
+
+/** Таблица «все забеги» — за всю историю: забегов единицы в неделю. */
+const TABLE_FROM = "2000-01-01";
+const TABLE_TO = "2100-12-31";
+
+/**
+ * Статус и порядок строк списка — функциями lib/team (signupStatus и
+ * viewSignups), чтобы «⚠️ не подтвердил» значило ровно то же, что в
+ * командном боте. Chat_id в выборку не попадает: signupStatus нужен только
+ * факт «чат есть», поэтому вместо id передаётся 1.
+ */
+export function orderRoster(rows: readonly RosterRow[]): Array<SignupView & { isNew: boolean }> {
+  const asSignups = rows.map((r) => ({
+    name: r.name,
+    contact: "",
+    pace: r.pace,
+    created_at: r.createdAt,
+    confirmed_at: r.confirmedAt,
+    reminder_sent_at: r.reminderSentAt,
+    tg_username: r.nick,
+    tg_chat_id: r.tgLinked ? 1 : null,
+    isNew: r.isNew,
+  }));
+  // viewSignups копирует строку ({ ...row, status }), поэтому isNew доезжает.
+  return viewSignups(asSignups) as Array<SignupView & { isNew: boolean }>;
+}
 
 /** Ближайших забегов кнопками на экране раздела. */
 const UPCOMING_BUTTONS = 4;
@@ -207,17 +260,69 @@ export function createRunsHandler(deps: RunsDeps = DEFAULT_DEPS): SectionHandler
         const title = `Прошлые забеги · ${list[0]?.spotName ?? spotName(spot ?? "")}`;
         return screensOf(runsListScreen(title, list, "У этой точки прошедших забегов пока нет."));
       }
-      // Таблица, список участников и план явки — Промт 6.
-      case "table":
-      case "people":
+      case "people": {
+        // Доступ и окно дат проверил конвейер (access.ts) — до обращения к базе.
+        const { runs } = await snapshot(now);
+        const run = runs.find((r) => r.spot === spot && r.date === date);
+        if (!run) return { kind: "stale" };
+        const ordered = orderRoster(await deps.fetchRunRoster(run.spot, run.date));
+        const page = Number(intent.params.page ?? "1");
+        const out = screensOf(
+          peoplePageScreen({
+            spot: run.spot,
+            date: run.date,
+            spotName: ref(run).spotName,
+            page,
+            rows: ordered.map((v) => ({ status: v.status, name: v.name, nick: v.tg_username, pace: v.pace, isNew: v.isNew })),
+          }),
+        );
+        // «Ещё» — новым защищённым сообщением; кнопку у прошлого снимаем, чтобы
+        // второе нажатие не прислало ту же страницу ещё раз.
+        return page > 1 ? { ...out, consumeButton: true } : out;
+      }
       case "plan": {
-        const back = spot && date ? cb("run", "card", spot, date) : cb("run", "list");
-        return screensOf({ text: NOT_READY_TEXT, buttons: [[{ text: "Назад", data: back }]] });
+        const { runs } = await snapshot(now);
+        const run = runs.find((r) => r.spot === spot && r.date === date);
+        if (!run) return { kind: "stale" };
+        if (run.past) return screensOf({ text: PLAN_PAST_TEXT });
+        await req.store.setForm(req.subject.chatId, openForm("run.plan", { spot: run.spot, date: run.date }, now), now);
+        return screensOf({ text: PLAN_ASK });
+      }
+      case "plan_submit": {
+        const { archive, runs } = await snapshot(now);
+        const run = runs.find((r) => r.spot === spot && r.date === date);
+        if (!run || run.past) {
+          await req.store.clearSession(req.subject.chatId);
+          return screensOf({ text: PLAN_PAST_TEXT });
+        }
+        const raw = (intent.params.value ?? "").trim();
+        const target = /^\d{1,3}$/.test(raw) ? Number(raw) : NaN;
+        // Не число или вне диапазона — просим ещё раз, форма остаётся открытой.
+        if (!(target >= PLAN_MIN && target <= PLAN_MAX)) return screensOf({ text: PLAN_RETRY });
+        await deps.setRunPlan(run.spot, run.date, target, req.subject.chatId, now);
+        await req.store.clearSession(req.subject.chatId);
+        return screensOf({ text: planSavedText(target) }, await card(req, run, archive));
+      }
+      case "table": {
+        const rows = await deps.fetchRunsTable(TABLE_FROM, TABLE_TO);
+        const page = Number(intent.params.page ?? "1");
+        return screensOf(runsTableScreen(tableLines(rows), page, now));
+      }
+      case "csv": {
+        const rows = await deps.fetchRunsTable(TABLE_FROM, TABLE_TO);
+        return screensOf({
+          text: "Все забеги — только агрегаты, без имён",
+          document: { filename: runsCsvFilename(mskToday(now)), content: runsCsv(tableLines(rows)) },
+        });
       }
       default:
         return { kind: "stale" };
     }
   };
+}
+
+function tableLines(rows: readonly RunsTableRow[]) {
+  return rows.map((r) => ({ ...r, spotName: spotName(r.spot) }));
 }
 
 function screensOf(...screens: Screen[]): SectionOutcome {
