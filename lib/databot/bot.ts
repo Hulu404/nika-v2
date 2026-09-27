@@ -2,7 +2,9 @@ import { autoRetry } from "@grammyjs/auto-retry";
 import { Bot, type Context } from "grammy";
 import type { Update, UserFromGetMe } from "grammy/types";
 import { databotToken } from "./config";
-import { runPipeline } from "./pipeline";
+import type { DatabotStore } from "./data/store";
+import { createSupabaseStore } from "./data/supabase-store";
+import { createPipeline } from "./pipeline";
 
 /**
  * Бот данных команды: цифры из Supabase по кнопке или вопросу, с учётом зоны
@@ -18,10 +20,14 @@ export interface CreateDatabotOptions {
   /** Готовый getMe — в тестах, чтобы не ходить в сеть за bot.init(). */
   botInfo?: UserFromGetMe;
   /**
-   * Печатать chat_id входящих апдейтов. Только для dev: так Али узнаёт свой
-   * chat_id для DATABOT_OWNER_IDS. В проде chat_id в логи не пишем.
+   * Печатать chat_id входящих апдейтов. Только для dev: так владелец узнаёт свой
+   * chat_id для DATABOT_OWNER_IDS. В проде chat_id в логи не писать.
    */
   logChatIds?: boolean;
+  /** Хранилище; по умолчанию — Supabase. В тестах — MemoryStore. */
+  store?: DatabotStore;
+  /** Часы — в тестах (срок приглашения). */
+  now?: () => Date;
 }
 
 /**
@@ -43,7 +49,7 @@ export function createDatabot(token: string, opts: CreateDatabotOptions = {}): B
     });
   }
 
-  bot.use(runPipeline);
+  bot.use(createPipeline({ store: opts.store ?? createSupabaseStore(), now: opts.now }));
 
   bot.catch((err) => {
     const e = err.error;

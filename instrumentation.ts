@@ -65,6 +65,22 @@ async function tickTeamDigests(): Promise<void> {
   }
 }
 
+/**
+ * Уборка бота данных: старые приглашения, raw_text журнала старше 30 дней,
+ * журнал старше 180, брошенные формы. Раз в сутки, первый проход после 04:00
+ * МСК — окно и отметку «сегодня убрано» проверяет сама. Без DATABOT_TOKEN
+ * возвращает absent и ничего не трогает.
+ */
+async function tickDatabotCleanup(): Promise<void> {
+  try {
+    const { runDatabotCleanup } = await import("./lib/databot/cleanup");
+    const res = await runDatabotCleanup();
+    if (res.status === "done") console.log(`[databot] уборка: ${res.detail ?? "готово"}`);
+  } catch (err) {
+    console.error("[databot] уборка упала:", err instanceof Error ? err.message : String(err));
+  }
+}
+
 async function tickReminders(): Promise<void> {
   try {
     const { dispatchCoffeeRunReminders } = await import("./lib/coffeerun/reminder-dispatch");
@@ -110,10 +126,12 @@ export async function register(): Promise<void> {
   void tickReminders();
   void tickInvites();
   void tickTeamDigests();
+  void tickDatabotCleanup();
   const timer = setInterval(() => {
     void tickReminders();
     void tickInvites();
     void tickTeamDigests();
+    void tickDatabotCleanup();
   }, REMINDER_TICK_MS);
   // Не держим процесс живым только ради тикера.
   timer.unref?.();
