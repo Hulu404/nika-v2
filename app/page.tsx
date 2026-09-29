@@ -25,5 +25,5 @@ export default async function Home() {
     redirect("/today");
   }
 
-  redirect("/auth");
+  redirect("/landing.html");
 }
