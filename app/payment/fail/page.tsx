@@ -168,7 +168,7 @@ export default async function PaymentFailPage({
             Попробовать снова
           </Link>
           <a
-            href="mailto:ceo@mynika.online"
+            href="mailto:ceo@mynika.ru"
             style={{
               marginTop: 10,
               width: "100%",

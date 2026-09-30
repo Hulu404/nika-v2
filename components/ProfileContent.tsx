@@ -10,8 +10,7 @@ import { subscribeToPush, unsubscribeFromPush } from "@/lib/push-subscribe";
 import type { Gender, NotifPermission } from "@/types/app";
 import { BottomSheet } from "@/components/BottomSheet";
 import { PlanBadge } from "@/components/PlanBadge";
-import { PrivacyContent } from "@/components/legal/PrivacyContent";
-import { OfertaContent } from "@/components/legal/OfertaContent";
+import { LegalLinks } from "@/components/legal/LegalLinks";
 
 // ─── типы ────────────────────────────────────────────────────────────────────
 
@@ -1066,24 +1065,15 @@ export function ProfileContent({
         </div>
       </BottomSheet>
 
-      {/* Условия и приватность */}
+      {/* Условия и приватность, Политика, Оферта: тексты на /legal/* */}
       <BottomSheet isOpen={activeSheet === "terms"} onClose={closeSheet} title="Условия и приватность">
-        <div className="space-y-4 text-[14px] leading-[1.65] text-ink-secondary">
-          <p>Твои данные хранятся на защищённых серверах и не передаются третьим лицам.</p>
-          <p>Диалоги используются только для формирования ответов НИКИ в рамках твоей сессии.</p>
-          <p>Ты можешь удалить все свои данные в любой момент в разделе «Данные».</p>
-          <p>Оплата обрабатывается через ЮKassa. Отмена подписки — в любой момент из личного кабинета.</p>
-        </div>
+        <LegalLinks onClose={closeSheet} />
       </BottomSheet>
-
-      {/* Политика конфиденциальности */}
       <BottomSheet isOpen={activeSheet === "privacy"} onClose={closeSheet} title="Политика конфиденциальности">
-        <PrivacyContent onClose={closeSheet} />
+        <LegalLinks onClose={closeSheet} />
       </BottomSheet>
-
-      {/* Публичная оферта */}
       <BottomSheet isOpen={activeSheet === "oferta"} onClose={closeSheet} title="Публичная оферта">
-        <OfertaContent onClose={closeSheet} />
+        <LegalLinks onClose={closeSheet} />
       </BottomSheet>
     </>
   );
