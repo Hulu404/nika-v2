@@ -11,6 +11,8 @@ import type { Gender, NotifPermission } from "@/types/app";
 import { BottomSheet } from "@/components/BottomSheet";
 import { PlanBadge } from "@/components/PlanBadge";
 import { LegalLinks } from "@/components/legal/LegalLinks";
+import { deleteAllCycleData } from "@/lib/rhythm/cycles";
+import type { ConsentType } from "@/lib/legal";
 
 // ─── типы ────────────────────────────────────────────────────────────────────
 
@@ -18,8 +20,10 @@ type NotifFrequency = "daily" | "every_other_day" | "weekdays" | "weekly" | "biw
 type SheetId =
   | "when" | "name" | "gender" | "morning" | "pause"
   | "export" | "delete" | "how" | "manifesto" | "support" | "terms"
-  | "privacy" | "oferta"
+  | "privacy" | "oferta" | "consents" | "deleteAccount"
   | null;
+
+type ConsentView = Record<ConsentType, { granted: boolean; version: string | null; at: string | null }>;
 
 // ─── константы ───────────────────────────────────────────────────────────────
 
@@ -249,6 +253,43 @@ export function ProfileContent({
   // Active sheet
   const [activeSheet, setActiveSheet] = useState<SheetId>(null);
   const closeSheet = useCallback(() => setActiveSheet(null), []);
+
+  // Согласия: состояние из журнала consents (подгружаем при открытии шторки)
+  const [consents, setConsents] = useState<ConsentView | "error" | null>(null);
+  const [consentBusy, setConsentBusy] = useState(false);
+  useEffect(() => {
+    if (activeSheet !== "consents") return;
+    let off = false;
+    setConsents(null);
+    fetch("/api/consents", { credentials: "same-origin" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => { if (!off) setConsents(j?.consents ?? "error"); })
+      .catch(() => { if (!off) setConsents("error"); });
+    return () => { off = true; };
+  }, [activeSheet]);
+
+  async function revokeHealth(deleteData: boolean) {
+    setConsentBusy(true);
+    try {
+      const res = await fetch("/api/consents", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({ entries: [{ type: "health", granted: false }], source: "profile" }),
+      });
+      if (!res.ok) throw new Error(String(res.status));
+      if (deleteData) await deleteAllCycleData(supabase, userId);
+      setConsents((c) =>
+        c && c !== "error"
+          ? { ...c, health: { granted: false, version: c.health.version, at: new Date().toISOString() } }
+          : c,
+      );
+    } catch {
+      setConsents("error");
+    } finally {
+      setConsentBusy(false);
+    }
+  }
 
   // Days counter
   const daysWithNika = Math.max(1, Math.floor(
@@ -742,6 +783,7 @@ export function ProfileContent({
                   Появится после запуска. Пока НИКА работает по тому, что ты пишешь.
                 </p>
               </div>
+              <Row label="Согласия"                        onClick={() => setActiveSheet("consents")} />
               <Row label="Экспорт диалогов"                onClick={() => setActiveSheet("export")} />
               <Row label="Удалить все диалоги" red          onClick={() => setActiveSheet("delete")} />
             </Card>
@@ -770,8 +812,8 @@ export function ProfileContent({
 
           {/* Удалить аккаунт */}
           <button
-            onClick={() => setActiveSheet("delete")}
-            className="mb-8 w-full py-2 text-center text-[12px] text-ink-faint transition-colors hover:text-ink-muted"
+            onClick={() => setActiveSheet("deleteAccount")}
+            className="mb-8 min-h-[44px] w-full py-2 text-center text-[12px] text-ink-faint transition-colors hover:text-ink-muted"
           >
             Удалить аккаунт
           </button>
@@ -1063,6 +1105,113 @@ export function ProfileContent({
             </svg>
           </a>
         </div>
+      </BottomSheet>
+
+      {/* Согласия */}
+      <BottomSheet isOpen={activeSheet === "consents"} onClose={closeSheet} title="Согласия">
+        {consents === null && <p className="text-[14px] text-ink-muted">Загружаем…</p>}
+        {consents === "error" && (
+          <p className="text-[14px] leading-[1.6] text-ink-secondary">
+            Не получилось загрузить или сохранить. Попробуй ещё раз позже или напиши на{" "}
+            <a href="mailto:ceo@mynika.ru" className="underline underline-offset-2">ceo@mynika.ru</a>.
+          </p>
+        )}
+        {consents && consents !== "error" && (
+          <div className="space-y-5 text-[14px] leading-[1.6] text-ink-secondary">
+            {(
+              [
+                { t: "offer", label: "Публичная оферта", href: "/legal/oferta" },
+                { t: "pd", label: "Обработка персональных данных", href: "/legal/consent" },
+              ] as const
+            ).map(({ t, label, href }) => (
+              <div key={t}>
+                <p className="text-[15px] text-ink-primary">{label}</p>
+                <p className="mt-0.5 text-[13px] text-ink-muted">
+                  {consents[t].granted && consents[t].at
+                    ? `Принято ${new Date(consents[t].at as string).toLocaleDateString("ru-RU")}`
+                    : "Отметки в журнале нет"}
+                  {" · "}
+                  <a href={href} target="_blank" rel="noopener" className="underline underline-offset-2">текст</a>
+                </p>
+              </div>
+            ))}
+            <p className="text-[12.5px] leading-[1.55] text-ink-muted">
+              Отозвать согласие на обработку персональных данных целиком можно письмом на{" "}
+              <a href="mailto:ceo@mynika.ru" className="underline underline-offset-2">ceo@mynika.ru</a>.
+            </p>
+
+            <div className="border-t border-line-default pt-5">
+              <p className="text-[15px] text-ink-primary">Сведения о здоровье</p>
+              <p className="mt-0.5 text-[13px] text-ink-muted">
+                {consents.health.granted && consents.health.at
+                  ? `Согласие дано ${new Date(consents.health.at).toLocaleDateString("ru-RU")}`
+                  : "Согласия нет, раздел «Мой ритм» закрыт"}
+                {" · "}
+                <a href="/legal/consent#c4" target="_blank" rel="noopener" className="underline underline-offset-2">текст</a>
+              </p>
+              {consents.health.granted ? (
+                <>
+                  <p className="mt-3 text-[13px] leading-[1.55] text-ink-muted">
+                    После отзыва раздел «Мой ритм» закроется, а данные цикла и самочувствия перестанут использоваться, в том
+                    числе в ответах Ники. Данные сразу не удаляются, если ты не выберешь это ниже.
+                  </p>
+                  <button
+                    onClick={() => revokeHealth(false)}
+                    disabled={consentBusy}
+                    className="mt-3 min-h-[44px] w-full rounded-pill border border-line-default py-[13px] text-[14px] font-medium text-ink-primary transition-colors hover:border-line-strong disabled:opacity-50"
+                  >
+                    Отозвать согласие
+                  </button>
+                  <button
+                    onClick={() => revokeHealth(true)}
+                    disabled={consentBusy}
+                    className="mt-2 min-h-[44px] w-full rounded-pill py-[13px] text-[14px] font-medium text-accent transition-colors hover:bg-surface-warm disabled:opacity-50"
+                  >
+                    Отозвать и удалить данные ритма
+                  </button>
+                </>
+              ) : (
+                <p className="mt-3 text-[13px] leading-[1.55] text-ink-muted">
+                  Дать согласие можно при следующем открытии раздела «Мой ритм».
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+      </BottomSheet>
+
+      {/* Удалить аккаунт */}
+      <BottomSheet isOpen={activeSheet === "deleteAccount"} onClose={closeSheet} title="Удалить аккаунт">
+        <div className="space-y-4 text-[14px] leading-[1.65] text-ink-secondary">
+          <p>
+            Автоматического удаления аккаунта в приложении пока нет. Чтобы удалить аккаунт и данные, напиши на{" "}
+            <a href="mailto:ceo@mynika.ru" className="underline underline-offset-2">ceo@mynika.ru</a> с адреса {email}.
+            Ответ придёт в течение 10 рабочих дней, данные будут уничтожены в течение 30 дней.
+          </p>
+          {isPro && (
+            <p className="rounded-[14px] border border-line-default bg-canvas px-4 py-3 text-ink-primary">
+              У тебя действует подписка Про. При удалении аккаунта можно запросить возврат за неиспользованные дни:
+              укажи это в письме на ceo@mynika.ru.
+            </p>
+          )}
+          <p className="text-[13px] text-ink-muted">
+            Только переписку с Никой можно удалить сразу: раздел «Данные», «Удалить все диалоги».
+          </p>
+        </div>
+        <a
+          href={`mailto:ceo@mynika.ru?subject=${encodeURIComponent("Удаление аккаунта НИКА")}&body=${encodeURIComponent(
+            `Прошу удалить мой аккаунт ${email} и связанные данные.${isPro ? " Прошу вернуть оплату за неиспользованные дни подписки." : ""}`,
+          )}`}
+          className="mt-6 flex min-h-[44px] w-full items-center justify-center rounded-pill bg-ink-primary py-[13px] text-[14px] font-medium text-canvas transition-colors hover:bg-accent"
+        >
+          Написать письмо
+        </a>
+        <button
+          onClick={closeSheet}
+          className="mt-3 min-h-[44px] w-full rounded-pill border border-line-default py-[13px] text-[14px] font-medium text-ink-secondary transition-colors hover:border-line-strong"
+        >
+          Закрыть
+        </button>
       </BottomSheet>
 
       {/* Условия и приватность, Политика, Оферта: тексты на /legal/* */}
