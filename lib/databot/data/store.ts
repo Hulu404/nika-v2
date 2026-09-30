@@ -1,5 +1,6 @@
 import type { FormState } from "../form";
 import type { TaskStore } from "../tasks";
+import type { AssignedTask, AssignedTaskDraft } from "../task-list";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 
 /**
@@ -11,6 +12,10 @@ import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
  * «никого нет». Запись журнала и отметки «был в боте» не бросают никогда.
  */
 export interface DatabotStore extends TaskStore {
+  importAssignedTasks(ownerId: number, messageId: number, tasks: AssignedTaskDraft[]): Promise<AssignedTask[]>;
+  getAssignedTask(id: number): Promise<AssignedTask | null>;
+  listAssignedTasks(userId: number): Promise<AssignedTask[]>;
+  assignedTaskDelivery(id: number, action: "lock" | "sent" | "failed" | "uncertain", messageId?: number): Promise<AssignedTask | null>;
   /** Активный участник по chat_id — одна выборка по первичному ключу, без кеша. */
   findActiveMember(chatId: number): Promise<MemberRow | null>;
 

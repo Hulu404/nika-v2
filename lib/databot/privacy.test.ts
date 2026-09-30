@@ -34,7 +34,7 @@ const MIGRATIONS_DIR = "supabase/migrations";
 
 /** Таблицы, которые боту можно трогать (аудит 7а). */
 const ALLOWED_TABLES = new Set([
-  "databot_members", "databot_invites", "databot_audit", "databot_kb", "databot_run_plans", "databot_tasks", "databot_task_claims",
+  "databot_members", "databot_invites", "databot_audit", "databot_kb", "databot_run_plans", "databot_tasks", "databot_task_claims", "databot_assigned_tasks",
   "tg_sessions", "processed_updates",
   "coffee_run_signups", "coffee_run_invites",
   "link_codes", "link_clicks", "user_attribution", "qr_codes", "qr_scans", "promo_tokens",
@@ -54,6 +54,7 @@ const ALLOWED_RPC = new Set([
   // Список участников (Промт 6): имя, ник, темп, статус — без телефона и email.
   "databot_run_roster",
   "databot_task_action", "databot_task_list", "databot_task_cleanup_list", "databot_task_json",
+  "databot_assigned_import", "databot_assigned_list", "databot_assigned_delivery",
 ]);
 
 /**
@@ -62,7 +63,7 @@ const ALLOWED_RPC = new Set([
  * chat_id сотрудника в databot_members, token приглашения в databot_invites.
  */
 const SERVICE_TABLES = new Set([
-  "databot_members", "databot_invites", "databot_audit", "databot_kb", "databot_run_plans", "databot_tasks", "databot_task_claims",
+  "databot_members", "databot_invites", "databot_audit", "databot_kb", "databot_run_plans", "databot_tasks", "databot_task_claims", "databot_assigned_tasks",
   "tg_sessions", "processed_updates",
 ]);
 const SERVICE_ONLY_COLUMNS = new Set(["display_name", "token", "chat_id"]);
@@ -435,7 +436,7 @@ function scanSql(rel: string, text: string): Violation[] {
     for (const m of body.matchAll(/[A-Za-z_][A-Za-z0-9_]*/g)) {
       const w = m[0].toLowerCase();
       if (isForbiddenTable(w)) hit(m.index ?? 0, `запрещённая таблица ${w}`);
-      else if (SQL_FORBIDDEN_COLUMNS.has(w) && !(w === "chat_id" && fn.name.startsWith("databot_task_")))
+      else if (SQL_FORBIDDEN_COLUMNS.has(w) && !(w === "chat_id" && (fn.name.startsWith("databot_task_") || fn.name.startsWith("databot_assigned_"))))
         hit(m.index ?? 0, `запрещённая колонка ${w}`);
     }
 
@@ -517,8 +518,9 @@ describe("приватность бота данных: код", () => {
   it("SQL: все функции 037 на месте", () => {
     const names = extractDatabotFunctions(stripSql(read(`${MIGRATIONS_DIR}/037_databot.sql`))).map((f) => f.name);
     const taskNames = extractDatabotFunctions(stripSql(read(`${MIGRATIONS_DIR}/038_databot_tasks.sql`))).map((f) => f.name);
+    const assignedNames = extractDatabotFunctions(stripSql(read(`${MIGRATIONS_DIR}/039_databot_assigned_tasks.sql`))).map((f) => f.name);
     for (const rpc of ALLOWED_RPC) if (rpc.startsWith("databot_"))
-      expect(rpc.startsWith("databot_task_") ? taskNames : names).toContain(rpc);
+      expect(rpc.startsWith("databot_task_") ? taskNames : rpc.startsWith("databot_assigned_") ? assignedNames : names).toContain(rpc);
   });
 
   it("SQL: тела функций databot_* во всех миграциях не трогают запрещённое", () => {

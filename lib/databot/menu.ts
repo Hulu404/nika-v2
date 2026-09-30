@@ -31,6 +31,8 @@ export const REMOVE_KEYBOARD: ReplyKeyboardRemove = { remove_keyboard: true };
 export function commandsFor(sections: readonly Section[]): BotCommand[] {
   return [
     ...sections.map((s) => ({ command: SECTION_COMMAND[s], description: SECTION_COMMAND_DESCRIPTION[s] })),
+    { command: "assigned", description: "Назначенные мне задачи" },
+    { command: "assign", description: "Загрузить список задач (владелец)" },
     { command: "help", description: HELP_COMMAND_DESCRIPTION },
   ];
 }

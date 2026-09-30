@@ -41,7 +41,9 @@ export function createDatabot(token: string, opts: CreateDatabotOptions = {}): B
   const retry = autoRetry(RETRY);
   bot.api.config.use((prev, method, payload, signal) => {
     // A group publication cannot be retried safely after an ambiguous network failure.
-    if (method === "sendMessage" && "chat_id" in payload && payload.chat_id === databotTaskConfig()?.chatId) {
+    if (method === "sendMessage" && "chat_id" in payload &&
+        (payload.chat_id === databotTaskConfig()?.chatId ||
+          ("text" in payload && typeof payload.text === "string" && payload.text.startsWith("<b>Новая задача от команды</b>")))) {
       return prev(method, payload, signal);
     }
     return retry(prev, method, payload, signal);

@@ -4,16 +4,16 @@ import { DATABOT_DEFAULT_COMMANDS } from "../lib/databot/copy";
 import { isProdWebhook } from "../lib/databot/dev-guard";
 import { DATABOT_ALLOWED_UPDATES } from "../lib/databot/ensure-webhook";
 
-// Сначала .env.local (там токен ТЕСТОВОГО бота), потом .env — dotenv не
-// перезаписывает уже заданные переменные.
+// Для этого запуска .env — основной источник ключей. .env.local заполняет
+// только отсутствующие переменные; dotenv не перезаписывает process.env.
+config({ path: ".env" });
 config({ path: ".env.local" });
-config();
 
 /**
  * DEV-режим бота данных: тот же бот на long-polling, как scripts/team-bot-dev.ts.
  *
  * Запуск:  npm run databot:dev
- * Нужен DATABOT_TOKEN ТЕСТОВОГО бота. Polling снимает вебхук, поэтому с боевым
+ * Нужен DATABOT_TOKEN ТЕСТОВОГО бота в .env. Polling снимает вебхук, поэтому с боевым
  * токеном скрипт не стартует: боевой бот замолчал бы в проде.
  *
  * Отличия от прода:
@@ -25,7 +25,7 @@ config();
 async function main(): Promise<void> {
   const token = process.env.DATABOT_TOKEN?.trim();
   if (!token) {
-    console.error("DATABOT_TOKEN не задан. Положи токен ТЕСТОВОГО бота в .env.local.");
+    console.error("DATABOT_TOKEN не задан. Положи токен ТЕСТОВОГО бота в .env.");
     process.exit(1);
   }
 
@@ -37,7 +37,7 @@ async function main(): Promise<void> {
       [
         "Это боевой бот: вебхук стоит на прод.",
         "Polling снимет боевой вебхук, и бот данных замолчит для команды.",
-        "Заведи отдельного тестового бота в BotFather и положи его токен в .env.local.",
+        "Заведи отдельного тестового бота в BotFather и положи его токен в .env.",
       ].join("\n"),
     );
     process.exit(1);

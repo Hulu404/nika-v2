@@ -81,7 +81,11 @@ export const HELP_COMMAND_DESCRIPTION = "Что я умею";
  * Меню команд по умолчанию — для всех, кто открыл бота. Разделы зоны ставятся
  * человеку отдельно, со scope chat.
  */
-export const DATABOT_DEFAULT_COMMANDS = [{ command: "help", description: HELP_COMMAND_DESCRIPTION }] as const;
+export const DATABOT_DEFAULT_COMMANDS = [
+  { command: "help", description: HELP_COMMAND_DESCRIPTION },
+  { command: "assigned", description: "Назначенные мне задачи" },
+  { command: "assign", description: "Загрузить список задач (владелец)" },
+] as const;
 
 /** Раздел по тексту кнопки постоянной клавиатуры. */
 export function sectionByLabel(text: string): Section | null {

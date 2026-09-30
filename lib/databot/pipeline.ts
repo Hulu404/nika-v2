@@ -1,6 +1,7 @@
 import { InputFile, type Context, type Keyboard, type MiddlewareFn } from "grammy";
 import { databotTaskConfig } from "./config";
 import { handleTaskUpdate } from "./task-handler";
+import { handleAssignedUpdate } from "./assigned-handler";
 import type { InlineKeyboardMarkup, ReplyKeyboardRemove } from "grammy/types";
 import { audienceOf, can, isEnvOwner, zoneCan } from "./access";
 import { buildAuditEntry, recordAudit } from "./audit";
@@ -88,6 +89,7 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
   // Шаг 1. Индикатор загрузки на кнопке гасим сразу — как lib/team/bot.ts.
   if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => {});
 
+  if (await handleAssignedUpdate(ctx, store)) return;
   if (await handleTaskUpdate(ctx, store)) return;
 
   // Шаг 2. Личка для отчётов; учёт задач настроенной группы уже обработан.

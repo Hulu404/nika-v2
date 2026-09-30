@@ -56,7 +56,16 @@ export async function handleTaskUpdate(ctx: Context, store: DatabotStore): Promi
       await reply(STRANGER_TEXT);
       return true;
     }
-    if (!config) { await reply("Задачи ещё не настроены: нужны DATABOT_TASK_CHAT_ID и DATABOT_TASK_SOURCE_THREAD_IDS."); return true; }
+    if (!config) {
+      if (!group && (cmd === "tasks" || cmd === "mytasks" || taskIntent?.report === "tsk.list")) {
+        const uid = ctx.from?.id;
+        if (!uid || !(await store.findActiveMember(uid))) taskError("member");
+        const assigned = await store.listAssignedTasks(uid);
+        if (!assigned.length) await reply("Назначенных вам задач пока нет.");
+        for (const item of assigned.slice(0, 30)) await reply(`#${item.id} · ${escapeHtml(item.what)}`);
+      } else await reply("Задачи ещё не настроены: нужны DATABOT_TASK_CHAT_ID и DATABOT_TASK_SOURCE_THREAD_IDS.");
+      return true;
+    }
     const thread = msg?.message_thread_id;
     if (group && (!thread || (!config.sourceThreads.includes(thread) && thread !== config.workThread))) return true;
     const uid = ctx.from?.id;
@@ -128,6 +137,11 @@ export async function handleTaskUpdate(ctx: Context, store: DatabotStore): Promi
           : { text: "Повторить публикацию", callback_data: cb("tsk", "retry", t.id) }]]);
       for (const t of active.filter(t => t.status === "completing").slice(0, 20)) await reply(`#${t.id} · Завершение в Telegram не подтверждено; слот занят.`,
         [[{ text: "Повторить оформление", callback_data: cb("tsk", "done", t.id) }]]);
+      const assigned = await store.listAssignedTasks(uid);
+      if (assigned.length) {
+        await reply("<b>Задачи, назначенные владельцем</b>");
+        for (const item of assigned.slice(0, 30)) await reply(`#${item.id} · ${escapeHtml(item.what)}`);
+      }
       auditOk = true;
       return true;
     }

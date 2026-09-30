@@ -4,6 +4,7 @@ import { asFormState, type FormState } from "../form";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 import type { DatabotStore } from "./store";
 import { TaskStoreBase, TaskError, type TaskRow } from "../tasks";
+import type { AssignedTask, AssignedTaskDraft } from "../task-list";
 
 /**
  * Боевое хранилище бота данных: таблицы databot_* из 037, tg_sessions и
@@ -69,6 +70,33 @@ function fail(op: string, message: string): never {
 }
 
 class SupabaseStore extends TaskStoreBase implements DatabotStore {
+  async importAssignedTasks(ownerId: number, messageId: number, tasks: AssignedTaskDraft[]): Promise<AssignedTask[]> {
+    const { data, error } = await this.db.rpc("databot_assigned_import", {
+      p_owner: ownerId, p_message: messageId, p_tasks: tasks,
+    }).abortSignal(timeout());
+    if (error) fail("importAssignedTasks", error.message);
+    return (data ?? []) as AssignedTask[];
+  }
+
+  async listAssignedTasks(userId: number): Promise<AssignedTask[]> {
+    const { data, error } = await this.db.rpc("databot_assigned_list", { p_user: userId }).abortSignal(timeout());
+    if (error) fail("listAssignedTasks", error.message);
+    return (data ?? []) as AssignedTask[];
+  }
+
+  async getAssignedTask(id: number): Promise<AssignedTask | null> {
+    const { data, error } = await this.db.from("databot_assigned_tasks").select("*").eq("id", id).abortSignal(timeout()).maybeSingle();
+    if (error) fail("getAssignedTask", error.message);
+    return data as AssignedTask | null;
+  }
+
+  async assignedTaskDelivery(id: number, action: "lock" | "sent" | "failed" | "uncertain", messageId?: number): Promise<AssignedTask | null> {
+    const { data, error } = await this.db.rpc("databot_assigned_delivery", {
+      p_id: id, p_action: action, p_message: messageId ?? null,
+    }).abortSignal(timeout());
+    if (error) fail("assignedTaskDelivery", error.message);
+    return data as AssignedTask | null;
+  }
   async taskAction(action: string, args: Record<string, unknown>): Promise<TaskRow | null> {
     const { data, error } = await this.db.rpc("databot_task_action", { p_action: action, p_args: args }).abortSignal(timeout());
     if (error) {
