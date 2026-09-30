@@ -20,6 +20,7 @@ import { resolveTier } from "@/lib/subscription";
 import { createServerComponentClient } from "@/lib/supabase";
 import type { Message } from "@/types/app";
 import type { Scenario } from "@/types/conversation";
+import { hasConsent } from "@/lib/consents";
 
 export const runtime = "nodejs";
 
@@ -280,7 +281,9 @@ export async function POST(req: Request) {
   const profile = await getProfile(supabase, user.id);
   let rhythmContextAdded = false;
 
-  if (showRhythm(profile?.gender, profile?.cycle)) {
+  // Цикл и чек-ин это сведения о здоровье: за границу (Anthropic) они уходят только
+  // при отдельном согласии (раздел 4 /legal/consent).
+  if (showRhythm(profile?.gender, profile?.cycle) && (await hasConsent(supabase, user.id, "health"))) {
     const cycles = await getLatestCycles(supabase, user.id, 3);
     if (cycles.length > 0) {
       const cycleLen = getCycleLength(cycles);

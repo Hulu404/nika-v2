@@ -15,6 +15,8 @@ import {
 import { RhythmContent } from "@/components/rhythm/RhythmContent";
 import { RhythmOnboarding } from "@/components/rhythm/RhythmOnboarding";
 import { MorningAttribution } from "@/components/rhythm/MorningAttribution";
+import { HealthConsentGate } from "@/components/consents/HealthConsentGate";
+import { hasConsent } from "@/lib/consents";
 
 function todayUtc(): string {
   return new Date().toISOString().slice(0, 10);
@@ -39,6 +41,16 @@ export default async function RhythmPage() {
   ]);
 
   if (!showRhythm(profile?.gender, profile?.cycle)) redirect("/");
+
+  // Цикл и самочувствие это сведения о здоровье: без отдельного согласия раздел закрыт
+  if (!(await hasConsent(supabase, user.id, "health"))) {
+    return (
+      <AppLayout sidebarSlot={<SidebarData />}>
+        <PageHeader title="Мой ритм" />
+        <HealthConsentGate hadData={cycles.length > 0} />
+      </AppLayout>
+    );
+  }
 
   // Нет ни одного цикла — онбординг
   if (cycles.length === 0) {

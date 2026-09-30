@@ -1,5 +1,6 @@
 import { anthropic } from "@/lib/anthropic";
 import { createServerComponentClient } from "@/lib/supabase";
+import { hasConsent } from "@/lib/consents";
 import { getLatestCycles, getTodayCheckin, getCycleLength, getCycleDay, getPhase, PHASE_META } from "@/lib/rhythm/cycles";
 
 export const runtime = "nodejs";
@@ -16,6 +17,9 @@ export async function POST() {
   const supabase = await createServerComponentClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return Response.json({ error: "Unauthorized" }, { status: 401 });
+  if (!(await hasConsent(supabase, user.id, "health"))) {
+    return Response.json({ error: "Health consent required" }, { status: 403 });
+  }
 
   const today = todayUtc();
 

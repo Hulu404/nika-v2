@@ -4,6 +4,7 @@ import { resolveIsPro } from "@/lib/subscription";
 import { getActiveSprint, sprintDay, sprintWeek } from "@/lib/sprint";
 import { getRuns } from "@/lib/runs";
 import { buildWordCloud } from "@/lib/analytics";
+import { hasConsent } from "@/lib/consents";
 import { getLatestCycles, getCycleLength, getCycleDay, getPhase, type Phase } from "@/lib/rhythm/cycles";
 import {
   buildSprintSignals,
@@ -33,6 +34,8 @@ async function getEnergyHint(
   userId: string,
 ): Promise<EnergyHint | null> {
   try {
+    // Данные цикла используем только при согласии на сведения о здоровье.
+    if (!(await hasConsent(supabase, userId, "health"))) return null;
     const cycles = await getLatestCycles(supabase, userId, 6);
     if (cycles.length === 0) return null;
     const len = getCycleLength(cycles);
