@@ -97,6 +97,16 @@ function parseCallbackIntent(data: string): ParseResult {
   if (section === "tm") return parseTeamCallback(action, params);
   if (section === "run") return parseRunCallback(action, params);
   if (section === "kb") return parseKbCallback(action, params);
+  if (section === "pro" || section === "prd") {
+    const [period, page, ...extra] = params;
+    if (action !== "summary" || !["7d", "pw", "tm", "30d"].includes(period) ||
+        extra.length || (page !== undefined && !isPage(page))) return { kind: "stale", section };
+    return intent({
+      report: section === "pro" ? "pro.summary" : "prd.summary",
+      section, action: "summary", source: "button",
+      params: { period, ...(page ? { page } : {}) },
+    });
+  }
 
   // Остальные разделы подключаются своими промтами; до тех пор их кнопок
   // быть не может, и любая такая кнопка — устаревшая.

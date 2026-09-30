@@ -19,6 +19,17 @@ import {
 } from "./copy";
 import { MemoryStore } from "./data/memory-store";
 import { INVITE_TTL_MS } from "./invite";
+import { fetchPro } from "./data/pro";
+import { fetchProduct } from "./data/product";
+
+vi.mock("./data/pro", () => ({ fetchPro: vi.fn(async () => ({
+  proNow: 3, proPaid: 1, proPromo: 1, proManual: 1, paymentsCount: 1, paymentsSum: 299,
+  paymentsByPlan: {}, redeemedByCode: [], redeemedToPaid: 0, expiring7d: 0,
+})) }));
+vi.mock("./data/product", () => ({ fetchProduct: vi.fn(async () => ({
+  signups: 4, onboarded: 2, tgLinked: 1, byChannel: {}, active7d: 3,
+  sprintsStarted: 0, sprintsActive: 0, sprintsClosed: 0, nudgeSent: 0, nudgeClicked: 0, nsm: null,
+})) }));
 
 /**
  * Конвейер целиком на настоящем grammY: вызовы Bot API перехватываются
@@ -44,8 +55,7 @@ function setup() {
   const bot = createDatabot("999:test-token", { botInfo: BOT_INFO, store, now: clock });
   bot.api.config.use(async (_prev, method, payload) => {
     calls.push({ method, payload: payload as Record<string, unknown> });
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return { ok: true, result: true } as any;
+    return { ok: true, result: true } as Awaited<ReturnType<typeof _prev>>;
   });
   let updateId = 1;
   const send = async (update: Record<string, unknown>) => {
@@ -95,6 +105,7 @@ const commandsSetFor = (calls: Call[], chatId: number) =>
   );
 
 beforeEach(() => {
+  vi.clearAllMocks();
   vi.stubEnv("DATABOT_OWNER_IDS", String(OWNER));
   vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -156,7 +167,7 @@ describe("владелец из env", () => {
     expect(row).toMatchObject({ zone: "council", is_owner: true, is_active: true });
     const cmds = commandsSetFor(calls, OWNER)!;
     expect(cmds.method).toBe("setMyCommands");
-    expect((cmds.payload.commands as { command: string }[]).map((c) => c.command)).toEqual(["runs", "kb", "team", "help"]);
+    expect((cmds.payload.commands as { command: string }[]).map((c) => c.command)).toEqual(["runs", "pro", "product", "kb", "team", "help"]);
     const welcome = calls.find((c) => c.method === "sendMessage")!;
     expect(welcome.payload.reply_markup).toMatchObject({ is_persistent: true, resize_keyboard: true });
     expect(JSON.stringify(welcome.payload.reply_markup)).toContain("Команда");
@@ -277,8 +288,7 @@ describe("разделы и разбор", () => {
   it("неготовый раздел из доступных — «ещё собираю»", async () => {
     const t = setup();
     await t.text(OWNER, "/start");
-    expect(texts(await t.text(OWNER, "/pro"))).toEqual([NOT_READY_TEXT]);
-    expect(texts(await t.text(OWNER, "/product"))).toEqual([NOT_READY_TEXT]);
+    expect(texts(await t.text(OWNER, "/social"))).toEqual([NOT_READY_TEXT]);
   });
 
   it("чужой раздел командой — отказ с доступными разделами", async () => {
@@ -286,6 +296,34 @@ describe("разделы и разбор", () => {
     await t.text(ALICE, `/start inv_${await invite(t, "smm")}`);
     const [reply] = texts(await t.text(ALICE, "/pro"));
     expect(reply).toMatch(/^Это видит совет\./);
+    expect(fetchPro).not.toHaveBeenCalled();
+  });
+
+  it("совет получает отчёты, смена периода сохраняется в аудите", async () => {
+    const t = setup();
+    await t.text(ALICE, `/start inv_${await invite(t, "council")}`);
+    expect(texts(await t.text(ALICE, "/pro"))[0]).toContain("PRO сейчас: 3");
+    expect(texts(await t.text(ALICE, "/product"))[0]).toContain("Регистрации за период: 4");
+    const calls = await t.press(ALICE, "d:prd:summary:pw");
+    expect(calls.some((c) => c.method === "editMessageText")).toBe(true);
+    expect(fetchProduct).toHaveBeenLastCalledWith(new Date("2026-09-20T21:00:00Z"), new Date("2026-09-27T21:00:00Z"));
+    expect(t.store.audit.at(-1)).toMatchObject({ report: "prd.summary", params: { period: "pw" }, ok: true });
+  });
+
+  it.each(["smm", "events"] as const)("%s не получает продуктовые данные через кнопку", async (zone) => {
+    const t = setup();
+    await t.text(ALICE, `/start inv_${await invite(t, zone)}`);
+    await t.press(ALICE, "d:prd:summary:7d");
+    expect(fetchProduct).not.toHaveBeenCalled();
+    expect(t.store.audit.at(-1)?.ok).toBe(false);
+  });
+
+  it("ошибка данных — сообщение о сбое и неуспешный аудит", async () => {
+    const t = setup();
+    await t.text(OWNER, "/start");
+    vi.mocked(fetchPro).mockRejectedValueOnce(new Error("database unavailable"));
+    expect(texts(await t.text(OWNER, "/pro"))).toEqual([DB_DOWN_TEXT]);
+    expect(t.store.audit.at(-1)).toMatchObject({ report: "pro.summary", ok: false });
   });
 
   it("вопрос текстом до Промта 14 — «не поняла» и меню; текст в журнале только тут", async () => {

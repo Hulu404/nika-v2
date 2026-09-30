@@ -6,13 +6,13 @@ import { SECTIONS, type ReportId, type Section, type Subject } from "./types";
  * постоянной клавиатуре, ни в меню команд; если до него всё же дошли (старая
  * клавиатура, команда руками) — «Этот раздел ещё собираю».
  *
- * Включают: run — Промт 5, kb — Промт 7, tr — Промт 12, pro и prd — Промт 13.
+ * «Соцсети» пока не подключены. Остальные разделы имеют обработчики.
  */
 export const SECTION_READY: Record<Section, boolean> = {
   run: true,
   tr: false,
-  pro: false,
-  prd: false,
+  pro: true,
+  prd: true,
   kb: true,
   tm: true,
 };
