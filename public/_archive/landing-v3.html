@@ -1,0 +1,947 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>НИКА · Practices you do on the run</title>
+<meta name="description" content="НИКА учит слышать тело во время бега. Практики в наушниках прямо на пробежке, короткий разговор после и никаких лишних цифр.">
+<meta name="theme-color" content="#08080A">
+<meta property="og:title" content="НИКА · The world gave athletes more data">
+<meta property="og:description" content="We want to give them back their sense. Практики, которые делаются на бегу.">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Caveat:wght@600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   НИКА · лендинг v3
+   Визуальный язык взят из PWA /authv1: тёмный холст, небо
+   с холмами на всю ширину, Inter Light + сериф на акцентном
+   слове, молочные пилюли, один акцент терракоты.
+   Структура показа продукта подсмотрена у Oura: телефон
+   держится на месте, экраны и небо меняются на прокрутке.
+   ============================================================ */
+:root{
+  --sans:'Inter',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+  --disp:'Playfair Display','Times New Roman',Georgia,serif;
+  --hand:'Caveat','Segoe Print',cursive;
+
+  --ink:#F4EFE6;
+  --ink-2:rgba(244,239,230,.68);
+  --ink-3:rgba(244,239,230,.42);
+  --ink-4:rgba(244,239,230,.16);
+  --void:#0B0B0D;
+  --night:#08080A;
+  --veil:rgba(255,255,255,.07);
+  --veil-2:rgba(255,255,255,.12);
+  --line:rgba(244,239,230,.12);
+  --brand:#D4703F;
+  --brand-deep:#A8452E;
+
+  --r-md:16px; --r-lg:22px; --r-xl:28px; --r-pill:999px;
+  --gut:clamp(16px,4vw,40px);
+  --maxw:1200px;
+  --ease:cubic-bezier(.32,.72,0,1);
+}
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%;scroll-behavior:smooth}
+body{margin:0;background:var(--night);color:var(--ink);font-family:var(--sans);font-size:16px;line-height:1.56;
+  letter-spacing:-.002em;font-optical-sizing:auto;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+a{color:inherit;text-decoration:none}
+img,svg{display:block}
+:focus-visible{outline:1.5px solid var(--ink);outline-offset:4px;border-radius:8px}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 var(--gut)}
+
+/* ---------- типографика ---------- */
+.ser{font-family:var(--disp);font-weight:400;letter-spacing:.002em}
+.disp{font-weight:300;margin:0;letter-spacing:-.022em;line-height:1.04}
+.disp .ser{font-size:1.06em;line-height:.9}
+.d-hero{font-size:clamp(2.4rem,6vw,5.2rem);letter-spacing:-.034em;line-height:1.0}
+.d-xl{font-size:clamp(2.2rem,4.8vw,4.2rem)}
+.d-lg{font-size:clamp(1.9rem,3.6vw,3.1rem);letter-spacing:-.018em;line-height:1.08}
+.d-md{font-size:clamp(1.45rem,2.2vw,1.9rem);letter-spacing:-.012em;line-height:1.16}
+.lab{font-size:.7rem;letter-spacing:.17em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+.lead{font-size:clamp(1rem,1.3vw,1.14rem);color:var(--ink-2);line-height:1.6;max-width:34em}
+.cap{font-size:.88rem;color:var(--ink-2);line-height:1.5}
+
+/* ---------- кнопки ---------- */
+.pill{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:52px;padding:0 28px;
+  border-radius:var(--r-pill);background:var(--veil-2);color:var(--ink);font-size:.97rem;font-weight:500;
+  -webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);border:0;cursor:pointer;font-family:inherit;
+  transition:transform .15s var(--ease),background .25s,box-shadow .25s}
+.pill:hover{background:rgba(255,255,255,.18)}
+.pill:active{transform:scale(.97)}
+.pill.solid{background:var(--ink);color:#111}
+.pill.solid:hover{background:#fff;box-shadow:0 10px 40px -12px rgba(244,239,230,.45)}
+.pill.sm{height:40px;padding:0 18px;font-size:.88rem}
+.pill .arr{transition:transform .25s var(--ease)}
+.pill:hover .arr{transform:translateX(3px)}
+
+/* ---------- навигация ---------- */
+.nav{position:fixed;top:0;left:0;right:0;z-index:50;transition:background .35s,backdrop-filter .35s,border-color .35s;
+  border-bottom:1px solid transparent}
+.nav.scrolled{background:rgba(8,8,10,.62);-webkit-backdrop-filter:blur(20px) saturate(1.3);backdrop-filter:blur(20px) saturate(1.3);
+  border-bottom-color:rgba(255,255,255,.06)}
+.nav .wrap{display:flex;align-items:center;justify-content:space-between;height:68px;max-width:none}
+.wordmark{font-family:var(--disp);font-size:1.22rem;letter-spacing:.16em;font-weight:400;white-space:nowrap}
+.wordmark .my{font-family:var(--sans);font-size:.6em;letter-spacing:.06em;color:var(--ink-2);vertical-align:.12em;margin-right:.2em}
+.nav-links{display:flex;gap:34px;font-size:.9rem;color:var(--ink-2)}
+.nav-links a{transition:color .2s}
+.nav-links a:hover{color:var(--ink)}
+@media (max-width:860px){.nav-links{display:none}}
+
+/* ---------- небо (иллюстрация на всю ширину) ---------- */
+.sky{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.sky svg{width:100%;height:100%}
+.fade-b{position:absolute;left:0;right:0;bottom:0;height:62%;z-index:1;pointer-events:none;
+  background:linear-gradient(to bottom,transparent 0%,rgba(8,8,10,.4) 36%,rgba(8,8,10,.86) 70%,var(--night) 96%)}
+
+/* ---------- 1. HERO ---------- */
+.hero{position:relative;min-height:100svh;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden}
+.hero .sky svg{transform:translateY(calc(var(--py,0) * 1px))}
+.hero-body{position:relative;z-index:2;padding-top:120px;padding-bottom:clamp(56px,9vh,110px)}
+.hero .breath{margin:0 0 clamp(14px,3vh,34px) -6px}
+.hero h1{max-width:15em}
+.hero h1 .l2{display:block;color:var(--ink)}
+.hero h1 .l1{display:block;color:var(--ink-2)}
+.hero .lead{margin:26px 0 34px}
+.cta-row{display:flex;flex-wrap:wrap;gap:12px}
+.scroll-hint{position:absolute;right:var(--gut);bottom:clamp(56px,9vh,110px);z-index:2;display:flex;align-items:center;gap:10px;
+  writing-mode:vertical-rl;font-size:.7rem;letter-spacing:.17em;text-transform:uppercase;color:var(--ink-3)}
+.scroll-hint i{display:block;width:1px;height:54px;background:linear-gradient(var(--ink-3),transparent);animation:drip 2.4s var(--ease) infinite}
+@keyframes drip{0%{transform:scaleY(0);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}51%{transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
+@media (max-width:700px){.scroll-hint{display:none}}
+
+/* дуга дыхания */
+.breath{position:relative;width:min(420px,86vw);height:150px}
+.breath svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.breath .track{fill:none;stroke:rgba(244,239,230,.22);stroke-width:1.5;stroke-linecap:round}
+.breath .lit{fill:none;stroke:var(--ink);stroke-width:2.5;stroke-linecap:round}
+.breath .bead{fill:var(--ink);filter:drop-shadow(0 0 8px rgba(244,239,230,.8))}
+.breath .core{position:absolute;left:0;right:0;top:62px;text-align:center}
+.breath .phase{font-size:.66rem;letter-spacing:.17em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+.breath .count{font-size:3.2rem;letter-spacing:-.036em;font-weight:300;line-height:1;margin-top:4px;font-variant-numeric:tabular-nums}
+
+/* ---------- 2. ЦИФРЫ РАСТВОРЯЮТСЯ ---------- */
+.dissolve{position:relative;height:260vh}
+.dissolve .pin{position:sticky;top:0;height:100svh;display:flex;align-items:center;overflow:hidden}
+.dissolve .wrap{position:relative;width:100%;text-align:center}
+.dissolve h2{position:relative;z-index:3;max-width:12em;margin:0 auto}
+.dissolve .lead{margin:22px auto 0;position:relative;z-index:3}
+.metrics{position:absolute;inset:0;z-index:1;pointer-events:none}
+.metric{position:absolute;font-weight:300;letter-spacing:-.03em;white-space:nowrap;color:var(--ink-3);
+  font-variant-numeric:tabular-nums;will-change:filter,opacity,transform}
+.metric small{display:block;font-size:.62rem;letter-spacing:.17em;text-transform:uppercase;font-weight:500;margin-top:4px;opacity:.8}
+.senses{display:flex;justify-content:center;gap:clamp(18px,4vw,56px);margin-top:44px;position:relative;z-index:3}
+.sense{opacity:0;transform:translateY(14px);transition:opacity .9s var(--ease),transform .9s var(--ease);text-align:center}
+.sense.on{opacity:1;transform:none}
+.sense .dot{width:64px;height:64px;border-radius:50%;margin:0 auto 12px;display:grid;place-items:center;
+  background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);position:relative}
+.sense .dot svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.sense .dot circle{fill:none;stroke-width:2;stroke-linecap:round}
+.sense .dot .fill{stroke:var(--ink);stroke-dasharray:195;stroke-dashoffset:195;transition:stroke-dashoffset 1.6s var(--ease) .2s}
+.sense.on .dot .fill{stroke-dashoffset:var(--o)}
+.sense b{font-family:var(--disp);font-weight:400;font-size:1.2rem}
+@media (max-width:560px){.senses{gap:14px}.sense .dot{width:54px;height:54px}.sense b{font-size:1.02rem}}
+
+/* ---------- 3. ПОКАЗ ПРОДУКТА (sticky телефон) ---------- */
+.show{position:relative;height:460vh}
+.show .pin{position:sticky;top:0;height:100svh;overflow:hidden}
+.show .bg{position:absolute;inset:-60px;z-index:0}
+.show .bg .layer{position:absolute;inset:0;opacity:0;transition:opacity 1.1s var(--ease)}
+.show .bg .layer.on{opacity:1}
+.show .bg svg{width:100%;height:100%;filter:blur(38px) saturate(1.05);transform:scale(1.1)}
+.show .bg::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse at 60% 50%,rgba(8,8,10,.25),rgba(8,8,10,.78) 75%)}
+.show .grid{position:relative;z-index:2;height:100%;display:grid;grid-template-columns:1fr auto;align-items:center;gap:clamp(24px,6vw,110px)}
+.show .intro{position:absolute;top:clamp(84px,12vh,130px);left:0;right:0}
+.steps{position:relative;min-height:260px}
+.step{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;opacity:0;transform:translateY(22px);
+  transition:opacity .7s var(--ease),transform .7s var(--ease);pointer-events:none}
+.step.on{opacity:1;transform:none;pointer-events:auto}
+.step .tag{display:inline-flex;align-items:center;gap:14px;margin-bottom:22px}
+.step .ico{width:52px;height:52px;border-radius:50%;display:grid;place-items:center;background:var(--veil);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1)}
+.step .tag span{font-size:1.5rem;font-weight:300;letter-spacing:-.014em}
+.step p{max-width:25em}
+.progress{display:flex;gap:8px;margin-top:34px}
+.progress i{width:26px;height:2px;border-radius:2px;background:var(--ink-4);transition:background .4s,width .4s var(--ease)}
+.progress i.on{background:var(--ink);width:44px}
+
+/* телефон */
+.phone{--pw:300px;position:relative;width:var(--pw);height:calc(var(--pw) * 2.1);border-radius:calc(var(--pw) * .15);
+  background:#000;padding:calc(var(--pw) * .028);box-shadow:0 0 0 1.5px #2A2A2F,0 50px 110px -30px rgba(0,0,0,.9)}
+.screen{position:relative;width:100%;height:100%;border-radius:calc(var(--pw) * .125);overflow:hidden;background:var(--void);isolation:isolate}
+.scr{position:absolute;inset:0;opacity:0;transition:opacity .8s var(--ease);font-size:11.5px;line-height:1.45}
+.scr.on{opacity:1}
+.scr .art{position:absolute;inset:0;z-index:0}
+.scr .art svg{width:100%;height:100%}
+.scr .shade{position:absolute;left:0;right:0;bottom:0;height:70%;z-index:1;
+  background:linear-gradient(to bottom,transparent,rgba(11,11,13,.55) 36%,rgba(11,11,13,.92) 66%,var(--void) 92%)}
+.scr .in{position:absolute;inset:0;z-index:2;padding:46px 18px 18px;display:flex;flex-direction:column}
+.sbar{position:absolute;top:0;left:0;right:0;z-index:5;height:34px;display:flex;justify-content:space-between;align-items:center;
+  padding:8px 22px 0;font-size:10.5px;font-weight:600}
+.island{position:absolute;top:8px;left:50%;transform:translateX(-50%);width:84px;height:24px;border-radius:14px;background:#000;z-index:6}
+.abar{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.abar .orb{width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#F0A77E,#C8553D 60%,#7A2F22)}
+.abar .wm{font-family:var(--disp);font-size:12px;letter-spacing:.16em}
+.abar .wm small{font-family:var(--sans);font-size:.62em;letter-spacing:.06em;color:var(--ink-2);margin-right:2px}
+.m-lab{font-size:7.5px;letter-spacing:.17em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+.m-disp{font-weight:300;font-size:25px;letter-spacing:-.02em;line-height:1.02;margin:6px 0 0}
+.m-disp .ser{font-size:1.06em}
+.m-cap{font-size:10px;color:var(--ink-2);line-height:1.45;margin:8px 0 12px}
+.m-pill{height:34px;border-radius:99px;background:var(--ink);color:#111;display:grid;place-items:center;font-weight:500;font-size:11px}
+.m-ghost{font-size:9.5px;color:var(--ink-3);margin-top:8px}
+.rings{display:flex;gap:9px}
+.ring{width:46px;text-align:center}
+.ring .c{width:42px;height:42px;margin:0 auto 4px;border-radius:50%;position:relative;display:grid;place-items:center;
+  background:rgba(255,255,255,.06);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);font-size:14px;font-weight:300}
+.ring .c svg{position:absolute;inset:0;width:100%;height:100%;transform:rotate(-90deg)}
+.ring .c circle{fill:none;stroke-width:1.6;stroke-linecap:round}
+.ring i{font-style:normal;font-size:8.5px;color:var(--ink-3)}
+.m-breath{position:relative;height:84px;margin:auto 0 6px}
+.m-breath svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.m-breath .core{position:absolute;left:0;right:0;top:34px;text-align:center}
+.m-breath .count{font-size:30px;font-weight:300;letter-spacing:-.03em;line-height:1}
+.tabbar{display:flex;align-items:center;gap:8px;margin-top:12px}
+.tabbar .tb{flex:1;height:40px;border-radius:99px;background:rgba(30,30,34,.8);-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px);
+  display:flex;justify-content:space-around;align-items:center;font-size:7.5px;color:var(--ink-3)}
+.tabbar .tb span.on{color:var(--ink)}
+.tabbar .fab{width:40px;height:40px;border-radius:50%;background:var(--brand);display:grid;place-items:center}
+/* плеер */
+.player-t{margin-top:auto}
+.bar{height:3px;border-radius:3px;background:rgba(255,255,255,.18);margin:16px 0 6px;overflow:hidden}
+.bar i{display:block;height:100%;width:34%;background:var(--ink);border-radius:3px;animation:play 12s linear infinite}
+@keyframes play{from{width:14%}to{width:78%}}
+.times{display:flex;justify-content:space-between;font-size:8.5px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+.ctrls{display:flex;justify-content:center;align-items:center;gap:28px;margin:16px 0 6px}
+.ctrls .big{width:56px;height:56px;border-radius:50%;background:var(--ink);display:grid;place-items:center}
+.cue{margin-top:14px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.08);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);
+  font-family:var(--disp);font-size:12.5px;line-height:1.35}
+/* как это было */
+.feel{margin-top:14px}
+.feel .row{margin-bottom:12px}
+.feel .row b{display:block;font-weight:400;font-size:11px;margin-bottom:6px}
+.segs{display:grid;grid-template-columns:repeat(10,1fr);gap:3px}
+.segs i{height:13px;border-radius:4px;background:rgba(255,255,255,.07)}
+.segs i.f{background:rgba(244,239,230,.85)}
+.note{margin-top:4px;padding:10px 12px;border-radius:14px;background:rgba(255,255,255,.06);color:var(--ink-2);font-size:10px}
+/* чат */
+.chat{display:flex;flex-direction:column;gap:8px;margin-top:auto}
+.bub{max-width:84%;padding:9px 12px;border-radius:15px;font-size:10.5px;line-height:1.42}
+.bub.n{background:rgba(255,255,255,.1);-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px);border-bottom-left-radius:5px}
+.bub.u{align-self:flex-end;background:var(--ink);color:#111;border-bottom-right-radius:5px}
+.typing{display:flex;gap:4px;padding:10px 12px;background:rgba(255,255,255,.1);border-radius:15px;width:max-content}
+.typing i{width:5px;height:5px;border-radius:50%;background:var(--ink-2);animation:blink 1.3s infinite}
+.typing i:nth-child(2){animation-delay:.18s}.typing i:nth-child(3){animation-delay:.36s}
+@keyframes blink{0%,60%,100%{opacity:.3;transform:none}30%{opacity:1;transform:translateY(-2px)}}
+.input{margin-top:10px;height:36px;border-radius:99px;background:rgba(255,255,255,.07);display:flex;align-items:center;padding:0 14px;
+  font-size:10px;color:var(--ink-3)}
+
+@media (max-width:860px){
+  .show .grid{grid-template-columns:1fr;grid-template-rows:auto auto;align-content:start;gap:14px;padding-top:84px}
+  .show .intro{display:none}
+  .steps{min-height:196px;order:1}
+  .step{justify-content:flex-start}
+  .step .tag{margin-bottom:10px}.step .ico{width:40px;height:40px}.step .tag span{font-size:1.2rem}
+  .step p{font-size:.92rem;margin-top:10px!important}
+  .progress{margin-top:6px}
+  .phone{--pw:300px;margin:0 auto;order:2;transform:scale(var(--ps,.74));transform-origin:top center}
+}
+@media (max-width:860px) and (max-height:700px){.phone{--ps:.6}
+}
+@media (max-height:760px) and (min-width:861px){.phone{--pw:260px}}
+
+/* ---------- 4. ПРАКТИКИ ---------- */
+.sec{padding:clamp(90px,14vh,160px) 0}
+.sec-head{display:flex;justify-content:space-between;align-items:flex-end;gap:24px;flex-wrap:wrap;margin-bottom:44px}
+.sec-head .lab{margin-bottom:16px}
+.rail{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.pract{position:relative;aspect-ratio:3/4;border-radius:var(--r-lg);overflow:hidden;isolation:isolate;
+  transition:transform .5s var(--ease)}
+.pract:hover{transform:translateY(-6px)}
+.pract .art{position:absolute;inset:0;z-index:0;transition:transform 1.2s var(--ease)}
+.pract:hover .art{transform:scale(1.05)}
+.pract .art svg{width:100%;height:100%}
+.pract .shade{position:absolute;inset:0;z-index:1;background:linear-gradient(to bottom,transparent 38%,rgba(11,11,13,.6) 66%,rgba(11,11,13,.94))}
+.pract .t{position:absolute;top:14px;left:14px;z-index:2;font-size:.72rem;padding:5px 11px;border-radius:99px;background:rgba(0,0,0,.28);
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.pract .tx{position:absolute;left:20px;right:20px;bottom:20px;z-index:2}
+.pract .tx b{display:block;font-family:var(--disp);font-weight:400;font-size:1.42rem;letter-spacing:-.008em;line-height:1.15;margin-bottom:6px}
+.pract .tx span{font-size:.86rem;color:var(--ink-2)}
+@media (max-width:900px){
+  .rail{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;margin:0 calc(var(--gut) * -1);padding:0 var(--gut) 8px;scrollbar-width:none}
+  .rail::-webkit-scrollbar{display:none}
+  .pract{flex:none;width:min(72vw,300px);scroll-snap-align:start}
+}
+
+/* ---------- 5. МАНИФЕСТ ---------- */
+.manifest{position:relative;min-height:92svh;display:flex;align-items:flex-end;overflow:hidden}
+.manifest .body{position:relative;z-index:2;padding-bottom:clamp(70px,12vh,130px);width:100%}
+.manifest h2{max-width:11em}
+.manifest .lead{margin-top:24px}
+
+/* ---------- 6. КАК УСТРОЕНО ---------- */
+.how{display:grid;grid-template-columns:1fr 1.15fr;gap:clamp(32px,6vw,100px);align-items:start}
+.how h2{position:sticky;top:120px}
+.how ol{list-style:none;margin:0;padding:0;counter-reset:s}
+.how li{display:grid;grid-template-columns:56px 1fr;gap:8px;padding:28px 0;border-top:1px solid var(--line)}
+.how li:last-child{border-bottom:1px solid var(--line)}
+.how li::before{counter-increment:s;content:"0" counter(s);font-size:.78rem;color:var(--ink-3);letter-spacing:.08em;padding-top:6px}
+.how li b{display:block;font-weight:400;font-size:1.28rem;letter-spacing:-.01em;margin-bottom:6px}
+.how li b .ser{font-size:1.08em}
+.how li p{margin:0;color:var(--ink-2);font-size:.97rem}
+@media (max-width:860px){.how{grid-template-columns:1fr}.how h2{position:static}}
+
+/* ---------- 7. КЛУБ ---------- */
+.club{position:relative;border-radius:var(--r-xl);overflow:hidden;isolation:isolate;min-height:520px;display:flex;align-items:flex-end}
+.club .fade-b{height:80%}
+.club .body{position:relative;z-index:2;padding:clamp(28px,5vw,64px);display:grid;grid-template-columns:1.2fr 1fr;gap:32px;align-items:end;width:100%}
+.club .motto{font-size:.72rem;letter-spacing:.24em;text-transform:uppercase;color:var(--ink-2);margin-bottom:18px}
+.club .side{display:flex;flex-direction:column;gap:18px;align-items:flex-start}
+@media (max-width:760px){.club .body{grid-template-columns:1fr}}
+
+/* ---------- 8. FAQ ---------- */
+.faq{display:grid;grid-template-columns:1fr 1.5fr;gap:clamp(32px,6vw,100px)}
+.faq details{border-top:1px solid var(--line)}
+.faq details:last-child{border-bottom:1px solid var(--line)}
+.faq summary{list-style:none;cursor:pointer;padding:24px 0;display:flex;justify-content:space-between;gap:20px;font-size:1.12rem;font-weight:400}
+.faq summary::-webkit-details-marker{display:none}
+.faq summary .pm{flex:none;width:26px;height:26px;border-radius:50%;background:var(--veil);display:grid;place-items:center;transition:transform .35s var(--ease)}
+.faq details[open] summary .pm{transform:rotate(45deg)}
+.faq details p{margin:-6px 0 24px;color:var(--ink-2);max-width:36em}
+@media (max-width:860px){.faq{grid-template-columns:1fr}}
+
+/* ---------- 9. CTA (паттерн ВетФинанса) ---------- */
+.cta{position:relative;overflow:hidden;isolation:isolate;padding:clamp(90px,14vh,150px) 0;
+  background:
+    radial-gradient(ellipse at 85% 110%,rgba(252,220,169,.35),transparent 55%),
+    radial-gradient(ellipse at 10% 0%,rgba(122,47,34,.7),transparent 60%),
+    linear-gradient(135deg,#D97A46 0%,#C45F37 45%,#9C3F2B 100%)}
+.cta .grain{position:absolute;inset:0;z-index:0;opacity:.18;mix-blend-mode:overlay;pointer-events:none}
+.cta .wrap{position:relative;z-index:1;display:grid;grid-template-columns:1fr minmax(320px,520px);gap:clamp(32px,6vw,90px);align-items:center}
+.cta .lab{color:rgba(255,246,238,.7)}
+.cta h2{color:#FFF8F1;margin-top:16px}
+.cta .lead{color:rgba(255,246,238,.82);margin-top:22px}
+.card{padding:clamp(24px,3vw,40px);border-radius:var(--r-xl);background:rgba(255,255,255,.12);
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.24),0 30px 80px -40px rgba(60,16,8,.7);
+  -webkit-backdrop-filter:blur(22px);backdrop-filter:blur(22px)}
+.card h3{margin:0 0 6px;font-weight:400;font-size:1.3rem;color:#FFF8F1}
+.card .q{font-size:.9rem;color:rgba(255,246,238,.75);margin:0 0 22px}
+.moods{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:26px}
+.mood{height:84px;border-radius:18px;background:rgba(255,255,255,.1);box-shadow:inset 0 0 0 1px rgba(255,255,255,.2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color:#FFF8F1;
+  font-family:inherit;font-size:.86rem;border:0;transition:background .25s,transform .15s var(--ease),box-shadow .25s}
+.mood .ser{font-size:1.5rem;line-height:1}
+.mood:hover{background:rgba(255,255,255,.16)}
+.mood:active{transform:scale(.96)}
+.mood[aria-pressed="true"]{background:#FFF6EE;color:var(--brand-deep);box-shadow:none}
+.card .reply{min-height:3em;font-family:var(--disp);font-size:1.02rem;line-height:1.4;color:#FFF8F1;margin:0 0 22px;transition:opacity .4s}
+.cream{display:flex;align-items:center;justify-content:center;gap:10px;width:100%;height:62px;border-radius:18px;background:#FFF6EE;
+  color:var(--brand-deep);font-size:1.08rem;font-weight:600;letter-spacing:-.005em;transition:transform .15s var(--ease),box-shadow .25s,background .25s}
+.cream:hover{background:#fff;box-shadow:0 14px 40px -14px rgba(60,16,8,.6)}
+.cream:active{transform:scale(.98)}
+.card .promise{text-align:center;font-size:.86rem;color:rgba(255,246,238,.72);margin:16px 0 0}
+@media (max-width:860px){.cta .wrap{grid-template-columns:1fr}}
+
+/* ---------- 10. ФУТЕР ---------- */
+.foot{background:#111014;padding:clamp(64px,9vh,96px) 0 40px;color:var(--ink)}
+.foot-grid{display:grid;grid-template-columns:1.3fr 1fr 1.2fr 1fr;gap:40px}
+.foot h4{margin:0 0 20px;font-size:1rem;font-weight:600}
+.foot .brand .wordmark{font-size:1.4rem}
+.foot .brand p{margin:18px 0 0;color:var(--ink-2);font-size:1rem;line-height:1.55}
+.foot ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:14px;font-size:1rem}
+.foot ul a{color:var(--ink);transition:color .2s}
+.foot ul a:hover{color:var(--brand)}
+.svc{display:block;padding:20px 22px;border-radius:18px;box-shadow:inset 0 0 0 1px rgba(255,255,255,.12);transition:box-shadow .25s,background .25s}
+.svc:hover{background:rgba(255,255,255,.03);box-shadow:inset 0 0 0 1px rgba(255,255,255,.22)}
+.svc b{display:block;font-weight:600;font-size:1.12rem;margin-bottom:6px}
+.svc span{display:block;color:var(--ink-2);font-size:.95rem}
+.svc em{display:block;font-style:normal;color:var(--brand);margin-top:12px;font-size:.95rem}
+.legal{margin-top:64px;padding-top:32px;border-top:1px solid rgba(255,255,255,.1);color:var(--ink-3);font-size:.86rem;line-height:1.75}
+.legal p{margin:0 0 14px}
+.legal a{text-decoration:underline;text-underline-offset:3px}
+.foot-bottom{display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap;margin-top:40px;color:var(--ink-2);font-size:.95rem}
+.jbd{display:flex;align-items:baseline;gap:10px;color:var(--ink)}
+.jbd span{font-size:.95rem}
+.jbd i{font-family:var(--hand);font-style:normal;font-size:1.7rem;font-weight:600;line-height:1;transform:rotate(-2deg);display:inline-block}
+.jbd sup{font-size:.55rem;vertical-align:super}
+@media (max-width:900px){.foot-grid{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.foot-grid{grid-template-columns:1fr}}
+
+/* ---------- появление на прокрутке ---------- */
+.rv{opacity:0;transform:translateY(26px);transition:opacity 1s var(--ease),transform 1s var(--ease)}
+.rv.in{opacity:1;transform:none}
+.rv.d1{transition-delay:.08s}.rv.d2{transition-delay:.16s}.rv.d3{transition-delay:.24s}
+
+@media (prefers-reduced-motion:reduce){
+  *{animation:none!important;transition:none!important;scroll-behavior:auto!important}
+  .rv{opacity:1;transform:none}
+  .sense{opacity:1;transform:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ============ ИЛЛЮСТРАЦИИ ============
+     Палитры неба те же, что в PWA (Рассвет, Сумерки, Ночь, Туман).
+     w-* широкие версии для экрана компьютера, p-* вертикальные
+     из приложения для карточек и телефона. -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+<defs>
+  <linearGradient id="skDusk" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#14263C"/><stop offset=".30" stop-color="#2C4155"/>
+    <stop offset=".47" stop-color="#5C6862"/><stop offset=".55" stop-color="#9E8F63"/>
+    <stop offset=".60" stop-color="#CDA472"/></linearGradient>
+  <linearGradient id="skDawn" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#281F3E"/><stop offset=".30" stop-color="#4C3357"/>
+    <stop offset=".47" stop-color="#95607A"/><stop offset=".55" stop-color="#C8867A"/>
+    <stop offset=".60" stop-color="#EAAC7E"/></linearGradient>
+  <linearGradient id="skNight" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#0A0B1C"/><stop offset=".40" stop-color="#171331"/>
+    <stop offset=".60" stop-color="#35213E"/></linearGradient>
+  <linearGradient id="skMist" x1="0" y1="0" x2="0" y2="1">
+    <stop offset="0" stop-color="#1B2831"/><stop offset=".40" stop-color="#33505E"/>
+    <stop offset=".60" stop-color="#8FA6A6"/></linearGradient>
+  <radialGradient id="sun"><stop offset="0" stop-color="#FCDCA9"/><stop offset=".6" stop-color="#F0AA68"/><stop offset="1" stop-color="#DE8B4E"/></radialGradient>
+  <radialGradient id="moon"><stop offset="0" stop-color="#EFE9DE"/><stop offset="1" stop-color="#BAB2A3"/></radialGradient>
+  <radialGradient id="halo"><stop offset="0" stop-color="rgba(242,176,110,.5)"/><stop offset="1" stop-color="rgba(242,176,110,0)"/></radialGradient>
+  <radialGradient id="haloC"><stop offset="0" stop-color="rgba(198,214,232,.38)"/><stop offset="1" stop-color="rgba(198,214,232,0)"/></radialGradient>
+
+  <!-- широкие -->
+  <symbol id="w-dusk" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+    <rect width="1600" height="1000" fill="url(#skDusk)"/>
+    <circle cx="1170" cy="610" r="380" fill="url(#halo)"/>
+    <circle cx="1170" cy="612" r="96" fill="url(#sun)" opacity=".92"/>
+    <path d="M0 600 C260 540 480 606 760 588 C1040 570 1300 612 1600 578 L1600 1000 L0 1000Z" fill="#6C7A3F"/>
+    <path d="M0 690 C300 636 560 694 860 674 C1140 656 1380 702 1600 668 V1000 H0Z" fill="#42501F"/>
+    <path d="M0 784 C340 742 640 790 960 772 C1240 758 1440 790 1600 774 V1000 H0Z" fill="#1E2712"/>
+    <rect y="880" width="1600" height="120" fill="#12180C"/>
+  </symbol>
+  <symbol id="w-dawn" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+    <rect width="1600" height="1000" fill="url(#skDawn)"/>
+    <circle cx="800" cy="600" r="420" fill="url(#halo)"/>
+    <circle cx="800" cy="604" r="130" fill="url(#sun)"/>
+    <path d="M0 606 C240 548 470 612 790 590 C1080 570 1320 616 1600 582 V1000 H0Z" fill="#26382C"/>
+    <path d="M0 696 C320 646 580 700 880 680 C1160 662 1390 708 1600 676 V1000 H0Z" fill="#15231A"/>
+    <path d="M0 790 C360 750 660 794 980 778 C1250 764 1450 792 1600 780 V1000 H0Z" fill="#0B120E"/>
+    <rect y="880" width="1600" height="120" fill="#080D0A"/>
+  </symbol>
+  <symbol id="w-night" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+    <rect width="1600" height="1000" fill="url(#skNight)"/>
+    <circle cx="420" cy="290" r="220" fill="url(#haloC)"/>
+    <circle cx="420" cy="288" r="40" fill="url(#moon)"/>
+    <g fill="#E8E2D4"><circle cx="980" cy="180" r="2" opacity=".8"/><circle cx="1210" cy="300" r="1.5" opacity=".6"/>
+    <circle cx="860" cy="360" r="1.3" opacity=".5"/><circle cx="160" cy="420" r="1.5" opacity=".55"/>
+    <circle cx="1420" cy="160" r="1.7" opacity=".7"/><circle cx="700" cy="120" r="1.2" opacity=".5"/><circle cx="1320" cy="440" r="1.1" opacity=".45"/></g>
+    <path d="M0 616 C250 562 480 620 790 600 C1080 580 1320 622 1600 590 V1000 H0Z" fill="#1B1730"/>
+    <path d="M0 704 C320 656 580 708 880 688 C1160 670 1390 714 1600 684 V1000 H0Z" fill="#11101E"/>
+    <path d="M0 796 C360 758 660 800 980 784 C1250 770 1450 798 1600 786 V1000 H0Z" fill="#090811"/>
+    <rect y="880" width="1600" height="120" fill="#07060D"/>
+  </symbol>
+  <symbol id="w-mist" viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice">
+    <rect width="1600" height="1000" fill="url(#skMist)"/>
+    <ellipse cx="700" cy="610" rx="900" ry="80" fill="rgba(222,234,232,.2)"/>
+    <ellipse cx="1000" cy="672" rx="820" ry="56" fill="rgba(222,234,232,.15)"/>
+    <path d="M0 610 C260 556 480 616 800 596 C1080 578 1320 618 1600 586 V1000 H0Z" fill="#2C3E37"/>
+    <path d="M0 700 C320 652 580 704 880 684 C1160 666 1390 710 1600 680 V1000 H0Z" fill="#1A2622"/>
+    <path d="M0 794 C360 756 660 798 980 782 C1250 768 1450 796 1600 784 V1000 H0Z" fill="#0E1714"/>
+    <rect y="880" width="1600" height="120" fill="#0A1210"/>
+  </symbol>
+
+  <!-- вертикальные, из приложения -->
+  <symbol id="p-dusk" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">
+    <rect width="400" height="800" fill="url(#skDusk)"/>
+    <circle cx="306" cy="498" r="146" fill="url(#halo)"/><circle cx="306" cy="498" r="42" fill="url(#sun)" opacity=".92"/>
+    <path d="M0 486 C70 448 132 480 202 470 C274 460 332 484 400 468 L400 800 L0 800Z" fill="#6C7A3F"/>
+    <path d="M0 548 C86 516 146 546 220 534 C292 522 342 548 400 532 L400 800 L0 800Z" fill="#42501F"/>
+    <path d="M0 614 C98 588 162 614 236 604 C302 594 350 612 400 602 L400 800 L0 800Z" fill="#1E2712"/>
+    <rect y="700" width="400" height="100" fill="#12180C"/>
+  </symbol>
+  <symbol id="p-dawn" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">
+    <rect width="400" height="800" fill="url(#skDawn)"/>
+    <circle cx="196" cy="486" r="170" fill="url(#halo)"/><circle cx="196" cy="488" r="58" fill="url(#sun)"/>
+    <path d="M0 492 C64 456 128 490 200 478 C274 466 334 492 400 474 L400 800 L0 800Z" fill="#26382C"/>
+    <path d="M0 556 C88 524 148 554 224 542 C292 532 344 556 400 542 L400 800 L0 800Z" fill="#15231A"/>
+    <path d="M0 620 C104 596 168 620 240 610 C302 602 352 618 400 610 L400 800 L0 800Z" fill="#0B120E"/>
+    <rect y="700" width="400" height="100" fill="#080D0A"/>
+  </symbol>
+  <symbol id="p-night" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">
+    <rect width="400" height="800" fill="url(#skNight)"/>
+    <circle cx="126" cy="230" r="106" fill="url(#haloC)"/><circle cx="126" cy="228" r="21" fill="url(#moon)"/>
+    <circle cx="296" cy="182" r="1.6" fill="#E8E2D4" opacity=".8"/><circle cx="332" cy="268" r="1.2" fill="#E8E2D4" opacity=".6"/>
+    <circle cx="252" cy="300" r="1.1" fill="#E8E2D4" opacity=".5"/><circle cx="70" cy="356" r="1.3" fill="#E8E2D4" opacity=".55"/>
+    <path d="M0 502 C70 466 132 498 202 488 C276 477 334 502 400 486 L400 800 L0 800Z" fill="#1B1730"/>
+    <path d="M0 562 C90 532 152 562 226 550 C294 540 346 562 400 550 L400 800 L0 800Z" fill="#11101E"/>
+    <path d="M0 624 C102 602 168 626 240 616 C300 608 354 622 400 616 L400 800 L0 800Z" fill="#090811"/>
+    <rect y="700" width="400" height="100" fill="#07060D"/>
+  </symbol>
+  <symbol id="p-mist" viewBox="0 0 400 800" preserveAspectRatio="xMidYMid slice">
+    <rect width="400" height="800" fill="url(#skMist)"/>
+    <ellipse cx="176" cy="500" rx="260" ry="44" fill="rgba(222,234,232,.2)"/><ellipse cx="252" cy="542" rx="240" ry="32" fill="rgba(222,234,232,.15)"/>
+    <path d="M0 496 C74 460 132 492 204 482 C276 470 334 496 400 478 L400 800 L0 800Z" fill="#2C3E37"/>
+    <path d="M0 558 C86 526 148 556 224 544 C292 534 344 558 400 544 L400 800 L0 800Z" fill="#1A2622"/>
+    <path d="M0 622 C100 600 166 624 238 614 C300 606 352 620 400 614 L400 800 L0 800Z" fill="#0E1714"/>
+    <rect y="700" width="400" height="100" fill="#0A1210"/>
+  </symbol>
+</defs>
+</svg>
+
+<!-- ============ НАВИГАЦИЯ ============ -->
+<header class="nav" id="nav">
+  <div class="wrap">
+    <a href="#top" class="wordmark" aria-label="My NIKA"><span class="my">My</span>NIKA</a>
+    <nav class="nav-links" aria-label="Разделы">
+      <a href="#show">Как это устроено</a>
+      <a href="#practices">Практики</a>
+      <a href="#club">Кофе-раны</a>
+      <a href="#faq">Вопросы</a>
+    </nav>
+    <a class="pill sm solid" href="https://www.mynika.online/authv1">Начать</a>
+  </div>
+</header>
+
+<main id="top">
+
+<!-- ============ 1. HERO ============ -->
+<section class="hero" aria-label="НИКА">
+  <div class="sky"><svg><use href="#w-dusk"/></svg></div>
+  <div class="fade-b"></div>
+  <div class="wrap hero-body">
+    <div class="breath rv" id="breath" aria-hidden="true">
+      <svg viewBox="0 0 420 150" preserveAspectRatio="none">
+        <path class="track" id="arcTrack" d="M12 140 C70 20 350 20 408 140"/>
+        <path class="lit" id="arcLit" d="M12 140 C70 20 350 20 408 140"/>
+        <circle class="bead" id="bead" cx="12" cy="140" r="4.5"/>
+      </svg>
+      <div class="core"><div class="phase" id="phase">Вдох</div><div class="count" id="count">1</div></div>
+    </div>
+    <h1 class="disp d-hero rv d1" lang="en">
+      <span class="l1">The world gave athletes more&nbsp;data.</span>
+      <span class="l2">We want to give them back their <span class="ser">sense</span>.</span>
+    </h1>
+    <p class="lead rv d2">НИКА учит слышать тело во время бега. Голос в наушниках ведёт дыхание и внимание, а после пробежки Ника задаёт один точный вопрос.</p>
+    <div class="cta-row rv d3">
+      <a class="pill solid" href="https://www.mynika.online/authv1">Начать бесплатно <span class="arr">→</span></a>
+      <a class="pill" href="#show">Как это устроено</a>
+    </div>
+  </div>
+  <div class="scroll-hint" aria-hidden="true"><i></i>Листай</div>
+</section>
+
+<!-- ============ 2. ЦИФРЫ РАСТВОРЯЮТСЯ ============ -->
+<section class="dissolve" id="dissolve" aria-label="Меньше цифр">
+  <div class="pin">
+    <div class="metrics" id="metrics" aria-hidden="true"></div>
+    <div class="wrap">
+      <div class="lab" style="margin-bottom:18px">Well-being вместо отчёта</div>
+      <h2 class="disp d-xl">Меньше цифр.<br>Больше <span class="ser">ощущений</span>.</h2>
+      <p class="lead">Часы считают всё. Тело чувствует раньше и точнее. НИКА возвращает этот навык: слушать себя на бегу и доверять тому, что слышишь.</p>
+      <div class="senses" id="senses">
+        <div class="sense" style="--o:78"><div class="dot"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="31" stroke="rgba(255,255,255,.12)"/><circle class="fill" cx="32" cy="32" r="31"/></svg></div><b>Ноги</b></div>
+        <div class="sense" style="--o:40"><div class="dot"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="31" stroke="rgba(255,255,255,.12)"/><circle class="fill" cx="32" cy="32" r="31"/></svg></div><b>Дыхание</b></div>
+        <div class="sense" style="--o:58"><div class="dot"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="31" stroke="rgba(255,255,255,.12)"/><circle class="fill" cx="32" cy="32" r="31"/></svg></div><b>Настрой</b></div>
+        <div class="sense" style="--o:20"><div class="dot"><svg viewBox="0 0 64 64"><circle cx="32" cy="32" r="31" stroke="rgba(255,255,255,.12)"/><circle class="fill" cx="32" cy="32" r="31"/></svg></div><b>Желание</b></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 3. ПОКАЗ ПРОДУКТА ============ -->
+<section class="show" id="show" aria-label="Как устроена НИКА">
+  <div class="pin">
+    <div class="bg" aria-hidden="true">
+      <div class="layer on"><svg><use href="#w-dusk"/></svg></div>
+      <div class="layer"><svg><use href="#w-dawn"/></svg></div>
+      <div class="layer"><svg><use href="#w-night"/></svg></div>
+      <div class="layer"><svg><use href="#w-mist"/></svg></div>
+    </div>
+    <div class="wrap grid">
+      <div class="intro lab">Один день с Никой</div>
+      <div>
+        <div class="steps" id="steps">
+          <div class="step on">
+            <div class="tag"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F4EFE6" stroke-width="1.5" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg></div><span>Утро</span></div>
+            <h3 class="disp d-lg">Как ты <span class="ser">сегодня</span>?</h3>
+            <p class="lead" style="margin-top:16px">Сон, ноги, настрой. Одно касание на каждый, и день собирается вокруг твоего ответа, а не вокруг плана.</p>
+          </div>
+          <div class="step">
+            <div class="tag"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F4EFE6" stroke-width="1.5" stroke-linecap="round"><path d="M4 14v-2a8 8 0 0 1 16 0v2"/><rect x="3" y="14" width="4" height="6" rx="1.5"/><rect x="17" y="14" width="4" height="6" rx="1.5"/></svg></div><span>На бегу</span></div>
+            <h3 class="disp d-lg">Голос ведёт <span class="ser">внимание</span></h3>
+            <p class="lead" style="margin-top:16px">Практика звучит в наушниках прямо на пробежке. Дыхание, стопы, плечи. Четыре минуты, и ты уже в теле.</p>
+          </div>
+          <div class="step">
+            <div class="tag"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F4EFE6" stroke-width="1.5" stroke-linecap="round"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg></div><span>После</span></div>
+            <h3 class="disp d-lg">Три строки <span class="ser">вместо отчёта</span></h3>
+            <p class="lead" style="margin-top:16px">Усилие, ноги, дыхание. Отметил, как было, и пошёл дальше. Из этих строк Ника собирает твою историю.</p>
+          </div>
+          <div class="step">
+            <div class="tag"><div class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#F4EFE6" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/></svg></div><span>Разговор</span></div>
+            <h3 class="disp d-lg">Ника <span class="ser">помнит</span></h3>
+            <p class="lead" style="margin-top:16px">Что было вчера на третьем километре и как ты спала. Поэтому вопрос звучит точно, а совет подходит именно тебе.</p>
+          </div>
+        </div>
+        <div class="progress" id="progress" aria-hidden="true"><i class="on"></i><i></i><i></i><i></i></div>
+      </div>
+
+      <div class="phone" aria-hidden="true">
+        <div class="screen">
+          <div class="island"></div>
+          <div class="sbar"><span>7:42</span><span>●●● ▮</span></div>
+
+          <!-- 1. Сегодня -->
+          <div class="scr on">
+            <div class="art"><svg><use href="#p-dusk"/></svg></div><div class="shade"></div>
+            <div class="in">
+              <div class="abar"><div class="orb"></div><div class="wm"><small>My</small>NIKA</div><div style="width:22px"></div></div>
+              <div class="rings">
+                <div class="ring"><div class="c"><svg viewBox="0 0 42 42"><circle cx="21" cy="21" r="20" stroke="rgba(255,255,255,.14)"/><circle cx="21" cy="21" r="20" stroke="#F4EFE6" stroke-dasharray="126" stroke-dashoffset="50"/></svg>6</div><i>Сон</i></div>
+                <div class="ring"><div class="c"><svg viewBox="0 0 42 42"><circle cx="21" cy="21" r="20" stroke="rgba(255,255,255,.14)"/><circle cx="21" cy="21" r="20" stroke="#F4EFE6" stroke-dasharray="126" stroke-dashoffset="88"/></svg>3</div><i>Ноги</i></div>
+                <div class="ring"><div class="c"><svg viewBox="0 0 42 42"><circle cx="21" cy="21" r="20" stroke="rgba(255,255,255,.14)"/><circle cx="21" cy="21" r="20" stroke="#F4EFE6" stroke-dasharray="126" stroke-dashoffset="38"/></svg>7</div><i>Настрой</i></div>
+                <div class="ring"><div class="c" style="color:var(--ink-4)">·</div><i>Желание</i></div>
+              </div>
+              <div class="m-breath">
+                <svg viewBox="0 0 240 84" preserveAspectRatio="none"><path d="M8 80 C40 10 200 10 232 80" fill="none" stroke="rgba(244,239,230,.22)" stroke-width="1.2"/><path id="mArc" d="M8 80 C40 10 200 10 232 80" fill="none" stroke="#F4EFE6" stroke-width="2" stroke-linecap="round"/><circle id="mBead" r="3.2" fill="#F4EFE6"/></svg>
+                <div class="core"><div class="m-lab" id="mPhase">Вдох</div><div class="count" id="mCount">1</div></div>
+              </div>
+              <div class="m-lab">Сегодня, среда</div>
+              <div class="m-disp">Двадцать минут<br><span class="ser">без темпа</span></div>
+              <div class="m-cap">Вчера ноги были тяжёлые на третьем километре. Сегодня бежим по ощущениям.</div>
+              <div class="m-pill">Отметить пробежку</div>
+              <div class="tabbar"><div class="tb"><span class="on">Сегодня</span><span>Практики</span><span>Дневник</span></div><div class="fab"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8"><path d="M20 12a8 8 0 0 1-11.6 7.1L4 20l1-4.2A8 8 0 1 1 20 12z"/></svg></div></div>
+            </div>
+          </div>
+
+          <!-- 2. Практика -->
+          <div class="scr">
+            <div class="art"><svg><use href="#p-dawn"/></svg></div><div class="shade"></div>
+            <div class="in">
+              <div class="abar"><span style="font-size:14px">‹</span><div class="m-lab">Практика</div><span style="width:10px"></span></div>
+              <div class="player-t">
+                <div class="m-lab">4 минуты · голос, дыхание, тело</div>
+                <div class="m-disp" style="font-size:30px"><span class="ser">Заземление</span></div>
+                <div class="cue">«Почувствуй, как стопа касается земли. Пятка, середина, носок. Просто замечай.»</div>
+                <div class="bar"><i></i></div>
+                <div class="times"><span>1:24</span><span>4:00</span></div>
+                <div class="ctrls">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F4EFE6" stroke-width="1.6"><path d="M11 5 4 12l7 7M20 5l-7 7 7 7"/></svg>
+                  <div class="big"><svg width="18" height="18" viewBox="0 0 24 24" fill="#111"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg></div>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F4EFE6" stroke-width="1.6"><path d="m13 5 7 7-7 7M4 5l7 7-7 7"/></svg>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Как это было -->
+          <div class="scr">
+            <div class="art" style="height:46%"><svg><use href="#p-night"/></svg></div><div class="shade" style="height:100%"></div>
+            <div class="in">
+              <div class="abar"><span style="font-size:14px">‹</span><div style="font-size:11px">Пробежка</div><span style="width:10px"></span></div>
+              <div class="m-lab" style="margin-top:34px">Только что</div>
+              <div class="m-disp">Пробежка<br><span class="ser">позади</span></div>
+              <div class="feel">
+                <div class="m-lab" style="margin-bottom:10px">Как это было</div>
+                <div class="row"><b>Усилие</b><div class="segs"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i></div></div>
+                <div class="row"><b>Ноги</b><div class="segs"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div>
+                <div class="row"><b>Дыхание</b><div class="segs"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i></div></div>
+              </div>
+              <div class="note">Одно касание на строку. Любую можно пропустить.</div>
+              <div class="m-pill" style="margin-top:auto">Сохранить</div>
+            </div>
+          </div>
+
+          <!-- 4. Разговор -->
+          <div class="scr">
+            <div class="art"><svg><use href="#p-mist"/></svg></div><div class="shade" style="height:88%"></div>
+            <div class="in">
+              <div class="abar"><span style="font-size:14px">‹</span><div style="display:flex;align-items:center;gap:6px"><div class="orb" style="width:16px;height:16px"></div><span style="font-family:var(--disp);font-size:13px">Ника</span></div><span style="width:10px"></span></div>
+              <div class="chat">
+                <div class="bub n">Вчера на третьем километре ноги были тяжёлые. Сегодня как?</div>
+                <div class="bub u">Легче. Но в горку дыхание сбилось</div>
+                <div class="bub n">На подъёме попробуй считать шаги: четыре на вдох, четыре на выдох. Темп подстроится сам.</div>
+                <div class="typing"><i></i><i></i><i></i></div>
+              </div>
+              <div class="input">Написать Нике…</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 4. ПРАКТИКИ ============ -->
+<section class="sec" id="practices">
+  <div class="wrap">
+    <div class="sec-head">
+      <div>
+        <div class="lab rv">Практики</div>
+        <h2 class="disp d-lg rv d1">Шестнадцать практик.<br>Начни с <span class="ser">одной</span>.</h2>
+      </div>
+      <p class="cap rv d2" style="max-width:24em">Каждая звучит в наушниках прямо на пробежке. Короткие для обычного дня, длинные для особенных.</p>
+    </div>
+    <div class="rail">
+      <a class="pract rv" href="https://www.mynika.online/authv1">
+        <div class="art"><svg><use href="#p-dawn"/></svg></div><div class="shade"></div>
+        <span class="t">4 мин</span>
+        <div class="tx"><b>Заземление</b><span>Голос, дыхание, тело. С неё начинают все</span></div>
+      </a>
+      <a class="pract rv d1" href="https://www.mynika.online/authv1">
+        <div class="art"><svg><use href="#p-mist"/></svg></div><div class="shade"></div>
+        <span class="t">3 мин</span>
+        <div class="tx"><b>В стартовом коридоре</b><span>За десять минут до выстрела</span></div>
+      </a>
+      <a class="pract rv d2" href="https://www.mynika.online/authv1">
+        <div class="art"><svg><use href="#p-night"/></svg></div><div class="shade"></div>
+        <span class="t">9 мин</span>
+        <div class="tx"><b>После трудной</b><span>Вернуть спокойствие, когда пробежка сорвалась</span></div>
+      </a>
+      <a class="pract rv d3" href="https://www.mynika.online/authv1">
+        <div class="art"><svg><use href="#p-dusk"/></svg></div><div class="shade"></div>
+        <span class="t">Курс · 8</span>
+        <div class="tx"><b>Слушать тело</b><span>Восемь занятий, от стоп до дыхания</span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 5. МАНИФЕСТ ============ -->
+<section class="manifest" aria-label="Манифест">
+  <div class="sky"><svg><use href="#w-dawn"/></svg></div>
+  <div class="fade-b" style="height:70%"></div>
+  <div class="wrap body">
+    <div class="lab rv" style="margin-bottom:18px">Манифест</div>
+    <h2 class="disp d-xl rv d1">Тело уже всё сказало.<br>Осталось <span class="ser">услышать</span>.</h2>
+    <p class="lead rv d2">Ника спрашивает, а выводы делаешь ты. Бег снова становится твоим: про удовольствие, про голову, про то, каким ты возвращаешься домой.</p>
+  </div>
+</section>
+
+<!-- ============ 6. КАК УСТРОЕНО ============ -->
+<section class="sec">
+  <div class="wrap how">
+    <h2 class="disp d-lg rv">Всё, что нужно,<br>уже <span class="ser">с тобой</span></h2>
+    <ol>
+      <li class="rv"><div><b>Телефон и <span class="ser">наушники</span></b><p>Часы и датчики можно оставить дома. Ника работает с тем, что ты чувствуешь и рассказываешь.</p></div></li>
+      <li class="rv d1"><div><b>Вопрос <span class="ser">утром</span></b><p>Одна минута, чтобы понять, какой сегодня день. Ника подбирает практику под твой ответ.</p></div></li>
+      <li class="rv d2"><div><b>Практика <span class="ser">на бегу</span></b><p>Голос ведёт дыхание и внимание. Подходит для лёгкой пробежки, длинной и даже для быстрой прогулки.</p></div></li>
+      <li class="rv d3"><div><b>Память и <span class="ser">разговор</span></b><p>Три строки после пробежки складываются в историю. Через неделю Ника знает тебя лучше любых графиков.</p></div></li>
+    </ol>
+  </div>
+</section>
+
+<!-- ============ 7. КЛУБ ============ -->
+<section class="sec" id="club" style="padding-top:0">
+  <div class="wrap">
+    <div class="club rv">
+      <div class="sky"><svg><use href="#w-mist"/></svg></div>
+      <div class="fade-b"></div>
+      <div class="body">
+        <div>
+          <div class="motto">You'll never move alone</div>
+          <h2 class="disp d-lg">Бегаем <span class="ser">вместе</span></h2>
+          <p class="lead" style="margin-top:18px">Кофе-раны по выходным в Москве. Пробежка в темпе разговора и кофе после. Приходи один, уйдёшь с компанией.</p>
+        </div>
+        <div class="side">
+          <a class="pill solid" href="https://t.me/nika_run_bot">Записаться на кофе-ран <span class="arr">→</span></a>
+          <span class="cap">Запись через Telegram, место держим за тобой</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 8. FAQ ============ -->
+<section class="sec" id="faq" style="padding-top:0">
+  <div class="wrap faq">
+    <h2 class="disp d-lg rv">Коротко<br>о <span class="ser">главном</span></h2>
+    <div class="rv d1">
+      <details><summary>Что нужно, чтобы начать?<span class="pm">+</span></summary><p>Телефон и наушники. НИКА открывается в браузере и ставится на экран телефона как приложение за пару касаний.</p></details>
+      <details><summary>Подойдёт новичку?<span class="pm">+</span></summary><p>Да. Практики рассчитаны на любой темп и любую дистанцию. Первая длится четыре минуты и подходит даже для быстрой прогулки.</p></details>
+      <details><summary>Ника заменит тренера?<span class="pm">+</span></summary><p>Ника отвечает за голову и ощущения. План тренировок веди где удобно, Ника добавит к нему внимание к телу и разговор после пробежки.</p></details>
+      <details><summary>Сколько стоит?<span class="pm">+</span></summary><p>Начать можно бесплатно. Подписка Pro открывает память Ники и трёхнедельные циклы, которые подстраиваются под твою подготовку.</p></details>
+      <details><summary>Будет ли в App Store и Google Play?<span class="pm">+</span></summary><p>Готовим. Пока веб-версия работает на любом телефоне и выглядит как обычное приложение.</p></details>
+    </div>
+  </div>
+</section>
+
+<!-- ============ 9. CTA ============ -->
+<section class="cta" id="start" aria-label="Начать">
+  <svg class="grain" width="100%" height="100%" aria-hidden="true"><filter id="gn"><feTurbulence type="fractalNoise" baseFrequency=".8" numOctaves="3" stitchTiles="stitch"/></filter><rect width="100%" height="100%" filter="url(#gn)"/></svg>
+  <div class="wrap">
+    <div>
+      <div class="lab rv">Начать</div>
+      <h2 class="disp d-xl rv d1">Первая практика<br>займёт <span class="ser">четыре минуты</span></h2>
+      <p class="lead rv d2">Надень наушники и выйди на улицу. Остальное Ника расскажет сама.</p>
+    </div>
+    <div class="card rv d2">
+      <h3>Как ты сегодня?</h3>
+      <p class="q">Выбери, и Ника подберёт первую практику</p>
+      <div class="moods" role="group" aria-label="Как ты сегодня">
+        <button class="mood" type="button" aria-pressed="false" data-r="Тогда начнём с Заземления. Четыре минуты, чтобы собраться и почувствовать стопы."><span class="ser">Устал</span></button>
+        <button class="mood" type="button" aria-pressed="false" data-r="Отличный день для «Слушать тело». Первое занятие про дыхание на лёгком темпе."><span class="ser">Бодро</span></button>
+        <button class="mood" type="button" aria-pressed="false" data-r="Попробуем «В стартовом коридоре». Три минуты, и волнение становится энергией."><span class="ser">Волнуюсь</span></button>
+      </div>
+      <p class="reply" id="reply" aria-live="polite">Ника ответит здесь.</p>
+      <a class="cream" id="startBtn" href="https://www.mynika.online/authv1">Начать бесплатно</a>
+      <p class="promise">Регистрация займёт минуту</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<!-- ============ 10. ФУТЕР ============ -->
+<footer class="foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div class="brand">
+        <div class="wordmark"><span class="my">My</span>NIKA</div>
+        <p>Практики, которые делаются на бегу.<br>You'll never move alone.</p>
+      </div>
+      <div>
+        <h4>Связаться</h4>
+        <ul>
+          <li><a href="https://t.me/meine_nika">Telegram: @meine_nika</a></li>
+          <li><a href="mailto:ceo@mynika.online">ceo@mynika.online</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Другие наши сервисы</h4>
+        <a class="svc" href="https://vetfinance.online">
+          <b>ВетФинанс</b>
+          <span>Финансовый контроль ветклиники. Каждое утро в Telegram.</span>
+          <em>vetfinance.online</em>
+        </a>
+      </div>
+      <div>
+        <h4>Документы</h4>
+        <ul>
+          <li><a href="/legal/privacy">Политика конфиденциальности</a></li>
+          <li><a href="/legal/oferta">Публичная оферта</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="legal">
+      <p>Информация на сайте не является публичной офертой. Условия оказания услуг определяются <a href="/legal/oferta">Публичной офертой</a>. НИКА помогает слышать тело во время бега и не заменяет консультацию врача.</p>
+      <p>ИП Серебряков Дмитрий Сергеевич · ИНН 645053987663 · ОГРНИП 326645700053239</p>
+    </div>
+    <div class="foot-bottom">
+      <span>© 2026 НИКА</span>
+      <span class="jbd"><span>продукт</span><i>just business, darling<sup>™</sup></i></span>
+    </div>
+  </div>
+</footer>
+
+<script>
+(() => {
+  const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+  /* ---- навигация ---- */
+  const nav = document.getElementById('nav');
+  const onNav = () => nav.classList.toggle('scrolled', scrollY > 40);
+
+  /* ---- появление ---- */
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+  }), { threshold: .14, rootMargin: '0px 0px -6% 0px' });
+  document.querySelectorAll('.rv').forEach(el => io.observe(el));
+
+  /* ---- дуга дыхания: 4 счёта вдох, 4 выдох ---- */
+  function breathe(pathEl, litEl, bead, phaseEl, countEl) {
+    const L = pathEl.getTotalLength();
+    if (litEl) { litEl.style.strokeDasharray = L; }
+    const CYCLE = 8000;
+    let t0 = performance.now();
+    function frame(now) {
+      const t = ((now - t0) % CYCLE) / CYCLE;           // 0..1
+      const inhale = t < .5;
+      const k = inhale ? t * 2 : 1 - (t - .5) * 2;      // 0→1→0
+      const e = .5 - Math.cos(k * Math.PI) / 2;          // сглаживание
+      const p = pathEl.getPointAtLength(e * L);
+      bead.setAttribute('cx', p.x); bead.setAttribute('cy', p.y);
+      if (litEl) litEl.style.strokeDashoffset = L * (1 - e);
+      phaseEl.textContent = inhale ? 'Вдох' : 'Выдох';
+      countEl.textContent = Math.min(4, Math.floor((inhale ? t : t - .5) * 8) + 1);
+      if (!reduce) requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(frame);
+  }
+  breathe(document.getElementById('arcTrack'), document.getElementById('arcLit'),
+          document.getElementById('bead'), document.getElementById('phase'), document.getElementById('count'));
+  breathe(document.getElementById('mArc'), document.getElementById('mArc'),
+          document.getElementById('mBead'), document.getElementById('mPhase'), document.getElementById('mCount'));
+
+  /* ---- цифры, которые растворяются ---- */
+  const DATA = [
+    ['164','уд/мин'],['5:12','темп /км'],['178','каденс'],['VO₂ 47','max'],['HRV 38','мс'],
+    ['Z4','пульсовая зона'],['312','нагрузка'],['18 ч','восстановление'],['71','сон'],['1 240','ккал'],
+    ['+86 м','набор'],['4,8','аэробный эффект'],['92%','готовность'],['0,94','GCT баланс'],['7,2 см','вертикальные колебания']
+  ];
+  // позиции подобраны так, чтобы центр с заголовком оставался чистым
+  const POS = [[6,14],[78,10],[40,6],[88,34],[3,40],[70,70],[14,74],[86,86],[30,88],[58,90],[22,22],[64,18],[92,58],[8,58],[46,94]];
+  const box = document.getElementById('metrics');
+  const chips = DATA.map((d, i) => {
+    const el = document.createElement('div');
+    el.className = 'metric';
+    const size = [2.6, 3.4, 2.2, 1.8, 2.8][i % 5];
+    el.style.cssText = `left:${POS[i][0]}%;top:${POS[i][1]}%;font-size:clamp(1.1rem,${size}vw,${size * 1.1}rem);transform:translate(-${POS[i][0]}%,-${POS[i][1]}%)`;
+    el.innerHTML = `${d[0]}<small>${d[1]}</small>`;
+    el._delay = (i * 0.037) % .42;
+    box.appendChild(el);
+    return el;
+  });
+  const dis = document.getElementById('dissolve');
+  const senses = [...document.querySelectorAll('.sense')];
+  function onDissolve() {
+    const r = dis.getBoundingClientRect();
+    const total = r.height - innerHeight;
+    const p = clamp(-r.top / total, 0, 1);
+    chips.forEach(el => {
+      const k = clamp((p - el._delay) / .45, 0, 1);
+      el.style.filter = `blur(${k * 16}px)`;
+      el.style.opacity = (1 - k * .9) * (r.top < innerHeight ? 1 : 0);
+      el.style.color = k < .15 ? 'rgba(244,239,230,.62)' : '';
+    });
+    senses.forEach((s, i) => s.classList.toggle('on', p > .42 + i * .06));
+  }
+
+  /* ---- sticky показ продукта ---- */
+  const show = document.getElementById('show');
+  const steps = [...document.querySelectorAll('.step')];
+  const scrs = [...document.querySelectorAll('.scr')];
+  const layers = [...document.querySelectorAll('.show .bg .layer')];
+  const dots = [...document.querySelectorAll('#progress i')];
+  let cur = 0;
+  function onShow() {
+    const r = show.getBoundingClientRect();
+    const p = clamp(-r.top / (r.height - innerHeight), 0, .999);
+    const i = Math.floor(p * steps.length);
+    if (i === cur) return;
+    cur = i;
+    [steps, scrs, layers, dots].forEach(list => list.forEach((el, j) => el.classList.toggle('on', j === i)));
+  }
+
+  /* ---- параллакс неба в hero ---- */
+  const heroSky = document.querySelector('.hero .sky svg');
+  function onHero() { if (scrollY < innerHeight * 1.2) heroSky.style.setProperty('--py', (scrollY * .25).toFixed(1)); }
+
+  let ticking = false;
+  function onScroll() {
+    if (ticking) return; ticking = true;
+    requestAnimationFrame(() => { onNav(); onDissolve(); onShow(); if (!reduce) onHero(); ticking = false; });
+  }
+  addEventListener('scroll', onScroll, { passive: true });
+  addEventListener('resize', onScroll);
+  onScroll();
+
+  /* ---- CTA: мини-вопрос Ники ---- */
+  const reply = document.getElementById('reply');
+  document.querySelectorAll('.mood').forEach(b => b.addEventListener('click', () => {
+    document.querySelectorAll('.mood').forEach(x => x.setAttribute('aria-pressed', x === b));
+    reply.style.opacity = 0;
+    setTimeout(() => { reply.textContent = b.dataset.r; reply.style.opacity = 1; }, 180);
+  }));
+})();
+</script>
+</body>
+</html>

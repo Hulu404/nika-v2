@@ -117,12 +117,23 @@ export async function middleware(request: NextRequest) {
     return res;
   };
 
-  // Rewrite с переносом cookies (по аналогии с redirect выше).
-  const rewrite = (url: URL) => {
+  // Лендинг для гостя. Это статический самодостаточный HTML (инлайн-скрипты,
+  // blob-видео): nonce-CSP к нему неприменим, поэтому CSP здесь не отдаём
+  // (иначе при переводе Report-Only в боевой режим пропадут видео и анимации).
+  // Кэш публичный на 5 минут, но корень отдаёт разный контент гостю и вошедшему,
+  // поэтому Vary: Cookie: после входа браузер не подставит закэшированный лендинг.
+  // Если в ответ едут Set-Cookie (рефреш сессии), кэшировать нельзя.
+  const rewriteLanding = (url: URL) => {
     const res = NextResponse.rewrite(url);
-    response.cookies.getAll().forEach((c) => res.cookies.set(c.name, c.value, c));
-    res.headers.set("Cache-Control", "no-store, must-revalidate");
-    res.headers.set("Content-Security-Policy-Report-Only", csp);
+    const carried = response.cookies.getAll();
+    carried.forEach((c) => res.cookies.set(c.name, c.value, c));
+    res.headers.set(
+      "Cache-Control",
+      carried.length
+        ? "no-store, must-revalidate"
+        : "public, max-age=300, stale-while-revalidate=86400",
+    );
+    res.headers.set("Vary", "Cookie");
     return res;
   };
 
@@ -134,7 +145,7 @@ export async function middleware(request: NextRequest) {
       const url = request.nextUrl.clone();
       url.pathname = "/landing.html";
       url.search = "";
-      return rewrite(url);
+      return rewriteLanding(url);
     }
     if (
       pathname.startsWith("/chat") ||

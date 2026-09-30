@@ -34,6 +34,27 @@ const nextConfig = {
   async headers() {
     return [
       { source: "/:path*", headers: securityHeaders },
+      // Лендинг (статический HTML, отдаётся со сжатием: compress включён по умолчанию).
+      // Вход через "/" получает те же заголовки из middleware.ts.
+      {
+        source: "/landing.html",
+        headers: [
+          { key: "Cache-Control", value: "public, max-age=300, stale-while-revalidate=86400" },
+        ],
+      },
+      // Своя копия three.js r128 для лендинга; файлы не меняются без смены версии.
+      {
+        source: "/landing/vendor/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=604800" }],
+      },
+      // Старые версии лендинга лежат для истории, наружу они не нужны
+      {
+        source: "/_archive/:path*",
+        headers: [
+          { key: "X-Robots-Tag", value: "noindex, nofollow" },
+          { key: "Cache-Control", value: "no-store" },
+        ],
+      },
       // /authv1 — прототип, не индексировать, не кешировать
       {
         source: "/authv1/:path*",
