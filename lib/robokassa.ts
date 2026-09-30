@@ -70,7 +70,7 @@ export const ROBOKASSA_PLANS: Record<
     amount: 1,
     months: 1,
     subscriptionPlan: "monthly",
-    description: "Подписка НИКА PRO — 1 месяц",
+    description: "Подписка НИКА PRO, 1 месяц",
   },
 };
 
