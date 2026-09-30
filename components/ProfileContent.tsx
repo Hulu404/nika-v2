@@ -636,7 +636,7 @@ export function ProfileContent({
                 ))}
               </ul>
               <p className="mb-4 font-mono text-[13px]" style={MUTED_ON_INVERTED}>
-                <span className="font-semibold text-accent">Попробуй за 1 ₽</span> · далее 249 ₽/мес
+                <span className="font-semibold text-accent">1 ₽</span> · доступ на 1 месяц
               </p>
               <Link
                 href="/upgrade"
@@ -645,7 +645,7 @@ export function ProfileContent({
                 Попробовать
               </Link>
               <p className="mt-2.5 text-center text-[11px] leading-[1.45]" style={MUTED_ON_INVERTED}>
-                Первая неделя — 1 ₽, далее 249 ₽/мес. Отменить можно в любой момент.
+                Один платёж, без автопродления: повторно деньги не спишутся.
               </p>
             </div>
           )}

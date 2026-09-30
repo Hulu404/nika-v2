@@ -69,7 +69,8 @@ export function UpgradeContent() {
    * Реальный старт оплаты через существующую точку входа Robokassa
    * (POST /api/robokassa/create-payment): она заводит pending-строку в
    * robokassa_payments и возвращает подписанную ссылку (buildPaymentUrl). Тариф
-   * pro = первая неделя 1 ₽. Подпись/URL здесь не собираем — это делает сервер.
+   * pro = 1 ₽ за месяц доступа, без автопродления. Подпись/URL здесь не собираем:
+   * это делает сервер.
    */
   async function handlePay() {
     setLoading(true);
@@ -160,10 +161,10 @@ export function UpgradeContent() {
 
             <div className="mt-4 flex items-end gap-2.5">
               <span className="font-mono text-[40px] font-medium leading-none tracking-[-0.02em] text-canvas">1 ₽</span>
-              <span className="mb-1 font-serif text-[15px] italic" style={MUTED_ON_DARK}>первая неделя</span>
+              <span className="mb-1 font-serif text-[15px] italic" style={MUTED_ON_DARK}>один платёж</span>
             </div>
             <p className="mt-1.5 text-[13px]" style={MUTED_ON_DARK}>
-              Далее <span className="font-mono">249 ₽</span> / мес · отмена в любой момент
+              Доступ к PRO на 1 месяц с момента оплаты
             </p>
 
             <ul className="mt-5 flex flex-1 flex-col gap-3">
@@ -177,13 +178,34 @@ export function UpgradeContent() {
 
             <p className="mt-4 text-[13px]" style={MUTED_ON_DARK}>Медитации — скоро</p>
 
+            <div className="mt-5 text-[13px] leading-[1.55]" style={MUTED_ON_DARK}>
+              <p>
+                К оплате <span className="font-mono">1 ₽</span>, один раз. Автопродления нет: повторно деньги не
+                спишутся, по окончании срока аккаунт вернётся на Free, данные сохранятся. Кассовый чек придёт на
+                твою почту.
+              </p>
+              <p className="mt-2">
+                Нажимая кнопку, ты принимаешь условия{" "}
+                <a
+                  href="/legal/oferta"
+                  target="_blank"
+                  rel="noopener"
+                  className="underline underline-offset-2"
+                  style={{ color: "inherit" }}
+                >
+                  Публичной оферты
+                </a>
+                .
+              </p>
+            </div>
+
             <button
               type="button"
               onClick={handlePay}
               disabled={loading}
               className="mt-5 flex min-h-[48px] w-full items-center justify-center gap-2 rounded-pill bg-accent text-[14px] font-medium text-canvas transition-opacity hover:opacity-90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent-deep disabled:cursor-not-allowed disabled:opacity-70 motion-reduce:transition-none"
             >
-              {loading ? "Переходим к оплате…" : "Попробовать за 1 ₽"}
+              {loading ? "Переходим к оплате…" : "Оплатить 1 ₽"}
               {!loading && <ArrowRight />}
             </button>
 

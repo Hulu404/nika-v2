@@ -48,6 +48,7 @@ export async function POST(request: Request) {
       amount,
       description,
       shp: { uid: user.id, plan },
+      email: user.email,
     });
 
     return NextResponse.json({ paymentUrl });

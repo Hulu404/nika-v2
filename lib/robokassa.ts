@@ -63,14 +63,14 @@ export const ROBOKASSA_PLANS: Record<
     subscriptionPlan: "yearly",
     description: "Подписка НИКА PRO — 6 месяцев",
   },
-  // PRO: стартовая цена первой недели 1 ₽. Автопродление 249 ₽/мес пока НЕ
-  // реализовано (Robokassa Recurring не подключён) — см. открытый вопрос в PR.
-  // months=1 здесь это интерим-грант доступа за первый платёж, а не срок триала.
+  // PRO: платёж 1 ₽ даёт доступ на months=1 (месяц). Автопродление НЕ реализовано
+  // (Robokassa Recurring не подключён), поэтому интерфейс и чек говорят ровно это:
+  // один платёж, один месяц, без повторных списаний.
   pro: {
     amount: 1,
     months: 1,
     subscriptionPlan: "monthly",
-    description: "Подписка НИКА PRO (первая неделя 1 ₽)",
+    description: "Подписка НИКА PRO — 1 месяц",
   },
 };
 
@@ -131,8 +131,10 @@ export function buildPaymentUrl(params: {
   amount: number;
   description: string;
   shp: Record<string, string>; // например { uid: userId, plan: 'monthly' }
+  /** Почта покупателя: Robokassa подставит её в форму и отправит на неё кассовый чек (54-ФЗ). */
+  email?: string | null;
 }): string {
-  const { invId, amount, description, shp } = params;
+  const { invId, amount, description, shp, email } = params;
   const outSum = amount.toFixed(2);
   const shpStr = shpString(shp);
   const receipt = buildReceipt(amount, description);
@@ -168,6 +170,7 @@ export function buildPaymentUrl(params: {
   url.searchParams.set("Description", description);
   url.searchParams.set("SignatureValue", signature);
   url.searchParams.set("Culture", "ru");
+  if (email) url.searchParams.set("Email", email);
   if (IS_TEST) url.searchParams.set("IsTest", "1");
 
   for (const [key, value] of Object.entries(shp)) {
