@@ -47,6 +47,11 @@ const nextConfig = {
         source: "/landing/vendor/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=604800" }],
       },
+      // Юридические страницы: обновляются редко, короткий кэш, чтобы правки доходили быстро
+      {
+        source: "/legal/:path*",
+        headers: [{ key: "Cache-Control", value: "public, max-age=300, stale-while-revalidate=86400" }],
+      },
       // Старые версии лендинга лежат для истории, наружу они не нужны
       {
         source: "/_archive/:path*",
@@ -78,6 +83,10 @@ const nextConfig = {
         source: "/coffeerunluzhniki",
         destination: "/coffeerunluzhniki/index.html",
       },
+      // Юридические страницы: /legal/privacy → /legal/privacy.html, без редиректа
+      { source: "/legal/privacy", destination: "/legal/privacy.html" },
+      { source: "/legal/consent", destination: "/legal/consent.html" },
+      { source: "/legal/oferta", destination: "/legal/oferta.html" },
       // /authv1 → /authv1/index.html (прототип НИКА Лайт)
       {
         source: "/authv1",
