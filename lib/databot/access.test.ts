@@ -61,6 +61,9 @@ const ZONE_EXPECT: Record<ReportId, Row> = {
   "tm.invite": [Y, N, N, N],
   "tm.zone": [Y, N, N, N],
   "tm.remove": [Y, N, N, N],
+  "tsk.list": [Y, Y, Y, Y],
+  "tsk.take": [Y, Y, Y, Y],
+  "tsk.done": [Y, Y, Y, Y],
 };
 
 /**
@@ -225,6 +228,7 @@ describe("canOpenSection — все пары", () => {
     prd: [Y, Y, N, N],
     kb: [Y, Y, Y, Y],
     tm: [Y, Y, N, N],
+    tsk: [Y, Y, Y, Y],
   };
   for (const section of SECTIONS) {
     WHO.forEach(([name, subject], i) => {

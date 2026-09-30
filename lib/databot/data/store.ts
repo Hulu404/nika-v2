@@ -1,4 +1,5 @@
 import type { FormState } from "../form";
+import type { TaskStore } from "../tasks";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 
 /**
@@ -9,7 +10,7 @@ import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
  * команды), при сбое базы БРОСАЕТ исключение — чтобы конвейер отличил аварию от
  * «никого нет». Запись журнала и отметки «был в боте» не бросают никогда.
  */
-export interface DatabotStore {
+export interface DatabotStore extends TaskStore {
   /** Активный участник по chat_id — одна выборка по первичному ключу, без кеша. */
   findActiveMember(chatId: number): Promise<MemberRow | null>;
 

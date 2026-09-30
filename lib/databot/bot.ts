@@ -1,7 +1,7 @@
 import { autoRetry } from "@grammyjs/auto-retry";
 import { Bot, type Context } from "grammy";
 import type { Update, UserFromGetMe } from "grammy/types";
-import { databotToken } from "./config";
+import { databotToken, databotTaskConfig } from "./config";
 import type { DatabotStore } from "./data/store";
 import { createSupabaseStore } from "./data/supabase-store";
 import { createPipeline } from "./pipeline";
@@ -38,13 +38,20 @@ const RETRY = { maxRetryAttempts: 3, maxDelaySeconds: 10 };
 
 export function createDatabot(token: string, opts: CreateDatabotOptions = {}): Bot<Context> {
   const bot = new Bot<Context>(token, opts.botInfo ? { botInfo: opts.botInfo } : undefined);
-  bot.api.config.use(autoRetry(RETRY));
+  const retry = autoRetry(RETRY);
+  bot.api.config.use((prev, method, payload, signal) => {
+    // A group publication cannot be retried safely after an ambiguous network failure.
+    if (method === "sendMessage" && "chat_id" in payload && payload.chat_id === databotTaskConfig()?.chatId) {
+      return prev(method, payload, signal);
+    }
+    return retry(prev, method, payload, signal);
+  });
 
   if (opts.logChatIds) {
     bot.use(async (ctx, next) => {
       const chat = ctx.chat ?? ctx.myChatMember?.chat;
       const who = ctx.from?.username ? ` @${ctx.from.username}` : "";
-      console.log(`[databot:dev] chat_id=${chat?.id ?? "—"} (${chat?.type ?? "?"})${who}`);
+      console.log(`[databot:dev] chat_id=${chat?.id ?? "—"} message_thread_id=${ctx.msg?.message_thread_id ?? "—"} (${chat?.type ?? "?"})${who}`);
       await next();
     });
   }

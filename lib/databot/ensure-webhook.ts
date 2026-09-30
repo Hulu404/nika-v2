@@ -19,7 +19,7 @@ export interface EnsureDatabotWebhookResult {
 }
 
 /** my_chat_member — чтобы узнать, что бота добавили в группу, и выйти. */
-export const DATABOT_ALLOWED_UPDATES = ["message", "callback_query", "my_chat_member"] as const;
+export const DATABOT_ALLOWED_UPDATES = ["message", "edited_message", "callback_query", "my_chat_member"] as const;
 
 export async function ensureDatabotWebhook(): Promise<EnsureDatabotWebhookResult> {
   const bot = getDatabot();

@@ -1,4 +1,6 @@
 import { InputFile, type Context, type Keyboard, type MiddlewareFn } from "grammy";
+import { databotTaskConfig } from "./config";
+import { handleTaskUpdate } from "./task-handler";
 import type { InlineKeyboardMarkup, ReplyKeyboardRemove } from "grammy/types";
 import { audienceOf, can, isEnvOwner, zoneCan } from "./access";
 import { buildAuditEntry, recordAudit } from "./audit";
@@ -38,9 +40,9 @@ import type { AnyReport, Intent, MemberRow, ReportId, Screen, Section, Subject }
  * Конвейер апдейта бота данных — единственное место, где решается, что делать
  * с апдейтом. Порядок держится здесь, а не размазан по экранам:
  *
- *   0. бот сам вошёл в группу или канал → выходит, больше ничего;
+ *   0. бот сам вошёл в чужую группу или канал → выходит, больше ничего;
  *   1. нажатие кнопки гасится сразу, до любых проверок;
- *   2. всё не из лички игнорируется, из группы — ещё и выходим;
+ *   2. только настроенный командный чат отдаём учёту задач; отчёты — из лички;
  *   3. лимит — раньше всего остального, включая /start;
  *   4. членство — одна выборка по chat_id, без кеша; чужой получает одну фразу;
  *   5. разбор запроса → Intent;
@@ -71,12 +73,13 @@ export function createPipeline(deps: PipelineDeps): MiddlewareFn<Context> {
 async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date): Promise<void> {
   const startedAt = Date.now();
 
-  // Шаг 0. Бота добавили в группу, супергруппу или канал — уходим. Собственный
+  // Шаг 0. Бота добавили в чужую группу, супергруппу или канал — уходим. Собственный
   // выход (left) и блокировка в личке (kicked) приходят сюда же — без ответа.
   const membership = ctx.myChatMember;
   if (membership) {
     const { chat, new_chat_member } = membership;
-    if (chat.type !== "private" && PRESENT_STATUSES.has(new_chat_member.status)) {
+    if (chat.type !== "private" && PRESENT_STATUSES.has(new_chat_member.status) &&
+        !((chat.type === "group" || chat.type === "supergroup") && chat.id === databotTaskConfig()?.chatId)) {
       await leave(ctx, chat.id);
     }
     return;
@@ -85,7 +88,9 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
   // Шаг 1. Индикатор загрузки на кнопке гасим сразу — как lib/team/bot.ts.
   if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => {});
 
-  // Шаг 2. Только личка.
+  if (await handleTaskUpdate(ctx, store)) return;
+
+  // Шаг 2. Личка для отчётов; учёт задач настроенной группы уже обработан.
   const chat = ctx.chat;
   if (!chat) return;
   if (chat.type !== "private") {

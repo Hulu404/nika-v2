@@ -1,6 +1,7 @@
 import { asFormState, type FormState } from "../form";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 import type { DatabotStore } from "./store";
+import { MemoryTasks } from "./memory-tasks";
 
 /**
  * Хранилище в памяти — для тестов конвейера и разделов. Повторяет смысл
@@ -11,7 +12,7 @@ import type { DatabotStore } from "./store";
  * failNext("findActiveMember") — следующая такая операция бросит, как база,
  * которая не ответила.
  */
-export class MemoryStore implements DatabotStore {
+export class MemoryStore extends MemoryTasks implements DatabotStore {
   members = new Map<number, MemberRow>();
   invites = new Map<string, InviteRow>();
   audit: Array<AuditEntry & { created_at: string }> = [];

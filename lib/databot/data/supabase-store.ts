@@ -3,6 +3,7 @@ import { tgAdmin } from "../../telegram/supabase";
 import { asFormState, type FormState } from "../form";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 import type { DatabotStore } from "./store";
+import { TaskStoreBase, TaskError, type TaskRow } from "../tasks";
 
 /**
  * Боевое хранилище бота данных: таблицы databot_* из 037, tg_sessions и
@@ -67,7 +68,35 @@ function fail(op: string, message: string): never {
   throw new Error(`databot store: ${op}: ${message}`);
 }
 
-class SupabaseStore implements DatabotStore {
+class SupabaseStore extends TaskStoreBase implements DatabotStore {
+  async taskAction(action: string, args: Record<string, unknown>): Promise<TaskRow | null> {
+    const { data, error } = await this.db.rpc("databot_task_action", { p_action: action, p_args: args }).abortSignal(timeout());
+    if (error) {
+      if (error.message.startsWith("task:")) throw new TaskError(error.message.slice(5));
+      fail("taskAction", error.message);
+    }
+    return data as TaskRow | null;
+  }
+
+  async listAvailableTasks(chatId: number): Promise<TaskRow[]> {
+    return this.taskList(chatId, null);
+  }
+
+  async listActiveTasks(userId: number, chatId: number): Promise<TaskRow[]> {
+    return this.taskList(chatId, userId);
+  }
+
+  async listPendingTaskCleanup(userId: number, chatId: number): Promise<TaskRow[]> {
+    const { data, error } = await this.db.rpc("databot_task_cleanup_list", { p_chat: chatId, p_user: userId }).abortSignal(timeout());
+    if (error) fail("taskCleanupList", error.message);
+    return (data ?? []) as TaskRow[];
+  }
+
+  private async taskList(chatId: number, userId: number | null): Promise<TaskRow[]> {
+    const { data, error } = await this.db.rpc("databot_task_list", { p_chat: chatId, p_user: userId }).abortSignal(timeout());
+    if (error) fail("taskList", error.message);
+    return (data ?? []) as TaskRow[];
+  }
   // Клиент берём лениво, на каждом вызове: tgAdmin() сам кеширует, а без env
   // конструктор не должен падать — createSupabaseStore() зовётся при сборке
   // бота, в том числе там, где до базы дело не дойдёт (тесты webhook-роута).

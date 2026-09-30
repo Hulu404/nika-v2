@@ -15,6 +15,7 @@ export const SECTION_READY: Record<Section, boolean> = {
   prd: true,
   kb: true,
   tm: true,
+  tsk: true,
 };
 
 /** Команда раздела (без «/»). */
@@ -25,6 +26,7 @@ export const SECTION_COMMAND: Record<Section, string> = {
   prd: "product",
   kb: "kb",
   tm: "team",
+  tsk: "tasks",
 };
 
 /** Отчёт, которым открывается раздел. */
@@ -35,6 +37,7 @@ export const SECTION_HOME_REPORT: Record<Section, ReportId> = {
   prd: "prd.summary",
   kb: "kb.list",
   tm: "tm.list",
+  tsk: "tsk.list",
 };
 
 /** Разделы, которые человек видит в клавиатуре и меню: доступны зоне И готовы. */

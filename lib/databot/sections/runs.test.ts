@@ -272,10 +272,10 @@ describe("экран раздела и поиск забега", () => {
     const data = buttonData(s);
     const cards = data.filter((d) => d.startsWith("d:run:card"));
     expect(cards).toEqual([
+      "d:run:card:usachevo:2026-10-04",
       "d:run:card:luzhniki:2026-10-10",
       "d:run:card:usachevo:2026-10-10",
       "d:run:card:luzhniki:2026-10-17",
-      "d:run:card:luzhniki:2026-10-24",
     ]);
     expect(data).toContain("d:run:past");
     expect(data).toContain("d:run:table");
@@ -290,15 +290,16 @@ describe("экран раздела и поиск забега", () => {
     ]);
   });
 
-  it("на дату нет забега — «На 04.10 забегов нет. Ближайшие:» и кнопки", async () => {
-    const s = await screen(createRunsHandler(deps({ archive: twoOnDate() })), req("list", { q: "04.10" }));
-    expect(s.text).toBe("На 04.10 забегов нет. Ближайшие:");
+  it("на дату нет забега — «На 05.10 забегов нет. Ближайшие:» и кнопки", async () => {
+    const s = await screen(createRunsHandler(deps({ archive: twoOnDate() })), req("list", { q: "05.10" }));
+    expect(s.text).toBe("На 05.10 забегов нет. Ближайшие:");
     expect(buttonData(s).filter((d) => d.startsWith("d:run:card")).length).toBe(4);
   });
 
-  it("ближайших нет — так и пишем", async () => {
+  it("пустая база не скрывает ближайший забег из расписания", async () => {
     const s = await screen(createRunsHandler(deps({ archive: [] })), req("list", {}));
-    expect(s.text).toContain("Ближайших забегов в расписании нет");
+    expect(s.text).toContain("Ближайшие — кнопками ниже");
+    expect(buttonData(s)).toContain("d:run:card:usachevo:2026-10-04");
   });
 });
 

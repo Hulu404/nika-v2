@@ -10,6 +10,6 @@ describe("ensureDatabotWebhook", () => {
   });
 
   it("allowed_updates ровно из ТЗ: my_chat_member нужен, чтобы выйти из группы", () => {
-    expect([...DATABOT_ALLOWED_UPDATES]).toEqual(["message", "callback_query", "my_chat_member"]);
+    expect([...DATABOT_ALLOWED_UPDATES]).toEqual(["message", "edited_message", "callback_query", "my_chat_member"]);
   });
 });

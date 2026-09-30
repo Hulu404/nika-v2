@@ -118,6 +118,9 @@ export const ACCESS_MATRIX: Readonly<Record<ReportId, Rule>> = {
   "tm.invite": { audience: "owner" },
   "tm.zone": { audience: "owner", ctx: notProtectedTarget },
   "tm.remove": { audience: "owner", ctx: notProtectedTarget },
+  "tsk.list": { audience: ALL },
+  "tsk.take": { audience: ALL },
+  "tsk.done": { audience: ALL },
 };
 
 /** Раздел отчёта — префикс до первой точки (0.4: каждый отчёт ровно в одном разделе). */
@@ -151,6 +154,7 @@ const SECTION_AUDIENCE: Readonly<Record<Section, readonly Zone[]>> = {
   pro: COUNCIL,
   prd: COUNCIL,
   tm: COUNCIL,
+  tsk: ALL,
 };
 
 /** Виден ли раздел в клавиатуре и меню команд зоны. */

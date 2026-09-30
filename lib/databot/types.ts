@@ -8,7 +8,7 @@ export const ZONES = ["council", "events", "smm"] as const;
 export type Zone = (typeof ZONES)[number];
 
 /** Разделы в порядке постоянной клавиатуры совета. */
-export const SECTIONS = ["run", "tr", "pro", "prd", "kb", "tm"] as const;
+export const SECTIONS = ["run", "tr", "pro", "prd", "kb", "tm", "tsk"] as const;
 export type Section = (typeof SECTIONS)[number];
 
 export type Source = "button" | "command" | "text" | "llm";
@@ -38,6 +38,9 @@ export const REPORTS = [
   "tm.invite",
   "tm.zone",
   "tm.remove",
+  "tsk.list",
+  "tsk.take",
+  "tsk.done",
 ] as const;
 export type ReportId = (typeof REPORTS)[number];
 

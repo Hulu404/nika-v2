@@ -2,6 +2,7 @@ import { config } from "dotenv";
 import { createDatabot } from "../lib/databot/bot";
 import { DATABOT_DEFAULT_COMMANDS } from "../lib/databot/copy";
 import { isProdWebhook } from "../lib/databot/dev-guard";
+import { DATABOT_ALLOWED_UPDATES } from "../lib/databot/ensure-webhook";
 
 // Сначала .env.local (там токен ТЕСТОВОГО бота), потом .env — dotenv не
 // перезаписывает уже заданные переменные.
@@ -43,6 +44,7 @@ async function main(): Promise<void> {
   }
 
   await bot.start({
+    allowed_updates: [...DATABOT_ALLOWED_UPDATES],
     onStart: async (me) => {
       console.log(`Бот данных запущен (dev, polling): @${me.username}`);
       console.log("Напиши боту в личку — ниже появится твой chat_id.");
