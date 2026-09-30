@@ -20,8 +20,20 @@ const serif = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "НИКА — ментальный ассистент для бегунов",
-  description: "НИКА помогает бегунам-любителям не бросить бег. Тёплый собеседник, а не тренер.",
+  metadataBase: new URL("https://www.mynika.online"),
+  title: "NIKA | YOU'LL NEVER MOVE ALONE",
+  description:
+    "НИКА учит слышать тело во время бега: утренний вопрос о самочувствии, практики дыхания в наушниках и разговор после пробежки.",
+  applicationName: "NIKA",
+  openGraph: {
+    type: "website",
+    siteName: "NIKA",
+    locale: "ru_RU",
+    title: "NIKA | YOU'LL NEVER MOVE ALONE",
+    description: "The world gave athletes more data. We want to give them back their sense.",
+    images: [{ url: "/og/nika-og.jpg", width: 1200, height: 630, alt: "NIKA | YOU'LL NEVER MOVE ALONE" }],
+  },
+  twitter: { card: "summary_large_image", images: ["/og/nika-og.jpg"] },
 };
 
 // maximum-scale=1 / user-scalable=false — гасит iOS-авто-зум при фокусе на
