@@ -25,6 +25,8 @@ export const metadata: Metadata = {
   description:
     "НИКА учит слышать тело во время бега: утренний вопрос о самочувствии, практики дыхания в наушниках и разговор после пробежки.",
   applicationName: "NIKA",
+  // Экраны приложения (вход, профиль и т. п.) в поиск не нужны: в выдаче только лендинг и документы
+  robots: { index: false, follow: true },
   openGraph: {
     type: "website",
     siteName: "NIKA",

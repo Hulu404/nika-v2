@@ -60,6 +60,12 @@ const nextConfig = {
           { key: "Cache-Control", value: "no-store" },
         ],
       },
+      // Страницы кофе-ранов живут по ссылке из бота, в поиске им не место:
+      // без JavaScript поисковик видел «This page requires JavaScript».
+      ...["/coffeerunsurfsport", "/coffeerunluzhniki"].flatMap((p) => [p, `${p}/:path*`]).map((source) => ({
+        source,
+        headers: [{ key: "X-Robots-Tag", value: "noindex, follow" }],
+      })),
       // /authv1 — прототип, не индексировать, не кешировать
       {
         source: "/authv1/:path*",

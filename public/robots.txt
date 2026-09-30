@@ -1,15 +1,6 @@
 User-agent: *
 Allow: /
-Allow: /legal/
 Disallow: /api/
 Disallow: /admin
-Disallow: /authv1
-Disallow: /_archive/
-Disallow: /today
-Disallow: /journal
-Disallow: /chat
-Disallow: /profile
-Disallow: /payment
 
 Sitemap: https://www.mynika.online/sitemap.xml
-Host: https://www.mynika.online
