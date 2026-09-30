@@ -1,6 +1,6 @@
 import { createServerComponentClient } from "@/lib/supabase";
 import { getConsentStates, recordConsents, requestMeta } from "@/lib/consents";
-import { CONSENT_TYPES, isConsentType, type ConsentType } from "@/lib/legal";
+import { CONSENT_TYPES, LEGAL_VERSION, isConsentType, type ConsentType } from "@/lib/legal";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,6 +48,14 @@ export async function POST(req: Request) {
     entries.push({ type: item.type, granted: item.granted });
   }
   if (!source || entries.length === 0) return Response.json({ error: "Invalid body" }, { status: 400 });
+
+  // Баннер cookie досылает выбор раз за сессию: одинаковое состояние не дублируем
+  if (source === "cookie_banner" && entries.length === 1 && entries[0].type === "cookies_analytics") {
+    const current = (await getConsentStates(supabase, user.id, ["cookies_analytics"])).cookies_analytics;
+    if (current.version === LEGAL_VERSION && current.granted === entries[0].granted) {
+      return Response.json({ ok: true, unchanged: true });
+    }
+  }
 
   const err = await recordConsents(user.id, entries, { ...requestMeta(req), source });
   if (err) {

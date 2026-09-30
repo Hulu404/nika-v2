@@ -7,6 +7,3 @@ export type ConsentType = (typeof CONSENT_TYPES)[number];
 export function isConsentType(v: unknown): v is ConsentType {
   return typeof v === "string" && (CONSENT_TYPES as readonly string[]).includes(v);
 }
-
-/** Версия текста баннера cookie. Совпадает с полем version в nika_cookie_consent_v1. */
-export const COOKIE_BANNER_VERSION = 1;

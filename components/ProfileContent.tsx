@@ -13,6 +13,7 @@ import { PlanBadge } from "@/components/PlanBadge";
 import { LegalLinks } from "@/components/legal/LegalLinks";
 import { deleteAllCycleData } from "@/lib/rhythm/cycles";
 import type { ConsentType } from "@/lib/legal";
+import { OPEN_COOKIE_SETTINGS_EVENT } from "@/lib/cookie-consent";
 
 // ─── типы ────────────────────────────────────────────────────────────────────
 
@@ -1139,6 +1140,22 @@ export function ProfileContent({
               Отозвать согласие на обработку персональных данных целиком можно письмом на{" "}
               <a href="mailto:ceo@mynika.ru" className="underline underline-offset-2">ceo@mynika.ru</a>.
             </p>
+
+            <div className="border-t border-line-default pt-5">
+              <p className="text-[15px] text-ink-primary">Аналитические cookie</p>
+              <p className="mt-0.5 text-[13px] text-ink-muted">
+                {consents.cookies_analytics.granted ? "Включены" : "Выключены"} · Яндекс Метрика и Amplitude
+              </p>
+              <button
+                onClick={() => {
+                  closeSheet();
+                  window.dispatchEvent(new Event(OPEN_COOKIE_SETTINGS_EVENT));
+                }}
+                className="mt-3 min-h-[44px] w-full rounded-pill border border-line-default py-[13px] text-[14px] font-medium text-ink-primary transition-colors hover:border-line-strong"
+              >
+                Настройки cookie
+              </button>
+            </div>
 
             <div className="border-t border-line-default pt-5">
               <p className="text-[15px] text-ink-primary">Сведения о здоровье</p>
