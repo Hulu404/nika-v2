@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createServerComponentClient } from "@/lib/supabase";
 import { createServiceRoleClient } from "@/lib/supabase-server";
 import { getPublicOrigin } from "@/lib/public-origin";
+import { recordConsents, requestMeta } from "@/lib/consents";
 
 export const runtime = "nodejs";
 
@@ -23,6 +24,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}/auth?error=auth`);
     }
     await upsertUser(data.user.id, data.user.email);
+    await flushPendingConsents(data.user, request);
     return NextResponse.redirect(`${origin}${next}`);
   }
 
@@ -36,6 +38,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}/auth?error=auth`);
     }
     await upsertUser(data.user.id, data.user.email);
+    await flushPendingConsents(data.user, request);
     return NextResponse.redirect(`${origin}${next}`);
   }
 
@@ -53,5 +56,41 @@ async function upsertUser(id: string, email?: string | null) {
       );
   } catch (err) {
     console.error("[auth/callback] users upsert failed:", err);
+  }
+}
+
+/**
+ * Регистрация с подтверждением почты: отметки офферты и согласия ПДн были даны на
+ * форме, но сессии тогда не было. Заносим их в журнал сейчас, один раз.
+ * created_at здесь это момент подтверждения почты, время отметки на форме лежит
+ * в user_metadata.pending_consents.at.
+ */
+async function flushPendingConsents(
+  user: { id: string; user_metadata?: Record<string, unknown> },
+  request: Request,
+) {
+  try {
+    const pending = user.user_metadata?.pending_consents as
+      | { offer?: boolean; pd?: boolean }
+      | undefined;
+    if (!pending) return;
+
+    const admin = createServiceRoleClient();
+    const { count } = await admin
+      .from("consents")
+      .select("id", { count: "exact", head: true })
+      .eq("user_id", user.id)
+      .in("type", ["offer", "pd"]);
+    if ((count ?? 0) > 0) return;
+
+    const entries: { type: "offer" | "pd"; granted: boolean }[] = [];
+    if (pending.offer === true) entries.push({ type: "offer", granted: true });
+    if (pending.pd === true) entries.push({ type: "pd", granted: true });
+    if (entries.length === 0) return;
+
+    const err = await recordConsents(user.id, entries, { ...requestMeta(request), source: "signup_confirm" });
+    if (err) console.error("[auth/callback] consents insert failed:", err);
+  } catch (err) {
+    console.error("[auth/callback] pending consents failed:", err);
   }
 }

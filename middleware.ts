@@ -210,6 +210,7 @@ export const config = {
     "/api/sprint/advice",
     "/api/notifications/:path*",
     "/api/prefs/:path*",
+    "/api/consents",
     "/api/push/subscribe",
     "/api/telegram/link",
     "/api/telegram/unlink",

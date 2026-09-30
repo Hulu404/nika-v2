@@ -777,6 +777,43 @@ export interface Database {
         };
         Relationships: [];
       };
+      consents: {
+        Row: {
+          id: number;
+          user_id: string;
+          type: "offer" | "pd" | "health" | "cookies_analytics";
+          version: string;
+          granted: boolean;
+          created_at: string;
+          ip: string | null;
+          user_agent: string | null;
+          source: string | null;
+        };
+        Insert: {
+          /** generated always as identity: на вставке не задаётся. */
+          id?: number;
+          user_id: string;
+          type: "offer" | "pd" | "health" | "cookies_analytics";
+          version: string;
+          granted: boolean;
+          created_at?: string;
+          ip?: string | null;
+          user_agent?: string | null;
+          source?: string | null;
+        };
+        Update: {
+          id?: number;
+          user_id?: string;
+          type?: "offer" | "pd" | "health" | "cookies_analytics";
+          version?: string;
+          granted?: boolean;
+          created_at?: string;
+          ip?: string | null;
+          user_agent?: string | null;
+          source?: string | null;
+        };
+        Relationships: [];
+      };
       link_codes: {
         Row: {
           code: string;

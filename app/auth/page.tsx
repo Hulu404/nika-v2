@@ -54,6 +54,8 @@ export default function AuthPage() {
   const [info, setInfo] = useState<string | null>(null);
   const [touchedEmail, setTouchedEmail] = useState(false);
   const [touchedPw, setTouchedPw] = useState(false);
+  const [acceptOffer, setAcceptOffer] = useState(false);
+  const [acceptPd, setAcceptPd] = useState(false);
 
   // Тема — синхронизируем с глобальным механизмом приложения (класс .dark + nika-theme).
   const [dark, setDark] = useState(false);
@@ -89,7 +91,8 @@ export default function AuthPage() {
 
   const emailOk = emailRe.test(email.trim());
   const pwOk = mode === "signup" ? password.length >= 8 : password.length >= 1;
-  const canSubmit = emailOk && pwOk && !loading;
+  const consentsOk = mode === "signin" || (acceptOffer && acceptPd);
+  const canSubmit = emailOk && pwOk && consentsOk && !loading;
 
   const emailErr = touchedEmail && email.trim() !== "" && !emailOk;
   const pwErr = touchedPw && mode === "signup" && password !== "" && password.length < 8;
@@ -131,7 +134,13 @@ export default function AuthPage() {
     const { data, error: err } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding` },
+      options: {
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+        // Если включено подтверждение почты, сессии сейчас нет и записать согласие
+        // в журнал нельзя: отметки уезжают в метаданные, а /auth/callback
+        // занесёт их в журнал после подтверждения.
+        data: { pending_consents: { offer: true, pd: true, at: new Date().toISOString() } },
+      },
     });
     if (err) {
       setLoading(false);
@@ -139,7 +148,23 @@ export default function AuthPage() {
       return;
     }
     if (data.session) {
-      // Сессия сразу (Confirm email выключен).
+      // Сессия сразу (Confirm email выключен). Согласия в журнал до любого редиректа.
+      try {
+        await fetch("/api/consents", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          credentials: "same-origin",
+          body: JSON.stringify({
+            entries: [
+              { type: "offer", granted: true },
+              { type: "pd", granted: true },
+            ],
+            source: "signup",
+          }),
+        });
+      } catch {
+        // Запись согласий не должна ломать вход: в метаданных пользователя отметка осталась
+      }
       // Погашаем промокод из QR-страницы если он есть (серверно через API).
       const promoToken = sessionStorage.getItem("nika_promo");
       if (promoToken) {
@@ -387,13 +412,58 @@ export default function AuthPage() {
                   )}
                 </div>
 
-                {/* Юридическая строка (только регистрация) */}
+                {/* Согласия (только регистрация): два отдельных поля, по умолчанию не отмечены */}
                 {mode === "signup" && (
-                  <p className="text-[11.5px] leading-[1.5] text-ink-muted">
-                    Создавая аккаунт, ты соглашаешься с{" "}
-                    <a href="#" className="text-ink-secondary underline underline-offset-2">условиями</a> и{" "}
-                    <a href="#" className="text-ink-secondary underline underline-offset-2">политикой приватности</a>.
-                  </p>
+                  <div className="flex flex-col gap-1 text-[12.5px] leading-[1.5] text-ink-secondary">
+                    <label className="flex min-h-[44px] cursor-pointer items-start gap-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={acceptOffer}
+                        onChange={(e) => setAcceptOffer(e.target.checked)}
+                        className="mt-[1px] h-5 w-5 flex-shrink-0 cursor-pointer accent-[var(--accent)]"
+                      />
+                      <span>
+                        Принимаю условия{" "}
+                        <a
+                          href="/legal/oferta"
+                          target="_blank"
+                          rel="noopener"
+                          className="text-ink-primary underline underline-offset-2"
+                        >
+                          Публичной оферты
+                        </a>
+                      </span>
+                    </label>
+                    <label className="flex min-h-[44px] cursor-pointer items-start gap-3 py-2">
+                      <input
+                        type="checkbox"
+                        checked={acceptPd}
+                        onChange={(e) => setAcceptPd(e.target.checked)}
+                        className="mt-[1px] h-5 w-5 flex-shrink-0 cursor-pointer accent-[var(--accent)]"
+                      />
+                      <span>
+                        Даю{" "}
+                        <a
+                          href="/legal/consent"
+                          target="_blank"
+                          rel="noopener"
+                          className="text-ink-primary underline underline-offset-2"
+                        >
+                          согласие на обработку персональных данных
+                        </a>
+                        . Порядок обработки описан в{" "}
+                        <a
+                          href="/legal/privacy"
+                          target="_blank"
+                          rel="noopener"
+                          className="text-ink-primary underline underline-offset-2"
+                        >
+                          Политике
+                        </a>
+                        .
+                      </span>
+                    </label>
+                  </div>
                 )}
 
                 {/* Сообщения */}

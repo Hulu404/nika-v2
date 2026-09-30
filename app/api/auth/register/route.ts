@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createServiceRoleClient } from "@/lib/supabase-server";
+import { recordConsents, requestMeta } from "@/lib/consents";
 
 export const runtime = "nodejs";
 
@@ -10,10 +11,17 @@ export const runtime = "nodejs";
  */
 export async function POST(request: Request) {
   try {
-    const { email, password } = await request.json();
+    const { email, password, acceptOffer, acceptPd } = await request.json();
 
     if (!email || !password) {
       return NextResponse.json({ error: "Email и пароль обязательны." }, { status: 400 });
+    }
+    // Без явных отметок оферты и согласия ПДн аккаунт не создаём.
+    if (acceptOffer !== true || acceptPd !== true) {
+      return NextResponse.json(
+        { error: "Нужно принять оферту и дать согласие на обработку персональных данных." },
+        { status: 400 },
+      );
     }
 
     const admin = createServiceRoleClient();
@@ -28,6 +36,16 @@ export async function POST(request: Request) {
       console.error("[register] createUser error:", error.message);
       return NextResponse.json({ error: error.message }, { status: 400 });
     }
+
+    const cerr = await recordConsents(
+      data.user.id,
+      [
+        { type: "offer", granted: true },
+        { type: "pd", granted: true },
+      ],
+      { ...requestMeta(request), source: "signup" },
+    );
+    if (cerr) console.error("[register] consents insert failed:", cerr);
 
     return NextResponse.json({ userId: data.user.id });
   } catch (err) {
