@@ -6,6 +6,7 @@ import { CONSENT_TYPES } from "@/lib/legal";
 import { resolveIsPro } from "@/lib/subscription";
 import { rhythmEnabled } from "@/lib/v2/validate";
 import { weekSummary } from "@/lib/runs";
+import { isTelegramAllowed } from "@/lib/telegram/allowlist";
 
 /**
  * Пользователи, заведённые до запуска новой версии, проходили старый онбординг
@@ -103,7 +104,7 @@ export async function buildMe(supabase: ServerClient, user: User) {
       lastEntry: lastEntryRow.data ?? null,
       week: weekSummary(weekRuns.data ?? []),
     },
-    telegram: { linked: !!tgRow.data },
+    telegram: { linked: !!tgRow.data, available: isTelegramAllowed(user.email) },
     push: { vapidPublicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null },
     state: entries + runs + practices === 0 ? ("fresh" as const) : ("regular" as const),
   };

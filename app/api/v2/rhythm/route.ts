@@ -1,6 +1,6 @@
 import { getAuthed, unauthorized, badRequest, readJson, serverError } from "@/lib/v2/http";
 import { hasConsent } from "@/lib/consents";
-import { getLatestCycles, getCycleLength, getCycleDay, getPhase, markCycleStart } from "@/lib/rhythm/cycles";
+import { getLatestCycles, getCycleLength, getCycleDay, getPhase, markCycleStart, deleteAllCycleData } from "@/lib/rhythm/cycles";
 import { isYmd } from "@/lib/v2/validate";
 
 export const runtime = "nodejs";
@@ -99,4 +99,13 @@ export async function POST(req: Request) {
   } catch (err) {
     return serverError("rhythm.post", err);
   }
+}
+
+/** Удалить все данные ритма (по запросу, например вместе с отзывом согласия). */
+export async function DELETE() {
+  const authed = await getAuthed();
+  if (!authed) return unauthorized();
+  const err = await deleteAllCycleData(authed.supabase, authed.user.id);
+  if (err) return serverError("rhythm.delete", err);
+  return Response.json({ ok: true });
 }

@@ -556,6 +556,23 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
   color:var(--ink);font-size:.95rem;padding:4px 0}
 .oother input::placeholder{color:var(--ink-3)}
 .msg.sys{opacity:.78;font-style:italic}
+.cookie{position:absolute;z-index:170;left:12px;right:12px;bottom:calc(12px + env(safe-area-inset-bottom,0px));background:#17171a;border:1px solid var(--ink-4);border-radius:18px;padding:16px;font-size:.84rem;line-height:1.5;color:var(--ink-2)}
+.cookie[hidden]{display:none}
+.cookie a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.cookie .cb{display:flex;gap:8px;margin-top:12px}
+.cookie .cb button{flex:1;min-height:44px;border-radius:99px;font:inherit;font-weight:600;font-size:.88rem}
+.cookie .cb .y{background:var(--ink);color:#111}.cookie .cb .n{background:rgba(255,255,255,.1);color:var(--ink)}
+.modal{position:absolute;inset:0;z-index:160;display:flex;align-items:flex-end;justify-content:center;background:rgba(0,0,0,.62)}
+.modal[hidden]{display:none}
+.modal .card{width:100%;max-width:480px;max-height:88%;overflow-y:auto;background:#141417;border-radius:26px 26px 0 0;padding:26px 22px calc(26px + env(safe-area-inset-bottom,0px))}
+.modal .card h2{margin:0 0 12px}
+.modal ul{margin:14px 0;padding-left:1.1em;color:var(--ink-2);font-size:.92rem;line-height:1.55}
+.prow2{display:flex;gap:8px;align-items:center;margin-top:12px}
+.prow2 input{flex:1;min-width:0;background:var(--veil);border:0;border-radius:var(--r-pill);padding:12px 16px;color:var(--ink);font:inherit;font-size:.95rem;outline:0}
+.seg{display:flex;gap:8px;margin-top:12px}
+.seg .tag{flex:1;text-align:center;justify-content:center}
+.seg .tag.on{background:rgba(212,112,63,.28);color:var(--ink)}
+.pmsg{font-size:.82rem;color:var(--ink-3);margin-top:8px;min-height:1em}
 .msgact{display:block;margin:4px 0 10px;align-self:flex-start}
 .ocheck{display:flex;gap:12px;align-items:flex-start;margin-top:16px;font-size:.86rem;line-height:1.45;color:var(--ink-2);cursor:pointer;min-height:44px}
 .ocheck input{appearance:none;-webkit-appearance:none;flex:none;width:22px;height:22px;border-radius:7px;border:1.5px solid rgba(244,239,230,.42);margin:0;display:grid;place-items:center;background:transparent;cursor:pointer}
@@ -894,7 +911,7 @@ button.cli:active{opacity:.65}
         <div class="tags" id="tagbox"></div>
         <div class="tagadd" id="tagAddRow" style="display:none"><input id="tagAddInput" maxlength="60" placeholder="Своя метка, только для этой записи"><button class="pill" id="tagAddOk">Добавить</button></div>
         <div class="compose" style="margin-top:16px">
-          <textarea id="entryText" rows="3" placeholder="Что сегодня было с телом и с головой"></textarea>
+          <textarea class="ym-disable-keys" id="entryText" rows="3" placeholder="Что сегодня было с телом и с головой"></textarea>
           <div class="cfoot">
             <span class="cap dim" id="entryHint">Видишь только ты и Ника</span>
             <button class="pill" id="entrySave">Записать</button>
@@ -910,13 +927,13 @@ button.cli:active{opacity:.65}
 
       <div class="block">
         <div class="lab" style="margin-bottom:6px">Лента</div>
-        <div id="entries"><p class="cap dim" id="entriesEmpty">Пока пусто. Первая запись может быть одной строкой: «Сегодня совсем не хотелось» это тоже запись.</p></div>
+        <div class="ym-hide-content" id="entries"><p class="cap dim" id="entriesEmpty">Пока пусто. Первая запись может быть одной строкой: «Сегодня совсем не хотелось» это тоже запись.</p></div>
       </div>
 
       <div class="block" id="tipsBlock" style="display:none">
         <div class="lab" style="margin-bottom:6px">Советы Ники</div>
         <p class="cap dim" style="margin:0 0 6px">Ника сохраняет их из разговоров, чтобы не потерялись.</p>
-        <div id="tips"></div>
+        <div class="ym-hide-content" id="tips"></div>
       </div>
 
     </section>
@@ -944,7 +961,7 @@ button.cli:active{opacity:.65}
     </section>
 
     <!-- ==================== РИТМ ==================== -->
-    <section class="view" data-view="rhythm">
+    <section class="view ym-hide-content" data-view="rhythm">
 
       <!-- отдельное согласие на сведения о здоровье -->
       <div id="rhythmConsent" class="rsetup" style="display:none">
@@ -1045,19 +1062,32 @@ button.cli:active{opacity:.65}
     <section class="view" data-view="profile">
       <div class="phead">
         <div class="av"></div>
-        <div class="who"><b id="profileName">Аня</b><span>С Никой четвёртый месяц</span></div>
+        <div class="who"><b id="profileName"></b><span id="profileSince"></span></div>
       </div>
-      <div class="rank"><i></i>Первая сотня · номер 47</div>
 
       <div class="setgroup">
         <div class="lab">Уровень</div>
         <div class="li" style="border-bottom:0;padding-left:0;padding-right:0">
           <div class="tx"><b class="freeonly">Бесплатный, бессрочно</b><b class="proonly">Про</b>
-          <span class="freeonly">Практики под момент, дневник, разговор с Никой</span>
-          <span class="proonly">Вся библиотека, память между разговорами, месячный разбор</span></div>
+          <span class="freeonly">Практики, дневник, ритм и разговор с Никой в пределах дневного лимита</span>
+          <span class="proonly" id="proUntil">Больше разговоров в день, память между разговорами, советы под тебя</span></div>
         </div>
-        <p class="why freeonly" style="margin-top:12px">Бесплатный уровень не заканчивается. SOS открыт всегда: помощь в остром моменте не продаётся.</p>
+        <p class="why freeonly" style="margin-top:12px">Бесплатный уровень не заканчивается.</p>
         <button class="pill wide freeonly" style="margin-top:10px" data-goPro>Что даёт Про</button>
+      </div>
+
+      <div class="setgroup">
+        <div class="lab">Как к тебе обращаться</div>
+        <div class="prow2"><input id="pfName" maxlength="40" placeholder="Имя" autocomplete="given-name"><button class="pill" id="pfNameSave">Сохранить</button></div>
+        <div class="seg" id="pfGender"><button class="tag" data-g="female">Она</button><button class="tag" data-g="male">Он</button></div>
+        <p class="pmsg" id="pfNameMsg"></p>
+      </div>
+
+      <div class="setgroup">
+        <div class="lab">Метки дневника</div>
+        <p class="why">От трёх до пяти. Ими отмечаются записи и пробежки.</p>
+        <div class="tags" id="pfTags"></div>
+        <p class="pmsg" id="pfTagsMsg"></p>
       </div>
 
       <div class="setgroup">
@@ -1123,16 +1153,34 @@ button.cli:active{opacity:.65}
       <div class="setgroup">
         <div class="lab">Как со мной говорить</div>
         <div class="toggle">
-          <div><b>Ника задаёт вопросы сама</b><div class="cap dim" style="margin-top:2px">Одно короткое сообщение утром</div></div>
-          <div class="sw on" data-sw></div>
-        </div>
-        <div class="toggle">
-          <div><b>Ставить метки из разговора</b><div class="cap dim" style="margin-top:2px">Иначе дневник заполняется только вручную</div></div>
-          <div class="sw on" data-sw></div>
+          <div><b>Ника пишет первой</b><div class="cap dim" style="margin-top:2px">Одно короткое сообщение в день, не чаще</div></div>
+          <div class="sw" id="swProactive"></div>
         </div>
       </div>
 
       <div class="setgroup">
+        <div class="lab">Уведомления</div>
+        <div class="toggle">
+          <div><b>Push на этом устройстве</b><div class="cap dim" style="margin-top:2px" id="pushHint">Сообщения Ники и напоминания</div></div>
+          <div class="sw" id="swPush"></div>
+        </div>
+        <div id="tgBlock" style="display:none">
+          <div class="toggle">
+            <div><b>Telegram</b><div class="cap dim" style="margin-top:2px" id="tgHint">Утреннее сообщение и ссылка для сброса пароля</div></div>
+            <button class="pill" id="tgBtn">Подключить</button>
+          </div>
+          <div id="tgMorning" style="display:none">
+            <div class="toggle">
+              <div><b>Утреннее сообщение</b><div class="cap dim" style="margin-top:2px">Время по твоему часовому поясу</div></div>
+              <div class="sw" id="swMorning"></div>
+            </div>
+            <div class="prow2"><input type="time" id="tgTime" value="08:00" style="color-scheme:dark"><button class="pill" id="tgTimeSave">Сохранить время</button></div>
+            <p class="pmsg" id="tgMsg"></p>
+          </div>
+        </div>
+      </div>
+
+      <div class="setgroup" id="pfRhythm" style="display:none">
         <div class="lab">Ритм</div>
         <div class="toggle">
           <div><b>Учитывать менструальный цикл</b><div class="cap dim" style="margin-top:2px">Показывает вкладку «Ритм» с фазами и практиками</div></div>
@@ -1141,49 +1189,44 @@ button.cli:active{opacity:.65}
       </div>
 
       <div class="setgroup">
-        <div class="lab">Клуб</div>
+        <div class="lab">Промокод</div>
+        <div class="prow2"><input id="promoInp" maxlength="32" placeholder="Код" autocapitalize="characters"><button class="pill" id="promoBtn">Применить</button></div>
+        <p class="pmsg" id="promoMsg"></p>
+      </div>
+
+      <div class="setgroup">
+        <div class="lab">Согласия</div>
         <div class="list">
-          <button class="li" data-open="nika"><div class="tx"><b>YOU'LL NEVER MOVE ALONE</b><span>Чат клуба и ближайшие встречи</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          <div class="li"><div class="tx"><b>Здесь не сравнивают</b><span>Ни с другими, ни с твоей прошлой неделей</span></div></div>
+          <div class="li"><div class="tx"><b>Публичная оферта</b><span id="csOffer">…</span></div></div>
+          <div class="li"><div class="tx"><b>Обработка персональных данных</b><span id="csPd">…</span></div></div>
+          <div class="li"><div class="tx"><b>Сведения о здоровье</b><span id="csHealth">…</span></div></div>
+          <div class="li"><div class="tx"><b>Аналитические cookie</b><span id="csCookie">…</span></div><button class="pill" id="cookieSettingsBtn">Настроить</button></div>
+        </div>
+        <div id="healthRevoke" style="display:none">
+          <p class="why" style="margin-top:12px">После отзыва раздел «Мой ритм» закроется, а данные цикла перестанут использоваться, в том числе в ответах Ники.</p>
+          <button class="pill wide" style="margin-top:10px" id="healthRevokeBtn">Отозвать согласие на сведения о здоровье</button>
+          <button class="textbtn" style="width:100%;justify-content:center" id="healthRevokeDel">Отозвать и удалить данные ритма</button>
+        </div>
+        <p class="why" style="margin-top:12px">Отозвать согласие на обработку персональных данных целиком можно письмом на ceo@mynika.ru или удалением аккаунта.</p>
+      </div>
+
+      <div class="setgroup">
+        <div class="lab">Документы и поддержка</div>
+        <div class="list">
+          <a class="li" href="/legal/oferta" target="_blank" rel="noopener"><div class="tx"><b>Публичная оферта</b><span>Тарифы, оплата, отказ и возврат</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          <a class="li" href="/legal/privacy" target="_blank" rel="noopener"><div class="tx"><b>Политика обработки данных</b><span>Что храним, кому передаём, сроки</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          <a class="li" href="/legal/consent" target="_blank" rel="noopener"><div class="tx"><b>Согласие на обработку данных</b><span>Включая сведения о здоровье</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          <a class="li" href="mailto:ceo@mynika.ru"><div class="tx"><b>Написать в поддержку</b><span>ceo@mynika.ru</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          <a class="li" href="https://t.me/meine_nika" target="_blank" rel="noopener"><div class="tx"><b>Поддержка в Telegram</b><span>@meine_nika</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+          <a class="li" href="https://t.me/nika_your_assistant" target="_blank" rel="noopener"><div class="tx"><b>YOU'LL NEVER MOVE ALONE</b><span>Клуб и кофе-раны в Telegram</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
         </div>
       </div>
 
+      <button class="pill wide" style="margin-top:28px" id="logoutBtn">Выйти</button>
+      <button class="textbtn" style="width:100%;justify-content:center;margin-top:6px" id="deleteOpen">Удалить аккаунт</button>
       <p class="cap dim" style="margin:30px 0 10px">НИКА · практики, которые делаются на бегу</p>
     </section>
 
-
-    <!-- ==================== НОВОСТИ ==================== -->
-    <section class="view" data-view="news">
-      <div class="lab" style="margin-bottom:10px">Новости</div>
-      <h1 class="disp xl">Что нового<br>у <span class="ser">Ники</span></h1>
-      <p class="cap" style="margin:16px 0 32px;max-width:300px">Обновления приложения и встречи клуба. Ничего про твои результаты: это живёт в дневнике.</p>
-
-      <div class="newsitem unread">
-        <div class="nmeta"><span class="lab">Клуб</span><i></i><span class="cap dim">вчера</span></div>
-        <h3 class="disp md">Кофе-ран в субботу, Усачёва 67</h3>
-        <p class="cap">Пять километров в любом темпе, потом кофе. Практика перед стартом на всех, вслух, в наушниках.</p>
-        <button class="pill" style="margin-top:14px" data-go="home">Посмотреть</button>
-      </div>
-
-      <div class="newsitem unread">
-        <div class="nmeta"><span class="lab">Практики</span><i></i><span class="cap dim">три дня назад</span></div>
-        <h3 class="disp md">Четыре новые практики под <span class="ser">тейпер</span></h3>
-        <p class="cap">Для недель перед стартом, когда объём падает и от этого колотит. Самая короткая на семь минут.</p>
-        <button class="pill" style="margin-top:14px" data-go="library">Открыть</button>
-      </div>
-
-      <div class="newsitem">
-        <div class="nmeta"><span class="lab">Продукт</span><i></i><span class="cap dim">неделю назад</span></div>
-        <h3 class="disp md">Дневник заполняется из разговора</h3>
-        <p class="cap">Раньше метки ставились руками. Теперь Ника читает то, что ты написала, и предлагает метки сама. Поправить можно всегда.</p>
-      </div>
-
-      <div class="newsitem">
-        <div class="nmeta"><span class="lab">Клуб</span><i></i><span class="cap dim">две недели назад</span></div>
-        <h3 class="disp md">Открыт набор в Первую сотню</h3>
-        <p class="cap">Первые сто участников получают пожизненный доступ к платному уровню и предмет с номером. Осталось пятьдесят три места.</p>
-      </div>
-    </section>
 
     <!-- ==================== ПОСЛЕ ПРОБЕЖКИ ==================== -->
     <section class="view" data-view="postrun">
@@ -1221,7 +1264,7 @@ button.cli:active{opacity:.65}
         <div class="block">
           <div class="lab" style="margin-bottom:13px">Что скажешь</div>
           <div class="compose">
-            <textarea id="prText" rows="3" maxlength="1000" placeholder="Одной строкой: как голова и как тело"></textarea>
+            <textarea class="ym-disable-keys" id="prText" rows="3" maxlength="1000" placeholder="Одной строкой: как голова и как тело"></textarea>
             <div class="cfoot">
               <span class="cap dim">Можно оставить пустым</span>
             </div>
@@ -1257,10 +1300,7 @@ button.cli:active{opacity:.65}
   <div class="appbar" id="appbar">
     <button class="ib" id="menuBtn" aria-label="Профиль"><span class="avatar" id="avatar"></span></button>
     <span class="wordmark"><span class="my-pre">My </span>NIKA</span>
-    <button class="ib" id="bellBtn" aria-label="Новости">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><path d="M12 3.2a5.6 5.6 0 015.6 5.6c0 4.2 1.2 5.7 1.9 6.4.4.4.1 1.1-.5 1.1H5c-.6 0-.9-.7-.5-1.1.7-.7 1.9-2.2 1.9-6.4A5.6 5.6 0 0112 3.2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M10.2 19.2a1.9 1.9 0 003.6 0" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-      <span class="pip" id="bellPip"></span>
-    </button>
+    <span class="ib" aria-hidden="true"></span>
   </div>
 
   <div class="backbar" id="backbar" style="display:none">
@@ -1302,7 +1342,7 @@ button.cli:active{opacity:.65}
       <button class="nback" id="nback" aria-label="Закрыть"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div><b>Ника</b><span id="nikaStatus">рядом</span></div>
     </div>
-    <div class="msgs" id="msgs"></div>
+    <div class="msgs ym-hide-content" id="msgs"></div>
     <div class="chips">
       <button class="chip" data-scenario="morning">Не хочу выходить</button>
       <button class="chip" data-scenario="after_skip" data-gm="Пропустил пару дней">Пропустила пару дней</button>
@@ -1310,7 +1350,7 @@ button.cli:active{opacity:.65}
       <button class="chip" data-scenario="after_run">После пробежки</button>
     </div>
     <div class="ninput">
-      <div class="f" id="nfield" data-ph="Написать Нике"></div>
+      <div class="f ym-disable-keys" id="nfield" data-ph="Написать Нике"></div>
       <button class="send" aria-label="Отправить"><svg width="18" height="18" viewBox="0 0 20 20" fill="none"><path d="M10 16V4M10 4L5 9M10 4l5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
     </div>
   </div>
@@ -1611,6 +1651,44 @@ button.cli:active{opacity:.65}
     </div>
   </div>
 
+  <!-- COOKIE: тот же ключ и событие, что на лендинге -->
+  <div class="cookie" id="cookie" role="dialog" aria-live="polite" aria-label="Файлы cookie" hidden>
+    <p style="margin:0">Мы используем cookie. Необходимые нужны для работы приложения, аналитические (Яндекс Метрика и Amplitude) включаем только с твоего согласия. <a href="/legal/privacy#cookie" target="_blank" rel="noopener">Подробнее</a></p>
+    <div class="cb"><button type="button" class="y" data-ck="all">Принять</button><button type="button" class="n" data-ck="necessary">Только необходимые</button></div>
+  </div>
+
+  <!-- ПРО -->
+  <div class="modal" id="proModal" hidden>
+    <div class="card">
+      <div class="lab" style="margin-bottom:10px">НИКА Про</div>
+      <h2 class="disp md">Ника, которая <span class="ser">помнит</span></h2>
+      <ul>
+        <li>Больше разговоров с Никой в день</li>
+        <li>Помнит контекст и не начинает с нуля каждый день</li>
+        <li>Советы собираются персонально под тебя</li>
+      </ul>
+      <p class="cap">К оплате 1 ₽, один раз. Доступ к Про на 1 месяц с момента оплаты. Автопродления нет: повторно деньги не спишутся, по окончании срока аккаунт вернётся на бесплатный уровень, данные сохранятся. Кассовый чек придёт на почту.</p>
+      <p class="cap" style="margin-top:10px">Нажимая кнопку, ты принимаешь условия <a href="/legal/oferta" target="_blank" rel="noopener" style="color:var(--ink);text-decoration:underline">Публичной оферты</a>.</p>
+      <p class="oerr" id="proErr" style="display:none"></p>
+      <button class="pill solid wide" style="margin-top:18px" id="proPay">Оплатить 1 ₽</button>
+      <button class="textbtn" style="width:100%;justify-content:center" data-close-modal>Не сейчас</button>
+    </div>
+  </div>
+
+  <!-- УДАЛЕНИЕ АККАУНТА -->
+  <div class="modal" id="deleteModal" hidden>
+    <div class="card">
+      <h2 class="disp md">Удалить <span class="ser">аккаунт</span></h2>
+      <p class="cap">Аккаунт и все данные удалятся сразу и навсегда: профиль, дневник, пробежки, разговоры с Никой, данные ритма и согласия. Восстановить их будет нельзя.</p>
+      <p class="cap" id="deletePro" style="display:none;margin-top:10px;color:var(--ink)">У тебя действует подписка Про. После удаления можно запросить возврат за неиспользованные дни письмом на ceo@mynika.ru.</p>
+      <p class="cap" style="margin-top:10px">Записи об оплатах остаются в бухгалтерии без привязки к тебе, так требует закон.</p>
+      <div class="ofield" style="margin-top:18px"><input id="deleteConfirm" placeholder="Напиши «удалить»" autocomplete="off"></div>
+      <p class="oerr" id="deleteErr" style="display:none"></p>
+      <button class="pill solid wide" style="margin-top:18px" id="deleteGo" disabled>Удалить навсегда</button>
+      <button class="textbtn" style="width:100%;justify-content:center" data-close-modal>Отмена</button>
+    </div>
+  </div>
+
   <div class="splash" id="splash">
     <div class="art"><svg viewBox="0 0 400 852" preserveAspectRatio="xMidYMid slice"><use href="#sc-dawn"/></svg></div>
     <div class="lock"><div class="w"><span class="my-pre">My </span>NIKA</div><div class="s">you’ll never move alone</div></div>
@@ -1885,7 +1963,6 @@ button.cli:active{opacity:.65}
   document.querySelectorAll('[data-push]').forEach(function(b){ b.addEventListener('click',function(){ push(b.dataset.push); }); });
   document.querySelectorAll('[data-pop]').forEach(function(b){ b.addEventListener('click',pop); });
   document.getElementById('backBtn').addEventListener('click',pop);
-  document.getElementById('bellBtn').addEventListener('click',function(){ push('news'); });
   document.getElementById('menuBtn').addEventListener('click',function(){ push('profile'); haptic(); });
 
   /* ---------- лист Ники ---------- */
@@ -2419,7 +2496,7 @@ button.cli:active{opacity:.65}
 
   /* переход к Про из профиля и с главной */
   document.querySelectorAll('[data-goPro]').forEach(function(b){
-    b.addEventListener('click',function(){ setPlan('pro'); haptic(14); });
+    b.addEventListener('click',function(){ if(window.__openPro) window.__openPro(); haptic(10); });
   });
 
 
@@ -3086,6 +3163,250 @@ button.cli:active{opacity:.65}
         b.disabled=false; if(r.ok){ refresh(); haptic(12); }
         else { b.textContent=r.data&&r.data.error==='startedAt'?'Сегодня уже отмечено':'Не получилось, попробуй ещё раз'; setTimeout(function(){ b.textContent='Начались месячные'; },2500); }
       });
+    });
+  })();
+
+  /* ============================================================
+     ПРОФИЛЬ
+     ============================================================ */
+  (function(){
+    var $=function(id){ return document.getElementById(id); };
+    function msg(id,t){ var e=$(id); if(e){ e.textContent=t||''; } }
+    function sinceText(iso){
+      var d=Math.max(1,Math.floor((Date.now()-new Date(iso).getTime())/86400000)+1);
+      if(d<31) return 'С Никой '+d+' '+plural(d,'день','дня','дней');
+      var m=Math.floor(d/30); return 'С Никой '+m+' '+plural(m,'месяц','месяца','месяцев');
+    }
+    function consentLine(c,onText,offText){ return c&&c.granted&&c.at?onText+' '+new Date(c.at).toLocaleDateString('ru-RU'):offText; }
+    var tagSel=[];
+    function drawProfileTags(){
+      var box=$('pfTags'); box.innerHTML='';
+      Object.keys(BEHAVIOR_LABELS).concat(tagSel.filter(function(t){ return t.indexOf('c:')===0; })).forEach(function(v){
+        var b=document.createElement('button'), on=tagSel.indexOf(v)>=0;
+        b.className='tag'+(on?' on':''); b.textContent=tagLabel(v);
+        b.addEventListener('click',function(){
+          var i=tagSel.indexOf(v);
+          if(i>=0){ if(tagSel.length<=3){ msg('pfTagsMsg','Нужно минимум три метки'); return; } tagSel.splice(i,1); }
+          else { if(tagSel.length>=5){ msg('pfTagsMsg','Максимум пять. Сними одну, чтобы выбрать другую'); return; } tagSel.push(v); }
+          drawProfileTags(); msg('pfTagsMsg','Сохраняю…');
+          api('/api/v2/profile',{method:'PATCH',body:{behaviors:tagSel}}).then(function(r){
+            msg('pfTagsMsg',r.ok?'Сохранено':'Не получилось сохранить');
+            if(r.ok&&ME){ ME.profile.behaviors=tagSel.slice(); window.__onMe.forEach(function(f){ try{ f(ME); }catch(e){} }); }
+          });
+          haptic(6);
+        });
+        box.appendChild(b);
+      });
+    }
+    window.__onMe.push(function(me){
+      $('profileName').textContent=capName(me.user.name)||me.user.email||'';
+      $('profileSince').textContent=sinceText(me.user.createdAt);
+      if(me.plan.isPro) $('proUntil').textContent=me.plan.periodEnd?'Про до '+new Date(me.plan.periodEnd).toLocaleDateString('ru-RU')+'. Больше разговоров, память, советы под тебя':'Больше разговоров в день, память между разговорами, советы под тебя';
+      if(document.activeElement!==$('pfName')) $('pfName').value=me.user.name||'';
+      document.querySelectorAll('#pfGender .tag').forEach(function(b){ b.classList.toggle('on',b.dataset.g===me.profile.gender); });
+      tagSel=(me.profile.behaviors&&me.profile.behaviors.length>=3)?me.profile.behaviors.slice():DEFAULT_TAGS.slice(0,5);
+      drawProfileTags();
+      $('swProactive').classList.toggle('on',me.profile.proactive!==false);
+      $('pfRhythm').style.display=me.profile.gender==='female'?'':'none';
+      $('swCycle').classList.toggle('on',me.profile.cycle==='on'||me.profile.cycle==='self');
+      $('tgBlock').style.display=me.telegram.available?'':'none';
+      $('tgBtn').textContent=me.telegram.linked?'Отключить':'Подключить';
+      $('tgMorning').style.display=me.telegram.linked?'':'none';
+      if(me.telegram.linked) loadMorning();
+      $('csOffer').textContent=consentLine(me.consents.offer,'Принята','Отметки в журнале нет');
+      $('csPd').textContent=consentLine(me.consents.pd,'Дано','Отметки в журнале нет');
+      $('csHealth').textContent=consentLine(me.consents.health,'Дано','Нет, «Мой ритм» закрыт');
+      $('csCookie').textContent=(window.NIKA_CONSENT&&window.NIKA_CONSENT.analytics)?'Включены':'Выключены';
+      $('healthRevoke').style.display=me.consents.health.granted?'':'none';
+      $('deletePro').style.display=me.plan.isPro?'':'none';
+      syncPush();
+    });
+
+    /* имя и обращение */
+    $('pfNameSave').addEventListener('click',function(){
+      var v=($('pfName').value||'').trim(); msg('pfNameMsg','Сохраняю…');
+      api('/api/v2/profile',{method:'PATCH',body:{name:v}}).then(function(r){
+        msg('pfNameMsg',r.ok?'Сохранено':'Не получилось сохранить'); if(r.ok) window.__refreshMe();
+      });
+    });
+    document.querySelectorAll('#pfGender .tag').forEach(function(b){
+      b.addEventListener('click',function(){
+        msg('pfNameMsg','Сохраняю…');
+        api('/api/v2/profile',{method:'PATCH',body:{gender:b.dataset.g}}).then(function(r){
+          msg('pfNameMsg',r.ok?'Сохранено':'Не получилось сохранить'); if(r.ok) window.__refreshMe();
+        });
+      });
+    });
+
+    /* переключатели */
+    $('swProactive').addEventListener('click',function(){
+      var sw=this, on=!sw.classList.contains('on'); sw.classList.toggle('on',on);
+      api('/api/v2/profile',{method:'PATCH',body:{proactive:on}}).then(function(r){ if(!r.ok) sw.classList.toggle('on',!on); });
+      haptic(7);
+    });
+    $('swCycle').addEventListener('click',function(){
+      var sw=this, on=!sw.classList.contains('on'); sw.classList.toggle('on',on);
+      api('/api/v2/profile',{method:'PATCH',body:{cycle:on?'yes':'no'}}).then(function(r){
+        if(!r.ok){ sw.classList.toggle('on',!on); return; } window.__refreshMe();
+      });
+      haptic(7);
+    });
+
+    /* push */
+    function currentSub(){
+      if(!('serviceWorker' in navigator)) return Promise.resolve(null);
+      return navigator.serviceWorker.getRegistration('/').then(function(reg){ return reg?reg.pushManager.getSubscription():null; }).catch(function(){ return null; });
+    }
+    function syncPush(){
+      var sw=$('swPush'), hint=$('pushHint');
+      if(!('Notification' in window)||!('serviceWorker' in navigator)){ sw.style.display='none'; hint.textContent='На iPhone push работает, если добавить НИКУ на экран «Домой»'; return; }
+      if(Notification.permission==='denied'){ sw.classList.remove('on'); hint.textContent='Уведомления запрещены в настройках браузера'; return; }
+      currentSub().then(function(sub){ sw.classList.toggle('on',!!sub&&Notification.permission==='granted'); });
+    }
+    $('swPush').addEventListener('click',function(){
+      var sw=this;
+      if(sw.classList.contains('on')){
+        currentSub().then(function(sub){ return sub?sub.unsubscribe():null; }).then(function(){ return api('/api/push/subscribe',{method:'DELETE'}); }).then(syncPush);
+      } else {
+        window.__enablePush().then(function(perm){
+          api('/api/v2/profile',{method:'PATCH',body:{notifPermission:perm}}); syncPush();
+        });
+      }
+      haptic(7);
+    });
+
+    /* Telegram */
+    $('tgBtn').addEventListener('click',function(){
+      var b=this;
+      if(ME&&ME.telegram.linked){
+        b.disabled=true;
+        api('/api/telegram/unlink',{method:'POST'}).then(function(){ b.disabled=false; window.__refreshMe(); });
+        return;
+      }
+      b.disabled=true;
+      api('/api/telegram/link',{method:'POST'}).then(function(r){
+        b.disabled=false;
+        if(r.ok&&r.data&&r.data.url){ window.open(r.data.url,'_blank'); $('tgHint').textContent='Открой бота и нажми «Старт». Потом вернись сюда'; }
+        else if(r.ok&&r.data&&r.data.linked) window.__refreshMe();
+        else $('tgHint').textContent='Не получилось получить ссылку. Попробуй позже';
+      });
+    });
+    document.addEventListener('visibilitychange',function(){ if(!document.hidden&&ME&&$('tgHint').textContent.indexOf('Старт')>=0) window.__refreshMe(); });
+    function loadMorning(){
+      api('/api/notifications/prefs').then(function(r){
+        if(!r.ok||!r.data) return;
+        $('swMorning').classList.toggle('on',!!r.data.morning_enabled);
+        $('tgTime').value=r.data.morning_time||'08:00';
+      });
+    }
+    $('swMorning').addEventListener('click',function(){
+      var sw=this, on=!sw.classList.contains('on'); sw.classList.toggle('on',on);
+      api('/api/notifications/prefs',{method:'POST',body:{morning_enabled:on}}).then(function(r){ if(!r.ok) sw.classList.toggle('on',!on); });
+    });
+    $('tgTimeSave').addEventListener('click',function(){
+      api('/api/notifications/prefs',{method:'POST',body:{morning_time:$('tgTime').value}}).then(function(r){ msg('tgMsg',r.ok?'Сохранено':'Не получилось сохранить'); });
+    });
+
+    /* промокод */
+    $('promoBtn').addEventListener('click',function(){
+      var v=($('promoInp').value||'').trim(); if(!v){ $('promoInp').focus(); return; }
+      var b=this; b.disabled=true; msg('promoMsg','Проверяю…');
+      api('/api/promo/redeem',{method:'POST',body:{token:v}}).then(function(r){
+        b.disabled=false;
+        if(r.ok&&r.data&&r.data.ok){ msg('promoMsg','Готово: Про на '+r.data.grant_days+' '+plural(r.data.grant_days,'день','дня','дней')); $('promoInp').value=''; window.__refreshMe(); }
+        else msg('promoMsg',(r.data&&r.data.error)||'Не получилось применить код');
+      });
+    });
+
+    /* согласия */
+    $('cookieSettingsBtn').addEventListener('click',function(){ window.dispatchEvent(new Event('nika:open-cookie-settings')); });
+    function revoke(del){
+      var b1=$('healthRevokeBtn'), b2=$('healthRevokeDel'); b1.disabled=b2.disabled=true;
+      api('/api/consents',{method:'POST',body:{entries:[{type:'health',granted:false}],source:'profile'}})
+        .then(function(r){ if(r.ok&&del) return api('/api/v2/rhythm',{method:'DELETE'}).then(function(){ return r; }); return r; })
+        .then(function(r){ b1.disabled=b2.disabled=false; if(r.ok){ loadRhythmState(true); window.__refreshMe(); } });
+    }
+    $('healthRevokeBtn').addEventListener('click',function(){ revoke(false); });
+    $('healthRevokeDel').addEventListener('click',function(){
+      var b=this; if(!b.dataset.sure){ b.dataset.sure='1'; b.textContent='Нажми ещё раз: данные ритма удалятся'; setTimeout(function(){ b.dataset.sure=''; b.textContent='Отозвать и удалить данные ритма'; },4000); return; }
+      revoke(true);
+    });
+
+    /* модальные окна */
+    function openModal(id){ $(id).hidden=false; haptic(8); }
+    document.querySelectorAll('[data-close-modal]').forEach(function(b){ b.addEventListener('click',function(){ b.closest('.modal').hidden=true; }); });
+    document.querySelectorAll('.modal').forEach(function(m){ m.addEventListener('click',function(e){ if(e.target===m) m.hidden=true; }); });
+    window.__openPro=function(){ $('proErr').style.display='none'; openModal('proModal'); };
+    $('proPay').addEventListener('click',function(){
+      var b=this; b.disabled=true; b.textContent='Переходим к оплате…';
+      api('/api/robokassa/create-payment',{method:'POST',body:{plan:'pro'}}).then(function(r){
+        if(r.ok&&r.data&&r.data.paymentUrl){ location.href=r.data.paymentUrl; return; }
+        b.disabled=false; b.textContent='Оплатить 1 ₽';
+        $('proErr').textContent=(r.data&&r.data.error)||'Не получилось перейти к оплате. Попробуй ещё раз.'; $('proErr').style.display='';
+      });
+    });
+
+    /* выход и удаление */
+    $('logoutBtn').addEventListener('click',function(){
+      this.disabled=true;
+      api('/api/v2/auth/logout',{method:'POST'}).then(function(){ location.href='/start'; });
+    });
+    $('deleteOpen').addEventListener('click',function(){ $('deleteConfirm').value=''; $('deleteGo').disabled=true; $('deleteErr').style.display='none'; openModal('deleteModal'); });
+    $('deleteConfirm').addEventListener('input',function(){ $('deleteGo').disabled=this.value.trim().toLowerCase()!=='удалить'; });
+    $('deleteGo').addEventListener('click',function(){
+      var b=this; b.disabled=true; b.textContent='Удаляю…';
+      api('/api/v2/account',{method:'DELETE',body:{confirm:$('deleteConfirm').value}}).then(function(r){
+        if(r.ok){ location.href='/'; return; }
+        b.disabled=false; b.textContent='Удалить навсегда';
+        $('deleteErr').textContent='Не получилось удалить. Попробуй ещё раз или напиши на ceo@mynika.ru'; $('deleteErr').style.display='';
+      });
+    });
+  })();
+
+  /* ============================================================
+     COOKIE И АНАЛИТИКА
+     Яндекс Метрика грузится только после «Принять». Ключ nika_cookie_consent_v1
+     общий с лендингом. Дневник, разговор и ритм помечены ym-hide-content,
+     их текст Вебвизор не записывает.
+     ============================================================ */
+  (function(){
+    var KEY='nika_cookie_consent_v1', box=document.getElementById('cookie'), YM=110821642, loaded=false;
+    function read(){ try{ var c=JSON.parse(localStorage.getItem(KEY)||'null'); return c&&typeof c.analytics==='boolean'?c:null; }catch(e){ return null; } }
+    function loadYm(){
+      if(loaded) return; loaded=true;
+      (function(m,e,t,r,i,k,a){ m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)}; m[i].l=1*new Date();
+        k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a);
+      })(window,document,'script','https://mc.yandex.ru/metrika/tag.js?id='+YM,'ym');
+      window.ym(YM,'init',{webvisor:true,clickmap:true,accurateTrackBounce:true,trackLinks:true});
+    }
+    function clearYm(){
+      document.cookie.split(';').forEach(function(p){ var n=p.split('=')[0].trim(); if(n.indexOf('_ym')===0||n==='yabs-sid'){
+        document.cookie=n+'=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/';
+        document.cookie=n+'=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; domain=.'+location.hostname.replace(/^www\./,''); } });
+    }
+    function apply(c){
+      window.NIKA_CONSENT=c;
+      try{ window.dispatchEvent(new CustomEvent('nika:consent',{detail:c})); }catch(e){}
+      if(c.analytics) loadYm();
+      var ce=document.getElementById('csCookie'); if(ce) ce.textContent=c.analytics?'Включены':'Выключены';
+    }
+    var saved=read();
+    if(saved) apply(saved); else box.hidden=false;
+    box.addEventListener('click',function(e){
+      var b=e.target.closest('[data-ck]'); if(!b) return;
+      var before=read(), c={necessary:true,analytics:b.dataset.ck==='all',date:new Date().toISOString(),version:1};
+      try{ localStorage.setItem(KEY,JSON.stringify(c)); }catch(err){}
+      box.hidden=true; apply(c);
+      try{ sessionStorage.setItem('nika_cookie_synced','1'); }catch(err){}
+      if(ME) api('/api/consents',{method:'POST',body:{entries:[{type:'cookies_analytics',granted:c.analytics}],source:'cookie_banner'}});
+      if(!c.analytics&&before&&before.analytics){ clearYm(); location.reload(); }
+    });
+    window.addEventListener('nika:open-cookie-settings',function(){ box.hidden=false; });
+    /* выбор, сделанный до входа, один раз за сессию попадает в журнал согласий */
+    window.__onMe.push(function(){
+      var c=read(); if(!c) return;
+      try{ if(sessionStorage.getItem('nika_cookie_synced')) return; sessionStorage.setItem('nika_cookie_synced','1'); }catch(e){ return; }
+      api('/api/consents',{method:'POST',body:{entries:[{type:'cookies_analytics',granted:c.analytics}],source:'cookie_banner'}});
     });
   })();
 
