@@ -1,24 +1,25 @@
 {
-  "name": "My NIKA",
-  "short_name": "NIKA",
-  "start_url": "/authv1",
-  "scope": "/authv1",
+  "name": "НИКА",
+  "short_name": "НИКА",
+  "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#08080A",
   "theme_color": "#08080A",
   "icons": [
     {
-      "src": "/authv1/icons/icon-192.png",
+      "src": "/app/icons/icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/authv1/icons/icon-512.png",
+      "src": "/app/icons/icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
     }
-  ]
+  ],
+  "id": "/"
 }

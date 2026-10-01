@@ -66,14 +66,50 @@ const nextConfig = {
         source,
         headers: [{ key: "X-Robots-Tag", value: "noindex, follow" }],
       })),
-      // /authv1 — прототип, не индексировать, не кешировать
+      // Приложение (новая версия): HTML не индексировать и не кешировать
       {
-        source: "/authv1/:path*",
+        source: "/app/index.html",
         headers: [
           { key: "X-Robots-Tag", value: "noindex, nofollow" },
           { key: "Cache-Control", value: "no-store, must-revalidate" },
         ],
       },
+      { source: "/start", headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }] },
+      // Звук практик и иконки меняются только с новым именем файла
+      { source: "/app/audio/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800" }] },
+    ];
+  },
+  // Старое приложение заменено новой версией (public/app/index.html).
+  // Старые адреса ведут в нужный раздел нового: ссылки из Telegram-бота,
+  // push-уведомлений и закладок продолжают работать.
+  async redirects() {
+    const to = (source, destination) => ({ source, destination, permanent: false });
+    return [
+      to("/authv1", "/start"),
+      to("/authv1/:path*", "/start"),
+      to("/auth", "/start?login=1"),
+      to("/signup", "/start"),
+      to("/forgot-password", "/start?login=1"),
+      to("/onboarding", "/start"),
+      to("/today", "/"),
+      to("/day1", "/"),
+      to("/chat", "/?go=nika"),
+      to("/chat/:path*", "/?go=nika"),
+      to("/journal", "/?go=diary"),
+      to("/journal/:path*", "/?go=diary"),
+      to("/tips", "/?go=diary"),
+      to("/analytics", "/?go=diary"),
+      to("/rhythm", "/?go=rhythm"),
+      to("/rhythm/:path*", "/?go=rhythm"),
+      to("/meditations", "/?go=library"),
+      to("/profile", "/?go=profile"),
+      to("/profile/:path*", "/?go=profile"),
+      to("/upgrade", "/?go=pro"),
+      to("/sprint", "/"),
+      to("/sprint/:path*", "/"),
+      to("/manifesto", "/"),
+      to("/install", "/"),
+      to("/landing", "/"),
     ];
   },
   async rewrites() {
@@ -93,13 +129,9 @@ const nextConfig = {
       { source: "/legal/privacy", destination: "/legal/privacy.html" },
       { source: "/legal/consent", destination: "/legal/consent.html" },
       { source: "/legal/oferta", destination: "/legal/oferta.html" },
-      // /start: вход, регистрация и онбординг новой версии
-      { source: "/start", destination: "/authv1/index.html" },
-      // /authv1 → /authv1/index.html (прототип НИКА Лайт)
-      {
-        source: "/authv1",
-        destination: "/authv1/index.html",
-      },
+      // Вход, регистрация, онбординг и новый пароль живут в приложении
+      { source: "/start", destination: "/app/index.html" },
+      { source: "/reset-password", destination: "/app/index.html" },
     ];
   },
 };

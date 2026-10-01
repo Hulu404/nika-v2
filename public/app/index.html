@@ -6,10 +6,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="robots" content="noindex, nofollow">
-<link rel="manifest" href="/authv1/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/authv1/icons/apple-touch-icon.png">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="manifest" href="/app/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png">
 <meta name="theme-color" content="#08080A">
-<title>My NIKA</title>
+<title>НИКА</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Lora:ital,wght@0,400;0,500;1,400&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;1,8..60,400&family=Golos+Text:wght@400;500;600&display=swap" rel="stylesheet">
@@ -852,7 +853,7 @@ button.cli:active{opacity:.65}
 
     <!-- ==================== ПРАКТИКА ==================== -->
     <section class="view" data-view="practice">
-      <audio id="prAudio" preload="metadata" src="/authv1/audio/nika-zazemlenie.mp3"></audio>
+      <audio id="prAudio" preload="metadata" src="/app/audio/nika-zazemlenie.mp3"></audio>
       <div class="pheader">
         <svg viewBox="0 0 400 330" preserveAspectRatio="xMidYMid slice"><use href="#sc-dawn"/></svg>
         <div class="fade"></div>
@@ -1545,7 +1546,7 @@ button.cli:active{opacity:.65}
       <div class="obody">
         <div class="oinner">
           <h1 class="disp">Когда обычно <span class="ser">получается</span></h1>
-          <p class="cap" style="margin-top:14px;max-width:290px">Ника пришлёт одно сообщение в это время. Больше ничего.</p>
+          <p class="cap" style="margin-top:14px;max-width:290px">Чтобы понимать твой ритм дня. Небо на главной подстроится под это время.</p>
           <div class="opts" data-key="daypart">
             <button class="opt" data-val="morning">Утром до дел</button>
             <button class="opt" data-val="noon">В обед или днём</button>
@@ -2635,7 +2636,7 @@ button.cli:active{opacity:.65}
           document.getElementById('oconfirmText').textContent='Мы отправили письмо на '+email+'. Открой ссылку из него, и аккаунт заработает.';
           oconfirm.style.display='flex'; return;
         }
-        if(r.ok){ loadMe().then(function(){ show(stepIdx('name')); }); return; }
+        if(r.ok){ loadMe().then(function(){ return window.__redeemPendingPromo(); }).then(function(){ show(stepIdx('name')); }); return; }
         var e=r.data&&r.data.error;
         if(e==='exists'){
           regErr.innerHTML='Эта почта уже зарегистрирована. <a href="#" id="regToLogin" style="color:var(--ink);text-decoration:underline">Войти</a>';
@@ -2981,6 +2982,13 @@ button.cli:active{opacity:.65}
   window.__enterApp=function(){
     var onbEl=document.getElementById('onb'); if(onbEl&&onbEl.style.opacity!=='0') onbEl.style.display='none';
     applyMe(); go('home');
+    /* старые адреса приходят сюда с ?go=раздел (next.config.mjs, redirects) */
+    var m=/[?&]go=([a-z]+)/.exec(location.search), dest=m&&m[1];
+    if(dest==='diary'||dest==='library'||(dest==='rhythm'&&ME.rhythm.enabled)) go(dest);
+    else if(dest==='profile') push('profile');
+    else if(dest==='nika') setTimeout(function(){ if(window.__openNika) window.__openNika(); },300);
+    else if(dest==='pro'&&!ME.plan.isPro) setTimeout(function(){ if(window.__openPro) window.__openPro(); },300);
+    if(location.pathname!=='/'||location.search) history.replaceState(null,'','/');
   };
   window.__refreshMe=function(){ return loadMe().then(function(r){ if(r.ok) applyMe(); return r; }); };
 
@@ -3420,7 +3428,10 @@ button.cli:active{opacity:.65}
     if(r.status===401){
       window.__onbOpen();
       if(/[?&]login=1/.test(location.search)&&window.__loginOpen) window.__loginOpen();
-      if(isReset) document.getElementById('loginInfo').textContent='Ссылка устарела. Запроси новую.';
+      if(isReset||/[?&]state=expired/.test(location.search)){
+        var li=document.getElementById('loginInfo'); li.textContent='Ссылка устарела. Введи почту и нажми «Забыли пароль?», пришлю новую.'; li.style.display='';
+        if(window.__loginOpen) window.__loginOpen();
+      }
     } else if(!r.ok){
       var sEl=splash.querySelector('.s');
       if(sEl) sEl.textContent=r.status===0?'Нет связи. Нажми, чтобы повторить':'Сервер не ответил. Нажми, чтобы повторить';
@@ -3433,7 +3444,21 @@ button.cli:active{opacity:.65}
     else { window.__enterApp(); }
     return true;
   }
-  window.__afterAuth=function(){ loadMe().then(route); };
+  /* промокод из QR (/activate → /signup → /start?promo=…): гасится после входа или регистрации */
+  (function(){
+    var m=/[?&]promo=([A-Za-z0-9_-]{1,32})/.exec(location.search);
+    if(m){ try{ sessionStorage.setItem('nika_promo',m[1]); }catch(e){} }
+  })();
+  function redeemPendingPromo(){
+    var t=null; try{ t=sessionStorage.getItem('nika_promo'); }catch(e){}
+    if(!t) return Promise.resolve();
+    return api('/api/promo/redeem',{method:'POST',body:{token:t}}).then(function(){
+      try{ sessionStorage.removeItem('nika_promo'); }catch(e){}
+      return loadMe();
+    });
+  }
+  window.__redeemPendingPromo=redeemPendingPromo;
+  window.__afterAuth=function(){ loadMe().then(function(r){ if(r.ok) return redeemPendingPromo().then(function(){ return r; }); return r; }).then(function(r){ route(r.ok?{ok:true,status:200}:r); }); };
   (function boot(){
     var t0=Date.now();
     loadMe().then(function(r){

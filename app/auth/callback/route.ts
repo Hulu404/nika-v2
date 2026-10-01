@@ -13,7 +13,7 @@ export async function GET(request: Request) {
   const token = searchParams.get("token");
   const type = searchParams.get("type");
   const nextParam = searchParams.get("next");
-  const next = nextParam && nextParam.startsWith("/") ? nextParam : "/day1";
+  const next = nextParam && nextParam.startsWith("/") && !nextParam.startsWith("//") ? nextParam : "/";
 
   const supabase = await createServerComponentClient();
 

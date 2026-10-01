@@ -239,7 +239,7 @@ export function parseDiaryEntry(
 
 /** Практики с аудио. Остальные в интерфейсе не показываются, пока не появится звук. */
 export const PRACTICES = {
-  zazemlenie: { title: "Заземление", seconds: 292, audio: "/authv1/audio/nika-zazemlenie.mp3" },
+  zazemlenie: { title: "Заземление", seconds: 292, audio: "/app/audio/nika-zazemlenie.mp3" },
 } as const;
 export type PracticeId = keyof typeof PRACTICES;
 
