@@ -555,6 +555,8 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 .oother input{width:100%;background:none;border:0;outline:none;font:inherit;
   color:var(--ink);font-size:.95rem;padding:4px 0}
 .oother input::placeholder{color:var(--ink-3)}
+.msg.sys{opacity:.78;font-style:italic}
+.msgact{display:block;margin:4px 0 10px;align-self:flex-start}
 .ocheck{display:flex;gap:12px;align-items:flex-start;margin-top:16px;font-size:.86rem;line-height:1.45;color:var(--ink-2);cursor:pointer;min-height:44px}
 .ocheck input{appearance:none;-webkit-appearance:none;flex:none;width:22px;height:22px;border-radius:7px;border:1.5px solid rgba(244,239,230,.42);margin:0;display:grid;place-items:center;background:transparent;cursor:pointer}
 .ocheck input:checked{background:var(--ink);border-color:var(--ink)}
@@ -1287,18 +1289,12 @@ button.cli:active{opacity:.65}
       <button class="nback" id="nback" aria-label="Закрыть"><svg width="15" height="15" viewBox="0 0 16 16" fill="none"><path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
       <div><b>Ника</b><span id="nikaStatus">рядом</span></div>
     </div>
-    <div class="msgs" id="msgs">
-      <div class="stamp">Сегодня, 07:12</div>
-      <div class="msg n">Вчера ты написала, что разогналась на третьем километре и дальше терпела. Как ноги сегодня?</div>
-      <div class="msg u">Тяжёлые. И спала мало.</div>
-      <div class="msg n">Тогда сегодня без темпа. Двадцать минут в любом ритме.</div>
-      <div class="msg n proonly">Это третий раз за две недели, когда ты разгоняешься в начале лёгкой. Вывод пока не делаю, просто отмечаю.</div>
-      <div class="msg n">Записала в дневник: спала мало, ноги тяжёлые. Больше ничего спрашивать не буду.</div>
-    </div>
+    <div class="msgs" id="msgs"></div>
     <div class="chips">
-      <button class="chip">Не хочу выходить</button>
-      <button class="chip">Пропустила два дня</button>
-      <button class="chip">Перед стартом</button>
+      <button class="chip" data-scenario="morning">Не хочу выходить</button>
+      <button class="chip" data-scenario="after_skip" data-gm="Пропустил пару дней">Пропустила пару дней</button>
+      <button class="chip" data-scenario="pre_race">Перед стартом</button>
+      <button class="chip" data-scenario="after_run">После пробежки</button>
     </div>
     <div class="ninput">
       <div class="f" id="nfield" data-ph="Написать Нике"></div>
@@ -1899,6 +1895,7 @@ button.cli:active{opacity:.65}
   }});
   paint(SH);
   function openSheet(){
+    if(window.__chatLoad) window.__chatLoad();
     sheet.style.visibility='visible'; scrim.style.pointerEvents='auto';
     fab.classList.add('on'); opened=true; msgs.scrollTop=msgs.scrollHeight;
     sy.to(0,null,1,0.44);
@@ -2299,58 +2296,112 @@ button.cli:active{opacity:.65}
 
   /* ============================================================
      РАЗГОВОР С НИКОЙ
-     Ответ идёт с задержкой и с индикатором. Мгновенный ответ
-     читается как подстановка, пауза читается как внимание.
+     Ответ стримится из /api/chat (Claude). Продолжается последний разговор
+     за двое суток, иначе Ника начинает заново.
      ============================================================ */
   (function(){
-    var field=document.getElementById('nfield'), send=document.querySelector('.ninput .send');
+    var field=document.getElementById('nfield'), send=document.querySelector('.ninput .send'),
+        status=document.getElementById('nikaStatus');
     if(!field) return;
     field.setAttribute('contenteditable','true');
     field.setAttribute('role','textbox');
-    var REPLY={
-      'не хочу выходить':'Это может быть тело, а может быть голова. Что сегодня тяжелее: встать или начать?',
-      'пропустила два дня':'Хорошо, что ты тут. Два дня это не откат, это два дня. Пойдём коротко и без темпа?',
-      'перед стартом':'До выстрела ещё есть время. Три минуты на дыхание, и мы вернём внимание в тело.',
-      '':'Слышу. Расскажи чуть подробнее, что сейчас происходит.'
-    };
+    var conv={id:null,scenario:'general'}, loaded=false, busy=false;
+    function scrollEnd(){ msgs.scrollTop=msgs.scrollHeight; }
     function bubble(cls,text){
       var m=document.createElement('div'); m.className='msg '+cls; m.textContent=text;
-      msgs.appendChild(m); msgs.scrollTop=msgs.scrollHeight; return m;
+      msgs.appendChild(m); scrollEnd(); return m;
     }
-    function answer(q){
-      var t=document.createElement('div');
-      t.className='msg n typing'; t.innerHTML='<i></i><i></i><i></i>';
-      msgs.appendChild(t); msgs.scrollTop=msgs.scrollHeight;
-      document.getElementById('nikaStatus').textContent='печатает';
-      setTimeout(function(){
-        t.remove();
-        document.getElementById('nikaStatus').textContent=app.dataset.plan==='pro'?'помнит твой спринт':'рядом';
-        bubble('n',REPLY[q.toLowerCase()]||REPLY['']);
-        haptic(8);
-      },1150);
+    function stamp(text){ var d=document.createElement('div'); d.className='stamp'; d.textContent=text; msgs.appendChild(d); }
+    function opener(){
+      var h=new Date().getHours(), nm=capName(ME&&ME.user.name);
+      var hi=(h<5?'Доброй ночи':h<12?'Доброе утро':h<17?'Добрый день':'Добрый вечер')+(nm?', '+nm:'')+'.';
+      var c=ME&&(ME.profile.intentCustom||ME.profile.barrierCustom);
+      if(c) return hi+' Ты '+g('написала','написал')+': «'+c+'». Можем начать с этого. Как ты сейчас?';
+      return hi+' Как ты сейчас? Можно про бег, можно про что угодно.';
     }
-    function push(text){
-      if(!text) return;
-      bubble('u',text); answer(text); haptic(9);
+    function load(){
+      if(loaded) return; loaded=true;
+      msgs.innerHTML='';
+      stamp('Сегодня');
+      api('/api/v2/chat').then(function(r){
+        var c=r.ok&&r.data&&r.data.conversation;
+        if(c&&c.messages.length){
+          conv.id=c.id; conv.scenario=c.scenario;
+          c.messages.forEach(function(m){ bubble(m.role==='user'?'u':'n',m.content); });
+        } else bubble('n',opener());
+        scrollEnd();
+      });
     }
-    send.addEventListener('click',function(){ var v=field.textContent.trim(); field.textContent=''; push(v); });
+    window.__chatLoad=load;
+    window.__onMe.push(function(){ applyGenderCopy(); });
+    function actionButton(a){
+      var href=String(a.href||''), target=/journal|tips|diary/.test(href)?'diary':/rhythm/.test(href)?'rhythm':null;
+      if(!target) return;
+      var b=document.createElement('button'); b.className='pill msgact'; b.textContent=target==='diary'?'Открыть дневник':'Открыть ритм';
+      b.addEventListener('click',function(){ closeSheet(); go(target); });
+      msgs.appendChild(b); scrollEnd();
+    }
+    function sendText(text,scenario){
+      text=(text||'').trim();
+      if(busy||!text) return;
+      if(scenario&&scenario!==conv.scenario){ conv={id:null,scenario:scenario}; stamp('Новый разговор'); }
+      bubble('u',text); haptic(9);
+      var t=document.createElement('div'); t.className='msg n typing'; t.innerHTML='<i></i><i></i><i></i>';
+      msgs.appendChild(t); scrollEnd();
+      busy=true; status.textContent='печатает';
+      var cid='m'+Date.now().toString(36)+Math.random().toString(36).slice(2,8), node=null;
+      fetch('/api/chat',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({scenario:conv.scenario,text:text,clientMessageId:cid,conversationId:conv.id})})
+      .then(function(res){
+        if(!res.ok) return res.json().catch(function(){ return {}; }).then(function(j){ throw {status:res.status,data:j}; });
+        conv.id=res.headers.get('X-Conversation-Id')||conv.id;
+        var reader=res.body.getReader(), dec=new TextDecoder(), acc='';
+        function pump(){
+          return reader.read().then(function(x){
+            if(x.done) return acc;
+            acc+=dec.decode(x.value,{stream:true});
+            var shown=acc.replace(/\n⟪ACTION:[\s\S]*$/,'');
+            if(shown){ if(!node){ t.remove(); node=bubble('n',''); } node.textContent=shown; scrollEnd(); }
+            return pump();
+          });
+        }
+        return pump().then(function(full){
+          var m=/\n⟪ACTION:(\{.*?\})⟫$/.exec(full);
+          if(!node){ t.remove(); bubble('n',full.replace(/\n⟪ACTION:[\s\S]*$/,'')||'…'); }
+          if(m){ try{ actionButton(JSON.parse(m[1])); }catch(e){} }
+          haptic(8);
+        });
+      })
+      .catch(function(e){
+        if(t.parentNode) t.remove();
+        var st=e&&e.status, d=(e&&e.data)||{};
+        bubble('n sys',st===402?'На сегодня разговоры закончились, завтра лимит обновится.'+(d.canUpgrade?' В Про их больше.':'')
+          :st===429?'Слишком быстро. Подожди минуту и напиши снова.'
+          :st===401?'Сессия закончилась. Войди заново, и продолжим.'
+          :st===413?'Сообщение слишком длинное. Раздели его на части.'
+          :'Не получилось отправить. Проверь связь и попробуй ещё раз.');
+        if(st===402&&d.canUpgrade&&window.__openPro){
+          var b=document.createElement('button'); b.className='pill msgact'; b.textContent='Что даёт Про';
+          b.addEventListener('click',function(){ closeSheet(); window.__openPro(); }); msgs.appendChild(b); scrollEnd();
+        }
+      })
+      .then(function(){ busy=false; status.textContent='рядом'; if(window.__refreshMe) window.__refreshMe(); });
+    }
+    function sendField(){ var v=field.textContent.trim(); if(!v||busy) return; field.textContent=''; sendText(v); }
+    send.addEventListener('click',sendField);
     field.addEventListener('keydown',function(e){
-      if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); var v=field.textContent.trim(); field.textContent=''; push(v); }
+      if(e.key==='Enter'&&!e.shiftKey){ e.preventDefault(); sendField(); }
     });
     document.querySelectorAll('.chips .chip').forEach(function(c){
-      c.addEventListener('click',function(){ push(c.textContent.trim()); });
+      c.addEventListener('click',function(){ sendText(c.textContent.trim(),c.dataset.scenario); });
     });
+    window.__openNika=function(prefill){
+      openSheet();
+      if(prefill){ field.textContent=prefill; setTimeout(function(){ field.focus(); },350); }
+    };
   })();
 
-  /* приду на кофе-ран */
-  (function(){
-    var b=document.getElementById('rsvpBtn'); if(!b) return;
-    b.addEventListener('click',function(){
-      var on=b.classList.toggle('solid');
-      b.textContent=on?'Буду. Записала':'Приду';
-      haptic(12);
-    });
-  })();
+  /* кофе-ран: запись идёт через страницу забега (ссылка в блоке клуба) */
 
   /* переход к Про из профиля и с главной */
   document.querySelectorAll('[data-goPro]').forEach(function(b){
