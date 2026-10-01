@@ -95,11 +95,12 @@ export async function buildMe(supabase: ServerClient, user: User) {
       entries,
       runs,
       practicesCompleted: practices,
-      records: entries + runs,
+      records: entries + runs + practices,
       lastRun: lastRunRow.data ?? null,
       lastEntry: lastEntryRow.data ?? null,
     },
     telegram: { linked: !!tgRow.data },
+    push: { vapidPublicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null },
     state: entries + runs + practices === 0 ? ("fresh" as const) : ("regular" as const),
   };
 }

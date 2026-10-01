@@ -98,6 +98,7 @@ export interface ProfilePatch {
   behaviors?: string[];
   cycle?: CyclePref | null;
   proactive?: boolean;
+  notif_permission?: "granted" | "denied" | "default";
   ui_prefs?: Record<string, string | number | boolean>;
 }
 
@@ -150,6 +151,11 @@ export function parseProfilePatch(body: Record<string, unknown>): { patch: Profi
   if ("proactive" in body) {
     if (typeof body.proactive === "boolean") patch.proactive = body.proactive;
     else errors.push("proactive");
+  }
+  if ("notifPermission" in body) {
+    const v = body.notifPermission;
+    if (v === "granted" || v === "denied" || v === "default") patch.notif_permission = v;
+    else errors.push("notifPermission");
   }
   if ("uiPrefs" in body) {
     const prefs = parseUiPrefs(body.uiPrefs);

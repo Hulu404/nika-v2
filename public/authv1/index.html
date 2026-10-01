@@ -540,6 +540,13 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 .oother input{width:100%;background:none;border:0;outline:none;font:inherit;
   color:var(--ink);font-size:.95rem;padding:4px 0}
 .oother input::placeholder{color:var(--ink-3)}
+.ocheck{display:flex;gap:12px;align-items:flex-start;margin-top:16px;font-size:.86rem;line-height:1.45;color:var(--ink-2);cursor:pointer;min-height:44px}
+.ocheck input{appearance:none;-webkit-appearance:none;flex:none;width:22px;height:22px;border-radius:7px;border:1.5px solid rgba(244,239,230,.42);margin:0;display:grid;place-items:center;background:transparent;cursor:pointer}
+.ocheck input:checked{background:var(--ink);border-color:var(--ink)}
+.ocheck input:checked::after{content:'';width:10px;height:6px;border-left:2px solid #0B0B0D;border-bottom:2px solid #0B0B0D;transform:translateY(-1px) rotate(-45deg)}
+.ocheck a{color:var(--ink);text-decoration:underline;text-underline-offset:3px}
+.oinfo{font-size:.86rem;color:var(--ink-2);margin-top:12px;line-height:1.5}
+.pill[disabled]{opacity:.42;pointer-events:none}
 
 /* ---- курс ---- */
 .clist{display:flex;flex-direction:column}
@@ -1358,15 +1365,42 @@ button.cli:active{opacity:.65}
       <div class="otop"><span class="wordmark"><span class="my-pre">My </span>NIKA</span></div>
       <div class="obody" style="justify-content:flex-end;padding-bottom:16px">
         <h1 class="disp">Добро<br><span class="ser">пожаловать</span></h1>
-        <p class="cap" style="margin-top:14px;max-width:290px">Введи почту и пароль, которые указывал при регистрации.</p>
+        <p class="cap" style="margin-top:14px;max-width:290px">Почта и пароль из регистрации.</p>
         <div class="ofield"><input id="loginEmail" type="email" placeholder="Почта" autocomplete="email" inputmode="email"></div>
         <div class="ofield"><input id="loginPass" type="password" placeholder="Пароль" autocomplete="current-password"></div>
         <p class="oerr" id="loginErr" style="display:none">Проверь почту и пароль</p>
+        <p class="oinfo" id="loginInfo" style="display:none"></p>
       </div>
       <div class="ofoot">
         <button class="pill solid wide" id="loginSubmit">Войти</button>
         <button class="pill ghost wide" id="loginForgot">Забыли пароль?</button>
         <button style="margin-top:4px;font-size:.82rem;color:var(--ink-3);text-align:center;width:100%;padding:10px 0" id="loginBack">← Назад</button>
+      </div>
+    </div>
+
+    <!-- ПОДТВЕРЖДЕНИЕ ПОЧТЫ -->
+    <div class="ologin" id="oconfirm" style="display:none">
+      <div class="otop"><span class="wordmark"><span class="my-pre">My </span>NIKA</span></div>
+      <div class="obody" style="justify-content:flex-end;padding-bottom:16px">
+        <h1 class="disp">Проверь <span class="ser">почту</span></h1>
+        <p class="cap" style="margin-top:14px;max-width:300px" id="oconfirmText">Мы отправили письмо со ссылкой. Открой его на этом устройстве, и аккаунт заработает.</p>
+      </div>
+      <div class="ofoot">
+        <button class="pill solid wide" id="oconfirmLogin">Почта подтверждена, войти</button>
+      </div>
+    </div>
+
+    <!-- НОВЫЙ ПАРОЛЬ (ссылка из письма сброса) -->
+    <div class="ologin" id="oreset" style="display:none">
+      <div class="otop"><span class="wordmark"><span class="my-pre">My </span>NIKA</span></div>
+      <div class="obody" style="justify-content:flex-end;padding-bottom:16px">
+        <h1 class="disp">Новый <span class="ser">пароль</span></h1>
+        <p class="cap" style="margin-top:14px;max-width:290px">Минимум восемь символов.</p>
+        <div class="ofield"><input id="resetPass" type="password" placeholder="Новый пароль" autocomplete="new-password"></div>
+        <p class="oerr" id="resetErr" style="display:none"></p>
+      </div>
+      <div class="ofoot">
+        <button class="pill solid wide" id="resetSubmit">Сохранить и войти</button>
       </div>
     </div>
 
@@ -1390,7 +1424,7 @@ button.cli:active{opacity:.65}
       <div class="obody">
         <div class="oinner">
           <h1 class="disp">Введи <span class="ser">почту</span></h1>
-          <p class="cap" style="margin-top:14px;max-width:290px">Это твой логин. Никаких писем без твоего запроса.</p>
+          <p class="cap" style="margin-top:14px;max-width:290px">Это твой логин. Письма приходят только по делу: подтверждение и сброс пароля.</p>
           <div class="ofield"><input id="regEmail" type="email" placeholder="Почта" autocomplete="email" inputmode="email"></div>
           <p class="oerr" id="regEmailErr" style="display:none">Введи корректный адрес почты</p>
         </div>
@@ -1399,20 +1433,40 @@ button.cli:active{opacity:.65}
     </div>
 
     <!-- 2 · регистрация: пароль -->
-    <div class="ostep" data-step="8">
+    <div class="ostep" data-step="password">
       <div class="obody">
         <div class="oinner">
           <h1 class="disp">Придумай <span class="ser">пароль</span></h1>
-          <p class="cap" style="margin-top:14px;max-width:290px">Минимум шесть символов. Лучше не использовать пароль от почты.</p>
+          <p class="cap" style="margin-top:14px;max-width:290px">Минимум восемь символов. Лучше не использовать пароль от почты.</p>
           <div class="ofield"><input id="regPass" type="password" placeholder="Пароль" autocomplete="new-password"></div>
-          <p class="oerr" id="regPassErr" style="display:none">Пароль слишком короткий, нужно минимум шесть символов</p>
+          <p class="oerr" id="regPassErr" style="display:none">Пароль слишком короткий, нужно минимум восемь символов</p>
+          <label class="ocheck"><input type="checkbox" id="regOffer"><span>Принимаю условия <a href="/legal/oferta" target="_blank" rel="noopener">Публичной оферты</a></span></label>
+          <label class="ocheck"><input type="checkbox" id="regPd"><span>Даю <a href="/legal/consent" target="_blank" rel="noopener">согласие на обработку персональных данных</a>. Порядок обработки описан в <a href="/legal/privacy" target="_blank" rel="noopener">Политике</a></span></label>
+          <p class="oerr" id="regErr" style="display:none"></p>
         </div>
       </div>
-      <div class="ofoot"><button class="pill solid wide" id="regPassNext">Создать аккаунт</button></div>
+      <div class="ofoot"><button class="pill solid wide" id="regPassNext" disabled>Создать аккаунт</button></div>
     </div>
 
-    <!-- 3 · что привело (intent) -->
-    <div class="ostep" data-step="3">
+    <!-- 3 · имя и обращение -->
+    <div class="ostep" data-step="name">
+      <div class="obody">
+        <div class="oinner">
+          <h1 class="disp">Как к тебе <span class="ser">обращаться</span></h1>
+          <p class="cap" style="margin-top:14px;max-width:290px">Имя видит только Ника. Поменять можно в профиле.</p>
+          <div class="ofield"><input id="oName" type="text" maxlength="40" placeholder="Имя" autocomplete="given-name"></div>
+          <div class="opts" data-key="gender">
+            <button class="opt" data-val="female">Она</button>
+            <button class="opt" data-val="male">Он</button>
+          </div>
+          <p class="oerr" id="oNameErr" style="display:none">Выбери, как к тебе обращаться</p>
+        </div>
+      </div>
+      <div class="ofoot"><button class="pill solid wide" id="oNameNext">Дальше</button></div>
+    </div>
+
+    <!-- 4 · что привело (intent) -->
+    <div class="ostep" data-step="intent">
       <div class="obody">
         <div class="oinner">
           <h1 class="disp">Что тебя сюда <span class="ser">привело</span></h1>
@@ -1496,11 +1550,11 @@ button.cli:active{opacity:.65}
           <p class="cap" style="margin-top:12px;max-width:300px">Выбери от трёх до пяти. С меньшим числом корреляции путаются, с большим тоже.</p>
           <p class="obcount" id="behaviorsCount">Выбрано <b>0</b> из 5</p>
           <div class="opts" data-key="behaviors" data-multi data-min="3" data-max="5">
-            <button class="opt" data-val="sleep">Спала мало</button>
-            <button class="opt" data-val="run_am">Бежала утром</button>
-            <button class="opt" data-val="run_together">Бежала не одна</button>
+            <button class="opt" data-val="sleep" data-gm="Спал мало">Спала мало</button>
+            <button class="opt" data-val="run_am" data-gm="Бежал утром">Бежала утром</button>
+            <button class="opt" data-val="run_together" data-gm="Бежал не один">Бежала не одна</button>
             <button class="opt" data-val="coffee">Кофе перед выходом</button>
-            <button class="opt" data-val="ate">Ела перед бегом</button>
+            <button class="opt" data-val="ate" data-gm="Ел перед бегом">Ела перед бегом</button>
             <button class="opt" data-val="heavy_legs">Ноги тяжёлые</button>
             <button class="opt" data-val="anxious">Тревожно</button>
             <button class="opt" data-val="work">Тяжёлый день</button>
@@ -1521,7 +1575,7 @@ button.cli:active{opacity:.65}
     </div>
 
     <!-- 8 · цикл (cycle) -->
-    <div class="ostep" data-step="8">
+    <div class="ostep" data-step="cycle">
       <div class="obody">
         <div class="oinner">
           <h1 class="disp">Учитывать <span class="ser">цикл</span></h1>
@@ -1567,11 +1621,12 @@ button.cli:active{opacity:.65}
     </div>
 
     <!-- 11 · финал -->
-    <div class="ostep" data-step="11">
+    <div class="ostep" data-step="final">
       <div class="obody">
         <div class="oinner" style="margin:auto 0">
           <h1 class="disp xl">Ника <span class="ser">рядом</span></h1>
           <p class="cap" style="margin-top:16px;max-width:290px" id="oFinal">Начнём с первой практики прямо сейчас.</p>
+          <p class="oerr" id="oFinishErr" style="display:none"></p>
         </div>
       </div>
       <div class="ofoot">
@@ -1604,6 +1659,48 @@ button.cli:active{opacity:.65}
   var mq=window.matchMedia('(prefers-reduced-motion: reduce)');
   function reduced(){ return mq.matches; }
   function haptic(ms){ try{ if(navigator.vibrate) navigator.vibrate(ms||8); }catch(e){} }
+
+  /* ---------- API ----------
+     Все данные приходят с сервера (/api/v2/*). Сессия в cookie того же домена,
+     поэтому SDK Supabase в странице не нужен. */
+  function api(path,opts){
+    opts=opts||{};
+    var init={method:opts.method||'GET',credentials:'same-origin',headers:{}};
+    if(opts.body!==undefined){ init.headers['Content-Type']='application/json'; init.body=JSON.stringify(opts.body); }
+    return fetch(path,init).then(function(r){
+      return r.text().then(function(t){
+        var j=null; try{ j=t?JSON.parse(t):null; }catch(e){}
+        return {ok:r.ok,status:r.status,data:j};
+      });
+    }).catch(function(){ return {ok:false,status:0,data:null}; });
+  }
+  var ME=null;
+  function loadMe(){ return api('/api/v2/me').then(function(r){
+    if(r.ok&&r.data&&r.data.auth===false) r={ok:false,status:401,data:null};
+    ME=r.ok?r.data:null; return r; }); }
+  function fem(){ return !ME||!ME.profile||ME.profile.gender!=='male'; }
+  /* окончание по роду: g('а') → «а» для неё, «» для него; g('ла','л') */
+  function g(f,m){ return fem()?f:(m||''); }
+  function capName(n){ n=(n||'').trim(); return n?n.charAt(0).toUpperCase()+n.slice(1):''; }
+  /* Тексты в разметке написаны в женском роде; мужской вариант лежит в data-gm. */
+  function applyGenderCopy(){
+    var male=!fem();
+    document.querySelectorAll('[data-gm]').forEach(function(el){
+      if(el.dataset.gf===undefined) el.dataset.gf=el.innerHTML;
+      el.innerHTML=male?el.dataset.gm:el.dataset.gf;
+    });
+  }
+  var BEHAVIOR_LABELS={
+    sleep:['Спала мало','Спал мало'],run_am:['Бежала утром','Бежал утром'],run_together:['Бежала не одна','Бежал не один'],
+    coffee:['Кофе перед выходом'],ate:['Ела перед бегом','Ел перед бегом'],heavy_legs:['Ноги тяжёлые'],
+    anxious:['Тревожно'],work:['Тяжёлый день'],heat:['Жарко или душно'],pain:['Болит что-то']
+  };
+  function tagLabel(v){
+    if(!v) return '';
+    if(v.indexOf('c:')===0) return v.slice(2);
+    var l=BEHAVIOR_LABELS[v]; if(!l) return v;
+    return (!fem()&&l[1])?l[1]:l[0];
+  }
 
   /* ---------- пружина ---------- */
   function makeSpring(o){
@@ -1760,12 +1857,8 @@ button.cli:active{opacity:.65}
     app.dataset.plan=p;
     document.querySelectorAll('.proonly').forEach(function(e){ e.style.display=pro?'':'none'; });
     document.querySelectorAll('.freeonly').forEach(function(e){ e.style.display=pro?'none':''; });
-    document.getElementById('nikaStatus').textContent=pro?'помнит твой спринт':'рядом';
-    document.querySelectorAll('#planSeg button').forEach(function(b){ b.classList.toggle('on',b.dataset.plan===p); });
+    document.getElementById('nikaStatus').textContent='рядом';
   }
-  document.querySelectorAll('#planSeg button').forEach(function(b){
-    b.addEventListener('click',function(){ setPlan(b.dataset.plan); haptic(); });
-  });
 
   /* ---------- навигация ---------- */
   var centerPager=null;
@@ -1782,7 +1875,6 @@ button.cli:active{opacity:.65}
     if(v==='diary'&&centerPager) centerPager();
     if(v!=='practice'&&window.__resetPlayer) window.__resetPlayer();
     if(v!=='postrun'&&window.__resetPostrun) window.__resetPostrun();
-    if(window.__ann) window.__ann(v);
   }
   var stack=['home'];
   function go(v){
@@ -1842,13 +1934,11 @@ button.cli:active{opacity:.65}
   function openSheet(){
     sheet.style.visibility='visible'; scrim.style.pointerEvents='auto';
     fab.classList.add('on'); opened=true; msgs.scrollTop=msgs.scrollHeight;
-    if(window.__ann) window.__ann('nika');
     sy.to(0,null,1,0.44);
   }
   function closeSheet(){
     if(!opened&&!sy.running) return;
     opened=false; fab.classList.remove('on'); scrim.style.pointerEvents='none';
-    if(window.__ann&&current()) window.__ann(current().dataset.view);
     sy.to(SH,null,1,0.4);
   }
   fab.addEventListener('click',function(){ opened?closeSheet():openSheet(); });
@@ -1943,50 +2033,9 @@ button.cli:active{opacity:.65}
     });
   })();
 
-  /* ---------- отметить пробежку, обратимо ---------- */
-  var marked=false,
-      btn=document.getElementById('markBtn'), ghost=document.getElementById('ghostBtn'),
-      heroTitle=document.getElementById('heroTitle'), heroSub=document.getElementById('heroSub'),
-      weekLine=document.getElementById('weekLine'), dayToday=document.getElementById('dayToday'),
-      jrnTodo=document.getElementById('jrnTodo'), diaryPip=document.getElementById('diaryPip'),
-      corrPin=document.getElementById('corrPin');
-  var T={
-    off:{t:'Двадцать минут<br>без темпа',
-      s:'Вчера ты разогналась на третьем километре и написала, что ноги тяжёлые. Сегодня это ещё держится.',
-      c:'Отметить пробежку',g:'Не сегодня, перенести',w:'Назначено 4, сделано 2',j:'Сегодня ещё не записано',p:'34%'},
-    on:{t:'Сделано.<br>Осталась длинная',
-      s:'Расскажи вечером, как оно шло, и я закрою день в дневнике. Длинная в субботу, до неё два свободных дня.',
-      c:'Отмечено',g:'Отменить отметку',w:'Назначено 4, сделано 3',j:'Ника спросит вечером',p:'46%'}
-  };
-  var dotSpring=makeSpring({from:1,damping:0.62,response:0.34,precision:0.004,onUpdate:function(x){
-    if(dayToday) dayToday.querySelector('.dot').style.transform='scale('+x.toFixed(3)+')';
-  }});
-  function setMarked(on){
-    marked=on;
-    var d=on?T.on:T.off;
-    heroTitle.innerHTML=d.t; heroSub.textContent=d.s;
-    btn.textContent=d.c; ghost.textContent=d.g;
-    weekLine.textContent=d.w; jrnTodo.textContent=d.j;
-    diaryPip.style.display=on?'none':'';
-    corrPin.style.left=d.p;
-    if(dayToday){
-      dayToday.classList.toggle('done',on); dayToday.classList.toggle('plan',!on);
-      dayToday.querySelector('.dot').innerHTML=on
-        ?'<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>':'';
-    }
-    if(on){ dotSpring.set(0.35); dotSpring.to(1); }
-    haptic(on?14:6);
-  }
-  btn.addEventListener('click',function(){ if(!marked) setMarked(true); });
-  ghost.addEventListener('click',function(){ if(marked) setMarked(false); });
+  /* ---------- заставка: скрывает загрузка состояния (boot ниже) ---------- */
+  function hideSplash(){ splash.classList.add('gone'); }
 
-  /* ---------- заставка ---------- */
-  var timer=setTimeout(hide,1000);
-  function hide(){ clearTimeout(timer); splash.classList.add('gone');
-    document.getElementById('jrnBar').style.width='60%'; }
-  splash.addEventListener('pointerdown',hide,{passive:true});
-
-  setPlan('free');
   chrome();
 
   /* ============================================================
@@ -2001,35 +2050,40 @@ button.cli:active{opacity:.65}
     golos:    {disp:"'Golos Text',-apple-system,system-ui,sans-serif",    sans:"'Golos Text',-apple-system,system-ui,sans-serif", ls:'-.042em'},
     pryamaya: {disp:"'Inter',-apple-system,system-ui,sans-serif",         sans:"'Inter',-apple-system,system-ui,sans-serif", ls:'-.045em'}
   };
-  function setFont(k){
+  var uiPrefs={};
+  function saveUi(patch){
+    for(var k in patch) uiPrefs[k]=patch[k];
+    api('/api/v2/profile',{method:'PATCH',body:{uiPrefs:uiPrefs}});
+  }
+  function setFont(k,silent){
     var f=FONTS[k]; if(!f) return;
     var r=app.style;
     r.setProperty('--disp',f.disp);
     r.setProperty('--sans',f.sans);
     r.setProperty('--n-ls',f.ls);
     document.querySelectorAll('#fontlist .fontrow').forEach(function(b){ b.classList.toggle('on',b.dataset.font===k); });
-    haptic(7);
+    if(!silent){ haptic(7); saveUi({font:k}); }
   }
   document.querySelectorAll('#fontlist .fontrow').forEach(function(b){
     b.addEventListener('click',function(){ setFont(b.dataset.font); });
   });
 
-  function setSize(px){
+  function setSize(px,silent){
     app.style.fontSize=px+'%';
     document.querySelectorAll('#sizeSeg button').forEach(function(b){ b.classList.toggle('on',b.dataset.size===String(px)); });
-    haptic(7);
+    if(!silent){ haptic(7); saveUi({size:px}); }
   }
   document.querySelectorAll('#sizeSeg button').forEach(function(b){
     b.addEventListener('click',function(){ setSize(+b.dataset.size); });
   });
 
-  function setSky(id){
+  function setSky(id,silent){
     document.querySelectorAll('[data-view="home"] .scene.hero .art use').forEach(function(u){
       u.setAttribute('href','#'+id);
     });
     document.querySelectorAll('.splash .art use').forEach(function(u){ u.setAttribute('href','#'+id); });
     document.querySelectorAll('#skyrow .skysw').forEach(function(b){ b.classList.toggle('on',b.dataset.sky===id); });
-    haptic(7);
+    if(!silent){ haptic(7); saveUi({sky:id}); }
   }
   document.querySelectorAll('#skyrow .skysw').forEach(function(b){
     b.addEventListener('click',function(){ setSky(b.dataset.sky); });
@@ -2039,14 +2093,23 @@ button.cli:active{opacity:.65}
   swC.addEventListener('click',function(){
     var on=!swC.classList.contains('on');
     swC.classList.toggle('on',on);
-    app.dataset.contrast=on?'high':'normal'; haptic(7);
+    app.dataset.contrast=on?'high':'normal'; haptic(7); saveUi({contrast:on});
   });
   var forceCalm=false;
   swM.addEventListener('click',function(){
     forceCalm=!swM.classList.contains('on');
     swM.classList.toggle('on',forceCalm);
-    app.dataset.calm=forceCalm?'1':'0'; haptic(7);
+    app.dataset.calm=forceCalm?'1':'0'; haptic(7); saveUi({calm:forceCalm});
   });
+  /* настройки вида из профиля; небо по умолчанию от времени, когда обычно получается бегать */
+  window.__applyUi=function(ui,daypart){
+    uiPrefs={}; for(var k in ui) uiPrefs[k]=ui[k];
+    setFont(ui.font||'nika',true);
+    setSize(ui.size||100,true);
+    setSky(ui.sky||(daypart==='evening'?'sc-dusk':daypart==='morning'?'sc-dawn':'sc-dusk'),true);
+    swC.classList.toggle('on',!!ui.contrast); app.dataset.contrast=ui.contrast?'high':'normal';
+    forceCalm=!!ui.calm; swM.classList.toggle('on',forceCalm); app.dataset.calm=forceCalm?'1':'0';
+  };
 
   /* ============================================================
      ПЛЕЕР ПРАКТИКИ — реальный <audio>
@@ -2253,14 +2316,25 @@ button.cli:active{opacity:.65}
     var steps=onb.querySelectorAll('.ostep'), LAST=steps.length-1, cur=0,
         bar=document.getElementById('obar'), fill=document.getElementById('oprogFill'),
         back=document.getElementById('oback');
+    function stepIdx(name){ for(var k=0;k<steps.length;k++){ if(steps[k].dataset.step===name) return k; } return -1; }
     function show(i){
+      var dir=i>=cur?1:-1;
+      i=Math.max(0,Math.min(i,LAST));
+      /* вопрос про цикл только для «она» */
+      if(steps[i]&&steps[i].dataset.step==='cycle'&&profile.gender!=='female') i+=dir;
       cur=Math.max(0,Math.min(i,LAST));
+      if(steps[cur].dataset.step==='final'){
+        var nm=capName(profile.name);
+        document.getElementById('oFinal').textContent=(nm?nm+', н':'Н')+'ачнём с первой практики. Она уже ждёт на главной.';
+      }
       steps.forEach(function(s,k){
         s.classList.toggle('on',k===cur);
         if(k===cur){ var ob=s.querySelector('.obody'); if(ob) ob.scrollTop=0; }
       });
-      bar.style.display=cur<3?'none':'flex';
-      fill.style.width=(Math.max(0,cur-2)/Math.max(1,LAST-2)*100).toFixed(1)+'%';
+      var ni=stepIdx('name');
+      bar.style.display=cur<1?'none':'flex';
+      back.style.visibility=cur===ni?'hidden':'visible';
+      fill.style.width=(Math.max(0,cur-ni)/Math.max(1,LAST-ni)*100).toFixed(1)+'%';
       haptic(8);
       setTimeout(function(){ setupVeil(steps[cur]); },40);
     }
@@ -2274,7 +2348,11 @@ button.cli:active{opacity:.65}
       ob.addEventListener('scroll',chk,{passive:true});
       setTimeout(chk,40);
     }
-    back.addEventListener('click',function(){ show(cur-1); });
+    back.addEventListener('click',function(){
+      /* назад за экран имени нельзя: аккаунт уже создан */
+      if(cur>=stepIdx('name')&&cur-1<=stepIdx('password')) return;
+      show(cur-1);
+    });
     // ── авторизация ──────────────────────────────────────────
     var ologin=document.getElementById('ologin');
     function showLogin(){
@@ -2287,44 +2365,132 @@ button.cli:active{opacity:.65}
     document.getElementById('oRegBtn').addEventListener('click',function(){ show(1); haptic(7); });
     document.getElementById('oLoginBtn').addEventListener('click',showLogin);
     document.getElementById('loginBack').addEventListener('click',function(){ hideLogin(); show(0); haptic(7); });
-    document.getElementById('loginForgot').addEventListener('click',function(){ haptic(7); });
+    var loginErr=document.getElementById('loginErr'), loginInfo=document.getElementById('loginInfo');
+    function loginMsg(err,info){
+      loginErr.textContent=err||''; loginErr.style.display=err?'':'none';
+      loginInfo.textContent=info||''; loginInfo.style.display=info?'':'none';
+    }
+    document.getElementById('loginForgot').addEventListener('click',function(){
+      var email=(document.getElementById('loginEmail').value||'').trim();
+      if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)){ loginMsg('Введи почту, и я пришлю ссылку для нового пароля'); document.getElementById('loginEmail').focus(); return; }
+      var b=this; b.disabled=true;
+      api('/api/auth/forgot',{method:'POST',body:{email:email}}).then(function(){
+        b.disabled=false;
+        loginMsg('', 'Если аккаунт с такой почтой есть, ссылка уже в почте. Если подключён Telegram, она придёт и туда.');
+      });
+      haptic(7);
+    });
     document.getElementById('loginSubmit').addEventListener('click',function(){
       var email=(document.getElementById('loginEmail').value||'').trim();
       var pass=document.getElementById('loginPass').value||'';
-      var err=document.getElementById('loginErr');
-      if(!email||email.indexOf('@')<1||pass.length<6){ err.style.display=''; return; }
-      err.style.display='none';
-      hideLogin();
-      onb.style.transition='opacity .4s ease'; onb.style.opacity='0';
-      setTimeout(function(){ onb.style.display='none'; onb.style.opacity=''; onb.style.transition=''; },450);
-      setState('regular'); go('home'); haptic(16);
+      if(!email||email.indexOf('@')<1||!pass){ loginMsg('Проверь почту и пароль'); return; }
+      var b=this; b.disabled=true; b.textContent='Входим…'; loginMsg('');
+      api('/api/v2/auth/login',{method:'POST',body:{email:email,password:pass}}).then(function(r){
+        b.disabled=false; b.textContent='Войти';
+        if(r.ok){ hideLogin(); window.__afterAuth(); return; }
+        var e=r.data&&r.data.error;
+        loginMsg(e==='unconfirmed'?'Почта ещё не подтверждена. Открой ссылку из письма.'
+          :e==='rate_limited'?'Слишком много попыток. Подожди несколько минут.'
+          :r.status===0?'Нет связи. Проверь интернет и попробуй ещё раз.'
+          :e==='invalid'?'Неверная почта или пароль':'Не получилось войти. Попробуй ещё раз.');
+      });
     });
+    var oconfirm=document.getElementById('oconfirm');
+    document.getElementById('oconfirmLogin').addEventListener('click',function(){
+      oconfirm.style.display='none';
+      document.getElementById('loginEmail').value=(document.getElementById('regEmail').value||'').trim();
+      showLogin();
+    });
+    var oreset=document.getElementById('oreset');
+    document.getElementById('resetSubmit').addEventListener('click',function(){
+      var v=document.getElementById('resetPass').value||'', err=document.getElementById('resetErr');
+      if(v.length<8){ err.textContent='Нужно минимум восемь символов'; err.style.display=''; return; }
+      var b=this; b.disabled=true;
+      api('/api/v2/auth/password',{method:'POST',body:{password:v}}).then(function(r){
+        b.disabled=false;
+        if(r.ok){ oreset.style.display='none'; history.replaceState(null,'','/start'); window.__afterAuth(); return; }
+        var e=r.data&&r.data.error;
+        err.textContent=r.status===401?'Ссылка устарела. Запроси новую на экране входа.'
+          :e==='same_password'?'Этот пароль уже был. Придумай другой.':'Не получилось сохранить. Попробуй ещё раз.';
+        err.style.display='';
+      });
+    });
+    window.__resetOpen=function(){ onb.style.display='block'; show(0); oreset.style.display='flex'; };
     // ── регистрация ───────────────────────────────────────────
+    var EMAIL_RE=/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     document.getElementById('regEmailNext').addEventListener('click',function(){
       var v=(document.getElementById('regEmail').value||'').trim();
       var err=document.getElementById('regEmailErr');
-      if(!v||v.indexOf('@')<1){ err.style.display=''; return; }
-      err.style.display='none'; show(2);
+      if(!EMAIL_RE.test(v)){ err.style.display=''; return; }
+      err.style.display='none'; show(stepIdx('password'));
     });
-    document.getElementById('regPassNext').addEventListener('click',function(){
+    var regOffer=document.getElementById('regOffer'), regPd=document.getElementById('regPd'),
+        regBtn=document.getElementById('regPassNext'), regErr=document.getElementById('regErr');
+    function regSync(){ regBtn.disabled=!(regOffer.checked&&regPd.checked); }
+    regOffer.addEventListener('change',regSync); regPd.addEventListener('change',regSync);
+    regBtn.addEventListener('click',function(){
+      var email=(document.getElementById('regEmail').value||'').trim();
       var v=document.getElementById('regPass').value||'';
-      var err=document.getElementById('regPassErr');
-      if(v.length<6){ err.style.display=''; return; }
-      err.style.display='none'; show(3);
+      var perr=document.getElementById('regPassErr');
+      if(v.length<8){ perr.style.display=''; return; }
+      perr.style.display='none'; regErr.style.display='none';
+      if(!(regOffer.checked&&regPd.checked)) return;
+      regBtn.disabled=true; regBtn.textContent='Создаём…';
+      api('/api/v2/auth/register',{method:'POST',body:{email:email,password:v,acceptOffer:true,acceptPd:true}}).then(function(r){
+        regBtn.textContent='Создать аккаунт'; regSync();
+        if(r.ok&&r.data&&r.data.confirm){
+          document.getElementById('oconfirmText').textContent='Мы отправили письмо на '+email+'. Открой ссылку из него, и аккаунт заработает.';
+          oconfirm.style.display='flex'; return;
+        }
+        if(r.ok){ loadMe().then(function(){ show(stepIdx('name')); }); return; }
+        var e=r.data&&r.data.error;
+        if(e==='exists'){
+          regErr.innerHTML='Эта почта уже зарегистрирована. <a href="#" id="regToLogin" style="color:var(--ink);text-decoration:underline">Войти</a>';
+          regErr.style.display='';
+          document.getElementById('regToLogin').addEventListener('click',function(ev){
+            ev.preventDefault(); document.getElementById('loginEmail').value=email; showLogin();
+          });
+          return;
+        }
+        regErr.textContent=e==='password'?'Пароль не подходит: нужно от восьми символов.'
+          :e==='email'?'Проверь адрес почты.'
+          :e==='rate_limited'?'Слишком много попыток. Подожди немного.'
+          :r.status===0?'Нет связи. Проверь интернет и попробуй ещё раз.':'Не получилось создать аккаунт. Попробуй ещё раз.';
+        regErr.style.display='';
+      });
     });
+
+    // ── имя и обращение ─────────────────────────────────────
+    (function(){
+      var g2=onb.querySelector('.opts[data-key="gender"]'), nameInp=document.getElementById('oName'),
+          err=document.getElementById('oNameErr'), btn=document.getElementById('oNameNext');
+      g2.querySelectorAll('.opt').forEach(function(o){
+        o.addEventListener('click',function(){
+          g2.querySelectorAll('.opt').forEach(function(x){ x.classList.remove('on'); });
+          o.classList.add('on'); profile.gender=o.dataset.val; err.style.display='none'; haptic(7);
+        });
+      });
+      btn.addEventListener('click',function(){
+        if(profile.gender!=='female'&&profile.gender!=='male'){ err.textContent='Выбери, как к тебе обращаться'; err.style.display=''; return; }
+        profile.name=(nameInp.value||'').trim();
+        btn.disabled=true;
+        api('/api/v2/profile',{method:'PATCH',body:{name:profile.name,gender:profile.gender}}).then(function(r){
+          btn.disabled=false;
+          if(!r.ok){ err.textContent=r.status===401?'Сессия закончилась, войди заново.':'Не получилось сохранить. Попробуй ещё раз.'; err.style.display=''; return; }
+          if(ME&&ME.profile){ ME.profile.gender=profile.gender; ME.user.name=profile.name; }
+          applyGenderCopy();
+          show(stepIdx('name')+1);
+        });
+      });
+    })();
     window.__loginOpen=function(){
       onb.style.display='block'; show(0); showLogin();
     };
 
     // ── profile ─────────────────────────────────────────────
-    var profile={name:'',intent:'',intentCustom:'',barrier:'',barrierCustom:'',
+    var profile={name:'',gender:'',intent:'',intentCustom:'',barrier:'',barrierCustom:'',
       baseline:'',daypart:'',behaviors:[],cycle:'',notify:false};
 
-    var BEHAVIOR_LABELS={
-      sleep:'Спала мало',run_am:'Бежала утром',run_together:'Бежала не одна',
-      coffee:'Кофе перед выходом',ate:'Ела перед бегом',heavy_legs:'Ноги тяжёлые',
-      anxious:'Тревожно',work:'Тяжёлый день',heat:'Жарко или душно',pain:'Болит что-то'
-    };
     var CORRIDOR_MAP={rare:'Почти без нагрузки',low:'1–2 в неделю',mid:'3–4 в неделю',high:'5–7 в неделю'};
     var BARRIER_PRACTICE={head:'Заземление · 4 мин',time:'Заземление · 4 мин',
       tired:'Заземление · 4 мин',weather:'Заземление · 4 мин',
@@ -2436,194 +2602,143 @@ button.cli:active{opacity:.65}
       var yes=document.getElementById('oNotifyYes'), no=document.getElementById('oNotifyNo');
       function next(){ show(cur+1); }
       if(yes) yes.addEventListener('click',function(){
-        profile.notify=true;
-        if(window.Notification&&Notification.permission==='default'){
-          Notification.requestPermission().then(function(){ next(); }).catch(function(){ next(); });
-        } else { next(); }
+        profile.notify=true; yes.disabled=true;
+        window.__enablePush().then(function(perm){
+          yes.disabled=false; profile.notifPermission=perm; next();
+        });
       });
       if(no) no.addEventListener('click',function(){ profile.notify=false; next(); });
     })();
 
-    function applyProfile(){
-      var cl=document.getElementById('corridorLabel');
-      if(cl&&profile.baseline) cl.textContent=CORRIDOR_MAP[profile.baseline]||profile.baseline;
-      if(profile.daypart==='evening'){
-        document.querySelectorAll('[data-view="home"] .scene.hero .art use').forEach(function(u){
-          u.setAttribute('href','#sc-dusk');
-        });
-      }
-      var mb=document.getElementById('markBtn');
-      if(mb&&profile.barrier&&BARRIER_PRACTICE[profile.barrier]) mb.textContent=BARRIER_PRACTICE[profile.barrier];
-      var rt=document.getElementById('rhythmTab');
-      if(rt) rt.style.display=(profile.cycle==='yes')?'':'none';
-      (function(){
-        var vals=profile.behaviors.length?profile.behaviors:['sleep','run_am','heavy_legs'];
-        [document.getElementById('prTags'),document.getElementById('tagbox')].forEach(function(box){
-          if(!box) return;
-          var addBtn=box.querySelector('.tag.add');
-          box.innerHTML='';
-          vals.forEach(function(v){
-            var b=document.createElement('button');
-            b.className='tag'; b.setAttribute('data-tag','');
-            b.textContent=v.startsWith('c:')?v.slice(2):(BEHAVIOR_LABELS[v]||v);
-            b.addEventListener('click',function(){ b.classList.toggle('on'); haptic(6); });
-            box.appendChild(b);
-          });
-          if(addBtn) box.appendChild(addBtn);
-        });
-      })();
-      // intentCustom/barrierCustom → первое сообщение Ники
-      var custom=profile.intentCustom||profile.barrierCustom;
-      if(custom){
-        var msgsEl=document.getElementById('msgs');
-        if(msgsEl){
-          var bub=document.createElement('div');
-          bub.className='msg from';
-          bub.textContent='Ты написала, что '+custom.charAt(0).toLowerCase()+custom.slice(1)+'. С этого и начнём.';
-          msgsEl.insertBefore(bub,msgsEl.firstChild);
-        }
-      }
-      // курс: сброс подписи
-      var cSub=document.getElementById('courseCardSub'), cLibSub=document.getElementById('courseLibSub');
-      var cText='Восемь занятий, начать с первого';
-      if(cSub) cSub.textContent=cText;
-      if(cLibSub) cLibSub.textContent=cText;
-      // имя: заглавная первая буква
-      if(profile.name){
-        var pName=profile.name;
-        var cap=pName.charAt(0).toUpperCase()+pName.slice(1);
-        var profN=document.getElementById('profileName');
-        if(profN) profN.textContent=cap;
-      }
-    }
-
     document.getElementById('oFinish').addEventListener('click',function(){
-      applyProfile();
-      onb.style.transition='opacity .5s ease'; onb.style.opacity='0';
-      setTimeout(function(){ onb.style.display='none'; onb.style.opacity=''; },520);
-      setState('fresh'); go('home'); haptic(16);
+      var b=this, body={finish:true};
+      ['intent','barrier','baseline','daypart'].forEach(function(k){ if(profile[k]) body[k]=profile[k]; });
+      if(profile.intent==='other'&&profile.intentCustom) body.intentCustom=profile.intentCustom;
+      if(profile.barrier==='other'&&profile.barrierCustom) body.barrierCustom=profile.barrierCustom;
+      if(profile.behaviors.length>=3) body.behaviors=profile.behaviors;
+      if(profile.gender==='female'&&profile.cycle) body.cycle=profile.cycle;
+      if(profile.notifPermission) body.notifPermission=profile.notifPermission;
+      b.disabled=true; b.textContent='Сохраняем…';
+      api('/api/v2/profile',{method:'PATCH',body:body}).then(function(r){
+        b.disabled=false; b.textContent='Открыть приложение';
+        var fe=document.getElementById('oFinishErr');
+        if(!r.ok){ fe.textContent=r.status===401?'Сессия закончилась, войди заново.':'Не получилось сохранить ответы. Попробуй ещё раз.'; fe.style.display=''; return; }
+        fe.style.display='none';
+        loadMe().then(function(){
+          onb.style.transition='opacity .5s ease'; onb.style.opacity='0';
+          setTimeout(function(){ onb.style.display='none'; onb.style.opacity=''; onb.style.transition=''; },520);
+          window.__enterApp(); haptic(16);
+        });
+      });
     });
+    window.__onbProfile=profile;
     setupVeil(steps[0]);
-    window.__onbReset=function(){ show(0); };
-    window.__onbOpen=function(){ onb.style.display='block'; show(0); if(window.__ann) window.__ann('onb'); };
+    window.__onbOpen=function(stepName){
+      onb.style.display='block';
+      if(ME&&ME.profile&&ME.profile.gender){ profile.gender=ME.profile.gender; profile.name=ME.user.name||''; }
+      var i=stepName?stepIdx(stepName):0; show(i<0?0:i);
+      if(stepName==='name'&&ME&&ME.user.name) document.getElementById('oName').value=ME.user.name;
+      applyGenderCopy();
+    };
   })();
 
   /* ============================================================
      СОСТОЯНИЕ АККАУНТА
      ============================================================ */
-  function setState(s){
-    app.dataset.state=s;
+  function localYmd(d){ return (d||new Date()).toLocaleDateString('en-CA'); }
+  function daysAgo(ymd){
+    var a=new Date(localYmd()+'T00:00:00'), b=new Date(String(ymd).slice(0,10)+'T00:00:00');
+    return Math.round((a-b)/86400000);
+  }
+  function relDay(ymd){
+    var n=daysAgo(ymd);
+    if(n<=0) return 'сегодня'; if(n===1) return 'вчера'; if(n===2) return 'позавчера';
+    if(n<7) return n+' '+plural(n,'день','дня','дней')+' назад';
+    return new Date(String(ymd).slice(0,10)+'T00:00:00').toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+  }
+  function plural(k,a,b,c){ var m=k%100; if(m>=11&&m<=14) return c; m=k%10; return m===1?a:(m>=2&&m<=4?b:c); }
+  function fmtKm(km){ return String(Math.round(Number(km)*10)/10).replace('.',','); }
+  function snippet(t,n){ t=String(t||'').replace(/\s+/g,' ').trim(); return t.length>n?t.slice(0,n-1)+'…':t; }
+
+  function setState(st){
+    app.dataset.state=st;
     var t=document.getElementById('heroTitle'), sub=document.getElementById('heroSub'),
         mark=document.getElementById('markBtn'), ghost=document.getElementById('ghostBtn'),
         row=document.getElementById('selfrow');
-    if(s==='fresh'){
+    var stats=(ME&&ME.stats)||{};
+    if(row) row.style.display='none';
+    if(st==='fresh'){
       t.innerHTML='Первый день<br><span class="ser">без плана</span>';
-      sub.textContent='Я пока ничего о тебе не знаю. Начни с Заземления. Четыре минуты, и ты уже в теле.';
-      mark.textContent='Заземление · 4 мин';
+      sub.textContent='Я пока ничего о тебе не знаю. Начни с Заземления: пять минут, и внимание возвращается в тело.';
+      mark.textContent='Заземление · 5 минут';
       if(ghost) ghost.style.display='none';
-      if(row) row.style.display='none';
-    }else{
-      t.innerHTML='Двадцать минут<br><span class="ser">без темпа</span>';
-      sub.textContent='Вчера ты разогналась на третьем километре и написала, что ноги тяжёлые. Сегодня это ещё держится.';
-      mark.textContent='Отметить пробежку';
-      if(ghost){ ghost.textContent='Не сегодня, перенести'; ghost.style.display=''; }
-      if(row) row.style.display='';
+      return;
     }
-    if(window.__ann&&current()) window.__ann(current().dataset.view);
+    var lr=stats.lastRun, le=stats.lastEntry;
+    if(lr&&daysAgo(lr.date)<=0){
+      t.innerHTML='Пробежка<br><span class="ser">отмечена</span>';
+      sub.textContent='Сегодня '+fmtKm(lr.distance_km)+' км за '+lr.duration_min+' мин.'+(le&&daysAgo(le.date)<=0?'':' Вечером можно дописать, как прошло.');
+    } else {
+      t.innerHTML='Сегодня<br><span class="ser">в своём ритме</span>';
+      if(le) sub.textContent='Последняя запись '+relDay(le.date)+': «'+snippet(le.text,90)+'»';
+      else if(lr) sub.textContent='Последняя пробежка '+relDay(lr.date)+': '+fmtKm(lr.distance_km)+' км за '+lr.duration_min+' мин.';
+      else sub.textContent='Практика уже есть в дневнике. Следующий шаг: одна строка о том, как ты сегодня.';
+    }
+    mark.textContent='Отметить пробежку';
+    if(ghost){ ghost.textContent='Записать в дневник'; ghost.style.display=''; }
   }
   document.getElementById('markBtn').addEventListener('click',function(){
     if(app.dataset.state==='fresh') push('practice'); else push('postrun');
     haptic(11);
   });
+  document.getElementById('ghostBtn').addEventListener('click',function(){ go('diary'); haptic(8); });
 
   /* ============================================================
-     МОЙ РИТМ: форма ввода и переключатель в профиле
+     ПРИМЕНЕНИЕ СОСТОЯНИЯ ПОЛЬЗОВАТЕЛЯ
      ============================================================ */
-  (function(){
-    var setup=document.getElementById('rhythmSetup'),
-        filled=document.getElementById('rhythmFilled'),
-        saveBtn=document.getElementById('rhythmSave'),
-        editBtn=document.getElementById('rhythmEditDate'),
-        dateInp=document.getElementById('cycleDateInp'),
-        lenInp=document.getElementById('cycleLenInp'),
-        rapprox=document.getElementById('rapprox');
-    if(!setup||!filled) return;
+  var CORRIDOR_MAP={rare:'Почти без нагрузки',low:'1–2 в неделю',mid:'3–4 в неделю',high:'5 и больше'};
+  var DEFAULT_TAGS=['sleep','heavy_legs','anxious','work','run_am'];
+  function myTags(){ return (ME&&ME.profile.behaviors&&ME.profile.behaviors.length)?ME.profile.behaviors:DEFAULT_TAGS; }
+  function applyMe(){
+    if(!ME) return;
+    var pr=ME.profile;
+    applyGenderCopy();
+    var cl=document.getElementById('corridorLabel');
+    if(cl) cl.textContent=pr.baseline?(CORRIDOR_MAP[pr.baseline]||''):'Не указан';
+    var ui=pr.uiPrefs||{};
+    if(window.__applyUi) window.__applyUi(ui, pr.daypart);
+    var rt=document.getElementById('rhythmTab');
+    if(rt) rt.style.display=ME.rhythm.enabled?'':'none';
+    var cText=ME.stats.practicesCompleted>0?'Первое занятие пройдено':'Восемь занятий, начать с первого';
+    ['courseCardSub','courseLibSub'].forEach(function(id){ var e=document.getElementById(id); if(e) e.textContent=cText; });
+    var profN=document.getElementById('profileName');
+    if(profN) profN.textContent=capName(ME.user.name)||(ME.user.email||'');
+    setPlan(ME.plan.isPro?'pro':'free');
+    setState(ME.state);
+    if(window.__onMe) window.__onMe.forEach(function(f){ try{ f(ME); }catch(e){ console.error(e); } });
+  }
+  window.__onMe=[];
+  window.__enterApp=function(){
+    var onbEl=document.getElementById('onb'); if(onbEl&&onbEl.style.opacity!=='0') onbEl.style.display='none';
+    applyMe(); go('home');
+  };
+  window.__refreshMe=function(){ return loadMe().then(function(r){ if(r.ok) applyMe(); return r; }); };
 
-    /* --- аппроксимация даты --- */
-    var approxDays=null;
-    if(rapprox){
-      rapprox.querySelectorAll('button').forEach(function(b){
-        b.addEventListener('click',function(){
-          rapprox.querySelectorAll('button').forEach(function(x){ x.classList.remove('on'); });
-          b.classList.add('on');
-          approxDays=+b.dataset.approx;
-          if(dateInp) dateInp.value='';
-          haptic(7);
-        });
-      });
-    }
-
-    function calcPhase(startMs, cycleLen){
-      var day=Math.floor((Date.now()-startMs)/86400000)+1;
-      day=((day-1)%cycleLen)+1;
-      var phases=[
-        {name:'Менструальная фаза',days:5,desc:'Обычно в эти дни нагрузку снижают. У многих это время для лёгких практик, а не силовых.'},
-        {name:'Фолликулярная фаза',days:9,desc:'Обычно в эти дни энергия растёт. Хорошее время для нагрузок, если так ощущается.'},
-        {name:'Овуляторная фаза',days:3,desc:'Обычно в эти дни самочувствие на подъёме. У многих это пиковое время для активности.'},
-        {name:'Лютеиновая фаза',days:999,desc:'Обычно в эти дни тяжелее держать темп. Это фаза, не откат.'}
-      ];
-      var acc=0, phase=phases[phases.length-1];
-      for(var p=0;p<phases.length-1;p++){
-        acc+=phases[p].days;
-        if(day<=acc){ phase=phases[p]; break; }
-      }
-      return {phase:phase,day:day,cycleLen:cycleLen};
-    }
-
-    function showFilled(startMs, cycleLen){
-      var info=calcPhase(startMs, cycleLen);
-      var labelEl=document.getElementById('rhythmPhaseLabel');
-      var titleEl=document.getElementById('rhythmPhaseTitle');
-      var descEl=document.getElementById('rhythmPhaseDesc');
-      if(labelEl) labelEl.textContent='Мой ритм · день '+info.day+' из '+info.cycleLen;
-      if(titleEl) titleEl.textContent=info.phase.name;
-      if(descEl) descEl.textContent=info.phase.desc;
-      setup.style.display='none'; filled.style.display='';
-    }
-
-    if(saveBtn) saveBtn.addEventListener('click',function(){
-      var startMs;
-      if(dateInp&&dateInp.value){
-        startMs=new Date(dateInp.value).getTime();
-      } else if(approxDays!==null){
-        startMs=Date.now()-approxDays*86400000;
-      } else {
-        if(dateInp) dateInp.focus(); return;
-      }
-      var cycleLen=lenInp?Math.max(21,Math.min(42,+lenInp.value||28)):28;
-      showFilled(startMs, cycleLen);
-      haptic(12);
-    });
-
-    if(editBtn) editBtn.addEventListener('click',function(){
-      filled.style.display='none'; setup.style.display='';
-      if(dateInp) dateInp.value='';
-      if(rapprox) rapprox.querySelectorAll('button').forEach(function(b){ b.classList.remove('on'); });
-      approxDays=null; haptic(7);
-    });
-
-    /* --- переключатель в профиле --- */
-    var swCycle=document.getElementById('swCycle');
-    if(swCycle){
-      swCycle.addEventListener('click',function(){
-        var on=!swCycle.classList.contains('on');
-        swCycle.classList.toggle('on',on);
-        var rt=document.getElementById('rhythmTab');
-        if(rt) rt.style.display=on?'':'none';
-        haptic(7);
-      });
-    }
-  })();
+  /* push: разрешение, подписка в браузере, сохранение на сервере */
+  function urlB64(b){ var p='='.repeat((4-b.length%4)%4), s=(b+p).replace(/-/g,'+').replace(/_/g,'/'), raw=atob(s), out=new Uint8Array(raw.length);
+    for(var i=0;i<raw.length;i++) out[i]=raw.charCodeAt(i); return out; }
+  window.__enablePush=function(){
+    if(!('Notification' in window)) return Promise.resolve('default');
+    var ask=Notification.permission==='default'?Notification.requestPermission():Promise.resolve(Notification.permission);
+    return Promise.resolve(ask).then(function(perm){
+      if(perm!=='granted'||!('serviceWorker' in navigator)||!ME||!ME.push||!ME.push.vapidPublicKey) return perm;
+      return navigator.serviceWorker.register('/sw.js').then(function(){ return navigator.serviceWorker.ready; })
+        .then(function(reg){ return reg.pushManager.getSubscription().then(function(sub){
+          return sub||reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlB64(ME.push.vapidPublicKey)}); }); })
+        .then(function(sub){ return api('/api/push/subscribe',{method:'POST',body:sub.toJSON()}); })
+        .then(function(){ return perm; }, function(){ return perm; });
+    }, function(){ return 'default'; });
+  };
 
   /* ============================================================
      ПОСЛЕ ПРОБЕЖКИ: оценки и запись
@@ -2663,26 +2778,34 @@ button.cli:active{opacity:.65}
   })();
 
   /* ============================================================
-     СЦЕНАРИИ СТЕНДА
+     ЗАПУСК
+     Без сессии: приветствие и вход. С сессией: недостающие шаги онбординга
+     или сразу приложение. Ссылка из письма сброса ведёт на /reset-password.
      ============================================================ */
-  window.__scenario=function(k){
-    app.dataset.scen=k;
-    closeSheet();
-    if(window.__resetPostrun) window.__resetPostrun();
-    if(k==='onb'){ if(window.__onbOpen) window.__onbOpen(); return; }
-    if(k==='login'){ if(window.__loginOpen) window.__loginOpen(); return; }
-    if(onb) onb.style.display='none';
-    if(k==='fresh'){ setState('fresh'); setPlan('free'); go('home'); }
-    if(k==='day'){ setState('regular'); go('home'); }
-    if(k==='run'){ setState('regular'); go('home'); push('postrun'); }
-    haptic(10);
-  };
-
-  (function(){
-    var s=new URLSearchParams(location.search).get('s');
-    if(s&&['onb','fresh','day','run','login'].indexOf(s)>=0){
-      setTimeout(function(){ window.__scenario(s); }, 60);
-    }
+  function route(r){
+    var isReset=location.pathname==='/reset-password'||/[?&]reset=1/.test(location.search);
+    if(r.status===401){
+      window.__onbOpen();
+      if(/[?&]login=1/.test(location.search)&&window.__loginOpen) window.__loginOpen();
+      if(isReset) document.getElementById('loginInfo').textContent='Ссылка устарела. Запроси новую.';
+    } else if(!r.ok){
+      var sEl=splash.querySelector('.s');
+      if(sEl) sEl.textContent=r.status===0?'Нет связи. Нажми, чтобы повторить':'Сервер не ответил. Нажми, чтобы повторить';
+      splash.classList.remove('gone');
+      splash.addEventListener('click',function(){ location.reload(); },{once:true});
+      return false;
+    } else if(isReset){ window.__resetOpen(); }
+    else if(ME.onboarding.needsName){ window.__onbOpen('name'); }
+    else if(!ME.onboarding.complete){ window.__onbOpen('intent'); }
+    else { window.__enterApp(); }
+    return true;
+  }
+  window.__afterAuth=function(){ loadMe().then(route); };
+  (function boot(){
+    var t0=Date.now();
+    loadMe().then(function(r){
+      setTimeout(function(){ if(route(r)!==false) hideSplash(); },Math.max(0,600-(Date.now()-t0)));
+    });
   })();
 
 })();
