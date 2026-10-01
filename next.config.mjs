@@ -93,6 +93,8 @@ const nextConfig = {
       { source: "/legal/privacy", destination: "/legal/privacy.html" },
       { source: "/legal/consent", destination: "/legal/consent.html" },
       { source: "/legal/oferta", destination: "/legal/oferta.html" },
+      // /start: вход, регистрация и онбординг новой версии
+      { source: "/start", destination: "/authv1/index.html" },
       // /authv1 → /authv1/index.html (прототип НИКА Лайт)
       {
         source: "/authv1",

@@ -84,6 +84,15 @@ export interface Database {
           last_push_sent_at: string | null;
           created_at: string;
           updated_at: string;
+          intent: string | null;
+          intent_custom: string | null;
+          barrier: string | null;
+          barrier_custom: string | null;
+          baseline: string | null;
+          daypart: string | null;
+          behaviors: string[];
+          ui_prefs: Json;
+          onboarded_at: string | null;
         };
         Insert: {
           id?: string;
@@ -103,6 +112,15 @@ export interface Database {
           last_push_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          intent?: string | null;
+          intent_custom?: string | null;
+          barrier?: string | null;
+          barrier_custom?: string | null;
+          baseline?: string | null;
+          daypart?: string | null;
+          behaviors?: string[];
+          ui_prefs?: Json;
+          onboarded_at?: string | null;
         };
         Update: {
           id?: string;
@@ -122,6 +140,15 @@ export interface Database {
           last_push_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
+          intent?: string | null;
+          intent_custom?: string | null;
+          barrier?: string | null;
+          barrier_custom?: string | null;
+          baseline?: string | null;
+          daypart?: string | null;
+          behaviors?: string[];
+          ui_prefs?: Json;
+          onboarded_at?: string | null;
         };
         Relationships: [];
       };
@@ -163,6 +190,8 @@ export interface Database {
           note: string | null;
           created_at: string;
           updated_at: string;
+          ratings: Json | null;
+          tags: string[];
         };
         Insert: {
           id?: string;
@@ -174,6 +203,8 @@ export interface Database {
           note?: string | null;
           created_at?: string;
           updated_at?: string;
+          ratings?: Json | null;
+          tags?: string[];
         };
         Update: {
           id?: string;
@@ -185,6 +216,8 @@ export interface Database {
           note?: string | null;
           created_at?: string;
           updated_at?: string;
+          ratings?: Json | null;
+          tags?: string[];
         };
         Relationships: [];
       };
@@ -774,6 +807,60 @@ export interface Database {
           ua_browser?: string | null;
           ua_device?: "mobile" | "tablet" | "desktop" | "bot" | "unknown" | null;
           is_bot?: boolean;
+        };
+        Relationships: [];
+      };
+      diary_entries: {
+        Row: {
+          id: string;
+          user_id: string;
+          date: string;
+          text: string;
+          tags: string[];
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          date: string;
+          text: string;
+          tags?: string[];
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          date?: string;
+          text?: string;
+          tags?: string[];
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      practice_sessions: {
+        Row: {
+          id: string;
+          user_id: string;
+          practice_id: string;
+          started_at: string;
+          completed_at: string | null;
+          listened_seconds: number;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          practice_id: string;
+          started_at?: string;
+          completed_at?: string | null;
+          listened_seconds?: number;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          practice_id?: string;
+          started_at?: string;
+          completed_at?: string | null;
+          listened_seconds?: number;
         };
         Relationships: [];
       };

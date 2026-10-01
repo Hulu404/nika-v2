@@ -14,6 +14,7 @@ function run(date: string, intensity: RunIntensity): RunRow {
   return {
     id: date, user_id: "u", date, distance_km: 5, duration_min: 30,
     intensity, note: null, created_at: `${date}T00:00:00Z`, updated_at: `${date}T00:00:00Z`,
+    ratings: null, tags: [],
   };
 }
 

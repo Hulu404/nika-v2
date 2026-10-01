@@ -13,6 +13,8 @@ function run(date: string, intensity: RunRow["intensity"] = "easy"): RunRow {
     note: null,
     created_at: `${date}T00:00:00Z`,
     updated_at: `${date}T00:00:00Z`,
+    ratings: null,
+    tags: [],
   };
 }
 
