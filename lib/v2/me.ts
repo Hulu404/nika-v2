@@ -5,6 +5,7 @@ import { getConsentStates } from "@/lib/consents";
 import { CONSENT_TYPES } from "@/lib/legal";
 import { resolveIsPro } from "@/lib/subscription";
 import { rhythmEnabled } from "@/lib/v2/validate";
+import { weekSummary } from "@/lib/runs";
 
 /**
  * Пользователи, заведённые до запуска новой версии, проходили старый онбординг
@@ -21,7 +22,8 @@ async function count(supabase: ServerClient, table: "diary_entries" | "runs" | "
 }
 
 export async function buildMe(supabase: ServerClient, user: User) {
-  const [userRow, profileRow, consents, entries, runs, practices, lastRunRow, lastEntryRow, tgRow, subRow] =
+  const weekFrom = new Date(Date.now() - 8 * 86_400_000).toISOString().slice(0, 10);
+  const [userRow, profileRow, consents, entries, runs, practices, lastRunRow, lastEntryRow, tgRow, subRow, weekRuns] =
     await Promise.all([
       supabase.from("users").select("display_name, is_pro, created_at").eq("id", user.id).maybeSingle(),
       supabase.from("profiles").select("*").eq("user_id", user.id).maybeSingle(),
@@ -51,6 +53,7 @@ export async function buildMe(supabase: ServerClient, user: User) {
         .order("updated_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
+      supabase.from("runs").select("*").eq("user_id", user.id).gte("date", weekFrom),
     ]);
 
   const u = userRow.data;
@@ -98,6 +101,7 @@ export async function buildMe(supabase: ServerClient, user: User) {
       records: entries + runs + practices,
       lastRun: lastRunRow.data ?? null,
       lastEntry: lastEntryRow.data ?? null,
+      week: weekSummary(weekRuns.data ?? []),
     },
     telegram: { linked: !!tgRow.data },
     push: { vapidPublicKey: process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null },

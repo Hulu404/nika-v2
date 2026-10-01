@@ -7,7 +7,8 @@ export const runtime = "nodejs";
  * Прослушивание практики.
  * { action: "start", practiceId }            → { id }
  * { action: "progress", id, seconds, done? } → прослушано секунд; done отмечает завершение.
- * Завершённой считается практика, прослушанная до конца (или на 90%+).
+ * Завершённой считается практика, прослушанная на 90%+, или дослушанная до конца
+ * при прослушанной половине. seconds это проигранное подряд, без перемоток.
  */
 export async function POST(req: Request) {
   const authed = await getAuthed();
@@ -41,7 +42,8 @@ export async function POST(req: Request) {
 
     const total = isPracticeId(row.practice_id) ? PRACTICES[row.practice_id].seconds : 0;
     const listened = Math.max(row.listened_seconds, seconds);
-    const done = body.done === true || (total > 0 && listened >= total * 0.9);
+    // Конец трека засчитывается, если прослушана хотя бы половина: перемотка в конец не считается.
+    const done = (body.done === true && listened >= total * 0.5) || (total > 0 && listened >= total * 0.9);
     const patch: { listened_seconds: number; completed_at?: string } = { listened_seconds: listened };
     if (done && !row.completed_at) patch.completed_at = new Date().toISOString();
 

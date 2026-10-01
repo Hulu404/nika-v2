@@ -445,7 +445,22 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 .compose textarea::placeholder{color:var(--ink-3)}
 .compose .cfoot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:11px}
 .compose .cfoot .cap{margin:0}
-.entry{padding:15px 0;border-bottom:1px solid var(--ink-4)}
+.entry{padding:15px 0;border-bottom:1px solid var(--ink-4);position:relative}
+.entry .meta{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:7px}
+.entry .meta .lab{margin:0}
+.entry .del{font-size:.72rem;color:var(--ink-3);padding:10px 0 10px 12px;min-height:44px}
+.entry .etags{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;padding-left:14px}
+.entry .etags span{font-size:.7rem;color:var(--ink-3);border:1px solid var(--ink-4);border-radius:var(--r-pill);padding:2px 9px}
+.entry .runline{font-size:.95rem;color:var(--ink);margin:0}
+.statin{display:flex;align-items:baseline;gap:6px;margin-top:6px}
+.statin input{width:100%;min-width:0;background:none;border:0;outline:0;color:var(--ink);font:inherit;font-size:1.5rem;font-weight:500;padding:0}
+.statin input::placeholder{color:var(--ink-4)}
+.statin em{font-style:normal;color:var(--ink-3);font-size:.85rem}
+.daychips{display:flex;gap:8px;margin-top:14px}
+.tagadd{display:flex;gap:8px;margin-top:10px}
+.tagadd input{flex:1;min-width:0;background:var(--veil);border:0;border-radius:var(--r-pill);padding:9px 15px;color:var(--ink);font:inherit;font-size:var(--t-cap);outline:0}
+.insight{display:flex;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--ink-4);font-size:.92rem}
+.insight b{font-weight:500}.insight span{color:var(--ink-3)}
 .entry .lab{margin-bottom:7px}
 .entry p{margin:0;padding-left:14px;border-left:1px solid var(--ink-4);font-style:italic;
   font-size:.9rem;line-height:1.55;color:var(--ink-2)}
@@ -707,9 +722,9 @@ button.cli:active{opacity:.65}
             </div>
           </div>
 
-          <div class="lab" style="margin-bottom:12px">Сегодня, среда</div>
-          <h1 class="disp xl" id="heroTitle">Двадцать минут<br><span class="ser">без темпа</span></h1>
-          <p class="cap" style="margin:14px 0 22px;max-width:300px" id="heroSub">Вчера ты разогналась на третьем километре и написала, что ноги тяжёлые. Сегодня это ещё держится.</p>
+          <div class="lab" style="margin-bottom:12px" id="heroDay">Сегодня</div>
+          <h1 class="disp xl" id="heroTitle"></h1>
+          <p class="cap" style="margin:14px 0 22px;max-width:300px" id="heroSub"></p>
 
           <button class="pill solid wide" id="markBtn">Отметить пробежку</button>
           <button class="textbtn" id="ghostBtn">Не сегодня, перенести</button>
@@ -720,7 +735,7 @@ button.cli:active{opacity:.65}
       <div class="section freshonly">
         <h2 class="disp md">У нас пока <span class="ser">нет истории</span>. Она появится за неделю</h2>
         <div class="list" style="margin-top:20px">
-          <button class="li" data-push="practice"><div class="tx"><b>Заземление</b><span>4 минуты · с неё начинают все</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="li" data-push="practice"><div class="tx"><b>Заземление</b><span>5 минут · с неё начинают все</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <button class="li" data-open="nika"><div class="tx"><b>Просто поговорить</b><span>Ника спросит, как ты сегодня</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <button class="li" data-go="diary"><div class="tx"><b>Записать первое</b><span>Одна строка про сегодня</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
         </div>
@@ -729,25 +744,15 @@ button.cli:active{opacity:.65}
       <div class="section">
         <div class="head">
           <div class="lab">Практики</div>
-          <button class="textbtn" data-push="library">Все шестнадцать
+          <button class="textbtn" data-push="library">Библиотека
             <svg width="11" height="11" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         </div>
         <div class="rail">
           <button class="pract" data-push="practice">
             <div class="art"><svg><use href="#sc-dawn"/></svg></div><div class="shade"></div>
-            <span class="tag">4 мин</span>
+            <span class="tag">5 минут</span>
             <div class="tx"><b>Заземление</b><span>Голос, дыхание, тело</span></div>
-          </button>
-          <button class="pract" data-push="practice">
-            <div class="art"><svg><use href="#sc-mist"/></svg></div><div class="shade"></div>
-            <span class="tag">3 минуты</span>
-            <div class="tx"><b>В стартовом коридоре</b><span>За десять минут до выстрела</span></div>
-          </button>
-          <button class="pract" data-push="practice">
-            <div class="art"><svg><use href="#sc-night"/></svg></div><div class="shade"></div>
-            <span class="tag">9 минут</span>
-            <div class="tx"><b>После сорванной</b><span>Пока не начала себя грызть</span></div>
           </button>
           <button class="pract" data-push="course">
             <div class="art"><svg><use href="#sc-dusk"/></svg></div><div class="shade"></div>
@@ -763,8 +768,7 @@ button.cli:active{opacity:.65}
         <div class="fadeout"></div>
         <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:0 20px 26px">
           <h2 class="disp" style="max-width:280px">Тело уже всё сказало.<br>Осталось <span class="ser">услышать</span>.</h2>
-          <p class="cap" style="margin:14px 0 20px;max-width:290px">Ника не считает пульс и не смотрит на часы. Она спрашивает, а выводы делаешь ты.</p>
-          <div><button class="pill">Как это устроено</button></div>
+          <p class="cap" style="margin:14px 0 4px;max-width:290px">Ника не считает пульс и не смотрит на часы. Она спрашивает, а выводы делаешь ты.</p>
         </div>
       </div>
 
@@ -772,22 +776,14 @@ button.cli:active{opacity:.65}
       <div class="section regonly">
         <div class="head">
           <div class="lab">Неделя</div>
-          <span class="cap" id="weekLine">Назначено 4, сделано 2</span>
+          <span class="cap" id="weekLine"></span>
         </div>
-        <h2 class="disp md">Ты держишь своё <span class="ser">намерение</span> вторую неделю подряд</h2>
-        <div class="days" id="days">
-          <div class="day done"><div class="dot"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><i>пн</i></div>
-          <div class="day done"><div class="dot"><svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><i>вт</i></div>
-          <div class="day plan" id="dayToday"><div class="dot"></div><i>ср</i></div>
-          <div class="day moved"><div class="dot"><svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M3 8h9M9 5l3 3-3 3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div><i>чт</i></div>
-          <div class="day"><div class="dot"></div><i>пт</i></div>
-          <div class="day plan"><div class="dot"></div><i>сб</i></div>
-          <div class="day"><div class="dot"></div><i>вс</i></div>
-        </div>
-        <div class="cap dim" style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Твой обычный коридор</span><span id="corridorLabel">3–5 в неделю</span></div>
-        <div class="corridor">
-          <div class="rail2"></div><div class="zone" style="left:28%;width:30%"></div>
-          <div class="pin" id="corrPin" style="left:34%"></div>
+        <h2 class="disp md" id="weekTitle"></h2>
+        <div class="days" id="days"></div>
+        <div class="cap dim" style="display:flex;justify-content:space-between;margin-bottom:8px"><span>Твой обычный коридор</span><span id="corridorLabel"></span></div>
+        <div class="corridor" id="corridor">
+          <div class="rail2"></div><div class="zone" id="corrZone"></div>
+          <div class="pin" id="corrPin"></div>
         </div>
       </div>
 
@@ -795,35 +791,31 @@ button.cli:active{opacity:.65}
       <button class="section regonly" style="width:100%;text-align:left;display:block" data-go="diary">
         <div class="head">
           <div class="lab">Дневник</div>
-          <span class="cap" id="jrnCount">12 из 20</span>
+          <span class="cap" id="jrnCount"></span>
         </div>
-        <h2 class="disp md">Ещё восемь записей, и я начну показывать, что на тебя влияет</h2>
+        <h2 class="disp md" id="jrnHead"></h2>
         <div class="meter"><span id="jrnBar"></span></div>
-        <div class="cap dim" id="jrnTodo">Сегодня ещё не записано</div>
+        <div class="cap dim" id="jrnTodo"></div>
       </button>
 
       <!-- Ритм -->
-      <div class="section regonly">
+      <div class="section regonly" id="homeRhythm" style="display:none">
         <div class="head"><div class="lab">Мой ритм</div></div>
         <div class="list">
           <button class="li" data-go="rhythm">
-            <div class="tx"><b>До месячных 11 дней</b><span>Неделя уже пересобрана под фазу</span></div>
-            <svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
-          </button>
-          <button class="li" data-open="nika">
-            <div class="tx"><b>Не хочу выходить</b><span>Разобрать, что за этим стоит</span></div>
+            <div class="tx"><b id="homeRhythmTitle">Мой ритм</b><span id="homeRhythmSub"></span></div>
             <svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </button>
         </div>
       </div>
 
-      <!-- Клуб -->
-      <div class="club">
+      <!-- Клуб: ближайший кофе-ран из расписания -->
+      <div class="club" id="club" style="display:none">
         <div class="kicker">You'll never move alone</div>
-        <h3>Кофе-ран в субботу</h3>
-        <p class="cap" style="margin:0;max-width:290px">Пять километров в любом темпе, потом кофе. Практика перед стартом на всех, вслух, в наушниках.</p>
-        <div class="cwhen"><span>Сб, 6 сентября · 9:00</span><i></i><span>Surf Coffee, Усачёва 67</span></div>
-        <button class="pill" id="rsvpBtn">Приду</button>
+        <h3 id="clubTitle">Кофе-ран</h3>
+        <p class="cap" style="margin:0;max-width:290px" id="clubText"></p>
+        <div class="cwhen"><span id="clubWhen"></span><i></i><span id="clubWhere"></span></div>
+        <a class="pill" id="clubBtn" href="#" target="_blank" rel="noopener" style="text-decoration:none">Записаться</a>
       </div>
       <!-- Pro -->
       <div class="scene freeonly" style="border-radius:22px;margin-bottom:12px">
@@ -831,8 +823,8 @@ button.cli:active{opacity:.65}
         <div class="fadeout"></div>
         <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:0 20px 26px">
           <div class="lab" style="margin-bottom:10px">НИКА Про</div>
-          <h2 class="disp">Дневник, который начинает <span class="ser">отвечать</span></h2>
-          <p class="cap" style="margin:14px 0 20px;max-width:290px">Месячный разбор, вся библиотека, память между разговорами. То, что у тебя сейчас, останется бесплатным навсегда.</p>
+          <h2 class="disp">Ника, которая <span class="ser">помнит</span></h2>
+          <p class="cap" style="margin:14px 0 20px;max-width:290px">Больше разговоров в день, память о прошлых разговорах и советы, собранные под тебя. Практики, дневник и ритм остаются бесплатными.</p>
           <button class="pill solid" style="align-self:flex-start" data-goPro>Что входит в Про</button>
         </div>
       </div>
@@ -846,9 +838,9 @@ button.cli:active{opacity:.65}
         <div class="fade"></div>
       </div>
       <div class="pbody">
-        <div class="lab" style="margin-bottom:10px">Практика · 4 минуты</div>
+        <div class="lab" style="margin-bottom:10px">Практика · 5 минут</div>
         <h1 class="disp xl">Заземление <span class="ser">перед бегом</span></h1>
-        <p style="margin-top:18px">Голос Ники ведёт внимание от головы к телу. Четыре с половиной минуты. И ты уже не думаешь, выйдешь ли. Ты просто идёшь.</p>
+        <p style="margin-top:18px">Голос Ники ведёт внимание от головы к телу. Пять минут, и ты уже не думаешь, выйдешь ли. Ты просто идёшь.</p>
 
         <div class="breath" id="prBreath" style="margin-top:28px">
           <svg viewBox="0 0 340 200" preserveAspectRatio="none" id="prBreathSvg" style="touch-action:none;cursor:pointer">
@@ -876,14 +868,6 @@ button.cli:active{opacity:.65}
 
     <!-- ==================== ДНЕВНИК ==================== -->
     <section class="view" data-view="diary">
-      <div class="datepager" id="datepager">
-        <button class="dp">пн, 24</button>
-        <button class="dp">вт, 25</button>
-        <button class="dp on">ср, 26</button>
-        <button class="dp">чт, 27</button>
-        <button class="dp">пт, 28</button>
-      </div>
-
       <div class="scene" style="border-radius:22px;margin-bottom:28px">
         <div class="art"><svg><use href="#sc-mist"/></svg></div>
         <div class="fadeout"></div>
@@ -896,31 +880,40 @@ button.cli:active{opacity:.65}
 
       <div class="block">
         <div class="toggle">
-          <div><b>Пробежка</b><div class="cap dim" style="margin-top:2px">Данные придут сами после пробежки с телефоном</div></div>
-          <div class="sw" data-sw></div>
+          <div><b>Пробежка</b><div class="cap dim" style="margin-top:2px">Дистанция, время и как это было</div></div>
+          <button class="pill" data-push="postrun">Отметить</button>
         </div>
       </div>
 
       <div class="block">
-        <div class="toggle">
-          <div><b>Метки и ощущения</b><div class="cap dim" style="margin-top:2px">Ника ставит их из разговора, можно поправить</div></div>
-          <div class="sw on" data-sw></div>
-        </div>
-        <div class="tags" id="tagbox">
-          <button class="tag add">+ Добавить</button>
-        </div>
-      </div>
-
-      <div class="block">
-        <div class="lab" style="margin-bottom:13px">Свободная запись</div>
-        <div id="entries"></div>
-        <div class="compose">
+        <div class="lab" style="margin-bottom:5px">Свободная запись</div>
+        <p class="cap dim" style="margin:0 0 4px">Отметь метки, если они про сегодня. Набор меток меняется в профиле.</p>
+        <div class="tags" id="tagbox"></div>
+        <div class="tagadd" id="tagAddRow" style="display:none"><input id="tagAddInput" maxlength="60" placeholder="Своя метка, только для этой записи"><button class="pill" id="tagAddOk">Добавить</button></div>
+        <div class="compose" style="margin-top:16px">
           <textarea id="entryText" rows="3" placeholder="Что сегодня было с телом и с головой"></textarea>
           <div class="cfoot">
-            <span class="cap dim" id="entryHint">Ника прочитает и поставит метки сама</span>
+            <span class="cap dim" id="entryHint">Видишь только ты и Ника</span>
             <button class="pill" id="entrySave">Записать</button>
           </div>
         </div>
+      </div>
+
+      <div class="block" id="insightBlock" style="display:none">
+        <div class="lab" style="margin-bottom:6px">Что повторяется</div>
+        <p class="cap dim" style="margin:0 0 6px">Сколько раз метка встречалась в записях и пробежках. Это частота, а не причина.</p>
+        <div id="insights"></div>
+      </div>
+
+      <div class="block">
+        <div class="lab" style="margin-bottom:6px">Лента</div>
+        <div id="entries"><p class="cap dim" id="entriesEmpty">Пока пусто. Первая запись может быть одной строкой: «Сегодня совсем не хотелось» это тоже запись.</p></div>
+      </div>
+
+      <div class="block" id="tipsBlock" style="display:none">
+        <div class="lab" style="margin-bottom:6px">Советы Ники</div>
+        <p class="cap dim" style="margin:0 0 6px">Ника сохраняет их из разговоров, чтобы не потерялись.</p>
+        <div id="tips"></div>
       </div>
 
     </section>
@@ -928,32 +921,13 @@ button.cli:active{opacity:.65}
     <!-- ==================== БИБЛИОТЕКА ==================== -->
     <section class="view" data-view="library">
       <div class="lab" style="margin-bottom:10px">Библиотека</div>
-      <h1 class="disp xl">Шестнадцать практик<br>под <span class="ser">конкретный момент</span></h1>
-      <p class="cap" style="margin:16px 0 34px;max-width:300px">Не курс на месяц. Каждая отвечает на один момент, в который ты обычно остаёшься одна.</p>
+      <h1 class="disp xl">Практики<br>под <span class="ser">конкретный момент</span></h1>
+      <p class="cap" style="margin:16px 0 34px;max-width:300px">Каждая отвечает на один момент, в который обычно остаёшься один на один с собой. Новые появятся здесь, как только будет готов звук.</p>
 
       <div class="section">
         <div class="head"><div class="lab">Заземление</div></div>
         <div class="rail">
-          <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-dawn"/></svg></div><div class="shade"></div><span class="tag">4 мин</span><div class="tx"><b>Заземление перед бегом</b><span>Голос, дыхание, тело</span></div></button>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="head"><div class="lab">Три минуты</div></div>
-        <div class="rail">
-          <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-dawn"/></svg></div><div class="shade"></div><span class="tag">SOS</span><div class="tx"><b>Перед выходом</b><span>Стоишь в коридоре</span></div></button>
-          <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-mist"/></svg></div><div class="shade"></div><span class="tag">SOS</span><div class="tx"><b>В стартовом коридоре</b><span>Десять минут до выстрела</span></div></button>
-          <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-night"/></svg></div><div class="shade"></div><span class="tag">SOS</span><div class="tx"><b>Пульс не падает</b><span>После финиша</span></div></button>
-        </div>
-      </div>
-
-      <div class="section">
-        <div class="head"><div class="lab">Под момент</div></div>
-        <div class="list">
-          <button class="li" data-push="practice"><div class="tx"><b>После сорванной тренировки</b><span>9 минут</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          <button class="li" data-push="practice"><div class="tx"><b>Когда объём упал и колотит</b><span>7 минут, для тейпера</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          <button class="li" data-push="practice"><div class="tx"><b>Ночь перед стартом</b><span>12 минут, можно засыпать</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          <button class="li" data-push="practice"><div class="tx"><b>Бок, колено, сбилось дыхание</b><span>Гид, 4 минуты чтения</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-dawn"/></svg></div><div class="shade"></div><span class="tag">5 минут</span><div class="tx"><b>Заземление перед бегом</b><span>Голос, дыхание, тело</span></div></button>
         </div>
       </div>
 
@@ -961,7 +935,6 @@ button.cli:active{opacity:.65}
         <div class="head"><div class="lab">Курс под этап</div></div>
         <div class="list">
           <button class="li" data-push="course"><div class="tx"><b>Слушать тело</b><span id="courseLibSub">Восемь занятий, начать с первого</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-          <button class="li proonly" data-push="practice"><div class="tx"><b>Набор объёма</b><span>Восемь занятий</span></div><span class="n">0/8</span></button>
         </div>
       </div>
       <button class="textbtn" style="width:100%;justify-content:center;margin-top:8px" data-pop="home">Назад</button>
@@ -1040,7 +1013,7 @@ button.cli:active{opacity:.65}
       <div class="clist" id="courseList">
         <button class="cli current" data-push="practice">
           <div class="cnum">1</div>
-          <div class="ctx"><b>Заземление перед бегом</b><span>4:52 · доступна сейчас</span></div>
+          <div class="ctx"><b>Заземление перед бегом</b><span id="lesson1Sub">4:52 · доступна сейчас</span></div>
           <svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M5 3l5 5-5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </button>
         <div class="cli soon"><div class="cnum">2</div><div class="ctx"><b>Возвращение после пропуска</b><span>Готовится</span></div><span class="ctag">Скоро</span></div>
@@ -1200,37 +1173,40 @@ button.cli:active{opacity:.65}
     <!-- ==================== ПОСЛЕ ПРОБЕЖКИ ==================== -->
     <section class="view" data-view="postrun">
       <div id="prForm">
-        <div class="lab" style="margin-bottom:10px">Только что</div>
-        <h1 class="disp">Пять километров<br><span class="ser">позади</span></h1>
-        <div class="duo" style="margin-top:24px">
-          <div class="stat"><div><div class="lab">Дистанция</div><b>5,02 км</b></div></div>
-          <div class="stat"><div><div class="lab">Время</div><b>27:41</b></div></div>
+        <div class="lab" style="margin-bottom:10px">Пробежка</div>
+        <h1 class="disp">Как <span class="ser">пробежалось</span></h1>
+        <div class="daychips" id="prDay">
+          <button class="tag on" data-day="0">Сегодня</button>
+          <button class="tag" data-day="1">Вчера</button>
+          <button class="tag" data-day="2">Позавчера</button>
         </div>
-        <p class="cap dim" style="margin:12px 0 0">Подтянулось само. Если бежала без телефона, поправь цифры вручную.</p>
+        <div class="duo" style="margin-top:16px">
+          <label class="stat"><div><div class="lab">Дистанция</div><div class="statin"><input id="prKm" inputmode="decimal" placeholder="5,0" maxlength="5"><em>км</em></div></div></label>
+          <label class="stat"><div><div class="lab">Время</div><div class="statin"><input id="prMin" inputmode="numeric" placeholder="30" maxlength="3"><em>мин</em></div></div></label>
+        </div>
+        <p class="oerr" id="prErr" style="display:none"></p>
 
         <div class="block">
           <div class="lab" style="margin-bottom:5px">Как это было</div>
           <p class="cap dim" style="margin:0 0 18px">Одно касание на каждую строку. Пропустить можно любую.</p>
           <div class="scaleset" id="scaleset">
-            <div class="scale" data-scale="Усилие"><div class="sname">Усилие<span></span></div><div class="dots"></div></div>
-            <div class="scale" data-scale="Ноги"><div class="sname">Ноги<span></span></div><div class="dots"></div></div>
-            <div class="scale" data-scale="Дыхание"><div class="sname">Дыхание<span></span></div><div class="dots"></div></div>
-            <div class="scale" data-scale="Настрой"><div class="sname">Настрой<span></span></div><div class="dots"></div></div>
+            <div class="scale" data-scale="effort"><div class="sname">Усилие<span></span></div><div class="dots"></div></div>
+            <div class="scale" data-scale="legs"><div class="sname">Ноги<span></span></div><div class="dots"></div></div>
+            <div class="scale" data-scale="breath"><div class="sname">Дыхание<span></span></div><div class="dots"></div></div>
+            <div class="scale" data-scale="mood"><div class="sname">Настрой<span></span></div><div class="dots"></div></div>
           </div>
         </div>
 
         <div class="block">
           <div class="lab" style="margin-bottom:5px">Метки</div>
-          <p class="cap dim" style="margin:0 0 16px">Ника предложила три по вчерашнему разговору. Добавь своё.</p>
-          <div class="tags" id="prTags">
-            <button class="tag add">+ Добавить</button>
-          </div>
+          <p class="cap dim" style="margin:0 0 4px">Что было про эту пробежку.</p>
+          <div class="tags" id="prTags"></div>
         </div>
 
         <div class="block">
           <div class="lab" style="margin-bottom:13px">Что скажешь</div>
           <div class="compose">
-            <textarea id="prText" rows="3" placeholder="Одной строкой: как голова и как тело"></textarea>
+            <textarea id="prText" rows="3" maxlength="1000" placeholder="Одной строкой: как голова и как тело"></textarea>
             <div class="cfoot">
               <span class="cap dim">Можно оставить пустым</span>
             </div>
@@ -1238,30 +1214,20 @@ button.cli:active{opacity:.65}
         </div>
 
         <button class="pill solid wide" style="margin-top:8px" id="prSave">Записать пробежку</button>
-        <button class="textbtn" style="width:100%;justify-content:center" data-go="home">Потом</button>
+        <button class="textbtn" style="width:100%;justify-content:center" data-pop="home">Потом</button>
       </div>
 
       <div id="prDone" style="display:none">
         <div class="lab" style="margin-bottom:10px">Готово</div>
         <h1 class="disp">Записано в <span class="ser">дневник</span></h1>
-        <p class="cap" style="margin:16px 0 28px;max-width:300px">Пробежка, четыре оценки и метки ушли в дневник. Осталось семь записей до первого разбора.</p>
-        <div class="meter" style="margin-bottom:30px"><span style="width:65%"></span></div>
-
-        <div class="reflect">
-          <div class="glow"></div>
-          <div class="body">
-            <div class="lab" style="margin-bottom:10px">Ника отвечает</div>
-            <h2 class="disp md">Ты бежала на <span class="ser">недосыпе</span> и всё равно держала ровно</h2>
-            <p>Отмечаю, вывод пока не делаю. Если хочешь, разберём, чем это обошлось телу.</p>
-            <button class="pill" style="margin-top:20px" data-open="nika">Разобрать</button>
-          </div>
-        </div>
+        <p class="cap" style="margin:16px 0 28px;max-width:300px" id="prDoneText"></p>
+        <div class="meter" style="margin-bottom:30px"><span id="prDoneBar"></span></div>
 
         <div class="section">
           <div class="head"><div class="lab">Дальше</div></div>
           <div class="list">
-            <button class="li" data-push="practice"><div class="tx"><b>Пульс не падает</b><span>3 минуты, прямо сейчас</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-            <button class="li" data-go="diary"><div class="tx"><b>Открыть дневник</b><span>Поправить метки или дописать</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="li" id="prAskNika"><div class="tx"><b>Разобрать с Никой</b><span>Расскажи, как прошло, она спросит остальное</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+            <button class="li" data-go="diary"><div class="tx"><b>Открыть дневник</b><span>Пробежка уже в ленте</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
             <button class="li" data-go="home"><div class="tx"><b>Вернуться на сегодня</b><span>Неделя уже пересчитана</span></div><svg class="chev" width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           </div>
         </div>
@@ -1675,6 +1641,8 @@ button.cli:active{opacity:.65}
     }).catch(function(){ return {ok:false,status:0,data:null}; });
   }
   var ME=null;
+  /* подписчики на обновление состояния пользователя */
+  window.__onMe=[];
   function loadMe(){ return api('/api/v2/me').then(function(r){
     if(r.ok&&r.data&&r.data.auth===false) r={ok:false,status:401,data:null};
     ME=r.ok?r.data:null; return r; }); }
@@ -1861,7 +1829,6 @@ button.cli:active{opacity:.65}
   }
 
   /* ---------- навигация ---------- */
-  var centerPager=null;
   var TABS={home:1,library:1,rhythm:1,diary:1};
   var TITLE={practice:'Практика',library:'Практики',profile:'Профиль',news:'Новости',postrun:'Пробежка',course:'Курс'};
   function view(v){ return document.querySelector('.view[data-view="'+v+'"]'); }
@@ -1872,7 +1839,7 @@ button.cli:active{opacity:.65}
     backbar.style.display=deep?'flex':'none';
     backTitle.textContent=TITLE[v]||'';
     document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('on',t.dataset.go===v); });
-    if(v==='diary'&&centerPager) centerPager();
+    if(v==='diary'&&window.__loadDiary) window.__loadDiary();
     if(v!=='practice'&&window.__resetPlayer) window.__resetPlayer();
     if(v!=='postrun'&&window.__resetPostrun) window.__resetPostrun();
   }
@@ -2004,35 +1971,6 @@ button.cli:active{opacity:.65}
     s.addEventListener('click',function(){ s.classList.toggle('on'); haptic(6); });
   });
 
-  /* ---------- дневник: страничный выбор дня ---------- */
-  (function(){
-    var dp=document.getElementById('datepager');
-    if(!dp) return;
-    var raf2=null;
-    function mark(){
-      raf2=null;
-      var mid=dp.scrollLeft+dp.clientWidth/2, best=null, bd=1e9;
-      dp.querySelectorAll('.dp').forEach(function(b){
-        var c=b.offsetLeft+b.offsetWidth/2, d=Math.abs(c-mid);
-        if(d<bd){ bd=d; best=b; }
-      });
-      dp.querySelectorAll('.dp').forEach(function(b){ b.classList.toggle('on',b===best); });
-    }
-    function center(b,smooth){
-      dp.scrollTo({left:b.offsetLeft+b.offsetWidth/2-dp.clientWidth/2,behavior:smooth?'smooth':'auto'});
-    }
-    centerPager=function(){
-      var cur=dp.querySelector('.dp.on')||dp.querySelectorAll('.dp')[2];
-      requestAnimationFrame(function(){ center(cur,false); mark(); });
-    };
-    dp.addEventListener('scroll',function(){ if(!raf2) raf2=requestAnimationFrame(mark); },{passive:true});
-    dp.querySelectorAll('.dp').forEach(function(b){
-      b.addEventListener('click',function(){
-        center(b,!reduced()); haptic(6);
-      });
-    });
-  })();
-
   /* ---------- заставка: скрывает загрузка состояния (boot ниже) ---------- */
   function hideSplash(){ splash.classList.add('gone'); }
 
@@ -2151,15 +2089,41 @@ button.cli:active{opacity:.65}
     audio.addEventListener('playing',function(){
       st.textContent='Слушай и дыши';
     });
-    audio.addEventListener('timeupdate',paintP);
+    /* учёт прослушивания: одна сессия на проход, прогресс раз в 15 секунд */
+    var sessionId=null, starting=null, lastSent=0, listened=0, lastT=0;
+    /* засчитываем только проигранное подряд: перемотка не считается прослушиванием */
+    audio.addEventListener('seeked',function(){ lastT=audio.currentTime; });
+    function ensureSession(){
+      if(sessionId||starting) return starting||Promise.resolve(sessionId);
+      starting=api('/api/v2/practice',{method:'POST',body:{action:'start',practiceId:'zazemlenie'}}).then(function(r){
+        starting=null; sessionId=r.ok&&r.data?r.data.id:null; return sessionId; });
+      return starting;
+    }
+    function sendProgress(done){
+      if(!sessionId) return Promise.resolve(null);
+      lastSent=listened;
+      return api('/api/v2/practice',{method:'POST',body:{action:'progress',id:sessionId,seconds:Math.round(listened),done:!!done}});
+    }
+    audio.addEventListener('timeupdate',function(){
+      paintP();
+      var d=audio.currentTime-lastT; if(d>0&&d<2&&!audio.paused) listened+=d; lastT=audio.currentTime;
+      if(sessionId&&listened-lastSent>=15) sendProgress(false);
+    });
+    audio.addEventListener('pause',function(){ if(sessionId&&!audio.ended) sendProgress(false); });
     audio.addEventListener('ended',function(){
       play.textContent='Пройдена'; play.classList.add('solid');
-      st.textContent='Записала в дневник';
-      if(window.__bumpDiary) window.__bumpDiary();
+      st.textContent='Сохраняю в дневник…';
+      ensureSession().then(function(){ return sendProgress(true); }).then(function(r){
+        st.textContent=!r||!r.ok?'Не получилось сохранить, проверь связь'
+          :r.data&&r.data.completed?'Записала в дневник':'В дневник идёт практика, прослушанная хотя бы наполовину';
+        sessionId=null; listened=0; lastSent=0;
+        if(window.__refreshMe) window.__refreshMe();
+      });
       haptic(16);
     });
 
     function startAudio(){
+      ensureSession();
       audio.play().then(function(){
         play.textContent='Пауза'; play.classList.remove('solid');
       }).catch(function(){
@@ -2192,6 +2156,8 @@ button.cli:active{opacity:.65}
 
     paintP();
     window.__resetPlayer=function(){
+      if(sessionId&&!audio.ended&&audio.currentTime>0) sendProgress(false);
+      sessionId=null; listened=0; lastSent=0; lastT=0;
       audio.pause(); audio.currentTime=0; paintP();
       play.textContent='Начать'; play.classList.add('solid');
       play.disabled=false; st.textContent='Дыши вместе с Никой';
@@ -2199,51 +2165,136 @@ button.cli:active{opacity:.65}
   })();
 
   /* ============================================================
-     ДНЕВНИК: запись двигает порог
-     Порог из Whoop: до двадцати записей выводы не показываем.
-     Счётчик тут не украшение, он объясняет, почему пока тихо.
+     ДНЕВНИК
+     Порог из Whoop: до двадцати записей частоту меток не показываем.
+     Счётчик объясняет, почему пока тихо.
      ============================================================ */
+  function renderTags(box,selected,onToggle){
+    if(!box) return;
+    box.innerHTML='';
+    myTags().concat(selected.filter(function(t){ return myTags().indexOf(t)<0; })).forEach(function(v){
+      var b=document.createElement('button');
+      b.className='tag'+(selected.indexOf(v)>=0?' on':''); b.textContent=tagLabel(v);
+      b.addEventListener('click',function(){
+        var i=selected.indexOf(v); if(i>=0) selected.splice(i,1); else selected.push(v);
+        b.classList.toggle('on',i<0); haptic(6); if(onToggle) onToggle();
+      });
+      box.appendChild(b);
+    });
+  }
+  window.__renderTags=renderTags;
   (function(){
     var save=document.getElementById('entrySave'), ta=document.getElementById('entryText'),
-        box=document.getElementById('entries'), bar=document.getElementById('jrnBar'),
-        cnt=document.getElementById('jrnCount'), todo=document.getElementById('jrnTodo'),
-        pip=document.getElementById('bellPip');
+        box=document.getElementById('entries'), tagbox=document.getElementById('tagbox'),
+        hint=document.getElementById('entryHint');
     if(!save) return;
-    var n=0, GOAL=20;
-    var head=document.querySelector('[data-view="diary"] .scene .disp'),
-        headSub=document.querySelector('[data-view="diary"] .scene .cap'),
-        homeHead=document.querySelector('[data-push="diary"] .disp');
-    function sync(){
-      var pc=Math.min(n/GOAL,1)*100;
-      if(bar) bar.style.width=pc.toFixed(1)+'%';
-      if(cnt) cnt.textContent=n+' из '+GOAL;
-      if(head) head.innerHTML=n+' из '+GOAL+' <span class="ser">записей</span>';
-      var leftN=Math.max(GOAL-n,0);
-      if(homeHead) homeHead.innerHTML=leftN>0
-        ? 'Ещё '+leftN+' '+plural(leftN,'запись','записи','записей')+', и я начну показывать, <span class="ser">что на тебя влияет</span>'
-        : 'Записей хватает. Первый <span class="ser">разбор готов</span>';
-      if(headSub) headSub.textContent=leftN>0
-        ? 'До двадцати записей выводов не будет. Нужно больше данных для точного ответа.'
-        : 'Данных хватает. Выводы опираются на твои записи.';
+    var selected=[], GOAL=20, lastData=null;
+
+    function addBtn(){
+      var a=document.createElement('button'); a.className='tag add'; a.textContent='+ Своя метка';
+      a.addEventListener('click',function(){ var row=document.getElementById('tagAddRow'); row.style.display=row.style.display==='none'?'flex':'none';
+        if(row.style.display==='flex') document.getElementById('tagAddInput').focus(); });
+      tagbox.appendChild(a);
     }
-    function plural(k,a,b,c){ var m=k%100; if(m>=11&&m<=14) return c; m=k%10;
-      return m===1?a:(m>=2&&m<=4?b:c); }
+    function drawTags(){ renderTags(tagbox,selected); addBtn(); }
+    document.getElementById('tagAddOk').addEventListener('click',function(){
+      var inp=document.getElementById('tagAddInput'), v=(inp.value||'').trim();
+      if(!v) return; selected.push('c:'+v.slice(0,60)); inp.value=''; document.getElementById('tagAddRow').style.display='none'; drawTags();
+    });
+
+    function head(rec){
+      var left=Math.max(GOAL-rec,0);
+      document.getElementById('diaryHead').innerHTML=Math.min(rec,GOAL)+' из '+GOAL+' <span class="ser">записей</span>';
+      document.getElementById('diaryThreshCap').textContent=left>0
+        ?'До двадцати записей выводов не будет. Нужно больше данных для точного ответа.'
+        :'Данных хватает. Ниже видно, какие метки повторяются чаще.';
+    }
+    function el(tag,cls,text){ var e=document.createElement(tag); if(cls) e.className=cls; if(text!=null) e.textContent=text; return e; }
+    function remove(kind,id,node){
+      node.style.opacity='.4';
+      api('/api/v2/'+(kind==='run'?'runs':'diary')+'?id='+encodeURIComponent(id),{method:'DELETE'}).then(function(r){
+        if(r.ok){ node.remove(); if(window.__refreshMe) window.__refreshMe(); load(); }
+        else node.style.opacity='';
+      });
+    }
+    function itemNode(it){
+      var n=el('div','entry'), meta=el('div','meta');
+      var when=relDay(it.date); when=when.charAt(0).toUpperCase()+when.slice(1);
+      meta.appendChild(el('div','lab',when+(it.kind==='run'?' · пробежка':it.kind==='practice'?' · практика':'')));
+      if(it.kind!=='practice'){
+        var d=el('button','del','Удалить');
+        d.addEventListener('click',function(){
+          if(d.dataset.sure){ remove(it.kind,it.id,n); return; }
+          d.dataset.sure='1'; d.textContent='Точно удалить?'; setTimeout(function(){ d.dataset.sure=''; d.textContent='Удалить'; },3000);
+        });
+        meta.appendChild(d);
+      }
+      n.appendChild(meta);
+      if(it.kind==='entry') n.appendChild(el('p',null,'«'+it.text+'»'));
+      if(it.kind==='run'){
+        var line=fmtKm(it.distanceKm)+' км за '+it.durationMin+' мин';
+        var rt=it.ratings||{}, parts=[];
+        if(rt.effort) parts.push('усилие '+rt.effort); if(rt.legs) parts.push('ноги '+rt.legs);
+        if(rt.breath) parts.push('дыхание '+rt.breath); if(rt.mood) parts.push('настрой '+rt.mood);
+        n.appendChild(el('p','runline',line+(parts.length?' · '+parts.join(', '):'')));
+        if(it.note){ var q=el('p',null,'«'+it.note+'»'); q.style.marginTop='8px'; n.appendChild(q); }
+      }
+      if(it.kind==='practice'){
+        n.appendChild(el('p','runline','«'+it.title+'» прослушана целиком'));
+      }
+      if(it.tags&&it.tags.length){
+        var t=el('div','etags'); it.tags.forEach(function(x){ t.appendChild(el('span',null,tagLabel(x))); }); n.appendChild(t);
+      }
+      return n;
+    }
+    function render(d){
+      lastData=d;
+      var rec=(ME&&ME.stats.records)||d.items.length;
+      head(rec);
+      box.innerHTML='';
+      if(!d.items.length){ box.appendChild(el('p','cap dim','Пока пусто. Первая запись может быть одной строкой: «Сегодня совсем не хотелось» это тоже запись.')); }
+      d.items.forEach(function(it){ box.appendChild(itemNode(it)); });
+      var ib=document.getElementById('insightBlock'), ins=document.getElementById('insights');
+      var pairs=Object.keys(d.tagCounts||{}).map(function(k){ return [k,d.tagCounts[k]]; }).sort(function(a,b){ return b[1]-a[1]; });
+      if(rec>=GOAL&&pairs.length){
+        ib.style.display=''; ins.innerHTML='';
+        pairs.slice(0,8).forEach(function(p){ var r=el('div','insight'); r.appendChild(el('b',null,tagLabel(p[0]))); r.appendChild(el('span',null,p[1]+' '+plural(p[1],'раз','раза','раз'))); ins.appendChild(r); });
+      } else ib.style.display='none';
+    }
+    function load(){
+      return api('/api/v2/diary').then(function(r){ if(r.ok&&r.data) render(r.data); });
+    }
+    function loadTips(){
+      api('/api/v2/tips').then(function(r){
+        var tb=document.getElementById('tipsBlock'), list=document.getElementById('tips');
+        var tips=(r.ok&&r.data&&r.data.tips)||[];
+        tb.style.display=tips.length?'':'none'; list.innerHTML='';
+        tips.forEach(function(t){
+          var n=el('div','entry'), meta=el('div','meta');
+          meta.appendChild(el('div','lab',t.title));
+          var d=el('button','del','Убрать');
+          d.addEventListener('click',function(){ n.style.opacity='.4'; api('/api/v2/tips?id='+encodeURIComponent(t.id),{method:'DELETE'}).then(function(x){ if(x.ok) n.remove(); else n.style.opacity=''; }); });
+          meta.appendChild(d); n.appendChild(meta); n.appendChild(el('p',null,t.body)); list.appendChild(n);
+        });
+      });
+    }
+    window.__loadDiary=function(){ drawTags(); load(); loadTips(); };
+    window.__onMe.push(function(me){ head(me.stats.records); drawTags(); });
+
     save.addEventListener('click',function(){
       var t=(ta.value||'').trim();
       if(!t){ ta.focus(); return; }
-      var el=document.createElement('div');
-      el.className='entry fresh';
-      el.innerHTML='<div class="lab">Только что</div><p></p>';
-      el.querySelector('p').textContent='«'+t+'»';
-      box.insertBefore(el,box.firstChild);
-      ta.value=''; n++; sync();
-      if(todo) todo.textContent='Сегодня записано';
-
-      document.getElementById('entryHint').textContent='Записала. Метки поставлю из текста';
-      haptic(12);
+      save.disabled=true; hint.textContent='Сохраняю…';
+      api('/api/v2/diary',{method:'POST',body:{text:t,tags:selected,date:localYmd()}}).then(function(r){
+        save.disabled=false;
+        if(!r.ok){ hint.textContent=r.status===0?'Нет связи, запись не сохранилась':'Не получилось сохранить, попробуй ещё раз'; return; }
+        ta.value=''; selected=[]; drawTags();
+        hint.textContent='Записала';
+        setTimeout(function(){ hint.textContent='Видишь только ты и Ника'; },2500);
+        if(window.__refreshMe) window.__refreshMe().then(load); else load();
+        haptic(12);
+      });
     });
-    sync();
-    window.__bumpDiary=function(){ n++; sync(); };
   })();
 
   /* ============================================================
@@ -2492,9 +2543,6 @@ button.cli:active{opacity:.65}
       baseline:'',daypart:'',behaviors:[],cycle:'',notify:false};
 
     var CORRIDOR_MAP={rare:'Почти без нагрузки',low:'1–2 в неделю',mid:'3–4 в неделю',high:'5–7 в неделю'};
-    var BARRIER_PRACTICE={head:'Заземление · 4 мин',time:'Заземление · 4 мин',
-      tired:'Заземление · 4 мин',weather:'Заземление · 4 мин',
-      fear:'Заземление · 4 мин',other:'Заземление · 4 мин'};
 
     // ── одиночный выбор (intent, barrier, baseline, daypart, cycle) ─
     (function(){
@@ -2667,6 +2715,8 @@ button.cli:active{opacity:.65}
         row=document.getElementById('selfrow');
     var stats=(ME&&ME.stats)||{};
     if(row) row.style.display='none';
+    var hd=document.getElementById('heroDay');
+    if(hd) hd.textContent='Сегодня, '+new Date().toLocaleDateString('ru-RU',{weekday:'long'});
     if(st==='fresh'){
       t.innerHTML='Первый день<br><span class="ser">без плана</span>';
       sub.textContent='Я пока ничего о тебе не знаю. Начни с Заземления: пять минут, и внимание возвращается в тело.';
@@ -2717,7 +2767,75 @@ button.cli:active{opacity:.65}
     setState(ME.state);
     if(window.__onMe) window.__onMe.forEach(function(f){ try{ f(ME); }catch(e){ console.error(e); } });
   }
-  window.__onMe=[];
+  /* ---------- главная: неделя, коридор, дневник ---------- */
+  var BASE_RANGE={rare:[0,1],low:[1,2],mid:[3,4],high:[5,7]};
+  var WD=['пн','вт','ср','чт','пт','сб','вс'];
+  var CHECK='<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3.5 8.5l3 3L12.5 5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  window.__onMe.push(function(me){
+    var w=me.stats.week||{count:0,activeWeekdays:[],today:0}, n=w.count;
+    var days=document.getElementById('days');
+    if(days) days.innerHTML=WD.map(function(d,i){
+      var on=w.activeWeekdays.indexOf(i)>=0, today=i===w.today;
+      return '<div class="day'+(on?' done':today?' plan':'')+'"><div class="dot">'+(on?CHECK:'')+'</div><i>'+d+'</i></div>';
+    }).join('');
+    document.getElementById('weekLine').textContent=n?(n+' '+plural(n,'пробежка','пробежки','пробежек')+' · '+String(w.km).replace('.',',')+' км'):'Пробежек пока нет';
+    var r=BASE_RANGE[me.profile.baseline], title;
+    if(!n) title='На этой неделе <span class="ser">пока без пробежек</span>';
+    else if(!r) title='На этой неделе '+n+' '+plural(n,'пробежка','пробежки','пробежек');
+    else if(n<r[0]) title='Пока ниже твоего коридора. <span class="ser">Это нормально</span>';
+    else if(n>r[1]) title='Выше твоего обычного коридора. <span class="ser">Береги восстановление</span>';
+    else title='Ты в своём <span class="ser">коридоре</span>';
+    document.getElementById('weekTitle').innerHTML=title;
+    var zone=document.getElementById('corrZone'), pin=document.getElementById('corrPin'), corr=document.getElementById('corridor');
+    if(corr) corr.style.display=r?'':'none';
+    if(r&&zone){ zone.style.left=(r[0]/7*100)+'%'; zone.style.width=(Math.max(r[1]-r[0],.6)/7*100)+'%'; pin.style.left=(Math.min(n,7)/7*100)+'%'; }
+
+    var rec=me.stats.records, GOAL=20, left=Math.max(GOAL-rec,0);
+    document.getElementById('jrnCount').textContent=Math.min(rec,GOAL)+' из '+GOAL;
+    document.getElementById('jrnBar').style.width=(Math.min(rec/GOAL,1)*100).toFixed(1)+'%';
+    document.getElementById('jrnHead').innerHTML=left>0
+      ?'Ещё '+left+' '+plural(left,'запись','записи','записей')+', и я начну показывать, <span class="ser">что на тебя влияет</span>'
+      :'Записей хватает. Метки показывают, <span class="ser">что повторяется</span>';
+    var today=localYmd(), le=me.stats.lastEntry, lr=me.stats.lastRun;
+    document.getElementById('jrnTodo').textContent=((le&&String(le.created_at||le.date).slice(0,10)>=today)||(lr&&lr.date>=today))?'Сегодня записано':'Сегодня ещё не записано';
+
+    var lessonSub=document.getElementById('lesson1Sub');
+    if(lessonSub) lessonSub.textContent=me.stats.practicesCompleted>0?'4:52 · пройдено':'4:52 · доступна сейчас';
+    var l1=document.querySelector('#courseList .cli');
+    if(l1){ l1.classList.toggle('done',me.stats.practicesCompleted>0); l1.classList.toggle('current',!me.stats.practicesCompleted); }
+
+    /* ритм на главной */
+    var hr=document.getElementById('homeRhythm');
+    if(hr){
+      hr.style.display=me.rhythm.enabled?'':'none';
+      if(me.rhythm.enabled) loadRhythmState().then(function(st){
+        var t=document.getElementById('homeRhythmTitle'), sb=document.getElementById('homeRhythmSub');
+        if(!st||!st.consent){ t.textContent='Настроить ритм'; sb.textContent='Нужно отдельное согласие и одна дата'; }
+        else if(!st.cycle){ t.textContent='Настроить ритм'; sb.textContent='Одна дата, и я посчитаю фазу'; }
+        else { t.textContent='День '+st.cycle.day+' из '+st.cycle.length; sb.textContent=PHASE_RU[st.cycle.phase]+', ориентир, а не диагноз'; }
+      });
+    }
+  });
+  var PHASE_RU={menses:'Менструальная фаза',rise:'Фолликулярная фаза',peak:'Овуляторная фаза',slow:'Лютеиновая фаза'};
+  var rhythmCache=null;
+  function loadRhythmState(force){
+    if(rhythmCache&&!force) return rhythmCache;
+    rhythmCache=api('/api/v2/rhythm').then(function(r){ return r.ok?r.data:null; });
+    return rhythmCache;
+  }
+  window.__loadRhythmState=loadRhythmState;
+
+  /* ---------- кофе-ран из расписания ---------- */
+  api('/api/v2/club').then(function(r){
+    var run=r.ok&&r.data&&r.data.runs&&r.data.runs[0], box=document.getElementById('club');
+    if(!run||!box) return;
+    document.getElementById('clubTitle').textContent='Кофе-ран, '+run.weekday;
+    document.getElementById('clubText').textContent=run.distance+' в любом темпе, потом кофе. Запись через страницу забега, там же время сбора и карта.';
+    document.getElementById('clubWhen').textContent=run.dateLabel+' · сбор в '+run.gatherTime;
+    document.getElementById('clubWhere').textContent=run.spotName;
+    document.getElementById('clubBtn').href=run.landing;
+    box.style.display='';
+  });
   window.__enterApp=function(){
     var onbEl=document.getElementById('onb'); if(onbEl&&onbEl.style.opacity!=='0') onbEl.style.display='none';
     applyMe(); go('home');
@@ -2763,18 +2881,52 @@ button.cli:active{opacity:.65}
         haptic(6);
       });
     });
-    var save=document.getElementById('prSave');
+    var save=document.getElementById('prSave'), prSel=[], dayOff=0;
+    var dayBox=document.getElementById('prDay');
+    dayBox.querySelectorAll('[data-day]').forEach(function(b){
+      b.addEventListener('click',function(){ dayOff=+b.dataset.day; dayBox.querySelectorAll('[data-day]').forEach(function(x){ x.classList.toggle('on',x===b); }); haptic(6); });
+    });
+    function num(id){ var v=(document.getElementById(id).value||'').replace(',','.').trim(); return v?Number(v):NaN; }
+    function ratings(){
+      var out={};
+      set.querySelectorAll('.scale').forEach(function(sc){ var on=sc.querySelectorAll('.dots button.on'); if(on.length) out[sc.dataset.scale]=on.length; });
+      return out;
+    }
     save.addEventListener('click',function(){
-      document.getElementById('prForm').style.display='none';
-      document.getElementById('prDone').style.display='';
-      scroll.scrollTop=0;
-      if(window.__bumpDiary) window.__bumpDiary();
-      haptic(16);
+      var km=num('prKm'), min=num('prMin'), err=document.getElementById('prErr');
+      if(!(km>=0.1&&km<=100)){ err.textContent='Укажи дистанцию в километрах, например 5,2'; err.style.display=''; return; }
+      if(!(min>=1&&min<=600)){ err.textContent='Укажи время в минутах'; err.style.display=''; return; }
+      err.style.display='none';
+      var d=new Date(); d.setDate(d.getDate()-dayOff);
+      save.disabled=true; save.textContent='Сохраняю…';
+      api('/api/v2/runs',{method:'POST',body:{date:localYmd(d),distanceKm:km,durationMin:Math.round(min),ratings:ratings(),tags:prSel,note:(document.getElementById('prText').value||'').trim()}}).then(function(r){
+        save.disabled=false; save.textContent='Записать пробежку';
+        if(!r.ok){ err.textContent=r.status===0?'Нет связи, пробежка не сохранилась':'Не получилось сохранить, проверь цифры'; err.style.display=''; return; }
+        window.__lastRunKm=km;
+        (window.__refreshMe?window.__refreshMe():Promise.resolve()).then(function(){
+          var rec=ME?ME.stats.records:0, left=Math.max(20-rec,0);
+          document.getElementById('prDoneText').textContent='Пробежка, оценки и метки ушли в дневник. '+(left>0?'До первых выводов '+left+' '+plural(left,'запись','записи','записей')+'.':'Записей достаточно, частота меток уже видна в дневнике.');
+          document.getElementById('prDoneBar').style.width=(Math.min(rec/20,1)*100).toFixed(1)+'%';
+          document.getElementById('prForm').style.display='none';
+          document.getElementById('prDone').style.display='';
+          scroll.scrollTop=0;
+        });
+        haptic(16);
+      });
+    });
+    document.getElementById('prAskNika').addEventListener('click',function(){
+      if(window.__openNika) window.__openNika('Пробежка: '+fmtKm(window.__lastRunKm||0)+' км. ');
     });
     window.__resetPostrun=function(){
       document.getElementById('prForm').style.display='';
       document.getElementById('prDone').style.display='none';
+      ['prKm','prMin','prText'].forEach(function(id){ document.getElementById(id).value=''; });
+      set.querySelectorAll('.dots button').forEach(function(b){ b.classList.remove('on','dim'); });
+      set.querySelectorAll('.sname span').forEach(function(x){ x.textContent=''; });
+      prSel=[]; dayOff=0; dayBox.querySelectorAll('[data-day]').forEach(function(x){ x.classList.toggle('on',x.dataset.day==='0'); });
+      renderTags(document.getElementById('prTags'),prSel);
     };
+    window.__onMe.push(function(){ renderTags(document.getElementById('prTags'),prSel); });
   })();
 
   /* ============================================================
