@@ -582,6 +582,7 @@ button.cli:active{opacity:.65}
 .rsetup{padding:0}
 .rapprox{display:flex;flex-direction:column;gap:8px;margin-top:12px}
 .rapprox button{text-align:left;padding:12px 14px;border:1px solid rgba(244,239,230,.13);border-radius:12px;background:none;color:var(--ink-2);font:inherit;font-size:.9rem;cursor:pointer;transition:background .15s,border-color .15s}
+.rdateinp{width:100%;background:rgba(244,239,230,.05);border:1px solid rgba(244,239,230,.18);border-radius:12px;color:var(--ink);font:inherit;font-size:1rem;padding:12px 14px;min-height:48px;color-scheme:dark}
 .rapprox button.on,.rapprox button:active{border-color:rgba(244,239,230,.4);background:rgba(244,239,230,.05);color:var(--ink)}
 .rcrow{display:flex;align-items:center;gap:12px;margin-top:8px}
 .rcrow label{font-size:.9rem;color:var(--ink-2);flex:1}
@@ -945,11 +946,23 @@ button.cli:active{opacity:.65}
     <!-- ==================== РИТМ ==================== -->
     <section class="view" data-view="rhythm">
 
-      <!-- форма первого открытия -->
-      <div id="rhythmSetup" class="rsetup">
+      <!-- отдельное согласие на сведения о здоровье -->
+      <div id="rhythmConsent" class="rsetup" style="display:none">
         <div class="lab" style="margin-bottom:10px">Мой ритм</div>
-        <h1 class="disp xl">Когда началась<br>последняя <span class="ser">менструация</span></h1>
-        <p class="cap" style="margin:16px 0 0;max-width:290px">Больше ничего не спрашиваю. Эти данные остаются на устройстве.</p>
+        <h1 class="disp xl">Сначала отдельное <span class="ser">согласие</span></h1>
+        <p class="cap" style="margin:16px 0 0;max-width:300px" id="rhythmConsentText">Раздел работает с датами цикла. Это сведения о здоровье, и по закону для них нужно отдельное согласие.</p>
+        <p class="cap" style="margin:12px 0 0;max-width:300px">Они нужны только для этого раздела и для ответов Ники, не используются для рекламы. Без согласия остальное приложение работает как обычно. Отозвать можно в профиле.</p>
+        <label class="ocheck" style="margin-top:22px"><input type="checkbox" id="healthAgree"><span>Даю согласие на обработку сведений о здоровье. Условия в <a href="/legal/consent#c4" target="_blank" rel="noopener">разделе 4 согласия</a></span></label>
+        <p class="oerr" id="healthErr" style="display:none"></p>
+        <button class="pill solid wide" style="margin-top:22px" id="healthSave" disabled>Продолжить</button>
+        <button class="textbtn" style="width:100%;justify-content:center" data-go="home">Не сейчас</button>
+      </div>
+
+      <!-- одна дата -->
+      <div id="rhythmSetup" class="rsetup" style="display:none">
+        <div class="lab" style="margin-bottom:10px">Мой ритм</div>
+        <h1 class="disp xl" id="rhythmSetupTitle">Когда началась<br>последняя <span class="ser">менструация</span></h1>
+        <p class="cap" style="margin:16px 0 0;max-width:290px">Больше ничего не спрашиваю. Дата хранится в твоём аккаунте и нужна только этому разделу.</p>
 
         <div style="margin-top:28px">
           <div class="lab" style="margin-bottom:8px">Точная дата</div>
@@ -959,49 +972,49 @@ button.cli:active{opacity:.65}
         <div style="margin-top:24px">
           <div class="lab" style="margin-bottom:8px">Или примерно</div>
           <div class="rapprox" id="rapprox">
-            <button data-approx="0">На этой неделе</button>
+            <button data-approx="3">На этой неделе</button>
             <button data-approx="14">Примерно две недели назад</button>
-            <button data-approx="25">Больше трёх недель назад</button>
+            <button data-approx="24">Больше трёх недель назад</button>
           </div>
         </div>
 
-        <div style="margin-top:24px">
+        <div style="margin-top:24px" id="cycleLenRow">
           <div class="lab" style="margin-bottom:8px">Обычная длина цикла</div>
           <div class="rcrow">
-            <label>Дней в цикле</label>
+            <label for="cycleLenInp">Дней в цикле</label>
             <input type="number" id="cycleLenInp" value="28" min="21" max="42">
           </div>
         </div>
+        <p class="oerr" id="rhythmErr" style="display:none"></p>
 
         <button class="pill solid wide" style="margin-top:32px" id="rhythmSave">Готово</button>
+        <button class="textbtn" style="width:100%;justify-content:center;display:none" id="rhythmCancel">Отмена</button>
       </div>
 
-      <!-- основной экран (после заполнения) -->
+      <!-- основной экран -->
       <div id="rhythmFilled" style="display:none">
         <div class="scene" style="margin-top:-100px;padding-top:100px;min-height:58dvh;margin-bottom:28px">
           <div class="art"><svg><use href="#sc-night"/></svg></div>
           <div class="fadeout"></div>
           <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding-bottom:20px">
             <div class="lab" style="margin-bottom:12px" id="rhythmPhaseLabel">Мой ритм</div>
-            <h1 class="disp xl" id="rhythmPhaseTitle">Подсчитываю фазу</h1>
-            <p class="cap" style="margin:14px 0 0;max-width:290px" id="rhythmPhaseDesc">Если ощущения расходятся с фазой, доверяй ощущениям.</p>
+            <h1 class="disp xl" id="rhythmPhaseTitle"></h1>
+            <p class="cap" style="margin:14px 0 0;max-width:290px" id="rhythmPhaseDesc"></p>
           </div>
         </div>
         <div class="section">
-          <div class="head"><div class="lab">Неделя пересобрана</div></div>
-          <div class="list">
-            <div class="li"><div class="tx"><b>Длинную перенесли на пятницу</b><span>В среду бежать будет легче</span></div></div>
-            <div class="li"><div class="tx"><b>Держим лёгкость, а не скорость</b><span>Никаких интервалов до конца недели</span></div></div>
-          </div>
+          <div class="head"><div class="lab">Что обычно помогает в эти дни</div></div>
+          <div class="list" id="rhythmTips"></div>
+          <p class="cap dim" style="margin-top:12px">Если ощущения расходятся с фазой, верь ощущениям. Фаза это ориентир, а не диагноз.</p>
         </div>
         <div class="section">
-          <div class="head"><div class="lab">Под эту фазу</div></div>
+          <div class="head"><div class="lab">Практика</div></div>
           <div class="rail">
-            <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-mist"/></svg></div><div class="shade"></div><span class="tag">8 минут</span><div class="tx"><b>Тело сегодня</b><span>Без сравнений</span></div></button>
-            <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-dawn"/></svg></div><div class="shade"></div><span class="tag">6 минут</span><div class="tx"><b>Мягкое дыхание</b><span>Когда всё раздражает</span></div></button>
+            <button class="pract" data-push="practice"><div class="art"><svg><use href="#sc-dawn"/></svg></div><div class="shade"></div><span class="tag">5 минут</span><div class="tx"><b>Заземление</b><span>Вернуть внимание в тело</span></div></button>
           </div>
         </div>
-        <button class="textbtn" style="margin-top:16px" id="rhythmEditDate">Поправить дату</button>
+        <button class="pill wide" id="rhythmNew">Начались месячные</button>
+        <button class="textbtn" style="width:100%;justify-content:center;margin-top:6px" id="rhythmEditDate">Поправить дату</button>
       </div>
 
     </section>
@@ -1836,6 +1849,7 @@ button.cli:active{opacity:.65}
     backTitle.textContent=TITLE[v]||'';
     document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('on',t.dataset.go===v); });
     if(v==='diary'&&window.__loadDiary) window.__loadDiary();
+    if(v==='rhythm'&&window.__onRhythmView) window.__onRhythmView();
     if(v!=='practice'&&window.__resetPlayer) window.__resetPlayer();
     if(v!=='postrun'&&window.__resetPostrun) window.__resetPostrun();
   }
@@ -2978,6 +2992,101 @@ button.cli:active{opacity:.65}
       renderTags(document.getElementById('prTags'),prSel);
     };
     window.__onMe.push(function(){ renderTags(document.getElementById('prTags'),prSel); });
+  })();
+
+  /* ============================================================
+     МОЙ РИТМ
+     Согласие на сведения о здоровье → одна дата → фаза и ориентиры.
+     Формулировки по брифу 4: «обычно», «у многих», ощущения важнее фазы.
+     ============================================================ */
+  (function(){
+    var vConsent=document.getElementById('rhythmConsent'), vSetup=document.getElementById('rhythmSetup'),
+        vFilled=document.getElementById('rhythmFilled');
+    if(!vFilled) return;
+    var PH={
+      menses:{t:'Менструальная фаза',d:'Обычно в эти дни энергии меньше, а сон и самочувствие чувствительнее. У всех по-разному: если тебе бодро, это тоже нормально.',
+        tips:[['Коротко и легко','Спокойная пробежка или прогулка часто ощущается лучше, чем ничего'],['Пропуск это часть ритма','Отдых в эти дни не откат и не повод себя ругать'],['Боль сильнее обычного','Лучше отдохнуть и, если так бывает часто, сказать врачу']]},
+      rise:{t:'Фолликулярная фаза',d:'Обычно силы прибывают, а восстановление идёт быстрее. У многих в эти дни интенсивность даётся легче.',
+        tips:[['Окно для сложного','Если хочется, это удачное время для интервалов или более длинной пробежки'],['По ощущениям','Добавляй нагрузку, когда тело готово, а не потому что так в календаре']]},
+      peak:{t:'Овуляторная фаза',d:'У многих в эти дни самочувствие на подъёме и хочется скорости.',
+        tips:[['Разминка дольше обычного','Перед быстрой работой она сейчас особенно к месту'],['Можно попробовать новое','Если чувствуешь подъём, это хороший день для непривычной дистанции']]},
+      slow:{t:'Лютеиновая фаза',d:'Обычно в эти дни бег ощущается тяжелее, пульс бывает выше, а сон чувствительнее. Это физиология, а не откат.',
+        tips:[['Лёгкий темп','Спокойная пробежка часто даёт больше, чем интервалы'],['Сон и восстановление','Сейчас они особенно в цене'],['Без сравнений','С прошлой неделей сравнивать не нужно']]}
+    };
+    var approx=null, editing=false;
+    function only(v){ [vConsent,vSetup,vFilled].forEach(function(x){ x.style.display=x===v?'':'none'; }); }
+    function render(st){
+      if(!st){ only(vConsent); document.getElementById('rhythmConsentText').textContent='Не получилось загрузить раздел. Проверь связь и открой его снова.'; return; }
+      if(!st.consent){ only(vConsent); return; }
+      if(!st.cycle||editing){ openSetup(!!st.cycle); return; }
+      var c=st.cycle, ph=PH[c.phase]||PH.slow;
+      document.getElementById('rhythmPhaseLabel').textContent='Мой ритм · день '+c.day+' из '+c.length;
+      document.getElementById('rhythmPhaseTitle').textContent=ph.t;
+      document.getElementById('rhythmPhaseDesc').textContent=c.overdue
+        ?'Цикл длиннее обычного. Так бывает. Если месячные уже начались, отметь это ниже.'
+        :ph.d;
+      var list=document.getElementById('rhythmTips'); list.innerHTML='';
+      ph.tips.forEach(function(t){ var li=document.createElement('div'); li.className='li';
+        var tx=document.createElement('div'); tx.className='tx'; var b=document.createElement('b'); b.textContent=t[0];
+        var sp=document.createElement('span'); sp.textContent=t[1]; tx.appendChild(b); tx.appendChild(sp); li.appendChild(tx); list.appendChild(li); });
+      only(vFilled);
+    }
+    function openSetup(isEdit){
+      editing=isEdit; approx=null;
+      document.getElementById('rhythmSetupTitle').innerHTML=isEdit?'Поправить <span class="ser">дату</span>':'Когда началась<br>последняя <span class="ser">менструация</span>';
+      document.getElementById('cycleLenRow').style.display=isEdit?'none':'';
+      document.getElementById('rhythmCancel').style.display=isEdit?'':'none';
+      var di=document.getElementById('cycleDateInp'); di.value=''; di.max=localYmd();
+      var mn=new Date(); mn.setDate(mn.getDate()-90); di.min=localYmd(mn);
+      document.querySelectorAll('#rapprox button').forEach(function(b){ b.classList.remove('on'); });
+      document.getElementById('rhythmErr').style.display='none';
+      only(vSetup);
+    }
+    function refresh(){ return loadRhythmState(true).then(render); }
+    window.__onRhythmView=function(){ editing=false; loadRhythmState().then(render); };
+
+    var agree=document.getElementById('healthAgree'), hs=document.getElementById('healthSave');
+    agree.addEventListener('change',function(){ hs.disabled=!agree.checked; });
+    hs.addEventListener('click',function(){
+      hs.disabled=true;
+      api('/api/consents',{method:'POST',body:{entries:[{type:'health',granted:true}],source:'health_gate'}}).then(function(r){
+        hs.disabled=!agree.checked;
+        var e=document.getElementById('healthErr');
+        if(!r.ok){ e.textContent='Не получилось сохранить согласие. Попробуй ещё раз.'; e.style.display=''; return; }
+        e.style.display='none'; agree.checked=false; hs.disabled=true;
+        if(window.__refreshMe) window.__refreshMe(); refresh(); haptic(12);
+      });
+    });
+    document.querySelectorAll('#rapprox button').forEach(function(b){
+      b.addEventListener('click',function(){
+        document.querySelectorAll('#rapprox button').forEach(function(x){ x.classList.toggle('on',x===b); });
+        approx=+b.dataset.approx; document.getElementById('cycleDateInp').value=''; haptic(7);
+      });
+    });
+    document.getElementById('cycleDateInp').addEventListener('change',function(){
+      approx=null; document.querySelectorAll('#rapprox button').forEach(function(x){ x.classList.remove('on'); });
+    });
+    document.getElementById('rhythmSave').addEventListener('click',function(){
+      var di=document.getElementById('cycleDateInp').value, err=document.getElementById('rhythmErr'), date;
+      if(di) date=di; else if(approx!==null){ var d=new Date(); d.setDate(d.getDate()-approx); date=localYmd(d); }
+      if(!date){ err.textContent='Выбери дату или вариант «примерно»'; err.style.display=''; return; }
+      var len=Math.max(21,Math.min(42,+document.getElementById('cycleLenInp').value||28));
+      var b=this; b.disabled=true;
+      api('/api/v2/rhythm',{method:'POST',body:editing?{action:'edit',startedAt:date}:{action:'start',startedAt:date,cycleLength:len}}).then(function(r){
+        b.disabled=false;
+        if(!r.ok){ err.textContent=r.data&&r.data.error==='startedAt'?'Дата должна быть не позже сегодня и не раньше трёх месяцев назад':'Не получилось сохранить. Попробуй ещё раз.'; err.style.display=''; return; }
+        editing=false; refresh(); haptic(12);
+      });
+    });
+    document.getElementById('rhythmCancel').addEventListener('click',function(){ editing=false; loadRhythmState().then(render); });
+    document.getElementById('rhythmEditDate').addEventListener('click',function(){ openSetup(true); });
+    document.getElementById('rhythmNew').addEventListener('click',function(){
+      var b=this; b.disabled=true;
+      api('/api/v2/rhythm',{method:'POST',body:{action:'start',startedAt:localYmd()}}).then(function(r){
+        b.disabled=false; if(r.ok){ refresh(); haptic(12); }
+        else { b.textContent=r.data&&r.data.error==='startedAt'?'Сегодня уже отмечено':'Не получилось, попробуй ещё раз'; setTimeout(function(){ b.textContent='Начались месячные'; },2500); }
+      });
+    });
   })();
 
   /* ============================================================
