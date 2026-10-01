@@ -2,7 +2,7 @@ import { asFormState, type FormState } from "../form";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 import type { DatabotStore } from "./store";
 import { normalizeTaskUsername } from "../tasks";
-import type { AssignedTask, AssignedTaskDraft } from "../task-list";
+import { isActiveAssigned, type AssignedAction, type AssignedStatus, type AssignedTask, type AssignedTaskDraft } from "../task-list";
 import { MemoryTasks } from "./memory-tasks";
 
 /**
@@ -43,7 +43,8 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
       if (!task) {
         task = { ...draft, id: this.assignedTasks.size + 1, source_chat_id: ownerId,
           source_message_id: messageId, assignee_id: recipients[index], assigned_by: ownerId,
-          created_at: this.clock().toISOString(), delivery_state: "pending", delivered_message_id: null };
+          created_at: this.clock().toISOString(), delivery_state: "pending", delivered_message_id: null,
+          status: "open", status_at: this.clock().toISOString(), reminded_at: null, overdue_notified_at: null };
         this.assignedTasks.set(task.id, task);
       }
       return structuredClone(task);
@@ -76,6 +77,66 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
       task.delivered_message_id = messageId;
     } else if (task.delivery_state === "sending") task.delivery_state = action;
     return structuredClone(task);
+  }
+
+  async setAssignedStatus(id: number, actorId: number, action: AssignedAction): Promise<{ task: AssignedTask; previous: AssignedStatus }> {
+    this.maybeFail("setAssignedStatus");
+    const task = this.assignedTasks.get(id);
+    if (!task) throw new Error("assigned:missing");
+    const actor = this.members.get(actorId);
+    const rules: Record<AssignedAction, [AssignedStatus, AssignedStatus[]]> = {
+      take: ["taken", ["open"]], done: ["done", ["open", "taken"]], decline: ["declined", ["open", "taken"]],
+      reopen: ["taken", ["done", "declined"]], cancel: ["cancelled", ["open", "taken", "declined"]],
+    };
+    if (action === "cancel" ? !(actor?.is_active && actor.is_owner) : task.assignee_id !== actorId || !actor?.is_active)
+      throw new Error("assigned:actor");
+    const [target, allowed] = rules[action];
+    const previous = task.status;
+    if (previous === target) return { task: structuredClone(task), previous };
+    if (!allowed.includes(previous)) throw new Error("assigned:state");
+    task.status = target;
+    task.status_at = this.clock().toISOString();
+    return { task: structuredClone(task), previous };
+  }
+
+  async editAssignedTask(id: number, ownerId: number, patch: { what?: string; due?: string | null }): Promise<AssignedTask> {
+    this.maybeFail("editAssignedTask");
+    const owner = this.members.get(ownerId);
+    if (!owner?.is_active || !owner.is_owner) throw new Error("assigned:actor");
+    const task = this.assignedTasks.get(id);
+    if (!task) throw new Error("assigned:missing");
+    if (!isActiveAssigned(task)) throw new Error("assigned:state");
+    if (patch.what !== undefined) {
+      if (!patch.what.trim() || patch.what.length > 3000) throw new Error("assigned:format");
+      task.what = patch.what;
+    }
+    if (patch.due !== undefined) {
+      task.due_at = patch.due;
+      task.reminded_at = null;
+      task.overdue_notified_at = null;
+    }
+    return structuredClone(task);
+  }
+
+  async listAssignedOverview(since: Date): Promise<AssignedTask[]> {
+    this.maybeFail("listAssignedOverview");
+    return structuredClone([...this.assignedTasks.values()]
+      .filter(t => isActiveAssigned(t) || Date.parse(t.status_at) >= since.getTime()));
+  }
+
+  async listAssignedDue(): Promise<AssignedTask[]> {
+    this.maybeFail("listAssignedDue");
+    return structuredClone([...this.assignedTasks.values()]
+      .filter(t => isActiveAssigned(t) && t.due_at && !t.overdue_notified_at));
+  }
+
+  async markAssignedNotice(id: number, kind: "reminder" | "overdue"): Promise<boolean> {
+    this.maybeFail("markAssignedNotice");
+    const task = this.assignedTasks.get(id);
+    const field = kind === "reminder" ? "reminded_at" : "overdue_notified_at";
+    if (!task || !isActiveAssigned(task) || task[field]) return false;
+    task[field] = this.clock().toISOString();
+    return true;
   }
 
   /** Часы для created_at журнала; тест может подменить. */

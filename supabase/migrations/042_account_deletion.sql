@@ -1,4 +1,4 @@
--- 040_account_deletion.sql
+-- 042_account_deletion.sql
 -- Самостоятельное удаление аккаунта (DELETE /api/v2/account → auth.admin.deleteUser).
 -- Удаление auth.users каскадом уносит public.users и все данные пользователя.
 -- Две связи мешали этому или противоречили Политике:

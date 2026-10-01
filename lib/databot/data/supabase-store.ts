@@ -4,7 +4,7 @@ import { asFormState, type FormState } from "../form";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 import type { DatabotStore } from "./store";
 import { TaskStoreBase, TaskError, type TaskRow } from "../tasks";
-import type { AssignedTask, AssignedTaskDraft } from "../task-list";
+import type { AssignedAction, AssignedStatus, AssignedTask, AssignedTaskDraft } from "../task-list";
 
 /**
  * Боевое хранилище бота данных: таблицы databot_* из 037, tg_sessions и
@@ -96,6 +96,43 @@ class SupabaseStore extends TaskStoreBase implements DatabotStore {
     }).abortSignal(timeout());
     if (error) fail("assignedTaskDelivery", error.message);
     return data as AssignedTask | null;
+  }
+
+  async setAssignedStatus(id: number, actorId: number, action: AssignedAction): Promise<{ task: AssignedTask; previous: AssignedStatus }> {
+    const { data, error } = await this.db.rpc("databot_assigned_status", {
+      p_id: id, p_actor: actorId, p_action: action,
+    }).abortSignal(timeout());
+    if (error) throw new Error(error.message.startsWith("assigned:") ? error.message : `databot store: setAssignedStatus: ${error.message}`);
+    return data as { task: AssignedTask; previous: AssignedStatus };
+  }
+
+  async editAssignedTask(id: number, ownerId: number, patch: { what?: string; due?: string | null }): Promise<AssignedTask> {
+    const { data, error } = await this.db.rpc("databot_assigned_edit", {
+      p_id: id, p_owner: ownerId, p_what: patch.what ?? null,
+      p_set_due: patch.due !== undefined, p_due: patch.due ?? null,
+    }).abortSignal(timeout());
+    if (error) throw new Error(error.message.startsWith("assigned:") ? error.message : `databot store: editAssignedTask: ${error.message}`);
+    return data as AssignedTask;
+  }
+
+  async listAssignedOverview(since: Date): Promise<AssignedTask[]> {
+    const { data, error } = await this.db.rpc("databot_assigned_overview", { p_since: since.toISOString() }).abortSignal(timeout());
+    if (error) fail("listAssignedOverview", error.message);
+    return (data ?? []) as AssignedTask[];
+  }
+
+  async listAssignedDue(): Promise<AssignedTask[]> {
+    const { data, error } = await this.db.from("databot_assigned_tasks").select("*")
+      .in("status", ["open", "taken"]).not("due_at", "is", null).is("overdue_notified_at", null)
+      .abortSignal(timeout());
+    if (error) fail("listAssignedDue", error.message);
+    return (data ?? []) as AssignedTask[];
+  }
+
+  async markAssignedNotice(id: number, kind: "reminder" | "overdue"): Promise<boolean> {
+    const { data, error } = await this.db.rpc("databot_assigned_notice", { p_id: id, p_kind: kind }).abortSignal(timeout());
+    if (error) fail("markAssignedNotice", error.message);
+    return data === true;
   }
   async taskAction(action: string, args: Record<string, unknown>): Promise<TaskRow | null> {
     const { data, error } = await this.db.rpc("databot_task_action", { p_action: action, p_args: args }).abortSignal(timeout());

@@ -72,7 +72,7 @@ export const SECTION_COMMAND_DESCRIPTION: Record<Section, string> = {
   prd: "Продукт",
   kb: "Справочник команды",
   tm: "Команда: кто в боте",
-  tsk: "Мои задачи и общий пул",
+  tsk: "Мои задачи",
 };
 
 export const HELP_COMMAND_DESCRIPTION = "Что я умею";
@@ -84,7 +84,6 @@ export const HELP_COMMAND_DESCRIPTION = "Что я умею";
 export const DATABOT_DEFAULT_COMMANDS = [
   { command: "help", description: HELP_COMMAND_DESCRIPTION },
   { command: "assigned", description: "Назначенные мне задачи" },
-  { command: "assign", description: "Загрузить список задач (владелец)" },
 ] as const;
 
 /** Раздел по тексту кнопки постоянной клавиатуры. */

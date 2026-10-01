@@ -27,12 +27,15 @@ export function replyKeyboard(sections: readonly Section[]): Keyboard | ReplyKey
 /** Для чужих: убрать клавиатуру, если у человека осталась старая. */
 export const REMOVE_KEYBOARD: ReplyKeyboardRemove = { remove_keyboard: true };
 
-/** Меню команд: разделы зоны и /help. */
-export function commandsFor(sections: readonly Section[]): BotCommand[] {
+/** Меню команд: разделы зоны, задачи и /help. Команды списков задач — только владельцу. */
+export function commandsFor(sections: readonly Section[], isOwner = false): BotCommand[] {
   return [
     ...sections.map((s) => ({ command: SECTION_COMMAND[s], description: SECTION_COMMAND_DESCRIPTION[s] })),
     { command: "assigned", description: "Назначенные мне задачи" },
-    { command: "assign", description: "Загрузить список задач (владелец)" },
+    ...(isOwner ? [
+      { command: "assign", description: "Раздать задачи списком" },
+      { command: "assign_status", description: "Кто что делает по задачам" },
+    ] : []),
     { command: "help", description: HELP_COMMAND_DESCRIPTION },
   ];
 }
@@ -60,7 +63,7 @@ export async function setChatCommands(api: Api, chatId: number, zone: Zone | nul
       return;
     }
     const subject: Subject = { chatId, zone, isOwner: isEnvOwner(chatId) };
-    await api.setMyCommands(commandsFor(visibleSections(subject)), { scope });
+    await api.setMyCommands(commandsFor(visibleSections(subject), subject.isOwner), { scope });
   } catch (err) {
     // chat_id в прод-логи не пишем.
     console.error("[databot] setMyCommands:", err instanceof Error ? err.message : String(err));

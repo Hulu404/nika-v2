@@ -89,7 +89,7 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
   // Шаг 1. Индикатор загрузки на кнопке гасим сразу — как lib/team/bot.ts.
   if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => {});
 
-  if (await handleAssignedUpdate(ctx, store)) return;
+  if (await handleAssignedUpdate(ctx, store, clock())) return;
   if (await handleTaskUpdate(ctx, store)) return;
 
   // Шаг 2. Личка для отчётов; учёт задач настроенной группы уже обработан.
@@ -253,7 +253,7 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
       await audit({ zone: subject.zone, intent, ok: true });
       return;
     case "help":
-      await send(ctx, { text: helpText(subject.zone, visible, commandsFor(visible).map((c) => c.command)) }, keyboard);
+      await send(ctx, { text: helpText(subject.zone, visible, commandsFor(visible, subject.isOwner).map((c) => c.command)) }, keyboard);
       await audit({ zone: subject.zone, intent, ok: true });
       return;
     case "menu":

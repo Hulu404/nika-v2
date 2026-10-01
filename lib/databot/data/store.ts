@@ -1,6 +1,6 @@
 import type { FormState } from "../form";
 import type { TaskStore } from "../tasks";
-import type { AssignedTask, AssignedTaskDraft } from "../task-list";
+import type { AssignedAction, AssignedStatus, AssignedTask, AssignedTaskDraft } from "../task-list";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 
 /**
@@ -16,6 +16,20 @@ export interface DatabotStore extends TaskStore {
   getAssignedTask(id: number): Promise<AssignedTask | null>;
   listAssignedTasks(userId: number): Promise<AssignedTask[]>;
   assignedTaskDelivery(id: number, action: "lock" | "sent" | "failed" | "uncertain", messageId?: number): Promise<AssignedTask | null>;
+  /**
+   * Смена статуса задачи из /assign. Бросает Error("assigned:missing" |
+   * "assigned:actor" | "assigned:state"). Повтор того же действия — без
+   * изменений, previous равен текущему статусу.
+   */
+  setAssignedStatus(id: number, actorId: number, action: AssignedAction): Promise<{ task: AssignedTask; previous: AssignedStatus }>;
+  /** Правка владельцем; due: undefined — срок не трогать, null — снять. */
+  editAssignedTask(id: number, ownerId: number, patch: { what?: string; due?: string | null }): Promise<AssignedTask>;
+  /** Всё незакрытое и закрытое начиная с since — для обзора владельца. */
+  listAssignedOverview(since: Date): Promise<AssignedTask[]>;
+  /** Кандидаты в напоминания: в работе, со сроком, о просрочке ещё не писали. */
+  listAssignedDue(): Promise<AssignedTask[]>;
+  /** Поставить отметку напоминания. true — её поставил этот вызов, и только он шлёт сообщение. */
+  markAssignedNotice(id: number, kind: "reminder" | "overdue"): Promise<boolean>;
   /** Активный участник по chat_id — одна выборка по первичному ключу, без кеша. */
   findActiveMember(chatId: number): Promise<MemberRow | null>;
 

@@ -1,6 +1,7 @@
 import { autoRetry } from "@grammyjs/auto-retry";
 import { Bot, type Context } from "grammy";
 import type { Update, UserFromGetMe } from "grammy/types";
+import { NEW_TASK_HEADER } from "./assigned-view";
 import { databotToken, databotTaskConfig } from "./config";
 import type { DatabotStore } from "./data/store";
 import { createSupabaseStore } from "./data/supabase-store";
@@ -43,7 +44,7 @@ export function createDatabot(token: string, opts: CreateDatabotOptions = {}): B
     // A group publication cannot be retried safely after an ambiguous network failure.
     if (method === "sendMessage" && "chat_id" in payload &&
         (payload.chat_id === databotTaskConfig()?.chatId ||
-          ("text" in payload && typeof payload.text === "string" && payload.text.startsWith("<b>Новая задача от команды</b>")))) {
+          ("text" in payload && typeof payload.text === "string" && payload.text.startsWith(NEW_TASK_HEADER)))) {
       return prev(method, payload, signal);
     }
     return retry(prev, method, payload, signal);

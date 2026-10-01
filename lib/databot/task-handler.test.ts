@@ -176,13 +176,13 @@ describe("Telegram task boundary", () => {
   });
   it("menu shows only confirmed tasks, slots and the four-task rule; callback rechecks status", async () => {
     await pin();
-    await send(privateMessage("Мои задачи"));
+    await send(privateMessage("/mytasks"));
     expect(replies()).toContain("свободных слотов: 4/4");
     expect(replies()).toContain("Сначала можно взять до четырёх задач");
     expect(calls.filter(c => c.payload.reply_markup && JSON.stringify(c.payload.reply_markup).includes("d:tsk:take"))).toHaveLength(0);
     await store.bindTask(1, 1, "alice", 9);
     calls.length = 0;
-    await send(privateMessage("Мои задачи"));
+    await send(privateMessage("/mytasks"));
     expect(calls.some(c => JSON.stringify(c.payload.reply_markup ?? null).includes("d:tsk:take:1"))).toBe(true);
     await press("d:tsk:take:1");
     await press("d:tsk:take:1");
@@ -222,7 +222,7 @@ describe("Telegram task boundary", () => {
     expect((await store.getTask(1))?.status).toBe("completing");
     expect(await store.listActiveTasks(1, -1001)).toHaveLength(1);
     failUnpin = false;
-    await send(privateMessage("Мои задачи"));
+    await send(privateMessage("/mytasks"));
     expect(calls.some(c => JSON.stringify(c.payload.reply_markup ?? null).includes("Повторить оформление"))).toBe(true);
     await press("d:tsk:done:1");
     const unpins = calls.filter(c => c.method === "unpinChatMessage");
@@ -258,11 +258,11 @@ describe("Telegram task boundary", () => {
   });
   it("shows an identity error for a missing or ambiguous username", async () => {
     await pin(); await store.bindTask(1, 1, "alice", 9);
-    await send(privateMessage("Мои задачи", 1, ""));
+    await send(privateMessage("/mytasks", 1, ""));
     expect(replies()).toContain("ник отсутствует");
     await store.upsertMember({ chat_id: 2, username: "ALICE", zone: "smm", display_name: null, is_owner: false, invited_by: 9 }, new Date());
     calls.length = 0;
-    await send(privateMessage("Мои задачи"));
+    await send(privateMessage("/mytasks"));
     expect(replies()).toContain("неоднозначен");
   });
   it("fails closed on incomplete or invalid config", () => {

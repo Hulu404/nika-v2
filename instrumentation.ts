@@ -81,6 +81,23 @@ async function tickDatabotCleanup(): Promise<void> {
   }
 }
 
+/**
+ * Напоминания по задачам команды из /assign: за сутки (или за три часа) до
+ * срока и одно сообщение о просрочке. Окно и тихие часы проверяет сама, дедуп —
+ * отметки в databot_assigned_tasks. Без DATABOT_TOKEN — пустой проход.
+ */
+async function tickDatabotTaskReminders(): Promise<void> {
+  try {
+    const { dispatchAssignedReminders } = await import("./lib/databot/assigned-reminders");
+    const res = await dispatchAssignedReminders();
+    if (res.reminders || res.overdue) {
+      console.log(`[databot] задачи: напоминаний ${res.reminders ?? 0}, просрочек ${res.overdue ?? 0}`);
+    }
+  } catch (err) {
+    console.error("[databot] напоминания по задачам упали:", err instanceof Error ? err.message : String(err));
+  }
+}
+
 async function tickReminders(): Promise<void> {
   try {
     const { dispatchCoffeeRunReminders } = await import("./lib/coffeerun/reminder-dispatch");
@@ -127,11 +144,13 @@ export async function register(): Promise<void> {
   void tickInvites();
   void tickTeamDigests();
   void tickDatabotCleanup();
+  void tickDatabotTaskReminders();
   const timer = setInterval(() => {
     void tickReminders();
     void tickInvites();
     void tickTeamDigests();
     void tickDatabotCleanup();
+    void tickDatabotTaskReminders();
   }, REMINDER_TICK_MS);
   // Не держим процесс живым только ради тикера.
   timer.unref?.();
@@ -139,6 +158,6 @@ export async function register(): Promise<void> {
   // потому, что о незапущенном слушателе нигде не было сказано.
   console.log(
     `[coffeerun] тикер запущен, интервал ${REMINDER_TICK_MS / 60000} мин ` +
-      "(напоминания накануне + приглашения по понедельникам + сводки команде)",
+      "(напоминания накануне + приглашения по понедельникам + сводки команде + сроки задач)",
   );
 }
