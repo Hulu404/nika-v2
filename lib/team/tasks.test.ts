@@ -60,6 +60,12 @@ describe("Пятница: задачи команды", () => {
     expect(store.assignedTasks.size).toBe(3);
     expect([...store.assignedTasks.values()].map(task => [task.line, task.username, task.assignee_id]))
       .toEqual([[2, "alice", 1], [2, "bob", 2], [3, "bob", 2]]);
+    const ownerReport = calls.filter(call => call.method === "sendMessage" && call.payload.chat_id === 9)
+      .map(call => String(call.payload.text)).find(text => text.includes("Сохранено задач: 3"))!;
+    expect(ownerReport).toContain("Макет -- пт 02.10, 18:00 -- @alice + @bob");
+    expect(ownerReport).toContain("#3 @bob — Текст");
+    expect(ownerReport).not.toContain("#1 @alice — Макет");
+    expect(ownerReport).not.toContain("#2 @bob — Макет");
     expect(calls.filter(call => call.method === "sendMessage" && call.payload.chat_id === 1 &&
       String(call.payload.text).includes("Макет"))).toHaveLength(1);
     expect(calls.filter(call => call.method === "sendMessage" && call.payload.chat_id === 2 &&

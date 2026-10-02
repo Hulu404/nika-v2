@@ -244,13 +244,25 @@ export async function handleAssignedUpdate(
     for (const task of tasks.filter(t => t.delivery_state === "pending")) await sendAssigned(ctx, store, task, now);
     const fresh = (await Promise.all(tasks.map(t => store.getAssignedTask(t.id)))).filter((t): t is AssignedTask => !!t);
     const sent = fresh.filter(t => t.delivery_state === "sent").length;
-    const lines = fresh.map(t => `#${t.id} @${escapeHtml(t.username)} — ${escapeHtml(short(t.what, 60))}` +
-      `${t.due_at ? ` · до ${formatDue(t.due_at)}` : ""}${t.delivery_state === "sent" ? "" : " · 📭"}`);
+    const byLine = new Map<number, AssignedTask[]>();
+    for (const task of fresh) byLine.set(task.line, [...(byLine.get(task.line) ?? []), task]);
+    const lines = [...byLine.values()].map(group => {
+      if (group.length > 1) {
+        const first = group[0];
+        return `${escapeHtml(short(first.what, 180))} -- ${first.due_at ? formatDue(first.due_at) : "без срока"} -- ` +
+          group.map(t => `@${escapeHtml(t.username)}`).join(" + ");
+      }
+      const t = group[0];
+      return `#${t.id} @${escapeHtml(t.username)} — ${escapeHtml(short(t.what, 60))}` +
+        `${t.due_at ? ` · до ${formatDue(t.due_at)}` : ""}${t.delivery_state === "sent" ? "" : " · 📭"}`;
+    });
     const pending = fresh.length - sent;
+    const pendingTasks = fresh.filter(t => t.delivery_state !== "sent")
+      .map(t => `#${t.id} @${escapeHtml(t.username)}`).join(", ");
     const report = [
       `Сохранено задач: ${tasks.length}. Доставлено в личку: ${sent}.`,
       ...lines,
-      pending ? `\n📭 Не доставлено: ${pending}. Человеку нужно открыть бота, затем /assign_retry ID.` : "",
+      pending ? `\n📭 Не доставлено: ${pending} (${pendingTasks}). Человеку нужно открыть бота, затем /assign_retry ID.` : "",
       "Кто что делает — /assign_status.",
     ].filter(Boolean);
     let chunk = "";
