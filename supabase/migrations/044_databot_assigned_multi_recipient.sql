@@ -3,6 +3,11 @@ begin;
 
 alter table public.databot_assigned_tasks
   drop constraint if exists databot_assigned_tasks_source_chat_id_source_message_id_line_key;
+-- PostgreSQL truncates the auto-generated name from 040 to 63 bytes.
+alter table public.databot_assigned_tasks
+  drop constraint if exists databot_assigned_tasks_source_chat_id_source_message_id_lin_key;
+alter table public.databot_assigned_tasks
+  drop constraint if exists databot_assigned_tasks_source_line_recipient_key;
 alter table public.databot_assigned_tasks
   add constraint databot_assigned_tasks_source_line_recipient_key
   unique (source_chat_id, source_message_id, line, username);
