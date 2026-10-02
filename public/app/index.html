@@ -142,6 +142,20 @@ a[href^="mailto:"],a[href^="tel:"],a[x-apple-data-detectors]{color:inherit!impor
 @keyframes upGlare{0%,78%{left:-40%}100%{left:130%}}
 @keyframes upDrift{from{transform:scale(1) translate3d(0,0,0)}to{transform:scale(1.06) translate3d(-2%,-1.5%,0)}}
 @media (prefers-reduced-motion:reduce){.upsell .art,.upsell .go::after{animation:none}}
+/* аватар (правка 12): фото, готовый кадр сцены с буквой или буква на терракоте */
+.avfill{position:relative;overflow:hidden;display:grid;place-items:center;background:#D4703F!important;background-image:none!important;color:#F4EFE6}
+.avfill>svg,.avfill>img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.avfill>b{position:relative;font-family:'Playfair Display','Times New Roman',Georgia,serif;font-weight:400;font-size:.95em;line-height:1;text-shadow:0 1px 6px rgba(0,0,0,.35)}
+.avfill.photo>b{display:none}
+.phead .av{cursor:pointer;font-size:1.6rem}
+.avatar{font-size:.95rem}
+.avgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:16px 0}
+.avgrid button{aspect-ratio:1;border-radius:50%;font-size:1.4rem;min-width:44px}
+.avgrid button.on{box-shadow:0 0 0 2px #F4EFE6}
+.cropbox{position:relative;width:min(78vw,300px);aspect-ratio:1;margin:8px auto 14px;overflow:hidden;border-radius:16px;background:#000;touch-action:none;cursor:grab}
+.cropbox img{position:absolute;left:0;top:0;transform-origin:0 0;user-select:none;-webkit-user-drag:none;pointer-events:none;max-width:none}
+.cropbox .mask{position:absolute;inset:0;pointer-events:none;border-radius:50%;box-shadow:0 0 0 999px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.5)}
+.cropzoom{width:100%;accent-color:#D4703F;margin:4px 0 6px}
 .prostat{display:flex;align-items:center;gap:.6rem;padding:.9rem var(--pad-tile);border-radius:var(--r-md);background:var(--veil);margin:0 0 var(--s4);font-size:.9rem}
 .prostat i{width:.5rem;height:.5rem;border-radius:50%;background:#7FB08C;flex:none}
 .prostat span{color:var(--ink-3);margin-left:auto;font-size:.8rem}
@@ -1178,7 +1192,7 @@ button.cli:active{opacity:.65}
     <!-- ==================== ПРОФИЛЬ ==================== -->
     <section class="view" data-view="profile">
       <div class="phead">
-        <div class="av"></div>
+        <button class="av" id="profileAv" aria-label="Фото профиля"></button>
         <div class="who"><b id="profileName"></b><span id="profileSince"></span></div>
       </div>
       <div class="upsell-slot" data-placement="profile"></div>
@@ -1798,6 +1812,31 @@ button.cli:active{opacity:.65}
       <p class="oerr" id="proErr" style="display:none"></p>
       <button class="pill solid wide" style="margin-top:18px" id="proPay">Попробовать неделю за 1 ₽</button>
       <button class="textbtn" style="width:100%;justify-content:center" data-close-modal>Не сейчас</button>
+    </div>
+  </div>
+
+  <!-- АВАТАР -->
+  <div class="modal" id="avatarModal" hidden>
+    <div class="card">
+      <h2 class="disp md">Фото <span class="ser">профиля</span></h2>
+      <label class="pill solid wide" style="display:flex;justify-content:center;cursor:pointer">Выбрать фото<input type="file" id="avFile" accept="image/*" hidden></label>
+      <p class="cap" style="margin:16px 0 0">Или готовый аватар</p>
+      <div class="avgrid" id="avPresets"></div>
+      <p class="oerr" id="avErr" style="display:none"></p>
+      <button class="pill wide" id="avRemove">Убрать фото</button>
+      <button class="textbtn" style="width:100%;justify-content:center" data-close-modal>Закрыть</button>
+    </div>
+  </div>
+
+  <!-- КАДРИРОВАНИЕ -->
+  <div class="modal" id="cropModal" hidden>
+    <div class="card">
+      <h2 class="disp md" style="text-align:center">Подвинь и увеличь</h2>
+      <div class="cropbox" id="cropBox"><img id="cropImg" alt=""><div class="mask"></div></div>
+      <input type="range" class="cropzoom" id="cropZoom" min="1" max="4" step="0.01" value="1" aria-label="Масштаб">
+      <p class="oerr" id="cropErr" style="display:none"></p>
+      <button class="pill solid wide" id="cropDone">Готово</button>
+      <button class="textbtn" style="width:100%;justify-content:center" id="cropCancel">Отмена</button>
     </div>
   </div>
 
@@ -3532,6 +3571,125 @@ button.cli:active{opacity:.65}
         if(r.ok){ location.href='/'; return; }
         b.disabled=false; b.textContent='Удалить навсегда';
         $('deleteErr').textContent='Не получилось удалить. Попробуй ещё раз или напиши на ceo@mynika.ru'; $('deleteErr').style.display='';
+      });
+    });
+  })();
+
+  /* ============================================================
+     АВАТАР (правка 12)
+     Фото хранится в Supabase Storage (бакет avatars, {user_id}/avatar.webp), отдаётся
+     через GET /api/v2/avatar. Готовые аватары: кадры сцен приложения с буквой имени.
+     ============================================================ */
+  (function(){
+    var PRESETS=[['sc-dawn',240],['sc-dusk',240],['sc-night',120],['sc-mist',260],['sc-dawn',60],['sc-dusk',380],['sc-night',300],['sc-mist',80]];
+    function letter(){ var n=(ME&&ME.user.name||'').trim(); return (n?n.charAt(0):(ME&&ME.user.email||'N').charAt(0)).toUpperCase(); }
+    function scene(i){ var p=PRESETS[i-1]; return '<svg viewBox="0 '+p[1]+' 400 400" preserveAspectRatio="xMidYMid slice"><use href="#'+p[0]+'" width="400" height="800"/></svg>'; }
+    function paint(el,av){
+      if(!el) return;
+      el.classList.add('avfill'); el.classList.toggle('photo',!!(av&&av.kind==='photo'));
+      var L='<b>'+letter()+'</b>';
+      if(av&&av.kind==='photo') el.innerHTML='<img alt="" src="'+av.url+'">'+L;
+      else if(av&&av.kind==='preset') el.innerHTML=scene(av.n)+L;
+      else el.innerHTML=L;
+    }
+    function paintAll(){ var av=ME&&ME.profile.avatar; paint(document.getElementById('avatar'),av); paint(document.getElementById('profileAv'),av); }
+    window.__onMe.push(paintAll);
+
+    var modal=document.getElementById('avatarModal'), grid=document.getElementById('avPresets'), err=document.getElementById('avErr');
+    function showErr(t){ err.textContent=t||''; err.style.display=t?'':'none'; }
+    function drawPresets(){
+      grid.innerHTML='';
+      for(var i=1;i<=8;i++){ (function(n){
+        var b=document.createElement('button'); b.className='avfill'+(ME&&ME.profile.avatar&&ME.profile.avatar.kind==='preset'&&ME.profile.avatar.n===n?' on':'');
+        b.setAttribute('aria-label','Готовый аватар '+n); b.innerHTML=scene(n)+'<b>'+letter()+'</b>';
+        b.addEventListener('click',function(){
+          showErr('');
+          api('/api/v2/avatar',{method:'POST',body:{preset:n}}).then(function(r){
+            if(!r.ok){ showErr('Не получилось сохранить. Попробуй ещё раз.'); return; }
+            modal.hidden=true; window.__refreshMe(); haptic(8);
+          });
+        });
+        grid.appendChild(b);
+      })(i); }
+    }
+    document.getElementById('profileAv').addEventListener('click',function(){
+      showErr(''); drawPresets();
+      document.getElementById('avRemove').style.display=ME&&ME.profile.avatar?'':'none';
+      modal.hidden=false; haptic(8);
+    });
+    document.getElementById('avRemove').addEventListener('click',function(){
+      api('/api/v2/avatar',{method:'DELETE'}).then(function(r){
+        if(!r.ok){ showErr('Не получилось убрать фото.'); return; }
+        modal.hidden=true; window.__refreshMe();
+      });
+    });
+
+    /* кадрирование: перемещение одним пальцем, масштаб двумя, колёсиком или ползунком */
+    var crop=document.getElementById('cropModal'), box=document.getElementById('cropBox'), img=document.getElementById('cropImg'),
+        zoom=document.getElementById('cropZoom'), cerr=document.getElementById('cropErr');
+    var st={x:0,y:0,s:1,base:1,w:0,h:0,S:0}, ptrs={}, pinch=null, objUrl=null;
+    function clamp(){
+      var vw=st.w*st.s, vh=st.h*st.s;
+      st.x=Math.min(0,Math.max(st.S-vw,st.x)); st.y=Math.min(0,Math.max(st.S-vh,st.y));
+      img.style.transform='translate('+st.x+'px,'+st.y+'px) scale('+st.s+')';
+    }
+    function setScale(ns,cx,cy){
+      ns=Math.max(st.base,Math.min(st.base*4,ns));
+      cx=cx==null?st.S/2:cx; cy=cy==null?st.S/2:cy;
+      st.x=cx-(cx-st.x)*ns/st.s; st.y=cy-(cy-st.y)*ns/st.s; st.s=ns;
+      zoom.value=String(st.s/st.base); clamp();
+    }
+    document.getElementById('avFile').addEventListener('change',function(){
+      var f=this.files&&this.files[0]; this.value=''; if(!f) return;
+      if(!/^image\//.test(f.type)){ showErr('Это не картинка.'); return; }
+      if(objUrl) URL.revokeObjectURL(objUrl);
+      objUrl=URL.createObjectURL(f);
+      img.onload=function(){
+        modal.hidden=true; crop.hidden=false; cerr.style.display='none';
+        requestAnimationFrame(function(){
+          st.S=box.clientWidth; st.w=img.naturalWidth; st.h=img.naturalHeight;
+          st.base=Math.max(st.S/st.w,st.S/st.h); st.s=st.base;
+          st.x=(st.S-st.w*st.s)/2; st.y=(st.S-st.h*st.s)/2; zoom.value='1'; clamp();
+        });
+      };
+      img.onerror=function(){ showErr('Не получилось открыть фото. Попробуй другое.'); };
+      img.src=objUrl;
+    });
+    zoom.addEventListener('input',function(){ setScale(st.base*Number(zoom.value)); });
+    box.addEventListener('wheel',function(e){ e.preventDefault(); var r=box.getBoundingClientRect(); setScale(st.s*(e.deltaY<0?1.08:1/1.08),e.clientX-r.left,e.clientY-r.top); },{passive:false});
+    box.addEventListener('pointerdown',function(e){ box.setPointerCapture(e.pointerId); ptrs[e.pointerId]={x:e.clientX,y:e.clientY}; pinch=null; });
+    box.addEventListener('pointermove',function(e){
+      var p=ptrs[e.pointerId]; if(!p) return;
+      var ids=Object.keys(ptrs);
+      if(ids.length===1){ st.x+=e.clientX-p.x; st.y+=e.clientY-p.y; p.x=e.clientX; p.y=e.clientY; clamp(); return; }
+      p.x=e.clientX; p.y=e.clientY;
+      var a=ptrs[ids[0]], b=ptrs[ids[1]], d=Math.hypot(a.x-b.x,a.y-b.y), r=box.getBoundingClientRect();
+      var cx=(a.x+b.x)/2-r.left, cy=(a.y+b.y)/2-r.top;
+      if(!pinch){ pinch={d:d,s:st.s}; return; }
+      setScale(pinch.s*d/pinch.d,cx,cy);
+    });
+    function up(e){ delete ptrs[e.pointerId]; pinch=null; }
+    box.addEventListener('pointerup',up); box.addEventListener('pointercancel',up);
+    document.getElementById('cropCancel').addEventListener('click',function(){ crop.hidden=true; });
+    function toBlob(cv,type,q){ return new Promise(function(res){ cv.toBlob(function(b){ res(b); },type,q); }); }
+    document.getElementById('cropDone').addEventListener('click',function(){
+      var btn=this; btn.disabled=true; btn.textContent='Сохраняю…';
+      var cv=document.createElement('canvas'); cv.width=cv.height=512;
+      var ctx=cv.getContext('2d'); ctx.fillStyle='#0B0B0D'; ctx.fillRect(0,0,512,512);
+      ctx.drawImage(img,-st.x/st.s,-st.y/st.s,st.S/st.s,st.S/st.s,0,0,512,512);
+      /* WebP, если браузер умеет его кодировать, иначе JPEG; качество снижаем до 150 КБ */
+      (async function(){
+        var type='image/webp', q=.86, blob=await toBlob(cv,type,q);
+        if(!blob||blob.type!=='image/webp'){ type='image/jpeg'; blob=await toBlob(cv,type,q); }
+        while(blob&&blob.size>150*1024&&q>.4){ q-=.08; blob=await toBlob(cv,type,q); }
+        if(!blob){ throw new Error('encode'); }
+        var r=await fetch('/api/v2/avatar',{method:'POST',credentials:'same-origin',headers:{'Content-Type':type},body:blob});
+        if(!r.ok) throw new Error(String(r.status));
+      })().then(function(){
+        btn.disabled=false; btn.textContent='Готово'; crop.hidden=true; window.__refreshMe(); haptic(10);
+      },function(){
+        btn.disabled=false; btn.textContent='Готово';
+        cerr.textContent='Не получилось сохранить фото. Проверь связь и попробуй ещё раз.'; cerr.style.display='';
       });
     });
   })();

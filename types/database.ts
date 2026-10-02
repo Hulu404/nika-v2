@@ -93,6 +93,7 @@ export interface Database {
           behaviors: string[];
           ui_prefs: Json;
           onboarded_at: string | null;
+          avatar_url: string | null;
         };
         Insert: {
           id?: string;
@@ -121,6 +122,7 @@ export interface Database {
           behaviors?: string[];
           ui_prefs?: Json;
           onboarded_at?: string | null;
+          avatar_url?: string | null;
         };
         Update: {
           id?: string;
@@ -149,6 +151,7 @@ export interface Database {
           behaviors?: string[];
           ui_prefs?: Json;
           onboarded_at?: string | null;
+          avatar_url?: string | null;
         };
         Relationships: [];
       };

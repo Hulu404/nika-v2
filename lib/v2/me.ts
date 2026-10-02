@@ -7,6 +7,7 @@ import { resolveIsPro } from "@/lib/subscription";
 import { rhythmEnabled } from "@/lib/v2/validate";
 import { weekSummary } from "@/lib/runs";
 import { isTelegramAllowed } from "@/lib/telegram/allowlist";
+import { parseAvatar } from "@/lib/v2/avatar";
 
 /**
  * Пользователи, заведённые до запуска новой версии, проходили старый онбординг
@@ -81,6 +82,13 @@ export async function buildMe(supabase: ServerClient, user: User) {
       daypart: p?.daypart ?? null,
       behaviors: p?.behaviors ?? [],
       uiPrefs: (p?.ui_prefs as Record<string, unknown> | null) ?? {},
+      avatar: (() => {
+        const a = parseAvatar(p?.avatar_url);
+        if (!a) return null;
+        return a.kind === "photo"
+          ? { kind: "photo" as const, url: "/api/v2/avatar?" + (p?.avatar_url?.split("?")[1] ?? "") }
+          : { kind: "preset" as const, n: a.n };
+      })(),
     },
     onboarding: {
       needsName: !p?.gender,
