@@ -46,6 +46,10 @@ afterEach(() => vi.unstubAllEnvs());
 describe("owner task lists", () => {
   it("delivers the slash format to matching users and shows completion in the owner list", async () => {
     await send("/assign\nМакет / пт 18:00 / @alice\nТекст / 03.10 / @bob");
+    const commands = calls.find(c => c.method === "setMyCommands" &&
+      (c.payload.scope as { chat_id?: number } | undefined)?.chat_id === 9);
+    expect((commands?.payload.commands as Array<{ command: string }>).map(c => c.command))
+      .toEqual(expect.arrayContaining(["tasks", "assign", "assign_status"]));
     expect(store.assignedTasks.size).toBe(2);
     expect(texts(1).some(t => t.includes("Макет") && t.includes("Срок: пт 02.10, 18:00"))).toBe(true);
     expect(texts(2).some(t => t.includes("Текст") && !t.includes("Макет"))).toBe(true);

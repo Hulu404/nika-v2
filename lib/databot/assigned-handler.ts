@@ -9,6 +9,7 @@ import type { DatabotStore } from "./data/store";
 import { escapeHtml } from "./html";
 import { formExpired, openForm } from "./form";
 import { parseIntent } from "./intent";
+import { setChatCommands } from "./menu";
 import { normalizeTaskUsername } from "./tasks";
 import { isActiveAssigned, parseTaskList, TaskListError, type AssignedAction, type AssignedTask } from "./task-list";
 
@@ -126,6 +127,10 @@ export async function handleAssignedUpdate(ctx: Context, store: DatabotStore, no
   const member = await store.findActiveMember(ctx.from.id);
   // Чужим отвечает остальной конвейер — одной общей фразой.
   if (!member) return false;
+  // Этот обработчик идёт раньше общего конвейера. При прямом /assign или
+  // /tasks обновляем сохранённое в Telegram меню даже без повторного /start.
+  if (command && (command[1].toLowerCase() === "assign" || command[1].toLowerCase() === "tasks"))
+    await setChatCommands(ctx.api, ctx.from.id, owner ? "council" : member.zone);
   const reply = (body: string, buttons?: Buttons) =>
     ctx.reply(body, { parse_mode: "HTML", link_preview_options: { is_disabled: true }, reply_markup: markup(buttons) });
   const cmd = myTasks ? "tasks" : command?.[1].toLowerCase() ?? "assign";

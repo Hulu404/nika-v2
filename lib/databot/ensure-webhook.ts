@@ -1,5 +1,7 @@
 import { getDatabot } from "./bot";
 import { DATABOT_DEFAULT_COMMANDS } from "./copy";
+import { createSupabaseStore } from "./data/supabase-store";
+import { setChatCommands } from "./menu";
 import { publicOriginFromEnv } from "../public-origin";
 
 /**
@@ -45,6 +47,15 @@ export async function ensureDatabotWebhook(): Promise<EnsureDatabotWebhookResult
     await bot.api.setMyCommands([...DATABOT_DEFAULT_COMMANDS]).catch((err) => {
       console.warn("[databot] setMyCommands:", err instanceof Error ? err.message : String(err));
     });
+    // Telegram сохраняет команды scope=chat между релизами. Обновляем меню
+    // уже вошедших участников при каждом старте, иначе они видят старый набор
+    // до следующего /start.
+    try {
+      const members = await createSupabaseStore().listMembers();
+      for (const member of members) await setChatCommands(bot.api, member.chat_id, member.zone);
+    } catch (err) {
+      console.warn("[databot] sync member commands:", err instanceof Error ? err.message : String(err));
+    }
     return { status: "registered", detail: target };
   } catch (err) {
     return { status: "failed", detail: err instanceof Error ? err.message : String(err) };
