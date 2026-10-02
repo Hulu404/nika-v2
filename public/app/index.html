@@ -684,7 +684,7 @@ a[href^="mailto:"],a[href^="tel:"],a[x-apple-data-detectors]{color:inherit!impor
   pointer-events:none;transition:opacity .25s}
 .ostep.scrolled-end .ofoot::before{opacity:0}
 .ostep .opts{margin-top:24px}
-.opt.dim{opacity:.4;pointer-events:none}
+.opt.dim{opacity:.4}
 .obcount{font-size:.78rem;color:var(--ink-3);margin-top:14px;margin-bottom:8px;line-height:1.4}
 .obcount b{color:var(--ink)}
 .ohint{font-size:.78rem;color:var(--ink-3);text-align:center;margin-top:4px;display:none}
@@ -1620,7 +1620,7 @@ button.cli:active{opacity:.65}
             <button class="opt" data-val="other">Другое</button>
           </div>
           <div class="oother" id="intentOtherDiv">
-            <input id="intentOtherInput" type="text" maxlength="60" placeholder="Например, устаю от учёбы" class="oother-input">
+            <input id="intentOtherInput" type="text" maxlength="40" placeholder="Своими словами" class="oother-input" enterkeyhint="done">
           </div>
         </div>
       </div>
@@ -1642,7 +1642,7 @@ button.cli:active{opacity:.65}
             <button class="opt" data-val="other">Другое</button>
           </div>
           <div class="oother" id="barrierOtherDiv">
-            <input id="barrierOtherInput" type="text" maxlength="60" placeholder="Например, хочется, но нет сил начать" class="oother-input">
+            <input id="barrierOtherInput" type="text" maxlength="40" placeholder="Своими словами" class="oother-input" enterkeyhint="done">
           </div>
         </div>
       </div>
@@ -1653,13 +1653,13 @@ button.cli:active{opacity:.65}
     <div class="ostep" data-step="5">
       <div class="obody">
         <div class="oinner">
-          <h1 class="disp">Как часто ты сейчас <span class="ser">двигаешься</span></h1>
+          <h1 class="disp">Сколько раз в неделю ты сейчас <span class="ser">бегаешь</span> или тренируешься</h1>
           <p class="cap" style="margin-top:14px;max-width:290px">Честно, а не как хотелось бы. Это станет твоим коридором, а не целью.</p>
           <div class="opts" data-key="baseline">
-            <button class="opt" data-val="rare">Почти не двигаюсь</button>
-            <button class="opt" data-val="low">Один или два раза в неделю</button>
-            <button class="opt" data-val="mid">Три или четыре раза</button>
-            <button class="opt" data-val="high">Пять и больше</button>
+            <button class="opt" data-val="rare">Пока ни разу</button>
+            <button class="opt" data-val="low">1 или 2 раза</button>
+            <button class="opt" data-val="mid">3 или 4 раза</button>
+            <button class="opt" data-val="high">5 и больше</button>
           </div>
         </div>
       </div>
@@ -1670,11 +1670,11 @@ button.cli:active{opacity:.65}
     <div class="ostep" data-step="6">
       <div class="obody">
         <div class="oinner">
-          <h1 class="disp">Когда обычно <span class="ser">получается</span></h1>
+          <h1 class="disp">В какое время ты обычно <span class="ser">бегаешь</span></h1>
           <p class="cap" style="margin-top:14px;max-width:290px">Чтобы понимать твой ритм дня. Небо на главной подстроится под это время.</p>
           <div class="opts" data-key="daypart">
-            <button class="opt" data-val="morning">Утром до дел</button>
-            <button class="opt" data-val="noon">В обед или днём</button>
+            <button class="opt" data-val="morning">Утром, до дел</button>
+            <button class="opt" data-val="noon">Днём</button>
             <button class="opt" data-val="evening">Вечером</button>
             <button class="opt" data-val="varies">По-разному</button>
           </div>
@@ -1704,7 +1704,7 @@ button.cli:active{opacity:.65}
             <button class="opt" data-val="other">Другое</button>
           </div>
           <div class="oother" id="behaviorsOtherDiv">
-            <input id="behaviorsOtherInput" type="text" maxlength="60" placeholder="Например, слушала музыку" class="oother-input">
+            <input id="behaviorsOtherInput" type="text" maxlength="40" placeholder="Своими словами" class="oother-input" enterkeyhint="done">
           </div>
           <p class="cap" style="margin-top:14px;font-size:.78rem;color:var(--ink-3)">Изменить набор можно в любой момент в профиле.</p>
         </div>
@@ -2856,7 +2856,9 @@ button.cli:active{opacity:.65}
             g.querySelectorAll('.opt').forEach(function(x){ x.classList.remove('on'); });
             o.classList.add('on');
             profile[key]=o.dataset.val;
-            if(otherDiv) otherDiv.style.display=(o.dataset.val==='other')?'':'none';
+            /* поле «Другое»: в CSS оно скрыто, поэтому показываем явным display:block */
+            if(otherDiv) otherDiv.style.display=(o.dataset.val==='other')?'block':'none';
+            /* фокус синхронно в обработчике касания: иначе iOS не откроет клавиатуру */
             if(o.dataset.val==='other'){ if(otherInp) otherInp.focus(); }
             else { if(profile[key+'Custom']!==undefined) profile[key+'Custom']=''; }
             haptic(7);
@@ -2869,60 +2871,62 @@ button.cli:active{opacity:.65}
     })();
 
     // ── behaviors (мультивыбор 3–5 + Другое) ────────────────
+    // «Другое» считается одной из пяти, пока выбрано меньше пяти, оно всегда нажимается.
+    // Пустое «Другое» в метки не попадает.
     (function(){
       var g=onb.querySelector('.opts[data-key="behaviors"]');
       if(!g) return;
-      var maxSel=5, minSel=3;
+      var maxSel=5, minSel=3, hintTimer=null;
       var countEl=document.getElementById('behaviorsCount');
       var hintEl=document.getElementById('behaviorsHint');
       var nextBtn=document.getElementById('behaviorsNext');
       var otherBtn=g.querySelector('[data-val="other"]');
       var otherDiv=document.getElementById('behaviorsOtherDiv');
       var otherInp=document.getElementById('behaviorsOtherInput');
-
-      function getVals(){
-        var arr=Array.from(g.querySelectorAll('.opt.on')).map(function(o){ return o.dataset.val; }).filter(function(v){ return v!=='other'; });
-        if(otherBtn&&otherBtn.classList.contains('on')&&otherInp&&otherInp.value.trim())
-          arr.push('c:'+otherInp.value.trim());
+      function regular(){ return Array.from(g.querySelectorAll('.opt.on')).filter(function(o){ return o!==otherBtn; }); }
+      function otherOn(){ return !!otherBtn&&otherBtn.classList.contains('on'); }
+      function count(){ return regular().length+(otherOn()?1:0); }
+      function vals(){
+        var arr=regular().map(function(o){ return o.dataset.val; });
+        var t=otherInp?otherInp.value.trim():'';
+        if(otherOn()&&t) arr.push('c:'+t.slice(0,40));
         return arr;
       }
-
-      function updateUI(){
-        profile.behaviors=getVals();
-        var n=profile.behaviors.length;
-        if(countEl) countEl.innerHTML='Выбрано <b>'+n+'</b> из '+maxSel;
-        var atMax=(n>=maxSel);
-        g.querySelectorAll('.opt:not(.on)').forEach(function(o){ o.classList.toggle('dim',atMax); });
-        var need=minSel-n;
-        if(need>0){
-          nextBtn.disabled=true;
-          if(hintEl){ hintEl.textContent='Выбери ещё '+(need===1?'одну':need===2?'две':String(need)); hintEl.style.display=''; }
-        } else {
-          nextBtn.disabled=false;
-          if(hintEl) hintEl.style.display='none';
-        }
+      function hint(text,flash){
+        if(!hintEl) return;
+        clearTimeout(hintTimer);
+        hintEl.textContent=text; hintEl.style.display=text?'':'none';
+        if(flash) hintTimer=setTimeout(updateUI,2200);
       }
-
-      g.querySelectorAll('.opt:not([data-val="other"])').forEach(function(o){
+      function updateUI(){
+        profile.behaviors=vals();
+        var n=count();
+        if(countEl) countEl.innerHTML='Выбрано <b>'+n+'</b> из '+maxSel;
+        var atMax=n>=maxSel;
+        g.querySelectorAll('.opt').forEach(function(o){ o.classList.toggle('dim',atMax&&!o.classList.contains('on')); });
+        var need=minSel-n;
+        nextBtn.disabled=profile.behaviors.length<minSel;
+        if(need>0) hint('Выбери ещё '+(need===1?'одну':need===2?'две':'три'));
+        else if(profile.behaviors.length<minSel) hint('Напиши своё в поле «Другое» или выбери ещё одну');
+        else hint('');
+      }
+      g.querySelectorAll('.opt').forEach(function(o){
+        if(o===otherBtn) return;
         o.addEventListener('click',function(){
-          if(!o.classList.contains('on')&&getVals().length>=maxSel) return;
-          o.classList.toggle('on');
-          updateUI(); haptic(7);
+          if(!o.classList.contains('on')&&count()>=maxSel){ hint('Можно до пяти, сними одну',true); haptic(12); return; }
+          o.classList.toggle('on'); updateUI(); haptic(7);
         });
       });
-
       if(otherBtn) otherBtn.addEventListener('click',function(){
-        var open=otherDiv&&otherDiv.style.display!=='none';
-        if(open){ otherDiv.style.display='none'; otherBtn.classList.remove('on'); }
-        else{ if(otherDiv){ otherDiv.style.display=''; if(otherInp) otherInp.focus(); } }
+        if(otherOn()){ otherBtn.classList.remove('on'); otherDiv.style.display='none'; }
+        else {
+          if(count()>=maxSel){ hint('Можно до пяти, сними одну',true); haptic(12); return; }
+          otherBtn.classList.add('on'); otherDiv.style.display='block';
+          otherInp.focus(); /* синхронно: иначе iOS не откроет клавиатуру */
+        }
         updateUI(); haptic(7);
       });
-      if(otherInp) otherInp.addEventListener('input',function(){
-        if(this.value.trim()) otherBtn.classList.add('on');
-        else otherBtn.classList.remove('on');
-        updateUI();
-      });
-
+      if(otherInp) otherInp.addEventListener('input',updateUI);
       if(nextBtn) nextBtn.addEventListener('click',function(){ if(!nextBtn.disabled) show(cur+1); });
       updateUI();
     })();
@@ -2936,8 +2940,9 @@ button.cli:active{opacity:.65}
           if(g&&!g.hasAttribute('data-multi')){
             var sel=g.querySelector('.opt.on');
             if(sel&&sel.dataset.val==='other'){
+              /* пустое «Другое» не сохраняется: ответа на этот шаг просто нет */
               var inp=document.getElementById(g.dataset.key+'OtherInput');
-              if(!inp||!inp.value.trim()){ if(inp) inp.focus(); return; }
+              if(!inp||!inp.value.trim()){ profile[g.dataset.key]=''; profile[g.dataset.key+'Custom']=''; }
             }
           }
         }
@@ -3046,7 +3051,7 @@ button.cli:active{opacity:.65}
   /* ============================================================
      ПРИМЕНЕНИЕ СОСТОЯНИЯ ПОЛЬЗОВАТЕЛЯ
      ============================================================ */
-  var CORRIDOR_MAP={rare:'Почти без нагрузки',low:'1–2 в неделю',mid:'3–4 в неделю',high:'5 и больше'};
+  var CORRIDOR_MAP={rare:'Пока без тренировок',low:'1–2 в неделю',mid:'3–4 в неделю',high:'5 и больше'};
   var DEFAULT_TAGS=['sleep','heavy_legs','anxious','work','run_am'];
   function myTags(){ return (ME&&ME.profile.behaviors&&ME.profile.behaviors.length)?ME.profile.behaviors:DEFAULT_TAGS; }
   function applyMe(){
