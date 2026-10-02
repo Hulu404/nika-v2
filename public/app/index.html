@@ -10,6 +10,10 @@
 <link rel="manifest" href="/app/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png">
 <meta name="theme-color" content="#0B0B0D">
+<script>/* вариант навигации до первой отрисовки: стекло на iOS/iPadOS, бар на остальных; ?nav=glass|solid для проверки */
+(function(){var q=/[?&]nav=(glass|solid)\b/.exec(location.search),ua=navigator.userAgent,
+ios=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1);
+document.documentElement.setAttribute('data-nav',q?q[1]:(ios?'glass':'solid'));})();</script>
 <title>НИКА</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -359,6 +363,43 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
   .statusbar{display:none}
   .homebar{display:none}
   .tabzone{position:fixed;left:16px;right:16px}
+}
+
+/* ── Нижняя навигация: data-nav="glass" (iOS) и "solid" (Android и запасной для iOS) ── */
+.tablens,.fablab{display:none}
+@media (max-width:1023px){
+  html[data-nav="glass"] .tabzone{left:16px;right:16px;bottom:calc(10px + env(safe-area-inset-bottom,0px));gap:10px}
+  html[data-nav="glass"] .tabs,html[data-nav="glass"] .fab{position:relative;isolation:isolate;background:rgba(255,255,255,.07);
+    -webkit-backdrop-filter:blur(12px) saturate(180%);backdrop-filter:blur(12px) saturate(180%);
+    box-shadow:inset 0 0 0 .5px rgba(255,255,255,.28),inset 0 1px 1px rgba(255,255,255,.35),inset 0 -1px 1px rgba(0,0,0,.25),0 10px 30px -10px rgba(0,0,0,.6)}
+  html[data-nav="glass"] .tabs::before,html[data-nav="glass"] .fab::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;
+    background:radial-gradient(120% 130% at 14% 0%,rgba(255,255,255,.18),rgba(255,255,255,0) 55%)}
+  html[data-nav="glass"] .tabs{height:62px;padding:0 5px;overflow:hidden}
+  html[data-nav="glass"] .tablens{display:block;position:absolute;top:5px;bottom:5px;left:0;width:0;opacity:0;z-index:0;pointer-events:none;
+    border-radius:var(--r-pill);background:rgba(255,255,255,.12);box-shadow:inset 0 0 0 .5px rgba(255,255,255,.3),inset 0 1px 0 rgba(255,255,255,.22);
+    transition:transform .35s cubic-bezier(.34,1.3,.64,1),width .35s cubic-bezier(.34,1.3,.64,1),opacity .2s}
+  html[data-nav="glass"] .tablens.instant{transition:none}
+  html[data-nav="glass"] .tab{position:relative;z-index:1;min-width:44px;min-height:44px;justify-content:center;color:rgba(244,239,230,.5)}
+  html[data-nav="glass"] .tab.on{color:#F4EFE6}
+  html[data-nav="glass"] .tab span{font-size:.66rem}
+  html[data-nav="glass"] .fab{width:62px;height:62px;color:var(--brand)}
+  html[data-nav="glass"] .fab.on{box-shadow:inset 0 0 0 .5px rgba(255,255,255,.28),inset 0 1px 1px rgba(255,255,255,.35),inset 0 -1px 1px rgba(0,0,0,.25),0 0 0 2px rgba(212,112,63,.38),0 10px 30px -10px rgba(0,0,0,.6)}
+  html[data-nav="glass"] .fab .pip{top:13px;right:13px;width:7px;height:7px;background:var(--brand)}
+
+  html[data-nav="solid"] .tabzone{left:0;right:0;bottom:0;gap:0;align-items:stretch;padding:0 4px env(safe-area-inset-bottom,0px);
+    height:calc(56px + env(safe-area-inset-bottom,0px));background:linear-gradient(to bottom,rgba(11,11,13,0),rgba(11,11,13,.88) 35%,#0B0B0D 70%)}
+  html[data-nav="solid"] .tabs{display:contents}
+  html[data-nav="solid"] .tab{flex:1;height:56px;justify-content:center;gap:4px;border-radius:0;color:rgba(244,239,230,.55)}
+  html[data-nav="solid"] .tab svg,html[data-nav="solid"] .fab svg{width:24px;height:24px}
+  html[data-nav="solid"] .tab span,html[data-nav="solid"] .fablab{font-size:.66rem;font-weight:500}
+  html[data-nav="solid"] .tab.on{color:#F4EFE6}
+  html[data-nav="solid"] .tab.on span{font-weight:700}
+  html[data-nav="solid"] .fab{flex:1;width:auto;height:56px;border-radius:0;background:none;box-shadow:none;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--brand)}
+  html[data-nav="solid"] .fab .fablab{display:block;order:2;color:rgba(244,239,230,.55)}
+  html[data-nav="solid"] .fab.on .fablab{color:#F4EFE6;font-weight:700}
+  html[data-nav="solid"] .fab .pip{display:none}
+  html[data-nav="solid"] .botveil{display:none}
 }
 
 /* ── Десктоп: навигация слева, контент колонкой, Ника всегда открыта справа ── */
@@ -1338,6 +1379,7 @@ button.cli:active{opacity:.65}
 
   <div class="tabzone">
     <nav class="tabs">
+      <span class="tablens" aria-hidden="true"></span>
       <button class="tab on" data-go="home">
         <svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.4" stroke="currentColor" stroke-width="1.7"/><path d="M12 7.6V12l3 1.8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
         <span>Сегодня</span>
@@ -1357,6 +1399,7 @@ button.cli:active{opacity:.65}
     </nav>
     <button class="fab" id="fab" aria-label="Ника">
       <span class="pip"></span>
+      <span class="fablab">Ника</span>
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><path d="M4 6.5A2.5 2.5 0 016.5 4h11A2.5 2.5 0 0120 6.5v7a2.5 2.5 0 01-2.5 2.5H10l-4.5 4v-4H6.5A2.5 2.5 0 014 13.5v-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
     </button>
   </div>
@@ -1954,11 +1997,26 @@ button.cli:active{opacity:.65}
     backbar.style.display=deep?'flex':'none';
     backTitle.textContent=TITLE[v]||'';
     document.querySelectorAll('.tab').forEach(function(t){ t.classList.toggle('on',t.dataset.go===v); });
+    placeLens();
     if(v==='diary'&&window.__loadDiary) window.__loadDiary();
     if(v==='rhythm'&&window.__onRhythmView) window.__onRhythmView();
     if(v!=='practice'&&window.__resetPlayer) window.__resetPlayer();
     if(v!=='postrun'&&window.__resetPostrun) window.__resetPostrun();
   }
+  /* линза стеклянной навигации переезжает под активную вкладку */
+  var lens=document.querySelector('.tablens'), lensReady=false;
+  function placeLens(){
+    if(!lens) return;
+    var t=document.querySelector('.tabs .tab.on');
+    if(!t||t.offsetParent===null){ lens.style.opacity='0'; return; }
+    if(!lensReady||reduced()) lens.classList.add('instant');
+    lens.style.width=t.offsetWidth+'px';
+    lens.style.transform='translateX('+t.offsetLeft+'px)';
+    lens.style.opacity='1';
+    if(!lensReady||reduced()){ void lens.offsetWidth; requestAnimationFrame(function(){ lens.classList.remove('instant'); }); lensReady=true; }
+  }
+  window.__placeLens=placeLens;
+  window.addEventListener('resize',function(){ lensReady=false; placeLens(); });
   var stack=['home'];
   function go(v){
     var next=view(v),cur=current();
@@ -2929,6 +2987,7 @@ button.cli:active{opacity:.65}
     if(window.__applyUi) window.__applyUi(ui, pr.daypart);
     var rt=document.getElementById('rhythmTab');
     if(rt) rt.style.display=ME.rhythm.enabled?'':'none';
+    lensReady=false; placeLens();
     var cText=ME.stats.practicesCompleted>0?'Первое занятие пройдено':'Восемь занятий, начать с первого';
     ['courseCardSub','courseLibSub'].forEach(function(id){ var e=document.getElementById(id); if(e) e.textContent=cText; });
     var profN=document.getElementById('profileName');
