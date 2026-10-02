@@ -49,7 +49,14 @@ const TAX = process.env.ROBOKASSA_TAX || "none";
  */
 export const ROBOKASSA_PLANS: Record<
   RobokassaPlan,
-  { amount: number; months: number; subscriptionPlan: "monthly" | "yearly"; description: string }
+  {
+    amount: number;
+    months: number;
+    /** Срок в днях вместо месяцев (пробная неделя). Если задан, months не используется. */
+    days?: number;
+    subscriptionPlan: "monthly" | "yearly";
+    description: string;
+  }
 > = {
   monthly: {
     amount: 299,
@@ -63,16 +70,25 @@ export const ROBOKASSA_PLANS: Record<
     subscriptionPlan: "yearly",
     description: "Подписка НИКА PRO — 6 месяцев",
   },
-  // PRO: платёж 1 ₽ даёт доступ на months=1 (месяц). Автопродление НЕ реализовано
-  // (Robokassa Recurring не подключён), поэтому интерфейс и чек говорят ровно это:
-  // один платёж, один месяц, без повторных списаний.
+  // PRO: первая неделя за 1 ₽ — доступ на 7 дней. Автопродление НЕ реализовано
+  // (Robokassa Recurring не подключён): один платёж, без повторных списаний.
   pro: {
     amount: 1,
-    months: 1,
+    months: 0,
+    days: 7,
     subscriptionPlan: "monthly",
-    description: "Подписка НИКА PRO, 1 месяц",
+    description: "Подписка NIKA Pro, 7 дней",
   },
 };
+
+/** Конец оплаченного периода: дни для пробной недели, месяцы для остальных тарифов. */
+export function periodEndFor(plan: RobokassaPlan, from: Date): Date {
+  const { months, days } = ROBOKASSA_PLANS[plan];
+  const end = new Date(from);
+  if (days) end.setDate(end.getDate() + days);
+  else end.setMonth(end.getMonth() + months);
+  return end;
+}
 
 export function isRobokassaPlan(value: unknown): value is RobokassaPlan {
   return value === "monthly" || value === "halfyear" || value === "pro";

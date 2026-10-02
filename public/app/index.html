@@ -118,6 +118,33 @@ a[href^="mailto:"],a[href^="tel:"],a[x-apple-data-detectors]{color:inherit!impor
 .scene.card .body{display:flex;flex-direction:column;align-items:flex-start;text-align:left;width:100%}
 .scene.card .fadeout{height:100%;background:linear-gradient(to bottom,rgba(11,11,13,.08) 0%,rgba(11,11,13,.55) 38%,rgba(11,11,13,.9) 70%,rgba(11,11,13,.96) 100%)}
 .scene.card .body>.cap{max-width:100%}
+/* карточка Pro (правка 06): единственный градиентный акцент экрана — слово в заголовке */
+.upsell{position:relative;overflow:hidden;border-radius:var(--r-lg);padding:var(--pad-card);min-height:22rem;margin:0 0 var(--s4);
+  display:flex;flex-direction:column;justify-content:flex-end;text-align:left;isolation:isolate}
+.upsell .art{position:absolute;inset:-6%;z-index:0}
+.upsell .art svg{width:100%;height:100%;display:block}
+.upsell .shade{position:absolute;inset:0;z-index:1;background:linear-gradient(to bottom,rgba(11,11,13,.18) 0%,rgba(11,11,13,.3) 40%,rgba(11,11,13,.62) 64%,rgba(11,11,13,.94) 86%)}
+.upsell .in{position:relative;z-index:2}
+.upsell .x{position:absolute;top:.5rem;right:.5rem;z-index:3;width:44px;height:44px;border-radius:50%;display:grid;place-items:center;color:var(--ink);
+  background:rgba(11,11,13,.28);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.upsell h2{font-family:'Playfair Display','Times New Roman',Georgia,serif;font-weight:400;font-size:1.85rem;line-height:1.12;letter-spacing:-.01em;margin:0 0 .6rem}
+.upsell h2 em{font-style:italic;background:linear-gradient(100deg,#FFC48A 0%,#F08A4B 48%,#D4703F 100%);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.04em}
+.upsell .sub{font-size:var(--t-cap);line-height:var(--t-lh-cap);color:var(--ink-2);margin:0 0 .9rem}
+.upsell ul{list-style:none;margin:0 0 1.1rem;padding:0;display:flex;flex-direction:column;gap:.5rem}
+.upsell li{display:flex;align-items:center;gap:.6rem;font-size:.86rem;color:var(--ink)}
+.upsell li svg{flex:none;width:1.1rem;height:1.1rem;color:#F0A070}
+.upsell .go{position:relative;overflow:hidden;width:100%;min-height:48px;border-radius:var(--r-pill);background:#F4EFE6;color:#0B0B0D;
+  font-weight:600;font-size:.95rem;text-align:center;justify-content:center;display:flex;align-items:center}
+.upsell .go::after{content:'';position:absolute;top:0;bottom:0;left:-40%;width:30%;transform:skewX(-20deg);
+  background:linear-gradient(90deg,rgba(255,255,255,0),rgba(255,255,255,.7),rgba(255,255,255,0));animation:upGlare 6s ease-in-out 2s infinite}
+.upsell .note{margin:.55rem 0 0;text-align:center;font-size:.74rem;color:var(--ink-3)}
+.upsell .art{animation:upDrift 22s ease-in-out infinite alternate}
+@keyframes upGlare{0%,78%{left:-40%}100%{left:130%}}
+@keyframes upDrift{from{transform:scale(1) translate3d(0,0,0)}to{transform:scale(1.06) translate3d(-2%,-1.5%,0)}}
+@media (prefers-reduced-motion:reduce){.upsell .art,.upsell .go::after{animation:none}}
+.prostat{display:flex;align-items:center;gap:.6rem;padding:.9rem var(--pad-tile);border-radius:var(--r-md);background:var(--veil);margin:0 0 var(--s4);font-size:.9rem}
+.prostat i{width:.5rem;height:.5rem;border-radius:50%;background:#7FB08C;flex:none}
+.prostat span{color:var(--ink-3);margin-left:auto;font-size:.8rem}
 .clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .scene .fadeout{position:absolute;left:0;right:0;bottom:0;height:74%;z-index:1;pointer-events:none;
   background:linear-gradient(to bottom,transparent 0%,rgba(11,11,13,.38) 34%,rgba(11,11,13,.82) 66%,var(--void) 94%)}
@@ -891,7 +918,8 @@ button.cli:active{opacity:.65}
         </div>
       </div>
 
-      <!-- место карточки Про (правка 06) -->
+      <!-- карточка Pro (правка 06) -->
+      <div class="upsell-slot" data-placement="today"></div>
 
       <!-- Неделя -->
       <div class="section regonly">
@@ -937,17 +965,6 @@ button.cli:active{opacity:.65}
         <p class="cap" style="margin:0;max-width:290px" id="clubText"></p>
         <div class="cwhen"><span id="clubWhen"></span><i></i><span id="clubWhere"></span></div>
         <a class="pill" id="clubBtn" href="#" target="_blank" rel="noopener" style="text-decoration:none">Записаться</a>
-      </div>
-      <!-- Pro -->
-      <div class="scene card freeonly">
-        <div class="art"><svg><use href="#sc-night"/></svg></div>
-        <div class="fadeout"></div>
-        <div class="body">
-          <div class="lab" style="margin-bottom:10px">НИКА Про</div>
-          <h2 class="disp">Ника, которая <span class="ser">помнит</span></h2>
-          <p class="cap" style="margin:14px 0 20px;max-width:290px">Больше разговоров в день, память о прошлых разговорах и советы, собранные под тебя. Практики, дневник и ритм остаются бесплатными.</p>
-          <button class="pill solid" style="align-self:flex-start" data-goPro>Что входит в Про</button>
-        </div>
       </div>
     </section>
 
@@ -1164,16 +1181,16 @@ button.cli:active{opacity:.65}
         <div class="av"></div>
         <div class="who"><b id="profileName"></b><span id="profileSince"></span></div>
       </div>
+      <div class="upsell-slot" data-placement="profile"></div>
 
       <div class="setgroup">
         <div class="lab">Уровень</div>
         <div class="li" style="border-bottom:0;padding-left:0;padding-right:0">
-          <div class="tx"><b class="freeonly">Бесплатный, бессрочно</b><b class="proonly">Про</b>
+          <div class="tx"><b class="freeonly">Базовая</b><b class="proonly">Pro</b>
           <span class="freeonly">Практики, дневник, ритм и разговор с Никой в пределах дневного лимита</span>
-          <span class="proonly" id="proUntil">Больше разговоров в день, память между разговорами, советы под тебя</span></div>
+          <span class="proonly" id="proUntil">Ника помнит ваши разговоры за три недели, советы под тебя, больше разговоров каждый день</span></div>
         </div>
-        <p class="why freeonly" style="margin-top:12px">Бесплатный уровень не заканчивается.</p>
-        <button class="pill wide freeonly" style="margin-top:10px" data-goPro>Что даёт Про</button>
+        <p class="why freeonly" style="margin-top:12px">Базовая остаётся с тобой без срока.</p>
       </div>
 
       <div class="setgroup">
@@ -1769,17 +1786,17 @@ button.cli:active{opacity:.65}
   <!-- ПРО -->
   <div class="modal" id="proModal" hidden>
     <div class="card">
-      <div class="lab" style="margin-bottom:10px">НИКА Про</div>
+      <div class="lab" style="margin-bottom:10px">Что даёт Pro</div>
       <h2 class="disp md">Ника, которая <span class="ser">помнит</span></h2>
       <ul>
-        <li>Больше разговоров с Никой в день</li>
-        <li>Помнит контекст и не начинает с нуля каждый день</li>
-        <li>Советы собираются персонально под тебя</li>
+        <li>Помнит ваши разговоры, пробежки и записи за три недели и возвращается к важному</li>
+        <li>Советы из разговоров собираются под тебя</li>
+        <li>Больше разговоров каждый день</li>
       </ul>
-      <p class="cap">К оплате 1 ₽, один раз. Доступ к Про на 1 месяц с момента оплаты. Автопродления нет: повторно деньги не спишутся, по окончании срока аккаунт вернётся на бесплатный уровень, данные сохранятся. Кассовый чек придёт на почту.</p>
+      <p class="cap">Первая неделя за 1 ₽: доступ к Pro на 7 дней с момента оплаты. Автопродления нет, повторно деньги не спишутся. Через 7 дней аккаунт вернётся на Базовую, данные сохранятся. Кассовый чек придёт на почту.</p>
       <p class="cap" style="margin-top:10px">Нажимая кнопку, ты принимаешь условия <a href="/legal/oferta" target="_blank" rel="noopener" style="color:var(--ink);text-decoration:underline">Публичной оферты</a>.</p>
       <p class="oerr" id="proErr" style="display:none"></p>
-      <button class="pill solid wide" style="margin-top:18px" id="proPay">Оплатить 1 ₽</button>
+      <button class="pill solid wide" style="margin-top:18px" id="proPay">Попробовать неделю за 1 ₽</button>
       <button class="textbtn" style="width:100%;justify-content:center" data-close-modal>Не сейчас</button>
     </div>
   </div>
@@ -3352,7 +3369,7 @@ button.cli:active{opacity:.65}
     window.__onMe.push(function(me){
       $('profileName').textContent=capName(me.user.name)||me.user.email||'';
       $('profileSince').textContent=sinceText(me.user.createdAt);
-      if(me.plan.isPro) $('proUntil').textContent=me.plan.periodEnd?'Про до '+new Date(me.plan.periodEnd).toLocaleDateString('ru-RU')+'. Больше разговоров, память, советы под тебя':'Больше разговоров в день, память между разговорами, советы под тебя';
+      if(me.plan.isPro&&me.plan.periodEnd) $('proUntil').textContent='Pro до '+new Date(me.plan.periodEnd).toLocaleDateString('ru-RU')+'. Ника помнит ваши разговоры за три недели, советы под тебя, больше разговоров каждый день';
       if(document.activeElement!==$('pfName')) $('pfName').value=me.user.name||'';
       document.querySelectorAll('#pfGender .tag').forEach(function(b){ b.classList.toggle('on',b.dataset.g===me.profile.gender); });
       tagSel=(me.profile.behaviors&&me.profile.behaviors.length>=3)?me.profile.behaviors.slice():DEFAULT_TAGS.slice(0,5);
@@ -3492,7 +3509,7 @@ button.cli:active{opacity:.65}
       var b=this; b.disabled=true; b.textContent='Переходим к оплате…';
       api('/api/robokassa/create-payment',{method:'POST',body:{plan:'pro'}}).then(function(r){
         if(r.ok&&r.data&&r.data.paymentUrl){ location.href=r.data.paymentUrl; return; }
-        b.disabled=false; b.textContent='Оплатить 1 ₽';
+        b.disabled=false; b.textContent='Попробовать неделю за 1 ₽';
         $('proErr').textContent=(r.data&&r.data.error)||'Не получилось перейти к оплате. Попробуй ещё раз.'; $('proErr').style.display='';
       });
     });
@@ -3510,6 +3527,72 @@ button.cli:active{opacity:.65}
         if(r.ok){ location.href='/'; return; }
         b.disabled=false; b.textContent='Удалить навсегда';
         $('deleteErr').textContent='Не получилось удалить. Попробуй ещё раз или напиши на ceo@mynika.ru'; $('deleteErr').style.display='';
+      });
+    });
+  })();
+
+  /* ============================================================
+     КАРТОЧКА PRO (правка 06)
+     Только для Базовой; у Pro вместо неё строка статуса. На «Сегодня» крестик
+     прячет карточку на 7 дней. Текст A или B: флаг UPSELL_VARIANT или ?upsell=a|b.
+     ============================================================ */
+  var UPSELL_VARIANT='a';
+  (function(){
+    var m=/[?&]upsell=(a|b)\b/.exec(location.search), variant=m?m[1]:UPSELL_VARIANT;
+    var HIDE_KEY='nika_upsell_hide_until', HIDE_DAYS=7;
+    var T={
+      a:{h:'Ника начнёт тебя <em>помнить</em>',s:'С Pro она держит в голове три недели ваших разговоров и замечает то, что легко пропустить самому.'},
+      b:{h:'Рассказываешь <em>один раз</em>',s:'Дальше Ника помнит сама и возвращается к важному: «На прошлой неделе вечером было тяжелее. Сегодня так же?»'}
+    };
+    var IC={
+      mem:'<svg viewBox="0 0 24 24" fill="none"><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4.5 12a7.5 7.5 0 1 0 2.2-5.3M4.5 4.5v3h3" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+      tip:'<svg viewBox="0 0 24 24" fill="none"><path d="M7 4h10v16l-5-3.5L7 20z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>',
+      chat:'<svg viewBox="0 0 24 24" fill="none"><path d="M4 6.5A2.5 2.5 0 016.5 4h11A2.5 2.5 0 0120 6.5v7a2.5 2.5 0 01-2.5 2.5H10l-4.5 4v-4H6.5A2.5 2.5 0 014 13.5v-7z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>'
+    };
+    function track(event,placement){
+      if(!(window.NIKA_CONSENT&&window.NIKA_CONSENT.analytics)) return;
+      var props={placement:placement,variant:variant};
+      try{ if(window.ym) window.ym(110821642,'reachGoal',event,props); }catch(e){}
+      api('/api/v2/event',{method:'POST',body:{event:event,props:props}});
+    }
+    function hiddenToday(){ try{ return +(localStorage.getItem(HIDE_KEY)||0)>Date.now(); }catch(e){ return false; } }
+    function card(placement){
+      var t=T[variant], el=document.createElement('div');
+      el.className='upsell';
+      el.innerHTML='<div class="art"><svg viewBox="0 120 400 560" preserveAspectRatio="xMidYMid slice"><use href="#sc-dawn" width="400" height="800"/></svg></div><div class="shade"></div>'+
+        (placement==='today'?'<button class="x" aria-label="Скрыть на неделю"><svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></button>':'')+
+        '<div class="in"><div class="lab" style="margin-bottom:.6rem">Pro</div><h2>'+t.h+'</h2><p class="sub">'+t.s+'</p>'+
+        '<ul><li>'+IC.mem+'Помнит ваши разговоры</li><li>'+IC.tip+'Советы под тебя</li><li>'+IC.chat+'Больше разговоров каждый день</li></ul>'+
+        '<button class="go">Попробовать неделю за 1 ₽</button><p class="note">Первая неделя за 1 ₽</p></div>';
+      el.querySelector('.go').addEventListener('click',function(){ track('upsell_click',placement); if(window.__openPro) window.__openPro(); });
+      var x=el.querySelector('.x');
+      if(x) x.addEventListener('click',function(){
+        try{ localStorage.setItem(HIDE_KEY,String(Date.now()+HIDE_DAYS*86400000)); }catch(e){}
+        el.remove(); haptic(8);
+      });
+      /* показ: один раз за сессию на место, когда карточка видна хотя бы наполовину */
+      if('IntersectionObserver' in window){
+        var io=new IntersectionObserver(function(es){ es.forEach(function(e){
+          if(!e.isIntersecting) return; io.disconnect();
+          var k='nika_upsell_seen_'+placement; try{ if(sessionStorage.getItem(k)) return; sessionStorage.setItem(k,'1'); }catch(err){}
+          track('upsell_view',placement);
+        }); },{threshold:.5});
+        io.observe(el);
+      }
+      return el;
+    }
+    function status(){
+      var el=document.createElement('div'); el.className='prostat';
+      var until=ME.plan.periodEnd?new Date(ME.plan.periodEnd).toLocaleDateString('ru-RU',{day:'numeric',month:'long'}):'';
+      el.innerHTML='<i></i><b>Pro активна</b>'+(until?'<span>до '+until+'</span>':'');
+      return el;
+    }
+    window.__onMe.push(function(me){
+      document.querySelectorAll('.upsell-slot').forEach(function(slot){
+        var placement=slot.dataset.placement; slot.innerHTML='';
+        if(me.plan.isPro){ slot.appendChild(status()); return; }
+        if(placement==='today'&&hiddenToday()) return;
+        slot.appendChild(card(placement));
       });
     });
   })();

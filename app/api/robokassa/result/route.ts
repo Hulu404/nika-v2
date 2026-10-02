@@ -1,4 +1,4 @@
-import { isRobokassaPlan, ROBOKASSA_PLANS, verifyResultSignature } from "@/lib/robokassa";
+import { isRobokassaPlan, ROBOKASSA_PLANS, periodEndFor, verifyResultSignature } from "@/lib/robokassa";
 import { createServiceRoleClient } from "@/lib/supabase-server";
 
 export const runtime = "nodejs";
@@ -85,9 +85,8 @@ async function handleResult(request: Request) {
   // чтобы прекратить ретраи по уже закрытому заказу.
   if (existing?.status === "pending" && existing.user_id === uid) {
     const now = new Date();
-    const { months, subscriptionPlan } = ROBOKASSA_PLANS[plan];
-    const periodEnd = new Date(now);
-    periodEnd.setMonth(periodEnd.getMonth() + months);
+    const { subscriptionPlan } = ROBOKASSA_PLANS[plan];
+    const periodEnd = periodEndFor(plan, now);
 
     await admin
       .from("robokassa_payments")

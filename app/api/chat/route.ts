@@ -21,6 +21,7 @@ import { createServerComponentClient } from "@/lib/supabase";
 import type { Message } from "@/types/app";
 import type { Scenario } from "@/types/conversation";
 import { hasConsent } from "@/lib/consents";
+import { loadMemory } from "@/lib/pro-memory";
 
 export const runtime = "nodejs";
 
@@ -311,6 +312,17 @@ export async function POST(req: Request) {
           text: buildRhythmContext(latestState.moods, latestState.ran),
         });
       }
+    }
+  }
+
+  // Память Про: контекст прошлых разговоров, пробежек и (при согласии на здоровье)
+  // дневника за три недели. Отдельный некэшируемый блок; сбой памяти не ломает ответ.
+  if (isPro) {
+    try {
+      const memory = await loadMemory(supabase, user.id, convId, await hasConsent(supabase, user.id, "health"));
+      if (memory) systemBlocks.push({ type: "text", text: memory });
+    } catch (err) {
+      console.error("[api/chat] memory failed:", err);
     }
   }
 
