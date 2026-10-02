@@ -64,9 +64,20 @@ describe("Пятница: задачи команды", () => {
       String(call.payload.text).includes("Макет"))).toHaveLength(1);
     expect(calls.filter(call => call.method === "sendMessage" && call.payload.chat_id === 2 &&
       String(call.payload.text).includes("Макет"))).toHaveLength(1);
+    expect(calls.some(call => call.method === "sendMessage" && call.payload.chat_id === 1 &&
+      String(call.payload.text).includes("Макет") && String(call.payload.text).includes("Вместе с вами: @bob"))).toBe(true);
+    expect(calls.some(call => call.method === "sendMessage" && call.payload.chat_id === 2 &&
+      String(call.payload.text).includes("Макет") && String(call.payload.text).includes("Вместе с вами: @alice"))).toBe(true);
+    expect(calls.some(call => call.method === "sendMessage" && call.payload.chat_id === 2 &&
+      String(call.payload.text).includes("Текст") && String(call.payload.text).includes("Вместе с вами"))).toBe(false);
     await press("a:done:1", 1, "alice");
     expect(store.assignedTasks.get(1)?.status).toBe("done");
     expect(store.assignedTasks.get(2)?.status).toBe("open");
+    expect(calls.some(call => call.method === "editMessageText" &&
+      String(call.payload.text).includes("Вместе с вами: @bob"))).toBe(true);
+    await send("/assigned", 2, "bob", 11);
+    expect(calls.some(call => call.method === "sendMessage" && call.payload.chat_id === 2 &&
+      String(call.payload.text).includes("Макет") && String(call.payload.text).includes("Вместе с вами: @alice"))).toBe(true);
   });
 
   it("rejects an unknown co-assignee before saving any tasks", async () => {

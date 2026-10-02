@@ -34,8 +34,9 @@ export function dueLine(t: AssignedTask, now: Date): string | null {
 }
 
 /** Карточка задачи для исполнителя. */
-export function taskCard(t: AssignedTask, now: Date, header = `<b>Задача #${t.id}</b>`): string {
-  return [header, escapeHtml(t.what), dueLine(t, now), `Статус: ${STATUS_LABEL[t.status]}`]
+export function taskCard(t: AssignedTask, now: Date, header = `<b>Задача #${t.id}</b>`, teammates: string[] = []): string {
+  const together = teammates.length ? `Вместе с вами: ${teammates.map(name => `@${escapeHtml(name)}`).join(", ")}` : null;
+  return [header, escapeHtml(t.what), dueLine(t, now), together, `Статус: ${STATUS_LABEL[t.status]}`]
     .filter((l): l is string => l !== null).join("\n");
 }
 
@@ -51,8 +52,8 @@ export function taskButtons(t: AssignedTask): Button[][] | undefined {
   }
 }
 
-export function deliveryText(t: AssignedTask, now: Date): string {
-  return `${taskCard(t, now, NEW_TASK_HEADER)}\n\n#${t.id} · все мои задачи: /tasks`;
+export function deliveryText(t: AssignedTask, now: Date, teammates: string[] = []): string {
+  return `${taskCard(t, now, NEW_TASK_HEADER, teammates)}\n\n#${t.id} · все мои задачи: /tasks`;
 }
 
 /** Уведомление владельцу о действии исполнителя. Без глаголов прошедшего времени: род не знаем. */
@@ -70,12 +71,12 @@ export function ownerShouldKnow(t: AssignedTask, previous: AssignedStatus): bool
   return previous !== t.status && (t.status === "done" || t.status === "declined" || (t.status === "taken" && previous !== "open"));
 }
 
-export function reminderText(t: AssignedTask, now: Date): string {
-  return taskCard(t, now, `⏰ <b>Срок задачи #${t.id}: ${formatDue(t.due_at!)}</b>`);
+export function reminderText(t: AssignedTask, now: Date, teammates: string[] = []): string {
+  return taskCard(t, now, `⏰ <b>Срок задачи #${t.id}: ${formatDue(t.due_at!)}</b>`, teammates);
 }
 
-export function overdueText(t: AssignedTask, now: Date): string {
-  return taskCard(t, now, `⚠️ <b>Срок задачи #${t.id} прошёл</b>`) + "\nЕсли не успеваешь — нажми «Не смогу», владелец увидит.";
+export function overdueText(t: AssignedTask, now: Date, teammates: string[] = []): string {
+  return taskCard(t, now, `⚠️ <b>Срок задачи #${t.id} прошёл</b>`, teammates) + "\nЕсли не успеваешь — нажми «Не смогу», владелец увидит.";
 }
 
 export function overdueOwnerText(t: AssignedTask): string {

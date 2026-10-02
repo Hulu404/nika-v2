@@ -62,15 +62,17 @@ export async function sendAssignedReminders(deps: ReminderDeps, now = new Date()
   const out = { reminders: 0, overdue: 0 };
   for (const task of await store.listAssignedDue()) {
     const kind = noticeDue(task, now);
-    if (!kind || !(await store.markAssignedNotice(task.id, kind))) continue;
+    if (!kind) continue;
+    const teammates = await store.listAssignedTeammates(task);
+    if (!(await store.markAssignedNotice(task.id, kind))) continue;
     const options = { parse_mode: "HTML" as const, link_preview_options: { is_disabled: true },
       reply_markup: { inline_keyboard: taskButtons(task) ?? [] } };
     // Сбой одной отправки не останавливает остальные: отметка уже стоит, повтора не будет.
     if (kind === "reminder") {
-      await api.sendMessage(task.assignee_id, reminderText(task, now), options).catch(() => {});
+      await api.sendMessage(task.assignee_id, reminderText(task, now, teammates), options).catch(() => {});
       out.reminders += 1;
     } else {
-      await api.sendMessage(task.assignee_id, overdueText(task, now), options).catch(() => {});
+      await api.sendMessage(task.assignee_id, overdueText(task, now, teammates), options).catch(() => {});
       if (task.assigned_by !== task.assignee_id)
         await api.sendMessage(task.assigned_by, overdueOwnerText(task), { parse_mode: "HTML" }).catch(() => {});
       out.overdue += 1;

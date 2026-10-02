@@ -33,7 +33,8 @@ async function sendAssigned(ctx: Context, store: DatabotStore, task: AssignedTas
   const locked = await store.assignedTaskDelivery(task.id, "lock");
   if (!locked) return;
   try {
-    const sent = await ctx.api.sendMessage(task.assignee_id, deliveryText(locked, now),
+    const teammates = await store.listAssignedTeammates(locked);
+    const sent = await ctx.api.sendMessage(task.assignee_id, deliveryText(locked, now, teammates),
       { parse_mode: "HTML", link_preview_options: { is_disabled: true }, reply_markup: markup(taskButtons(locked)) });
     await store.assignedTaskDelivery(task.id, "sent", sent.message_id);
   } catch (err) {
@@ -43,12 +44,13 @@ async function sendAssigned(ctx: Context, store: DatabotStore, task: AssignedTas
 }
 
 /** Сообщить исполнителю об изменении: новое сообщение с карточкой, старую доставку — обновить. Не бросает. */
-async function tellAssignee(ctx: Context, task: AssignedTask, header: string, now: Date): Promise<void> {
+async function tellAssignee(ctx: Context, store: DatabotStore, task: AssignedTask, header: string, now: Date): Promise<void> {
+  const teammates = await store.listAssignedTeammates(task);
   if (task.delivered_message_id) {
-    await ctx.api.editMessageText(task.assignee_id, task.delivered_message_id, taskCard(task, now),
+    await ctx.api.editMessageText(task.assignee_id, task.delivered_message_id, taskCard(task, now, undefined, teammates),
       { parse_mode: "HTML", reply_markup: markup(taskButtons(task)) }).catch(() => {});
   }
-  await ctx.api.sendMessage(task.assignee_id, taskCard(task, now, header),
+  await ctx.api.sendMessage(task.assignee_id, taskCard(task, now, header, teammates),
     { parse_mode: "HTML", link_preview_options: { is_disabled: true }, reply_markup: markup(taskButtons(task)) }).catch(() => {});
 }
 
@@ -66,12 +68,12 @@ export async function sendAssignedList(ctx: Context, store: DatabotStore, userId
     : "Назначенных вам задач пока нет.");
   else {
     await reply(`<b>Мои задачи</b> · в работе ${active.length}${done.length ? ` · сделано за ${CLOSED_VISIBLE_DAYS} дн.: ${done.length}` : ""}`);
-    for (const t of active) await reply(taskCard(t, now), taskButtons(t));
+    for (const t of active) await reply(taskCard(t, now, undefined, await store.listAssignedTeammates(t)), taskButtons(t));
   }
   if (done.length) {
     await reply("<b>Выполнено</b>");
     for (const t of done.sort((a, b) => Date.parse(b.status_at) - Date.parse(a.status_at) || b.id - a.id).slice(0, 20))
-      await reply(taskCard(t, now), taskButtons(t));
+      await reply(taskCard(t, now, undefined, await store.listAssignedTeammates(t)), taskButtons(t));
   }
 }
 
@@ -87,13 +89,15 @@ async function handleButton(ctx: Context, store: DatabotStore, action: Exclude<A
     if (!text) throw err;
     const current = await store.getAssignedTask(id).catch(() => null);
     if (current && current.assignee_id === uid) {
-      await ctx.editMessageText(taskCard(current, now), { parse_mode: "HTML", reply_markup: markup(taskButtons(current)) }).catch(() => {});
+      const teammates = await store.listAssignedTeammates(current);
+      await ctx.editMessageText(taskCard(current, now, undefined, teammates), { parse_mode: "HTML", reply_markup: markup(taskButtons(current)) }).catch(() => {});
       await notify(`${text} Статус сейчас: ${STATUS_LABEL[current.status]}.`);
     } else await notify(text);
     return;
   }
   const { task, previous } = result;
-  await ctx.editMessageText(taskCard(task, now), { parse_mode: "HTML", reply_markup: markup(taskButtons(task)) }).catch(() => {});
+  const teammates = await store.listAssignedTeammates(task);
+  await ctx.editMessageText(taskCard(task, now, undefined, teammates), { parse_mode: "HTML", reply_markup: markup(taskButtons(task)) }).catch(() => {});
   if (ownerShouldKnow(task, previous) && task.assigned_by !== uid) {
     await ctx.api.sendMessage(task.assigned_by, ownerNotice(task, previous), { parse_mode: "HTML" }).catch(() => {});
   }
@@ -199,19 +203,19 @@ export async function handleAssignedUpdate(
         }
       } else if (cmd === "assign_cancel") {
         const { task, previous } = await store.setAssignedStatus(id, ctx.from.id, "cancel");
-        if (previous !== "cancelled") await tellAssignee(ctx, task, `✖️ <b>Задача #${task.id} отменена</b>`, now);
+        if (previous !== "cancelled") await tellAssignee(ctx, store, task, `✖️ <b>Задача #${task.id} отменена</b>`, now);
         await reply(`Задача #${task.id} отменена${previous !== "cancelled" ? ", исполнитель предупреждён" : " (уже была)"}.`);
       } else if (cmd === "assign_edit") {
         const found = extractDue(rest, now);
         const what = found.what.replace(/[\s,;—–-]+$/u, "").trim();
         const task = await store.editAssignedTask(id, ctx.from.id,
           { what: what || undefined, due: found.due ? found.due.toISOString() : undefined });
-        await tellAssignee(ctx, task, `✏️ <b>Задача #${task.id} изменена</b>`, now);
+        await tellAssignee(ctx, store, task, `✏️ <b>Задача #${task.id} изменена</b>`, now);
         await reply(`Сохранено, исполнитель предупреждён.\n\n${taskCard(task, now)}`);
       } else {
         const due = /^(нет|без срока|-)$/i.test(rest) ? null : parseDue(rest.replace(/^до\s+/i, ""), now).toISOString();
         const task = await store.editAssignedTask(id, ctx.from.id, { due });
-        await tellAssignee(ctx, task, due ? `🗓 <b>Новый срок задачи #${task.id}</b>` : `🗓 <b>У задачи #${task.id} больше нет срока</b>`, now);
+        await tellAssignee(ctx, store, task, due ? `🗓 <b>Новый срок задачи #${task.id}</b>` : `🗓 <b>У задачи #${task.id} больше нет срока</b>`, now);
         await reply(due ? `Срок задачи #${task.id}: ${formatDue(due)}. Исполнитель предупреждён.` : `Срок задачи #${task.id} снят.`);
       }
     } catch (err) {

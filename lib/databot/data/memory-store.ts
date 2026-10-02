@@ -59,6 +59,14 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
       normalizeTaskUsername(member.username) === t.username));
   }
 
+  async listAssignedTeammates(task: AssignedTask): Promise<string[]> {
+    this.maybeFail("listAssignedTeammates");
+    return [...this.assignedTasks.values()]
+      .filter(t => t.source_chat_id === task.source_chat_id && t.source_message_id === task.source_message_id &&
+        t.line === task.line && t.id !== task.id)
+      .sort((a, b) => a.id - b.id).map(t => t.username);
+  }
+
   async getAssignedTask(id: number): Promise<AssignedTask | null> {
     this.maybeFail("getAssignedTask");
     return structuredClone(this.assignedTasks.get(id) ?? null);

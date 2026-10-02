@@ -15,6 +15,8 @@ export interface DatabotStore extends TaskStore {
   importAssignedTasks(ownerId: number, messageId: number, tasks: AssignedTaskDraft[]): Promise<AssignedTask[]>;
   getAssignedTask(id: number): Promise<AssignedTask | null>;
   listAssignedTasks(userId: number): Promise<AssignedTask[]>;
+  /** Другие исполнители той же строки исходного списка. */
+  listAssignedTeammates(task: AssignedTask): Promise<string[]>;
   assignedTaskDelivery(id: number, action: "lock" | "sent" | "failed" | "uncertain", messageId?: number): Promise<AssignedTask | null>;
   /**
    * Смена статуса задачи из /assign. Бросает Error("assigned:missing" |

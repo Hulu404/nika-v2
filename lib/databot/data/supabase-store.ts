@@ -84,6 +84,15 @@ class SupabaseStore extends TaskStoreBase implements DatabotStore {
     return (data ?? []) as AssignedTask[];
   }
 
+  async listAssignedTeammates(task: AssignedTask): Promise<string[]> {
+    const { data, error } = await this.db.from("databot_assigned_tasks").select("username")
+      .eq("source_chat_id", task.source_chat_id).eq("source_message_id", task.source_message_id)
+      .eq("line", task.line).neq("id", task.id).order("id", { ascending: true })
+      .abortSignal(timeout());
+    if (error) fail("listAssignedTeammates", error.message);
+    return (data ?? []).map(row => row.username as string);
+  }
+
   async getAssignedTask(id: number): Promise<AssignedTask | null> {
     const { data, error } = await this.db.from("databot_assigned_tasks").select("*").eq("id", id).abortSignal(timeout()).maybeSingle();
     if (error) fail("getAssignedTask", error.message);
