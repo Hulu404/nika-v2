@@ -143,7 +143,7 @@ export async function handleAssignedUpdate(
 
   if (cmd === "tasks" && owner && member.is_owner) {
     await store.setForm(ctx.from.id, openForm("assigned.upload", {}, now), now);
-    await reply("Пришлите список задач одним сообщением: одна строка — одна задача в формате «что делать / к какому времени / @ник». Например:\n<code>• Подготовить макет / пт 18:00 / @alice\n• Проверить текст / 03.10 / @bob</code>\nОтмена — /cancel.");
+    await reply("Пришлите список задач одним сообщением: одна строка — одно дело в формате «что делать -- дедлайн -- @ник + @ник». Каждому указанному исполнителю создаётся своя задача. Например:\n<code>• Подготовить макет -- пт 18:00 -- @alice + @bob\n• Проверить текст -- 03.10 -- @bob</code>\nОтмена — /cancel.");
     return true;
   }
 
@@ -243,12 +243,21 @@ export async function handleAssignedUpdate(
     const lines = fresh.map(t => `#${t.id} @${escapeHtml(t.username)} — ${escapeHtml(short(t.what, 60))}` +
       `${t.due_at ? ` · до ${formatDue(t.due_at)}` : ""}${t.delivery_state === "sent" ? "" : " · 📭"}`);
     const pending = fresh.length - sent;
-    await reply([
+    const report = [
       `Сохранено задач: ${tasks.length}. Доставлено в личку: ${sent}.`,
       ...lines,
       pending ? `\n📭 Не доставлено: ${pending}. Человеку нужно открыть бота, затем /assign_retry ID.` : "",
       "Кто что делает — /assign_status.",
-    ].filter(Boolean).join("\n"));
+    ].filter(Boolean);
+    let chunk = "";
+    for (const line of report) {
+      if (chunk && chunk.length + line.length + 1 > 3500) {
+        await reply(chunk);
+        chunk = "";
+      }
+      chunk += `${chunk ? "\n" : ""}${line}`;
+    }
+    if (chunk) await reply(chunk);
   } catch (err) {
     if (err instanceof TaskListError) await reply(`Строка ${err.line}: ${escapeHtml(err.message)} Список не сохранён.`);
     else if (err instanceof Error && err.message.includes("assigned:source_changed"))

@@ -12,6 +12,8 @@ const people: TeamMember[] = [
     added_by: null, last_seen_at: null, digest_opt_in: true },
   { chat_id: 1, username: "alice", display_name: "Alice", role: "member", joined_at: NOW.toISOString(),
     added_by: 9, last_seen_at: null, digest_opt_in: true },
+  { chat_id: 2, username: "bob", display_name: "Bob", role: "member", joined_at: NOW.toISOString(),
+    added_by: 9, last_seen_at: null, digest_opt_in: true },
 ];
 const person = (id: number, username: string) => ({ id, is_bot: false, first_name: username, username });
 let store: MemoryStore;
@@ -51,6 +53,26 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("Пятница: задачи команды", () => {
+  it("delivers a shared row to each named member and keeps retries idempotent", async () => {
+    const list = "/assign\nМакет -- пт 18:00 -- @alice + @bob\nТекст -- 03.10 -- @bob";
+    await send(list);
+    await send(list);
+    expect(store.assignedTasks.size).toBe(3);
+    expect([...store.assignedTasks.values()].map(task => [task.line, task.username, task.assignee_id]))
+      .toEqual([[2, "alice", 1], [2, "bob", 2], [3, "bob", 2]]);
+    expect(calls.filter(call => call.method === "sendMessage" && call.payload.chat_id === 1 &&
+      String(call.payload.text).includes("Макет"))).toHaveLength(1);
+    expect(calls.filter(call => call.method === "sendMessage" && call.payload.chat_id === 2 &&
+      String(call.payload.text).includes("Макет"))).toHaveLength(1);
+    await press("a:done:1", 1, "alice");
+    expect(store.assignedTasks.get(1)?.status).toBe("done");
+    expect(store.assignedTasks.get(2)?.status).toBe("open");
+  });
+
+  it("rejects an unknown co-assignee before saving any tasks", async () => {
+    await send("/assign\nМакет -- завтра -- @alice + @missing");
+    expect(store.assignedTasks.size).toBe(0);
+  });
   it("publishes owner task commands only in the owner's chat menu", async () => {
     const setMyCommands = vi.fn().mockResolvedValue(true);
     const api = { setMyCommands } as unknown as Api;

@@ -38,7 +38,7 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
     });
     return drafts.map((draft, index) => {
       let task = [...this.assignedTasks.values()].find(t => t.source_chat_id === ownerId &&
-        t.source_message_id === messageId && t.line === draft.line);
+        t.source_message_id === messageId && t.line === draft.line && t.username === draft.username);
       if (task && (task.username !== draft.username || task.what !== draft.what)) throw new Error("assigned:source_changed");
       if (!task) {
         task = { ...draft, id: this.assignedTasks.size + 1, source_chat_id: ownerId,
