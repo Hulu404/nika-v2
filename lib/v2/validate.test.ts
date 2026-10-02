@@ -83,6 +83,8 @@ describe("профиль и онбординг", () => {
   it("настройки вида отбрасывают неизвестное", () => {
     expect(parseUiPrefs({ size: 50, font: "comic" })).toEqual({});
     expect(parseUiPrefs("x")).toBeNull();
+    expect(parseUiPrefs({ weight: 500 })).toEqual({ weight: 500 });
+    expect(parseUiPrefs({ weight: 900 })).toEqual({});
   });
 });
 

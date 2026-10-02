@@ -174,6 +174,7 @@ export function parseUiPrefs(v: unknown): Record<string, string | number | boole
   if (typeof src.size === "number" && (UI_SIZES as readonly number[]).includes(src.size)) out.size = src.size;
   const sky = pick(UI_SKIES, src.sky);
   if (sky) out.sky = sky;
+  if (src.weight === 400 || src.weight === 500) out.weight = src.weight;
   if (typeof src.contrast === "boolean") out.contrast = src.contrast;
   if (typeof src.calm === "boolean") out.calm = src.calm;
   return out;

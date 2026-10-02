@@ -13,7 +13,17 @@
 <script>/* вариант навигации до первой отрисовки: стекло на iOS/iPadOS, бар на остальных; ?nav=glass|solid для проверки */
 (function(){var q=/[?&]nav=(glass|solid)\b/.exec(location.search),ua=navigator.userAgent,
 ios=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1);
-document.documentElement.setAttribute('data-nav',q?q[1]:(ios?'glass':'solid'));})();</script>
+document.documentElement.setAttribute('data-nav',q?q[1]:(ios?'glass':'solid'));})();
+/* вид из профиля до первой отрисовки, чтобы не мигало: шрифт, размер, жирность */
+(function(){try{var u=JSON.parse(localStorage.getItem('nika_ui')||'null');if(!u)return;var F={
+nika:["'Playfair Display','Times New Roman',Georgia,serif","'Inter',-apple-system,system-ui,sans-serif","-.036em"],
+tikhaya:["'Lora',Georgia,serif","'Inter',-apple-system,system-ui,sans-serif","-.03em"],
+kniga:["'Source Serif 4',Georgia,serif","'Inter',-apple-system,system-ui,sans-serif","-.032em"],
+golos:["'Golos Text',-apple-system,system-ui,sans-serif","'Golos Text',-apple-system,system-ui,sans-serif","-.042em"],
+pryamaya:["'Inter',-apple-system,system-ui,sans-serif","'Inter',-apple-system,system-ui,sans-serif","-.045em"]},
+r=document.documentElement.style,f=F[u.font];
+if(f){r.setProperty('--disp',f[0]);r.setProperty('--sans',f[1]);r.setProperty('--n-ls',f[2]);r.setProperty('--font-display',f[0]);r.setProperty('--font-ui',f[1]);}
+if(u.size)r.fontSize=u.size+'%';if(u.weight)r.setProperty('--font-weight-body',u.weight);}catch(e){}})();</script>
 <title>НИКА</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -59,7 +69,7 @@ document.documentElement.setAttribute('data-nav',q?q[1]:(ios?'glass':'solid'));}
 *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{font-size:100%}
 html,body{margin:0;padding:0;height:100%;background:#0B0B0D;overscroll-behavior:none}
-body{font-family:var(--sans);font-size:var(--t-body);line-height:var(--t-lh-body);letter-spacing:var(--t-ls-body);
+body{font-family:var(--sans);font-weight:var(--font-weight-body,400);font-size:var(--t-body);line-height:var(--t-lh-body);letter-spacing:var(--t-ls-body);
   color:var(--ink);background:#0B0B0D;font-optical-sizing:auto;font-variant-numeric:tabular-nums;
   overflow:hidden}
 button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:pointer;color:inherit;text-align:left;
@@ -1206,6 +1216,14 @@ button.cli:active{opacity:.65}
       </div>
 
       <div class="setgroup">
+        <div class="lab">Жирность текста</div>
+        <div class="seg2" id="weightSeg">
+          <button class="on" data-weight="400">Обычная</button>
+          <button data-weight="500">Плотнее</button>
+        </div>
+      </div>
+
+      <div class="setgroup">
         <div class="lab">Небо</div>
         <p class="why">Фон главного экрана. Он же определяет, в каком свете ты видишь Нику каждое утро.</p>
         <div class="skyrow" id="skyrow">
@@ -2172,15 +2190,19 @@ button.cli:active{opacity:.65}
     pryamaya: {disp:"'Inter',-apple-system,system-ui,sans-serif",         sans:"'Inter',-apple-system,system-ui,sans-serif", ls:'-.045em'}
   };
   var uiPrefs={};
+  var root=document.documentElement;
+  function saveLocalUi(){ try{ localStorage.setItem('nika_ui',JSON.stringify(uiPrefs)); }catch(e){} }
   function saveUi(patch){
     for(var k in patch) uiPrefs[k]=patch[k];
+    saveLocalUi();
     api('/api/v2/profile',{method:'PATCH',body:{uiPrefs:uiPrefs}});
   }
   function setFont(k,silent){
     var f=FONTS[k]; if(!f) return;
-    var r=app.style;
-    r.setProperty('--disp',f.disp);
-    r.setProperty('--sans',f.sans);
+    /* на <html>: font-family наследуется от body, переменные на .app до него не доходят */
+    var r=root.style;
+    r.setProperty('--disp',f.disp); r.setProperty('--font-display',f.disp);
+    r.setProperty('--sans',f.sans); r.setProperty('--font-ui',f.sans);
     r.setProperty('--n-ls',f.ls);
     document.querySelectorAll('#fontlist .fontrow').forEach(function(b){ b.classList.toggle('on',b.dataset.font===k); });
     if(!silent){ haptic(7); saveUi({font:k}); }
@@ -2190,7 +2212,8 @@ button.cli:active{opacity:.65}
   });
 
   function setSize(px,silent){
-    app.style.fontSize=px+'%';
+    /* масштаб от <html>: все размеры текста в rem */
+    root.style.fontSize=px+'%';
     document.querySelectorAll('#sizeSeg button').forEach(function(b){ b.classList.toggle('on',b.dataset.size===String(px)); });
     if(!silent){ haptic(7); saveUi({size:px}); }
   }
@@ -2222,9 +2245,20 @@ button.cli:active{opacity:.65}
     swM.classList.toggle('on',forceCalm);
     app.dataset.calm=forceCalm?'1':'0'; haptic(7); saveUi({calm:forceCalm});
   });
+  function setWeight(w,silent){
+    w=+w===500?500:400;
+    root.style.setProperty('--font-weight-body',w);
+    document.querySelectorAll('#weightSeg button').forEach(function(b){ b.classList.toggle('on',b.dataset.weight===String(w)); });
+    if(!silent){ haptic(7); saveUi({weight:w}); }
+  }
+  document.querySelectorAll('#weightSeg button').forEach(function(b){
+    b.addEventListener('click',function(){ setWeight(b.dataset.weight); });
+  });
   /* настройки вида из профиля; небо по умолчанию от времени, когда обычно получается бегать */
   window.__applyUi=function(ui,daypart){
     uiPrefs={}; for(var k in ui) uiPrefs[k]=ui[k];
+    saveLocalUi();
+    setWeight(ui.weight||400,true);
     setFont(ui.font||'nika',true);
     setSize(ui.size||100,true);
     setSky(ui.sky||(daypart==='evening'?'sc-dusk':daypart==='morning'?'sc-dawn':'sc-dusk'),true);
