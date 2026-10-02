@@ -38,8 +38,8 @@ export class TaskListError extends Error {
 }
 
 /**
- * One task per line. A «что -- срок -- @a + @b» row creates one independent
- * assignment per recipient. The slash and older single-recipient forms remain.
+ * One task per line. A «что / срок / @a + @b» row creates one independent
+ * assignment per recipient. The double-dash and older forms remain.
  */
 export function parseTaskList(text: string, now: Date = new Date()): AssignedTaskDraft[] {
   const lines = text.split(/\r?\n/);
@@ -48,13 +48,16 @@ export function parseTaskList(text: string, now: Date = new Date()): AssignedTas
   for (const [index, raw] of lines.entries()) {
     const line = raw.trim().replace(/^(?:[-*•]|\d+[.)])\s*/, "");
     if (!line) continue;
-    if (line.includes("--")) {
-      const fields = line.split(/\s*--\s*/);
-      if (fields.length !== 3) throw new TaskListError(index + 1, "Нужны три поля: что делать -- дедлайн -- @ник + @ник.");
+    const doubleDash = line.includes("--");
+    const slashFields = doubleDash ? null : /^(.*)\s*\/\s*([^/]*)\s*\/\s*(.+)$/.exec(line);
+    if (doubleDash || slashFields) {
+      const fields = doubleDash ? line.split(/\s*--\s*/) : slashFields!.slice(1);
+      if (fields.length !== 3) throw new TaskListError(index + 1, "Нужны три поля: что делать / дедлайн / @ник + @ник.");
       const [what, dueText, recipients] = fields.map(field => field.trim());
       if (!what || what.length > 3000) throw new TaskListError(index + 1, "Нужен текст задачи длиной до 3000 символов.");
       const names = recipients.split(/\s*\+\s*/);
-      if (!names.length || names.some(name => !/^@?[a-z0-9_]{1,32}$/i.test(name)))
+      const usernamePattern = doubleDash ? /^@?[a-z0-9_]{1,32}$/i : /^@[a-z0-9_]{1,32}$/i;
+      if (!names.length || names.some(name => !usernamePattern.test(name)))
         throw new TaskListError(index + 1, "Укажите ники исполнителей через +: @alice + @bob.");
       const usernames = names.map(normalizeTaskUsername);
       if (new Set(usernames).size !== usernames.length)
@@ -71,27 +74,11 @@ export function parseTaskList(text: string, now: Date = new Date()): AssignedTas
         tasks.push({ line: index + 1, username, what, due_at: due.toISOString() });
       continue;
     }
-    const slashFields = /^(.*)\s*\/\s*([^/]*)\s*\/\s*(@[a-z0-9_]{1,32})$/i.exec(line);
     if (!slashFields && line.includes(" / "))
-      throw new TaskListError(index + 1, "Нужны три поля: что делать / к какому времени / @username.");
+      throw new TaskListError(index + 1, "Нужны три поля: что делать / дедлайн / @ник + @ник.");
     const tags = [...line.matchAll(/(^|[^\w])@([a-z0-9_]{1,32})(?!\w)/gi)];
     if (tags.length !== 1) throw new TaskListError(index + 1, "Ожидается ровно один @username.");
     const username = normalizeTaskUsername(tags[0][2]);
-    if (slashFields) {
-      const [what, dueText, recipient] = slashFields.slice(1).map(field => field.trim());
-      if (recipient.toLowerCase() !== `@${username}`)
-        throw new TaskListError(index + 1, "Третье поле должно содержать только @username.");
-      if (!what || what.length > 3000) throw new TaskListError(index + 1, "Нужен текст задачи длиной до 3000 символов.");
-      let due: Date;
-      try { due = parseDue(dueText.replace(/^до\s+/i, ""), now); }
-      catch (err) {
-        if (err instanceof DueError) throw new TaskListError(index + 1, err.message);
-        throw err;
-      }
-      tasks.push({ line: index + 1, username, what, due_at: due.toISOString() });
-      if (tasks.length > 50) throw new TaskListError(index + 1, "В одном сообщении допускается не более 50 задач.");
-      continue;
-    }
     const body = line.replace(tags[0][0], tags[0][1]).replace(/^\s*[-—–:]\s*|\s*[-—–:]\s*$/g, "").trim();
     let found: { what: string; due: Date | null };
     try { found = extractDue(body, now); }

@@ -54,7 +54,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("Пятница: задачи команды", () => {
   it("delivers a shared row to each named member and keeps retries idempotent", async () => {
-    const list = "/assign\nМакет -- пт 18:00 -- @alice + @bob\nТекст -- 03.10 -- @bob";
+    const list = "/assign\nМакет / пт 18:00 / @alice + @bob\nТекст / 03.10 / @bob";
     await send(list);
     await send(list);
     expect(store.assignedTasks.size).toBe(3);
@@ -70,7 +70,7 @@ describe("Пятница: задачи команды", () => {
   });
 
   it("rejects an unknown co-assignee before saving any tasks", async () => {
-    await send("/assign\nМакет -- завтра -- @alice + @missing");
+    await send("/assign\nМакет / завтра / @alice + @missing");
     expect(store.assignedTasks.size).toBe(0);
   });
   it("publishes owner task commands only in the owner's chat menu", async () => {
