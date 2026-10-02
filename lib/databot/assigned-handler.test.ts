@@ -44,6 +44,16 @@ beforeEach(async () => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("owner task lists", () => {
+  it("delivers the slash format to matching users and shows completion in the owner list", async () => {
+    await send("/assign\nМакет / пт 18:00 / @alice\nТекст / 03.10 / @bob");
+    expect(store.assignedTasks.size).toBe(2);
+    expect(texts(1).some(t => t.includes("Макет") && t.includes("Срок: пт 02.10, 18:00"))).toBe(true);
+    expect(texts(2).some(t => t.includes("Текст") && !t.includes("Макет"))).toBe(true);
+    await press("a:done:1");
+    await send("/assign_status", 9, "owner", 12);
+    expect(texts(9).at(-1)).toMatch(/<b>@alice<\/b>\n✅ #1 Макет/);
+  });
+
   it("opens upload mode with /tasks and shows each member only their own tasks", async () => {
     await send("@alice — Вне режима", 9, "owner", 20);
     expect(store.assignedTasks.size).toBe(0);
@@ -166,6 +176,7 @@ describe("lifecycle of assigned tasks", () => {
     expect(String(out[0].payload.text)).toContain("в работе 1 · сделано за 7 дн.: 1");
     expect(String(out[1].payload.text)).toContain("Срок: сб 03.10");
     expect(buttonsOf(out[1].payload)).toContain("a:done:1");
+    expect(out.some(c => String(c.payload.text).includes("✅ сделано") && String(c.payload.text).includes("Звонок"))).toBe(true);
   });
 
   it("owner overview groups by person, marks overdue and undelivered", async () => {

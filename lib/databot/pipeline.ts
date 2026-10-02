@@ -1,6 +1,4 @@
 import { InputFile, type Context, type Keyboard, type MiddlewareFn } from "grammy";
-import { databotTaskConfig } from "./config";
-import { handleTaskUpdate } from "./task-handler";
 import { handleAssignedUpdate } from "./assigned-handler";
 import type { InlineKeyboardMarkup, ReplyKeyboardRemove } from "grammy/types";
 import { audienceOf, can, isEnvOwner, zoneCan } from "./access";
@@ -43,7 +41,7 @@ import type { AnyReport, Intent, MemberRow, ReportId, Screen, Section, Subject }
  *
  *   0. бот сам вошёл в чужую группу или канал → выходит, больше ничего;
  *   1. нажатие кнопки гасится сразу, до любых проверок;
- *   2. только настроенный командный чат отдаём учёту задач; отчёты — из лички;
+ *   2. задачи и отчёты обрабатываются только в личке;
  *   3. лимит — раньше всего остального, включая /start;
  *   4. членство — одна выборка по chat_id, без кеша; чужой получает одну фразу;
  *   5. разбор запроса → Intent;
@@ -79,8 +77,7 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
   const membership = ctx.myChatMember;
   if (membership) {
     const { chat, new_chat_member } = membership;
-    if (chat.type !== "private" && PRESENT_STATUSES.has(new_chat_member.status) &&
-        !((chat.type === "group" || chat.type === "supergroup") && chat.id === databotTaskConfig()?.chatId)) {
+    if (chat.type !== "private" && PRESENT_STATUSES.has(new_chat_member.status)) {
       await leave(ctx, chat.id);
     }
     return;
@@ -90,9 +87,8 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
   if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => {});
 
   if (await handleAssignedUpdate(ctx, store, clock())) return;
-  if (await handleTaskUpdate(ctx, store)) return;
 
-  // Шаг 2. Личка для отчётов; учёт задач настроенной группы уже обработан.
+  // Шаг 2. И задачи, и отчёты доступны только в личке.
   const chat = ctx.chat;
   if (!chat) return;
   if (chat.type !== "private") {

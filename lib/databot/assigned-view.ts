@@ -90,18 +90,19 @@ export function short(text: string, max: number): string {
 const DELIVERY_ISSUE = new Set<AssignedTask["delivery_state"]>(["pending", "failed", "uncertain", "sending"]);
 
 /**
- * Обзор для владельца, по людям. Сначала просроченное, потом по сроку.
+ * Обзор для владельца, по людям. Сначала просроченное, потом по сроку,
+ * затем закрытые задачи каждого человека.
  * Возвращает массив сообщений: длинный обзор режем по 4000 символов на
  * границе строк — лимит Telegram 4096.
  */
-export function overviewMessages(tasks: AssignedTask[], now: Date, sinceDays: number): string[] {
+export function overviewMessages(tasks: AssignedTask[], now: Date): string[] {
   const active = tasks.filter(isActiveAssigned);
   const closed = tasks.filter(t => !isActiveAssigned(t));
   const overdue = active.filter(t => isOverdue(t, now)).length;
   const lines = [`<b>Задачи команды</b> · в работе ${active.length}${overdue ? `, просрочено ${overdue}` : ""}`];
   if (!active.length) lines.push("Открытых задач нет.");
   const byPerson = new Map<string, AssignedTask[]>();
-  for (const t of active) byPerson.set(t.username, [...(byPerson.get(t.username) ?? []), t]);
+  for (const t of tasks) byPerson.set(t.username, [...(byPerson.get(t.username) ?? []), t]);
   const key = (t: AssignedTask) => [isOverdue(t, now) ? 0 : 1, t.due_at ? Date.parse(t.due_at) : Infinity, t.id];
   const cmp = (a: AssignedTask, b: AssignedTask) => {
     const [x, y] = [key(a), key(b)];
@@ -109,20 +110,23 @@ export function overviewMessages(tasks: AssignedTask[], now: Date, sinceDays: nu
   };
   for (const [username, list] of [...byPerson].sort(([a], [b]) => a.localeCompare(b))) {
     lines.push("", `<b>@${escapeHtml(username)}</b>`);
-    for (const t of list.sort(cmp)) {
+    for (const t of list.filter(isActiveAssigned).sort(cmp)) {
       const mark = isOverdue(t, now) ? "⚠️" : t.status === "taken" ? "🔄" : "🆕";
       const due = t.due_at ? ` · до ${formatDue(t.due_at)}` : "";
       const mail = DELIVERY_ISSUE.has(t.delivery_state) ? " · 📭 не доставлено" : "";
       lines.push(`${mark} #${t.id} ${escapeHtml(short(t.what, 90))}${due}${mail}`);
+    }
+    for (const t of list.filter(t => !isActiveAssigned(t))
+      .sort((a, b) => Date.parse(b.status_at) - Date.parse(a.status_at) || b.id - a.id)) {
+      const icon = t.status === "done" ? "✅" : t.status === "declined" ? "↩️" : "✖️";
+      lines.push(`${icon} #${t.id} ${escapeHtml(short(t.what, 90))}`);
     }
   }
   if (closed.length) {
     const count = (s: AssignedStatus) => closed.filter(t => t.status === s).length;
     const parts = ([["done", "✅"], ["declined", "↩️"], ["cancelled", "✖️"]] as const)
       .filter(([s]) => count(s)).map(([s, icon]) => `${icon} ${count(s)}`);
-    lines.push("", `Закрыто за ${sinceDays} дн.: ${parts.join(" · ")}`);
-    const declined = closed.filter(t => t.status === "declined");
-    for (const t of declined) lines.push(`↩️ #${t.id} @${escapeHtml(t.username)} — ${escapeHtml(short(t.what, 70))}`);
+    lines.push("", `Закрыто всего: ${parts.join(" · ")}`);
   }
   lines.push("", "Правка: /assign_edit ID текст · срок: /assign_due ID пт 18:00 · отмена: /assign_cancel ID");
   return chunk(lines, 4000);
@@ -142,10 +146,9 @@ function chunk(lines: string[], max: number): string[] {
 
 export const ASSIGN_HELP = [
   "Откройте /tasks и отправьте следующим сообщением:",
-  "<code>@alice — Подготовить макет до пт 18:00",
-  "@bob — Проверить текст до 03.10",
-  "@carol — Созвониться с площадкой</code>",
-  "Одна задача и один @username в каждой строке. Срок — необязательно, в конце строки после «до»: «до пт», «до завтра 12:00», «до 03.10», «до 18:00».",
+  "<code>Подготовить макет / пт 18:00 / @alice",
+  "Проверить текст / 03.10 / @bob</code>",
+  "Одна задача и один @username в каждой строке. Срок: «пт», «завтра 12:00», «03.10», «18:00».",
   "",
   "Дальше: /assign_status — кто что делает · /assign_edit ID текст · /assign_due ID срок|нет · /assign_cancel ID",
 ].join("\n");

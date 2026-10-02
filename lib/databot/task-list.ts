@@ -1,4 +1,4 @@
-import { DueError, extractDue } from "./assigned-due";
+import { DueError, extractDue, parseDue } from "./assigned-due";
 import { normalizeTaskUsername } from "./tasks";
 
 export interface AssignedTaskDraft {
@@ -38,8 +38,8 @@ export class TaskListError extends Error {
 }
 
 /**
- * One task per line, with exactly one Telegram @username anywhere in the line
- * and an optional deadline at the end: «@alice — макет до пт 18:00».
+ * One task per line. Accept both «что / срок / @username» and the earlier
+ * «@username — что до срок» form.
  */
 export function parseTaskList(text: string, now: Date = new Date()): AssignedTaskDraft[] {
   const lines = text.split(/\r?\n/);
@@ -48,9 +48,27 @@ export function parseTaskList(text: string, now: Date = new Date()): AssignedTas
   for (const [index, raw] of lines.entries()) {
     const line = raw.trim().replace(/^(?:[-*•]|\d+[.)])\s*/, "");
     if (!line) continue;
+    const slashFields = /^(.*)\s*\/\s*([^/]*)\s*\/\s*(@[a-z0-9_]{1,32})$/i.exec(line);
+    if (!slashFields && line.includes(" / "))
+      throw new TaskListError(index + 1, "Нужны три поля: что делать / к какому времени / @username.");
     const tags = [...line.matchAll(/(^|[^\w])@([a-z0-9_]{1,32})(?!\w)/gi)];
     if (tags.length !== 1) throw new TaskListError(index + 1, "Ожидается ровно один @username.");
     const username = normalizeTaskUsername(tags[0][2]);
+    if (slashFields) {
+      const [what, dueText, recipient] = slashFields.slice(1).map(field => field.trim());
+      if (recipient.toLowerCase() !== `@${username}`)
+        throw new TaskListError(index + 1, "Третье поле должно содержать только @username.");
+      if (!what || what.length > 3000) throw new TaskListError(index + 1, "Нужен текст задачи длиной до 3000 символов.");
+      let due: Date;
+      try { due = parseDue(dueText.replace(/^до\s+/i, ""), now); }
+      catch (err) {
+        if (err instanceof DueError) throw new TaskListError(index + 1, err.message);
+        throw err;
+      }
+      tasks.push({ line: index + 1, username, what, due_at: due.toISOString() });
+      if (tasks.length > 50) throw new TaskListError(index + 1, "В одном сообщении допускается не более 50 задач.");
+      continue;
+    }
     const body = line.replace(tags[0][0], tags[0][1]).replace(/^\s*[-—–:]\s*|\s*[-—–:]\s*$/g, "").trim();
     let found: { what: string; due: Date | null };
     try { found = extractDue(body, now); }

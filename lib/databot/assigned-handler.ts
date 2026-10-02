@@ -5,7 +5,6 @@ import {
   ASSIGN_HELP, ASSIGNED_CALLBACK, STATUS_LABEL, deliveryText, overviewMessages, ownerNotice,
   ownerShouldKnow, short, taskButtons, taskCard,
 } from "./assigned-view";
-import { databotTaskConfig } from "./config";
 import type { DatabotStore } from "./data/store";
 import { escapeHtml } from "./html";
 import { formExpired, openForm } from "./form";
@@ -13,7 +12,7 @@ import { parseIntent } from "./intent";
 import { normalizeTaskUsername } from "./tasks";
 import { isActiveAssigned, parseTaskList, TaskListError, type AssignedAction, type AssignedTask } from "./task-list";
 
-/** Сколько дней закрытые задачи видны в обзоре владельца и в «Моих задачах». */
+/** Сколько дней закрытые задачи учитываются в «Моих задачах». */
 const CLOSED_VISIBLE_DAYS = 7;
 
 type Buttons = Array<Array<{ text: string; callback_data: string }>>;
@@ -68,7 +67,11 @@ export async function sendAssignedList(ctx: Context, store: DatabotStore, userId
     await reply(`<b>Мои задачи</b> · в работе ${active.length}${done.length ? ` · сделано за ${CLOSED_VISIBLE_DAYS} дн.: ${done.length}` : ""}`);
     for (const t of active) await reply(taskCard(t, now), taskButtons(t));
   }
-  if (databotTaskConfig()) await reply("Задачи из топика группы: /mytasks");
+  if (done.length) {
+    await reply("<b>Выполнено</b>");
+    for (const t of done.sort((a, b) => Date.parse(b.status_at) - Date.parse(a.status_at) || b.id - a.id).slice(0, 20))
+      await reply(taskCard(t, now), taskButtons(t));
+  }
 }
 
 async function handleButton(ctx: Context, store: DatabotStore, action: Exclude<AssignedAction, "cancel">, id: number, now: Date): Promise<void> {
@@ -130,7 +133,7 @@ export async function handleAssignedUpdate(ctx: Context, store: DatabotStore, no
 
   if (cmd === "tasks" && owner && member.is_owner) {
     await store.setForm(ctx.from.id, openForm("assigned.upload", {}, now), now);
-    await reply("Пришлите список задач одним сообщением: по одной задаче с @ником участника в каждой строке. Например:\n<code>• @alice — Подготовить макет\n• @bob — Проверить текст</code>\nОтмена — /cancel.");
+    await reply("Пришлите список задач одним сообщением: одна строка — одна задача в формате «что делать / к какому времени / @ник». Например:\n<code>• Подготовить макет / пт 18:00 / @alice\n• Проверить текст / 03.10 / @bob</code>\nОтмена — /cancel.");
     return true;
   }
 
@@ -158,8 +161,8 @@ export async function handleAssignedUpdate(ctx: Context, store: DatabotStore, no
   if (command) await store.clearSession(ctx.from.id);
 
   if (cmd === "assign_status") {
-    const tasks = await store.listAssignedOverview(new Date(now.getTime() - CLOSED_VISIBLE_DAYS * 86_400_000));
-    for (const message of overviewMessages(tasks, now, CLOSED_VISIBLE_DAYS)) await reply(message);
+    const tasks = await store.listAssignedOverview(new Date(0));
+    for (const message of overviewMessages(tasks, now)) await reply(message);
     return true;
   }
 
