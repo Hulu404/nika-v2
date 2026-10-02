@@ -51,6 +51,8 @@ document.documentElement.setAttribute('data-nav',q?q[1]:(ios?'glass':'solid'));}
   --t-cap:.82rem;  --t-lh-cap:1.45;
   --t-lab:.665rem; --t-ls-lab:.17em;
   /* safe-area + layout rhythm */
+  /* внутренние отступы карточек (правка 08): большие карточки и маленькие плитки */
+  --pad-card:1.25rem; --pad-tile:1rem;
   --sat: env(safe-area-inset-top, 0px); --sab: env(safe-area-inset-bottom, 0px); --bar-h: 48px;
 }
 
@@ -94,6 +96,13 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 .scene .art{position:absolute;inset:0;z-index:0;pointer-events:none}
 .scene .art svg{width:100%;height:100%;display:block}
 .scene .body{position:relative;z-index:2}
+/* карточка-сцена: отступ по токену, текст прижат к низу flex-ом, высота от контента */
+.scene.card{margin:0 0 var(--s4);padding:var(--pad-card);border-radius:var(--r-lg);min-height:15rem;
+  display:flex;flex-direction:column;justify-content:flex-end}
+.scene.card .body{display:flex;flex-direction:column;align-items:flex-start;text-align:left;width:100%}
+.scene.card .fadeout{height:100%;background:linear-gradient(to bottom,rgba(11,11,13,.08) 0%,rgba(11,11,13,.55) 38%,rgba(11,11,13,.9) 70%,rgba(11,11,13,.96) 100%)}
+.scene.card .body>.cap{max-width:100%}
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .scene .fadeout{position:absolute;left:0;right:0;bottom:0;height:74%;z-index:1;pointer-events:none;
   background:linear-gradient(to bottom,transparent 0%,rgba(11,11,13,.38) 34%,rgba(11,11,13,.82) 66%,var(--void) 94%)}
 
@@ -167,15 +176,15 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 .rail{display:flex;gap:12px;overflow-x:auto;margin:0 -20px;padding:0 20px 10px;scrollbar-width:none;
   scroll-snap-type:x proximity;overscroll-behavior-x:contain}
 .rail::-webkit-scrollbar{display:none}
-.pract{flex:none;width:196px;height:250px;border-radius:var(--r-lg);overflow:hidden;position:relative;
-  scroll-snap-align:start;display:flex;flex-direction:column;justify-content:flex-end;padding:16px}
+.pract{flex:none;width:12.25rem;min-height:15.6rem;border-radius:var(--r-lg);overflow:hidden;position:relative;
+  scroll-snap-align:start;display:flex;flex-direction:column;justify-content:flex-end;padding:var(--pad-tile);text-align:left}
 .pract .art{position:absolute;inset:0;z-index:0}
 .pract .art svg{width:100%;height:100%;display:block}
-.pract .shade{position:absolute;inset:0;z-index:1;background:linear-gradient(to top,rgba(6,6,8,.92) 4%,rgba(6,6,8,.55) 40%,rgba(6,6,8,.06) 76%)}
-.pract .tx{position:relative;z-index:2}
-.pract .tx b{display:block;font-family:var(--disp);font-weight:400;font-size:1.24rem;letter-spacing:-.008em;line-height:1.16}
-.pract .tx span{display:block;font-size:var(--t-cap);color:var(--ink-3);margin-top:5px}
-.pract .tag{position:absolute;top:14px;left:14px;z-index:2;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;
+.pract .shade{position:absolute;inset:0;z-index:1;background:linear-gradient(to top,rgba(6,6,8,.95) 0%,rgba(6,6,8,.82) 30%,rgba(6,6,8,.4) 58%,rgba(6,6,8,.04) 82%)}
+.pract .tx{position:relative;z-index:2;width:100%;padding-top:2.4rem}
+.pract .tx b{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-family:var(--disp);font-weight:400;font-size:1.24rem;letter-spacing:-.008em;line-height:1.16}
+.pract .tx span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:var(--t-cap);color:var(--ink-2);margin-top:.3rem}
+.pract .tag{position:absolute;top:var(--pad-tile);left:var(--pad-tile);z-index:2;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;
   font-weight:500;color:var(--ink);background:rgba(255,255,255,.16);padding:4px 8px;border-radius:6px;
   -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 
@@ -549,7 +558,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 .player .tm{font-variant-numeric:tabular-nums;font-size:.8rem;color:var(--ink-3);letter-spacing:.02em}
 
 /* клуб */
-.club{border-radius:var(--r-lg);border:1px solid var(--ink-4);padding:20px;margin-bottom:var(--s4)}
+.club{border-radius:var(--r-lg);border:1px solid var(--ink-4);padding:var(--pad-card);margin-bottom:var(--s4)}
 .club .kicker{font-size:.665rem;letter-spacing:.19em;text-transform:uppercase;color:var(--brand);
   font-weight:500;margin-bottom:11px}
 .club h3{margin:0 0 9px;font-family:var(--disp);font-size:1.34rem;line-height:1.2;letter-spacing:-.014em;font-weight:400}
@@ -852,10 +861,10 @@ button.cli:active{opacity:.65}
       </div>
 
       <!-- Манифест -->
-      <div class="scene" style="border-radius:22px;margin-bottom:36px">
+      <div class="scene card">
         <div class="art"><svg><use href="#sc-dawn"/></svg></div>
         <div class="fadeout"></div>
-        <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:0 20px 26px">
+        <div class="body">
           <h2 class="disp" style="max-width:280px">Тело уже всё сказало.<br>Осталось <span class="ser">услышать</span>.</h2>
           <p class="cap" style="margin:14px 0 4px;max-width:290px">Ника не считает пульс и не смотрит на часы. Она спрашивает, а выводы делаешь ты.</p>
         </div>
@@ -907,10 +916,10 @@ button.cli:active{opacity:.65}
         <a class="pill" id="clubBtn" href="#" target="_blank" rel="noopener" style="text-decoration:none">Записаться</a>
       </div>
       <!-- Pro -->
-      <div class="scene freeonly" style="border-radius:22px;margin-bottom:12px">
+      <div class="scene card freeonly">
         <div class="art"><svg><use href="#sc-night"/></svg></div>
         <div class="fadeout"></div>
-        <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:0 20px 26px">
+        <div class="body">
           <div class="lab" style="margin-bottom:10px">НИКА Про</div>
           <h2 class="disp">Ника, которая <span class="ser">помнит</span></h2>
           <p class="cap" style="margin:14px 0 20px;max-width:290px">Больше разговоров в день, память о прошлых разговорах и советы, собранные под тебя. Практики, дневник и ритм остаются бесплатными.</p>
@@ -957,10 +966,10 @@ button.cli:active{opacity:.65}
 
     <!-- ==================== ДНЕВНИК ==================== -->
     <section class="view" data-view="diary">
-      <div class="scene" style="border-radius:22px;margin-bottom:28px">
+      <div class="scene card">
         <div class="art"><svg><use href="#sc-mist"/></svg></div>
         <div class="fadeout"></div>
-        <div class="body" style="height:100%;display:flex;flex-direction:column;justify-content:flex-end;padding:0 20px 24px">
+        <div class="body">
           <div class="lab" style="margin-bottom:10px">Порог</div>
           <h2 class="disp" id="diaryHead">0 из 20 записей</h2>
           <p class="cap" style="margin:12px 0 0;max-width:280px" id="diaryThreshCap">До двадцати записей выводов не будет. Нужно больше данных для точного ответа.</p>
