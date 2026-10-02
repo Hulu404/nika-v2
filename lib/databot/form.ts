@@ -14,8 +14,8 @@ import type { ReportId, Section } from "./types";
 export const FORM_TTL_MS = 10 * 60 * 1000;
 
 /** Какая форма ждёт ответа. Каждая — отчёт каталога, чтобы зона проверялась как у кнопок. */
-export type FormKind = "run.plan" | "kb.edit" | "kb.new";
-const FORM_KINDS: readonly FormKind[] = ["run.plan", "kb.edit", "kb.new"];
+export type FormKind = "run.plan" | "kb.edit" | "kb.new" | "assigned.upload";
+const FORM_KINDS: readonly FormKind[] = ["run.plan", "kb.edit", "kb.new", "assigned.upload"];
 
 /** Куда уходит ответ формы: тот же отчёт и раздел, что у кнопки, — зона проверяется так же. */
 export const FORM_ROUTE: Record<FormKind, { report: ReportId; section: Section; action: string }> = {
@@ -23,6 +23,7 @@ export const FORM_ROUTE: Record<FormKind, { report: ReportId; section: Section; 
   // Правка и новая статья — оба шага идут одним отчётом kb.edit (совет).
   "kb.edit": { report: "kb.edit", section: "kb", action: "edit_text" },
   "kb.new": { report: "kb.edit", section: "kb", action: "new_text" },
+  "assigned.upload": { report: "tsk.list", section: "tsk", action: "upload" },
 };
 
 export interface FormState {

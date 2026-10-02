@@ -44,6 +44,38 @@ beforeEach(async () => {
 afterEach(() => vi.unstubAllEnvs());
 
 describe("owner task lists", () => {
+  it("opens upload mode with /tasks and shows each member only their own tasks", async () => {
+    await send("@alice — Вне режима", 9, "owner", 20);
+    expect(store.assignedTasks.size).toBe(0);
+    await send("/tasks", 9, "owner", 21);
+    expect(texts(9).at(-1)).toContain("Пришлите список задач");
+    await send("1. @alice — Подготовить макет\n2. @bob — Проверить текст", 9, "owner", 22);
+    expect(store.assignedTasks.size).toBe(2);
+    expect(texts(1).some(t => t.includes("Подготовить макет"))).toBe(true);
+    expect(texts(1).some(t => t.includes("Проверить текст"))).toBe(false);
+    calls.length = 0;
+    await send("/tasks", 1, "alice", 23);
+    expect(texts(1).some(t => t.includes("Подготовить макет"))).toBe(true);
+    expect(texts(1).some(t => t.includes("Проверить текст"))).toBe(false);
+    await send("/tasks", 2, "bob", 24);
+    expect(texts(2).some(t => t.includes("Проверить текст"))).toBe(true);
+    expect(texts(2).some(t => t.includes("Подготовить макет"))).toBe(false);
+    await send("@alice — После загрузки", 9, "owner", 25);
+    expect(store.assignedTasks.size).toBe(2);
+  });
+
+  it("keeps upload mode after a malformed list and lets /cancel close it", async () => {
+    await send("/tasks", 9, "owner", 30);
+    await send("@missing — Ошибка", 9, "owner", 31);
+    expect(store.assignedTasks.size).toBe(0);
+    await send("@alice — Исправленная задача", 9, "owner", 32);
+    expect(store.assignedTasks.size).toBe(1);
+    await send("/tasks", 9, "owner", 33);
+    await send("/cancel", 9, "owner", 34);
+    await send("@bob — Отменённая загрузка", 9, "owner", 35);
+    expect(store.assignedTasks.size).toBe(1);
+  });
+
   it("splits, sends only to exact recipients, and ignores repeat delivery", async () => {
     const list = "/assign\n@ALICE — Сделать <макет>\n@bob — Проверить текст";
     await send(list); await send(list);

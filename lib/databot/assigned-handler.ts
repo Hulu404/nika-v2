@@ -8,13 +8,13 @@ import {
 import { databotTaskConfig } from "./config";
 import type { DatabotStore } from "./data/store";
 import { escapeHtml } from "./html";
+import { formExpired, openForm } from "./form";
 import { parseIntent } from "./intent";
 import { normalizeTaskUsername } from "./tasks";
 import { isActiveAssigned, parseTaskList, TaskListError, type AssignedAction, type AssignedTask } from "./task-list";
 
 /** Сколько дней закрытые задачи видны в обзоре владельца и в «Моих задачах». */
 const CLOSED_VISIBLE_DAYS = 7;
-const MAX_CARDS = 20;
 
 type Buttons = Array<Array<{ text: string; callback_data: string }>>;
 const markup = (buttons?: Buttons) => buttons ? { inline_keyboard: buttons } : undefined;
@@ -66,8 +66,7 @@ export async function sendAssignedList(ctx: Context, store: DatabotStore, userId
     : "Назначенных вам задач пока нет.");
   else {
     await reply(`<b>Мои задачи</b> · в работе ${active.length}${done.length ? ` · сделано за ${CLOSED_VISIBLE_DAYS} дн.: ${done.length}` : ""}`);
-    for (const t of active.slice(0, MAX_CARDS)) await reply(taskCard(t, now), taskButtons(t));
-    if (active.length > MAX_CARDS) await reply(`И ещё ${active.length - MAX_CARDS}.`);
+    for (const t of active) await reply(taskCard(t, now), taskButtons(t));
   }
   if (databotTaskConfig()) await reply("Задачи из топика группы: /mytasks");
 }
@@ -112,23 +111,30 @@ export async function handleAssignedUpdate(ctx: Context, store: DatabotStore, no
   if (!ctx.message?.text) return false;
 
   const text = ctx.message.text.trim();
-  const command = /^\/(assign|tasks_add|assigned|assign_retry|assign_status|assign_cancel|assign_edit|assign_due)(?:@([a-z0-9_]+))?(?=\s|$)/i.exec(text);
+  const command = /^\/(tasks|assign|tasks_add|assigned|assign_retry|assign_status|assign_cancel|assign_edit|assign_due)(?:@([a-z0-9_]+))?(?=\s|$)/i.exec(text);
   if (command?.[2] && command[2].toLowerCase() !== ctx.me.username.toLowerCase()) return false;
-  const bareList = !text.startsWith("/") && text.includes("\n") &&
-    text.split(/\r?\n/).some(line => /@[a-z0-9_]{1,32}/i.test(line));
-  const parsed = !command && !bareList ? parseIntent({ text, callbackData: null }) : null;
+  const parsed = !command ? parseIntent({ text, callbackData: null }) : null;
   const myTasks = parsed?.kind === "intent" && parsed.intent.report === "tsk.list";
-  if (!command && !bareList && !myTasks) return false;
+  const owner = isEnvOwner(ctx.from.id);
+  const form = !command && !myTasks && owner ? await store.getForm(ctx.from.id) : null;
+  const uploading = form?.kind === "assigned.upload" && !text.startsWith("/");
+  if (!command && !myTasks && !uploading) return false;
 
   const member = await store.findActiveMember(ctx.from.id);
   // Чужим отвечает остальной конвейер — одной общей фразой.
   if (!member) return false;
   const reply = (body: string, buttons?: Buttons) =>
     ctx.reply(body, { parse_mode: "HTML", link_preview_options: { is_disabled: true }, reply_markup: markup(buttons) });
-  const cmd = myTasks ? "assigned" : command?.[1].toLowerCase() ?? "assign";
+  const cmd = myTasks ? "tasks" : command?.[1].toLowerCase() ?? "assign";
   const args = text.slice(command?.[0].length ?? 0).trim();
 
-  if (cmd === "assigned") {
+  if (cmd === "tasks" && owner && member.is_owner) {
+    await store.setForm(ctx.from.id, openForm("assigned.upload", {}, now), now);
+    await reply("Пришлите список задач одним сообщением: по одной задаче с @ником участника в каждой строке. Например:\n<code>• @alice — Подготовить макет\n• @bob — Проверить текст</code>\nОтмена — /cancel.");
+    return true;
+  }
+
+  if (cmd === "assigned" || cmd === "tasks") {
     const username = normalizeTaskUsername(ctx.from.username);
     if (!username || normalizeTaskUsername(member.username) !== username) {
       await reply("Telegram-ник изменился или отсутствует. Напишите /start, чтобы обновить профиль, и попросите владельца проверить назначение.");
@@ -138,10 +144,18 @@ export async function handleAssignedUpdate(ctx: Context, store: DatabotStore, no
     return true;
   }
 
-  if (!isEnvOwner(ctx.from.id) || !member.is_owner) {
-    await reply("Загружать и править задачи может только владелец бота. Свои задачи — /assigned.");
+  if (!owner || !member.is_owner) {
+    await reply("Загружать и править задачи может только владелец бота. Свои задачи — /tasks.");
     return true;
   }
+
+  if (uploading && formExpired(form!, now)) {
+    await store.clearSession(ctx.from.id);
+    await reply("Режим загрузки задач истёк. Откройте /tasks и пришлите список снова.");
+    return true;
+  }
+
+  if (command) await store.clearSession(ctx.from.id);
 
   if (cmd === "assign_status") {
     const tasks = await store.listAssignedOverview(new Date(now.getTime() - CLOSED_VISIBLE_DAYS * 86_400_000));
@@ -209,6 +223,7 @@ export async function handleAssignedUpdate(ctx: Context, store: DatabotStore, no
       }
     }
     const tasks = await store.importAssignedTasks(ctx.from.id, ctx.message.message_id, drafts);
+    if (uploading) await store.clearSession(ctx.from.id);
     for (const task of tasks.filter(t => t.delivery_state === "pending")) await sendAssigned(ctx, store, task, now);
     const fresh = (await Promise.all(tasks.map(t => store.getAssignedTask(t.id)))).filter((t): t is AssignedTask => !!t);
     const sent = fresh.filter(t => t.delivery_state === "sent").length;

@@ -52,7 +52,7 @@ export function taskButtons(t: AssignedTask): Button[][] | undefined {
 }
 
 export function deliveryText(t: AssignedTask, now: Date): string {
-  return `${taskCard(t, now, NEW_TASK_HEADER)}\n\n#${t.id} · все мои задачи: /assigned`;
+  return `${taskCard(t, now, NEW_TASK_HEADER)}\n\n#${t.id} · все мои задачи: /tasks`;
 }
 
 /** Уведомление владельцу о действии исполнителя. Без глаголов прошедшего времени: род не знаем. */
@@ -141,9 +141,8 @@ function chunk(lines: string[], max: number): string[] {
 }
 
 export const ASSIGN_HELP = [
-  "Отправьте одним сообщением:",
-  "<code>/assign",
-  "@alice — Подготовить макет до пт 18:00",
+  "Откройте /tasks и отправьте следующим сообщением:",
+  "<code>@alice — Подготовить макет до пт 18:00",
   "@bob — Проверить текст до 03.10",
   "@carol — Созвониться с площадкой</code>",
   "Одна задача и один @username в каждой строке. Срок — необязательно, в конце строки после «до»: «до пт», «до завтра 12:00», «до 03.10», «до 18:00».",
