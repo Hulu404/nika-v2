@@ -9,7 +9,7 @@
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="manifest" href="/app/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png">
-<meta name="theme-color" content="#08080A">
+<meta name="theme-color" content="#0B0B0D">
 <title>НИКА</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -52,15 +52,16 @@
 
 *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{font-size:100%}
-html,body{margin:0;padding:0;height:100%}
+html,body{margin:0;padding:0;height:100%;background:#0B0B0D;overscroll-behavior:none}
 body{font-family:var(--sans);font-size:var(--t-body);line-height:var(--t-lh-body);letter-spacing:var(--t-ls-body);
-  color:var(--ink);background:#08080A;font-optical-sizing:auto;font-variant-numeric:tabular-nums;
-  display:flex;align-items:center;justify-content:center;min-height:100dvh;overflow:hidden}
+  color:var(--ink);background:#0B0B0D;font-optical-sizing:auto;font-variant-numeric:tabular-nums;
+  overflow:hidden}
 button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:pointer;color:inherit;text-align:left;
   touch-action:manipulation;letter-spacing:inherit}
 :focus-visible{outline:1.5px solid var(--ink);outline-offset:3px;border-radius:6px}
 
-.stage{width:100%;height:100dvh;display:flex;align-items:center;justify-content:center;gap:34px;background:#111114}
+/* корень приложения прибит к краям экрана: в PWA на iOS 100dvh короче физической высоты */
+.stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;gap:34px;background:#0B0B0D}
 .device{position:relative;width:393px;height:852px;border-radius:56px;background:#000;padding:11px;
   box-shadow:0 0 0 2px #26262A,0 40px 90px -30px rgba(0,0,0,.8);flex:none}
 .app{position:relative;width:100%;height:100%;border-radius:46px;overflow:hidden;isolation:isolate;background:var(--void)}
@@ -154,7 +155,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
   background:linear-gradient(to top,var(--void) 4%,rgba(11,11,13,.7) 42%,transparent 100%)}
 
 .scroll{position:absolute;inset:0;z-index:10;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;
-  padding:calc(var(--sat) + var(--bar-h) + 22px) 20px calc(var(--sab) + 132px);scrollbar-width:none;overscroll-behavior:contain}
+  padding:calc(var(--sat) + var(--bar-h) + 22px) 20px calc(var(--sab) + 132px);scrollbar-width:none;overscroll-behavior:none}
 .scroll::-webkit-scrollbar{display:none}
 .behind{position:absolute;inset:0;z-index:10;transform-origin:50% 24%;will-change:transform}
 
@@ -353,7 +354,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 
 @media (max-width:1023px){
   .stage{gap:0;padding:0;background:var(--void)}
-  .device{width:100%;height:100dvh;border-radius:0;padding:0;box-shadow:none;background:var(--void)}
+  .device{position:absolute;inset:0;width:auto;height:auto;border-radius:0;padding:0;box-shadow:none;background:var(--void)}
   .app{border-radius:0}
   .statusbar{display:none}
   .homebar{display:none}
@@ -364,7 +365,7 @@ button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:poi
 @media (min-width:1024px){
   .app{--side:236px;--nika:400px}
   .stage{display:block;background:var(--void)}
-  .device{width:100%;height:100dvh;border-radius:0;padding:0;box-shadow:none;background:var(--void)}
+  .device{position:absolute;inset:0;width:auto;height:auto;border-radius:0;padding:0;box-shadow:none;background:var(--void)}
   .app{border-radius:0}
   .statusbar,.homebar,.botveil,.scrim,.grab,.nback,.fab{display:none!important}
   .tabzone{position:absolute;left:0;right:auto;top:0;bottom:0;width:var(--side);flex-direction:column;align-items:stretch;
@@ -3444,6 +3445,27 @@ button.cli:active{opacity:.65}
       try{ if(sessionStorage.getItem('nika_cookie_synced')) return; sessionStorage.setItem('nika_cookie_synced','1'); }catch(e){ return; }
       api('/api/consents',{method:'POST',body:{entries:[{type:'cookies_analytics',granted:c.analytics}],source:'cookie_banner'}});
     });
+  })();
+
+  /* ============================================================
+     ОТЛАДКА ВЬЮПОРТА: ?debug=vp (в проде без параметра не включается)
+     ============================================================ */
+  (function(){
+    if(!/[?&]debug=vp\b/.test(location.search)) return;
+    var probe=document.createElement('div');
+    probe.style.cssText='position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
+    var box=document.createElement('pre');
+    box.style.cssText='position:fixed;left:8px;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:9999;margin:0;padding:8px 10px;background:rgba(0,0,0,.78);color:#7CFC9A;font:11px/1.45 ui-monospace,monospace;border-radius:8px;pointer-events:none;white-space:pre';
+    document.body.appendChild(probe); document.body.appendChild(box);
+    function upd(){
+      var cs=getComputedStyle(probe), st=document.querySelector('.stage').getBoundingClientRect(), ap=document.getElementById('app').getBoundingClientRect();
+      box.textContent=['innerHeight '+innerHeight,'screen.height '+screen.height,'visualViewport '+(window.visualViewport?Math.round(visualViewport.height):'n/a'),
+        'clientHeight '+document.documentElement.clientHeight,'stage '+Math.round(st.top)+'..'+Math.round(st.bottom),'app '+Math.round(ap.top)+'..'+Math.round(ap.bottom),
+        'safe top '+cs.paddingTop+' bottom '+cs.paddingBottom,'standalone '+(navigator.standalone||matchMedia('(display-mode: standalone)').matches)].join('\n');
+    }
+    upd(); addEventListener('resize',upd); addEventListener('orientationchange',function(){ setTimeout(upd,300); });
+    if(window.visualViewport) visualViewport.addEventListener('resize',upd);
+    document.addEventListener('visibilitychange',upd);
   })();
 
   /* ============================================================
