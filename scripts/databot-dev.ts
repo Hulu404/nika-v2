@@ -48,7 +48,7 @@ async function main(): Promise<void> {
     onStart: async (me) => {
       console.log(`Бот данных запущен (dev, polling): @${me.username}`);
       console.log("Напиши боту в личку — ниже появится твой chat_id.");
-      await bot.api.setMyCommands([...DATABOT_DEFAULT_COMMANDS]).catch(() => {});
+      await bot.api.setMyCommands(process.env.TEAM_BOT_TOKEN ? [DATABOT_DEFAULT_COMMANDS[0]] : [...DATABOT_DEFAULT_COMMANDS]).catch(() => {});
     },
   });
 }

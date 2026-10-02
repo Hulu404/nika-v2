@@ -1,4 +1,4 @@
-import { Bot, type Context } from "grammy";
+import { Bot, type Api, type Context } from "grammy";
 import { spotName } from "../coffeerun/run";
 import { teamToken } from "./config";
 import { buildDigest } from "./digest-build";
@@ -53,6 +53,7 @@ import {
   type TodayItem,
 } from "./copy";
 import { faqAnswerText, faqIndexText, findFaq } from "./faq";
+import { handleTeamTaskUpdate } from "./tasks";
 
 /**
  * Внутренний бот команды: сколько человек записалось, кто подтвердился, кому
@@ -243,6 +244,11 @@ async function showToday(ctx: TeamContext, snap: Snapshot): Promise<void> {
 }
 
 function registerHandlers(bot: Bot<TeamContext>): void {
+  bot.use(async (ctx, next) => {
+    if (await handleTeamTaskUpdate(ctx)) return;
+    await next();
+  });
+
   // ── Вход ───────────────────────────────────────────────────────────────────
   bot.command("join", async (ctx) => {
     const chatId = ctx.chat?.id;
@@ -261,6 +267,7 @@ function registerHandlers(bot: Bot<TeamContext>): void {
 
     switch (res.status) {
       case "joined":
+        await setTeamCommands(bot.api, res.member);
         await ctx.reply(
           [
             res.first
@@ -274,6 +281,7 @@ function registerHandlers(bot: Bot<TeamContext>): void {
         );
         break;
       case "already":
+        await setTeamCommands(bot.api, res.member);
         await ctx.reply(`Ты и так в команде.\n\n${helpText(res.member.role)}`);
         break;
       case "wrong_secret":
@@ -293,8 +301,16 @@ function registerHandlers(bot: Bot<TeamContext>): void {
   });
 
   bot.command(["start", "help"], async (ctx) => {
-    const member = await requireMember(ctx);
+    let member = await requireMember(ctx);
     if (!member) return;
+    if (ctx.message?.text?.startsWith("/start")) {
+      await joinTeam(member.chat_id, "", {
+        username: ctx.from?.username ?? null,
+        displayName: ctx.from?.first_name ?? null,
+      });
+      member = await findMember(member.chat_id) ?? member;
+    }
+    await setTeamCommands(bot.api, member);
     await ctx.reply(helpText(member.role));
     await withData(ctx, async () => showToday(ctx, await snapshot()));
   });
@@ -562,6 +578,10 @@ async function replyFaq(
 
 /** Меню команд в интерфейсе Telegram — чтобы синтаксис не держали в голове. */
 export const TEAM_COMMANDS = [
+  { command: "tasks", description: "Мои задачи и сроки" },
+  { command: "assigned", description: "Мои назначенные задачи" },
+  { command: "assign", description: "Раздать задачи команде" },
+  { command: "assign_status", description: "Общий список задач" },
   { command: "today", description: "Что сегодня и завтра" },
   { command: "runs", description: "Забеги в работе и цифры" },
   { command: "run", description: "Карточка забега" },
@@ -574,6 +594,19 @@ export const TEAM_COMMANDS = [
   { command: "team", description: "Кто в команде" },
   { command: "help", description: "Что я умею" },
 ];
+
+export const TEAM_MEMBER_COMMANDS = TEAM_COMMANDS.filter(command =>
+  command.command !== "assign" && command.command !== "assign_status");
+
+/** Telegram сохраняет меню чата между релизами: обновляем на /start и /join. */
+export async function setTeamCommands(api: Api, member: TeamMember): Promise<void> {
+  try {
+    await api.setMyCommands(member.role === "owner" ? TEAM_COMMANDS : TEAM_MEMBER_COMMANDS,
+      { scope: { type: "chat", chat_id: member.chat_id } });
+  } catch (err) {
+    console.error("[team] setMyCommands:", err instanceof Error ? err.message : String(err));
+  }
+}
 
 // ── Ленивый синглтон ──────────────────────────────────────────────────────────
 // Bot не создаём на уровне модуля: grammY бросает на пустом токене, а это

@@ -1,4 +1,5 @@
-import { getTeamBot, TEAM_COMMANDS } from "./bot";
+import { getTeamBot, setTeamCommands, TEAM_MEMBER_COMMANDS } from "./bot";
+import { listTeam } from "./access";
 import { teamBotConfigured } from "./config";
 import { publicOriginFromEnv } from "../public-origin";
 
@@ -47,9 +48,11 @@ export async function ensureTeamWebhook(): Promise<EnsureTeamWebhookResult> {
     });
     // Меню команд ставим здесь же: оно должно приезжать вместе с кодом, а не
     // настраиваться руками в BotFather после каждой новой команды.
-    await bot.api.setMyCommands(TEAM_COMMANDS).catch((err) => {
+    await bot.api.setMyCommands(TEAM_MEMBER_COMMANDS).catch((err) => {
       console.warn("[team] setMyCommands:", err instanceof Error ? err.message : String(err));
     });
+    // Старые scope=chat перекрывают общее меню. Обновляем их после деплоя.
+    for (const member of await listTeam()) await setTeamCommands(bot.api, member);
     return { status: "registered", detail: target };
   } catch (err) {
     return { status: "failed", detail: err instanceof Error ? err.message : String(err) };

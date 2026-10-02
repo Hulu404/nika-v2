@@ -4,6 +4,7 @@ import type { BotCommand, ReplyKeyboardRemove } from "grammy/types";
 import { cb } from "./callback";
 import { HELP_COMMAND_DESCRIPTION, SECTION_COMMAND_DESCRIPTION, SECTION_LABEL } from "./copy";
 import { isEnvOwner } from "./access";
+import { teamBotConfigured } from "../team/config";
 import { SECTION_COMMAND, visibleSections } from "./sections";
 import type { InlineButton, Section, Subject, Zone } from "./types";
 
@@ -31,8 +32,8 @@ export const REMOVE_KEYBOARD: ReplyKeyboardRemove = { remove_keyboard: true };
 export function commandsFor(sections: readonly Section[], isOwner = false): BotCommand[] {
   return [
     ...sections.map((s) => ({ command: SECTION_COMMAND[s], description: SECTION_COMMAND_DESCRIPTION[s] })),
-    { command: "assigned", description: "Назначенные мне задачи" },
-    ...(isOwner ? [
+    ...(!teamBotConfigured() ? [{ command: "assigned", description: "Назначенные мне задачи" }] : []),
+    ...(isOwner && !teamBotConfigured() ? [
       { command: "assign", description: "Раздать задачи списком" },
       { command: "assign_status", description: "Кто что делает по задачам" },
     ] : []),

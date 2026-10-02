@@ -1,4 +1,5 @@
 import { canOpenSection } from "./access";
+import { teamBotConfigured } from "../team/config";
 import { SECTIONS, type ReportId, type Section, type Subject } from "./types";
 
 /**
@@ -42,7 +43,7 @@ export const SECTION_HOME_REPORT: Record<Section, ReportId> = {
 
 /** Разделы, которые человек видит в клавиатуре и меню: доступны зоне И готовы. */
 export function visibleSections(subject: Subject): Section[] {
-  return SECTIONS.filter((s) => SECTION_READY[s] && canOpenSection(subject, s));
+  return SECTIONS.filter((s) => SECTION_READY[s] && (s !== "tsk" || !teamBotConfigured()) && canOpenSection(subject, s));
 }
 
 /** Разделы, доступные зоне, независимо от готовности. */
