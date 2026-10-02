@@ -10,6 +10,7 @@
 <link rel="manifest" href="/app/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png">
 <meta name="theme-color" content="#0B0B0D">
+<meta name="format-detection" content="telephone=no, email=no, address=no">
 <script>/* вариант навигации до первой отрисовки: стекло на iOS/iPadOS, бар на остальных; ?nav=glass|solid для проверки */
 (function(){var q=/[?&]nav=(glass|solid)\b/.exec(location.search),ua=navigator.userAgent,
 ios=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1);
@@ -75,6 +76,10 @@ body{font-family:var(--sans);font-weight:var(--font-weight-body,400);font-size:v
 button{font-family:inherit;font-size:inherit;border:0;background:none;cursor:pointer;color:inherit;text-align:left;
   touch-action:manipulation;letter-spacing:inherit}
 :focus-visible{outline:1.5px solid var(--ink);outline-offset:3px;border-radius:6px}
+/* ссылки без системного синего: цвет текста вокруг, пункты списка как обычные пункты */
+a{color:inherit}
+a.li{color:inherit;text-decoration:none}
+a[href^="mailto:"],a[href^="tel:"],a[x-apple-data-detectors]{color:inherit!important;text-decoration:none!important}
 
 /* корень приложения прибит к краям экрана: в PWA на iOS 100dvh короче физической высоты */
 .stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;gap:34px;background:#0B0B0D}
