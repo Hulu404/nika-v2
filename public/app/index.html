@@ -12,10 +12,11 @@
 <link rel="apple-touch-icon" href="/app/icons/apple-touch-icon.png">
 <meta name="theme-color" content="#0B0B0D">
 <meta name="format-detection" content="telephone=no, email=no, address=no">
-<script>/* вариант навигации до первой отрисовки: стекло на iOS/iPadOS, бар на остальных; ?nav=glass|solid для проверки */
-(function(){var q=/[?&]nav=(glass|solid)\b/.exec(location.search),ua=navigator.userAgent,
+<script>/* вариант навигации до первой отрисовки: бар как у Spotify везде (решение Дмитрия 2026-10-03),
+   стекло для iOS включается заменой NAV_IOS на 'glass'; ?nav=glass|solid для проверки */
+(function(){var NAV_IOS='solid',q=/[?&]nav=(glass|solid)\b/.exec(location.search),ua=navigator.userAgent,
 ios=/iPhone|iPad|iPod/.test(ua)||(/Macintosh/.test(ua)&&navigator.maxTouchPoints>1);
-document.documentElement.setAttribute('data-nav',q?q[1]:(ios?'glass':'solid'));})();
+document.documentElement.setAttribute('data-nav',q?q[1]:(ios?NAV_IOS:'solid'));})();
 /* вид из профиля до первой отрисовки, чтобы не мигало: шрифт, размер, жирность */
 (function(){try{var u=JSON.parse(localStorage.getItem('nika_ui')||'null');if(!u)return;var F={
 nika:["'Playfair Display','Times New Roman',Georgia,serif","'Inter',-apple-system,system-ui,sans-serif","-.036em"],
@@ -446,7 +447,7 @@ a[href^="mailto:"],a[href^="tel:"],a[x-apple-data-detectors]{color:inherit!impor
   .tabzone{position:fixed;left:16px;right:16px}
 }
 
-/* ── Нижняя навигация: data-nav="glass" (iOS) и "solid" (Android и запасной для iOS) ── */
+/* ── Нижняя навигация: data-nav="solid" (везде) и "glass" (стекло, сейчас выключено) ── */
 .tablens,.fablab{display:none}
 @media (max-width:1023px){
   html[data-nav="glass"] .tabzone{left:16px;right:16px;bottom:calc(10px + env(safe-area-inset-bottom,0px));gap:10px}
