@@ -21,4 +21,4 @@ iOS фиксирует мета-теги в момент установки.
 
 | # | Дата | Коммит | Что поменяли (одна вещь) | CACHE_VERSION | Результат на iPhone |
 |---|---|---|---|---|---|
-| 1 | 2026-10-03 | см. ниже | Диагностика: откат `38c0b0a`, временный красный фон `html, body`, новый оверлей (innerHeight, screen, visualViewport, clientHeight, границы `.stage`/`.app`, `--sat`/`--sab`, standalone, display-mode, UA) | `nika-bottom-gap-1` | ждём скриншот: полоса красная или чёрная |
+| 1 | 2026-10-03 | `4e6580c` + `14bf726` | Диагностика: откат `38c0b0a`, временный красный фон `html, body`, новый оверлей (innerHeight, screen, visualViewport, clientHeight, границы `.stage`/`.app`, `--sat`/`--sab`, standalone, display-mode, UA) | `nika-bottom-gap-1` | ждём скриншот: полоса красная или чёрная |
