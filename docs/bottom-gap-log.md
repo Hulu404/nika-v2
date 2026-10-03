@@ -24,9 +24,28 @@ iOS фиксирует мета-теги в момент установки.
 | 1 | 2026-10-03 | (тот же) | — | `nika-bottom-gap-1` | **PWA: полоса КРАСНАЯ**, около 60pt снизу (≈ высота статус-бара 62pt). Окно доходит до низа, корень `.stage` (`fixed; inset:0`) кончается выше: iOS считает вьюпорт короче окна. Цифр оверлея на скриншоте нет |
 | 2 | 2026-10-03 | см. git log | Диагностика: в оверлей добавлены высоты fixed-блоков `100%`, `100vh`, `100dvh`, `100lvh`, `100svh`, чтобы выбрать единицу, равную окну | `nika-bottom-gap-2` | iPhone 393×852, iOS 26.5, standalone true. innerHeight = clientHeight = visualViewport = 793 = 852 − 59 (статус-бар). `.stage` 0..793. `--sat` 59, `--sab` 34. fixed: `100%` 793, `100vh` **852**, `100dvh` 793, `100lvh` **852**, `100svh` 793. Полоса красная |
 | 3 | 2026-10-03 | см. git log | `.stage` в `@media (display-mode: standalone)`: `bottom:auto; height:100vh` (единица, равная окну). Красный фон и оверлей пока остаются | `nika-bottom-gap-3` | не проверялся отдельно: нижний бар `.tabzone` на телефоне `position:fixed`, он остался бы на 793 при корне 852. Сразу заменён деплоем 4 |
-| 4 | 2026-10-03 | см. git log | `.tabzone` на телефоне `position:fixed` → `absolute`: бар меряется от корня (852), а не от вьюпорта (793) | `nika-bottom-gap-4` | **принято Дмитрием**: полосы нет |
-| 5 | 2026-10-03 | см. git log | Убраны временный красный фон `html, body` и оверлей вьюпорта | `nika-bottom-gap-5` | — |
+| 4 | 2026-10-03 | см. git log | `.tabzone` на телефоне `position:fixed` → `absolute`: бар меряется от корня (852), а не от вьюпорта (793) | `nika-bottom-gap-4` | ошибочно отмечено как принятое: Дмитрий ответил «убирай» до проверки |
+| 5 | 2026-10-03 | `d36c3b1` | Убраны временный красный фон `html, body` и оверлей вьюпорта | `nika-bottom-gap-5` | **ничего не поменялось**. Бар стоит на 762..852, иконки (до 793) видны, подписи (798..811) не нарисованы, фон бара не закрывает текст. iOS не рисует содержимое ниже вьюпорта 793: полоса под ним залита цветом фона страницы (поэтому в шаге 1 она была красной). Вывод: это не вёрстка, само окно короче, переходим к шагу 2 |
+| 6 | 2026-10-03 | см. git log | Откат деплоев 3 и 4 (`.stage` 100vh, `.tabzone` absolute): не помогли и спрятали подписи бара | `nika-bottom-gap-6` | ожидается состояние деплоя 2 (бар на 793, полоса тёмная) |
 
-## Итог
+## Шаг 2. Различия с эталоном (прошлое приложение, `app/layout.tsx` и `public/site.webmanifest`)
 
-Причина: в установленном PWA на iOS 26 вьюпорт короче окна на высоту статус-бара (793 из 852 на iPhone 393×852). `position:fixed; inset:0`, `100%`, `100dvh` и `100svh` меряются от вьюпорта, `100vh` и `100lvh` от окна. Решение: корень `.stage` в `@media (display-mode: standalone)` высотой `100vh`, нижний бар `.tabzone` позиционируется от корня (`absolute`), а не от вьюпорта.
+| Параметр | Эталон (React) | Сейчас (`public/app`) | Отличается |
+|---|---|---|---|
+| viewport | `width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content` | то же без `maximum-scale=1` | да, мелко |
+| apple-mobile-web-app-capable | `yes` | `yes` | нет |
+| apple-mobile-web-app-status-bar-style | `black-translucent` | `black-translucent` | нет |
+| apple-mobile-web-app-title | `НИКА` | `NIKA` | только текст |
+| theme-color | `#C8553D` | `#0B0B0D` | да |
+| manifest display | `standalone` | `standalone` | нет |
+| manifest display_override | нет | нет | нет |
+| manifest orientation | нет | `portrait` | **да** |
+| manifest start_url | `/today` | `/` | да |
+| manifest scope | нет | `/` | да |
+| manifest id | нет | `/` | да |
+| manifest background_color | `#EFE7D7` | `#D8481E` | да |
+| manifest theme_color | `#C8553D` | `#0B0B0D` | да |
+| html, body | `body { min-height:100vh; min-height:100dvh }`, документ прокручивается | `html,body { height:100%; overscroll-behavior:none }`, `body { overflow:hidden }` | да |
+| корень | `.app-shell { position:fixed; top:var(--app-top); height:var(--app-h) }`, `--app-h:100dvh` | `.stage { position:fixed; inset:0 }` | по сути то же: `100dvh` тоже 793 |
+
+Замечание: в эталоне корень тоже `100dvh` (= 793 при этом баге), а фон страницы был кремовым, как и бар. Если баг был и там, полоса под баром сливалась с ним и не бросалась в глаза.

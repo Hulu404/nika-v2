@@ -85,9 +85,6 @@ a[href^="mailto:"],a[href^="tel:"],a[x-apple-data-detectors]{color:inherit!impor
 
 /* корень приложения прибит к краям экрана: в PWA на iOS 100dvh короче физической высоты */
 .stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;gap:34px;background:#0B0B0D}
-/* установленное PWA на iOS 26: вьюпорт (inset:0, 100%, dvh) короче окна на статус-бар, 793 из 852;
-   100vh равен окну целиком (замер docs/bottom-gap-log.md, деплой 2). В Safari не трогаем: там бар ушёл бы под панель браузера */
-@media (display-mode: standalone){ .stage{bottom:auto;height:100vh} }
 .device{position:relative;width:393px;height:852px;border-radius:56px;background:#000;padding:11px;
   box-shadow:0 0 0 2px #26262A,0 40px 90px -30px rgba(0,0,0,.8);flex:none}
 .app{position:relative;width:100%;height:100%;border-radius:46px;overflow:hidden;isolation:isolate;background:var(--void)}
@@ -447,7 +444,7 @@ a[href^="mailto:"],a[href^="tel:"],a[x-apple-data-detectors]{color:inherit!impor
   .app{border-radius:0}
   .statusbar{display:none}
   .homebar{display:none}
-  .tabzone{position:absolute;left:16px;right:16px}
+  .tabzone{position:fixed;left:16px;right:16px}
 }
 
 /* ── Нижняя навигация: data-nav="solid" (везде) и "glass" (стекло, сейчас выключено) ── */
