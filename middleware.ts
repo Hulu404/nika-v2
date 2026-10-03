@@ -81,9 +81,7 @@ export async function middleware(request: NextRequest) {
   response.headers.set("Content-Security-Policy-Report-Only", csp);
 
   // getUser() заодно обновляет сессию (рефреш токена) и пишет cookies.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
 
@@ -97,19 +95,11 @@ export async function middleware(request: NextRequest) {
     return response;
   }
 
-  // Корень "/" отдаёт разный контент в зависимости от авторизации
-  // (гость → лендинг, вошедший → приложение), поэтому его НЕЛЬЗЯ кэшировать:
-  // иначе закэшированный лендинг прилетает вошедшему (и наоборот).
-  if (pathname === "/") {
-    response.headers.set("Cache-Control", "no-store, must-revalidate");
-  }
-
-  // Лендинг для гостя. Это статический самодостаточный HTML (инлайн-скрипты,
+  // Лендинг. Это статический самодостаточный HTML (инлайн-скрипты,
   // blob-видео): nonce-CSP к нему неприменим, поэтому CSP здесь не отдаём
   // (иначе при переводе Report-Only в боевой режим пропадут видео и анимации).
-  // Кэш публичный на 5 минут, но корень отдаёт разный контент гостю и вошедшему,
-  // поэтому Vary: Cookie: после входа браузер не подставит закэшированный лендинг.
-  // Если в ответ едут Set-Cookie (рефреш сессии), кэшировать нельзя.
+  // Кэш публичный на 5 минут. Если в ответ едут Set-Cookie (рефреш сессии),
+  // кэшировать нельзя: чужая сессия не должна осесть в общем кэше.
   const rewriteLanding = (url: URL) => {
     const res = NextResponse.rewrite(url);
     const carried = response.cookies.getAll();
@@ -120,36 +110,24 @@ export async function middleware(request: NextRequest) {
         ? "no-store, must-revalidate"
         : "public, max-age=300, stale-while-revalidate=86400",
     );
-    res.headers.set("Vary", "Cookie");
     return res;
   };
 
-  // Приложение для вошедшего: тот же статический HTML, что на /start
-  // (public/app/index.html). Данные он берёт из /api/v2, поэтому nonce-CSP
-  // к нему не применяется, кэш запрещён.
-  const rewriteApp = (url: URL) => {
-    const res = NextResponse.rewrite(url);
-    response.cookies.getAll().forEach((c) => res.cookies.set(c.name, c.value, c));
-    res.headers.set("Cache-Control", "no-store, must-revalidate");
-    res.headers.set("Vary", "Cookie");
-    return res;
-  };
-
-  // Корень: гость видит лендинг, вошедший получает приложение. URL остаётся "/".
-  // Онбординг, вход и все экраны живут внутри приложения; старые адреса
-  // перенаправляются в next.config.mjs (redirects).
+  // Корень всегда лендинг, и гостю, и вошедшему. URL остаётся "/".
+  // Приложение живёт на /app (и /start для входа), см. next.config.mjs;
+  // туда же ведут старые адреса и кнопки лендинга.
   if (pathname === "/") {
     const url = request.nextUrl.clone();
-    url.pathname = user ? "/app/index.html" : "/landing.html";
+    url.pathname = "/landing.html";
     url.search = "";
-    return user ? rewriteApp(url) : rewriteLanding(url);
+    return rewriteLanding(url);
   }
 
   return response;
 }
 
 export const config = {
-  // "/" нужен, чтобы отдать гостю лендинг, а вошедшему приложение.
+  // "/" нужен, чтобы отдать лендинг (и обновить cookies сессии по пути).
   // Старые страницы (/today, /chat, /journal…) перенаправляются в next.config.mjs.
   // /auth/callback и /auth/confirm намеренно вне матчера и не блокируются.
   //

@@ -1,7 +1,7 @@
 {
   "name": "NIKA",
   "short_name": "NIKA",
-  "start_url": "/",
+  "start_url": "/app",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",

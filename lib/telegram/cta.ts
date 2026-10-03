@@ -17,7 +17,8 @@ export function siteUrl(): string | null {
 
 export function siteKeyboard(label = "Открыть НИКУ"): InlineKeyboard | undefined {
   const url = siteUrl();
-  return url ? new InlineKeyboard().url(label, url) : undefined;
+  // Корень сайта теперь лендинг, приложение живёт на /app
+  return url ? new InlineKeyboard().url(label, `${url}/app`) : undefined;
 }
 
 /**

@@ -35,7 +35,7 @@ const nextConfig = {
     return [
       { source: "/:path*", headers: securityHeaders },
       // Лендинг (статический HTML, отдаётся со сжатием: compress включён по умолчанию).
-      // Вход через "/" получает те же заголовки из middleware.ts.
+      // Вход через "/" получает заголовки кэша из middleware.ts.
       {
         source: "/landing.html",
         headers: [
@@ -75,11 +75,12 @@ const nextConfig = {
         ],
       },
       { source: "/start", headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }] },
+      { source: "/app", headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }, { key: "X-Robots-Tag", value: "noindex, nofollow" }] },
       // Звук практик и иконки меняются только с новым именем файла
       { source: "/app/audio/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800" }] },
     ];
   },
-  // Старое приложение заменено новой версией (public/app/index.html).
+  // Старое приложение заменено новой версией (public/app/index.html, адрес /app).
   // Старые адреса ведут в нужный раздел нового: ссылки из Telegram-бота,
   // push-уведомлений и закладок продолжают работать.
   async redirects() {
@@ -91,24 +92,24 @@ const nextConfig = {
       to("/signup", "/start"),
       to("/forgot-password", "/start?login=1"),
       to("/onboarding", "/start"),
-      to("/today", "/"),
-      to("/day1", "/"),
-      to("/chat", "/?go=nika"),
-      to("/chat/:path*", "/?go=nika"),
-      to("/journal", "/?go=diary"),
-      to("/journal/:path*", "/?go=diary"),
-      to("/tips", "/?go=diary"),
-      to("/analytics", "/?go=diary"),
-      to("/rhythm", "/?go=rhythm"),
-      to("/rhythm/:path*", "/?go=rhythm"),
-      to("/meditations", "/?go=library"),
-      to("/profile", "/?go=profile"),
-      to("/profile/:path*", "/?go=profile"),
-      to("/upgrade", "/?go=pro"),
-      to("/sprint", "/"),
-      to("/sprint/:path*", "/"),
-      to("/manifesto", "/"),
-      to("/install", "/"),
+      to("/today", "/app"),
+      to("/day1", "/app"),
+      to("/chat", "/app?go=nika"),
+      to("/chat/:path*", "/app?go=nika"),
+      to("/journal", "/app?go=diary"),
+      to("/journal/:path*", "/app?go=diary"),
+      to("/tips", "/app?go=diary"),
+      to("/analytics", "/app?go=diary"),
+      to("/rhythm", "/app?go=rhythm"),
+      to("/rhythm/:path*", "/app?go=rhythm"),
+      to("/meditations", "/app?go=library"),
+      to("/profile", "/app?go=profile"),
+      to("/profile/:path*", "/app?go=profile"),
+      to("/upgrade", "/app?go=pro"),
+      to("/sprint", "/app"),
+      to("/sprint/:path*", "/app"),
+      to("/manifesto", "/app"),
+      to("/install", "/app"),
       to("/landing", "/"),
     ];
   },
@@ -130,6 +131,7 @@ const nextConfig = {
       { source: "/legal/consent", destination: "/legal/consent.html" },
       { source: "/legal/oferta", destination: "/legal/oferta.html" },
       // Вход, регистрация, онбординг и новый пароль живут в приложении
+      { source: "/app", destination: "/app/index.html" },
       { source: "/start", destination: "/app/index.html" },
       { source: "/reset-password", destination: "/app/index.html" },
     ];

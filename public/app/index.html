@@ -3242,7 +3242,7 @@ button.cli:active{opacity:.65}
     else if(dest==='profile') push('profile');
     else if(dest==='nika') setTimeout(function(){ if(window.__openNika) window.__openNika(); },300);
     else if(dest==='pro'&&!ME.plan.isPro) setTimeout(function(){ if(window.__openPro) window.__openPro(); },300);
-    if(location.pathname!=='/'||location.search) history.replaceState(null,'','/');
+    if(location.pathname!=='/app'||location.search) history.replaceState(null,'','/app');
   };
   window.__refreshMe=function(){ return loadMe().then(function(r){ if(r.ok) applyMe(); return r; }); };
 

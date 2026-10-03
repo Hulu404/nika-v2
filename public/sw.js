@@ -2,7 +2,7 @@
 // fetch-обработчик обязателен для критерия установки на Android.
 // CACHE_VERSION поднимается перед каждым деплоем правок вёрстки (docs/bottom-gap-log.md):
 // новая версия воркера сразу активируется и стирает старые кэши.
-const CACHE_VERSION = 'nika-bottom-gap-7';
+const CACHE_VERSION = 'nika-bottom-gap-8';
 
 self.addEventListener('install', () => self.skipWaiting());
 
@@ -38,7 +38,7 @@ self.addEventListener('fetch', (event) => {
 // ── Push-уведомления ──────────────────────────────────────────────────────────
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'НИКА', body: 'Напоминание от НИКИ', url: '/' };
+  let data = { title: 'НИКА', body: 'Напоминание от НИКИ', url: '/app' };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {}
@@ -57,7 +57,7 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/';
+  const url = event.notification.data?.url || '/app';
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((list) => {
       for (const client of list) {

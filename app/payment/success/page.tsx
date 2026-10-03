@@ -157,7 +157,7 @@ export default async function PaymentSuccessPage({
         )}
 
         <Link
-          href="/"
+          href="/app"
           style={{
             marginTop: 28,
             width: "100%",

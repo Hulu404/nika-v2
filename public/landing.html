@@ -2,6 +2,8 @@
 <html lang="ru">
 <head>
 <meta charset="utf-8">
+<script>/* установленное приложение со старым start_url "/" открывает приложение, а не лендинг */
+try{if(navigator.standalone===true||matchMedia('(display-mode: standalone)').matches)location.replace('/app'+location.search);}catch(e){}</script>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>NIKA | YOU'LL NEVER MOVE ALONE</title>
 <meta name="description" content="НИКА учит слышать тело во время бега: утренний вопрос о самочувствии, практики дыхания в наушниках и разговор после пробежки. Меньше цифр, больше ощущений. Беговые клубы NIKA EVENTS.">

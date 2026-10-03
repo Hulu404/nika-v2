@@ -15,20 +15,18 @@ beforeEach(() => {
 });
 
 describe("middleware: корень", () => {
-  it("гостю отдаёт лендинг с публичным кэшем и Vary: Cookie, без CSP", async () => {
+  it("гостю отдаёт лендинг с публичным кэшем, без CSP", async () => {
     const res = await middleware(req("/"));
     expect(res.headers.get("x-middleware-rewrite")).toContain("/landing.html");
     expect(res.headers.get("cache-control")).toContain("public, max-age=300");
-    expect(res.headers.get("vary")).toBe("Cookie");
     expect(res.headers.get("content-security-policy-report-only")).toBeNull();
   });
 
-  it("вошедшему отдаёт приложение без кэша и без CSP", async () => {
+  it("вошедшему тоже отдаёт лендинг: приложение живёт на /app", async () => {
     currentUser = { id: "u1" };
     const res = await middleware(req("/"));
-    expect(res.headers.get("x-middleware-rewrite")).toContain("/app/index.html");
-    expect(res.headers.get("cache-control")).toBe("no-store, must-revalidate");
-    expect(res.headers.get("content-security-policy-report-only")).toBeNull();
+    expect(res.headers.get("x-middleware-rewrite")).toContain("/landing.html");
+    expect(res.headers.get("x-middleware-rewrite")).not.toContain("/app/index.html");
   });
 
   it("API пропускает дальше без перезаписи", async () => {
