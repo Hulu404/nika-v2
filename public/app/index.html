@@ -2142,6 +2142,55 @@ button.cli:active{opacity:.65}
       next.classList.add('on'); scroll.scrollTop=0; chrome();
     });
   }
+  /* свайп от левого края на вложенных экранах (практика, профиль, курс, пробежка) = «Назад» */
+  (function(){
+    var EDGE=24,sx=0,sy0=0,st=0,dx=0,mode=null,cur=null;
+    function reset(v){ v.style.transition=''; v.style.transform=''; v.style.opacity=''; }
+    scroll.addEventListener('touchstart',function(e){
+      mode=null;
+      if(stack.length<2||opened||e.touches.length!==1||document.querySelector('.modal:not([hidden])')) return;
+      var t=e.touches[0];
+      if(t.clientX>EDGE) return;
+      sx=t.clientX; sy0=t.clientY; st=Date.now(); dx=0; cur=current(); mode='wait';
+    },{passive:true});
+    scroll.addEventListener('touchmove',function(e){
+      if(!mode) return;
+      var t=e.touches[0], mx=t.clientX-sx, my=t.clientY-sy0;
+      if(mode==='wait'){
+        if(Math.abs(mx)<8&&Math.abs(my)<8) return;
+        if(mx>Math.abs(my)*1.2){ mode='drag'; cur.style.transition='none'; } else { mode=null; return; }
+      }
+      e.preventDefault();
+      dx=Math.max(0,mx);
+      cur.style.transform='translate3d('+dx+'px,0,0)';
+      cur.style.opacity=String(1-Math.min(dx/scroll.clientWidth,1)*0.6);
+    },{passive:false});
+    function end(){
+      if(mode!=='drag'){ mode=null; return; }
+      mode=null;
+      var v=cur, w=scroll.clientWidth, fast=dx/Math.max(Date.now()-st,1)>0.5;
+      if(dx>w*0.33||(fast&&dx>40)){
+        haptic(8);
+        if(reduced()){ reset(v); finish(v); return; }
+        v.style.transition='transform .2s cubic-bezier(.2,.8,.2,1),opacity .2s linear';
+        v.style.transform='translate3d('+w+'px,0,0)'; v.style.opacity='0';
+        setTimeout(function(){ reset(v); finish(v); },200);
+      } else {
+        v.style.transition='transform .22s cubic-bezier(.2,.8,.2,1),opacity .22s linear';
+        v.style.transform=''; v.style.opacity='';
+        setTimeout(function(){ reset(v); },230);
+      }
+    }
+    /* экран уже уехал жестом, поэтому без анимации popping */
+    function finish(v){
+      if(stack.length<2||current()!==v) return;
+      stack.pop();
+      v.classList.remove('on','pushing','popping');
+      view(stack[stack.length-1]).classList.add('on'); scroll.scrollTop=0; chrome();
+    }
+    scroll.addEventListener('touchend',end);
+    scroll.addEventListener('touchcancel',function(){ dx=0; end(); });
+  })();
   document.querySelectorAll('[data-go]').forEach(function(b){ b.addEventListener('click',function(){ go(b.dataset.go); }); });
   document.querySelectorAll('[data-push]').forEach(function(b){ b.addEventListener('click',function(){ push(b.dataset.push); }); });
   document.querySelectorAll('[data-pop]').forEach(function(b){ b.addEventListener('click',pop); });
