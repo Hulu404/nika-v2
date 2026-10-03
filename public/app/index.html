@@ -72,8 +72,6 @@ if(u.size)r.fontSize=u.size+'%';if(u.weight)r.setProperty('--font-weight-body',u
 *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{font-size:100%}
 html,body{margin:0;padding:0;height:100%;background:#0B0B0D;overscroll-behavior:none}
-/* ВРЕМЕННО, диагностика полосы снизу (docs/bottom-gap-log.md, шаг 1): убрать после приёмки */
-html,body{background:#ff0000!important}
 body{font-family:var(--sans);font-weight:var(--font-weight-body,400);font-size:var(--t-body);line-height:var(--t-lh-body);letter-spacing:var(--t-ls-body);
   color:var(--ink);background:#0B0B0D;font-optical-sizing:auto;font-variant-numeric:tabular-nums;
   overflow:hidden}
@@ -3860,58 +3858,6 @@ button.cli:active{opacity:.65}
       try{ if(sessionStorage.getItem('nika_cookie_synced')) return; sessionStorage.setItem('nika_cookie_synced','1'); }catch(e){ return; }
       api('/api/consents',{method:'POST',body:{entries:[{type:'cookies_analytics',granted:c.analytics}],source:'cookie_banner'}});
     });
-  })();
-
-  /* ============================================================
-     ОТЛАДКА ВЬЮПОРТА (docs/bottom-gap-log.md). Включается ?debug=vp или пятью
-     быстрыми тапами по знаку NIKA вверху: в установленном PWA нет адресной
-     строки. Тапы запоминают флаг, ещё пять тапов выключают.
-     ============================================================ */
-  (function(){
-    var KEY='nika_debug_vp', box=null, probe=null, units=[];
-    function stored(){ try{ return localStorage.getItem(KEY)==='1'; }catch(e){ return false; } }
-    function store(on){ try{ on?localStorage.setItem(KEY,'1'):localStorage.removeItem(KEY); }catch(e){} }
-    function rect(sel){ var e=document.querySelector(sel); if(!e) return 'нет'; var r=e.getBoundingClientRect(); return Math.round(r.top)+'..'+Math.round(r.bottom)+' (h '+Math.round(r.height)+')'; }
-    function upd(){
-      if(!box) return;
-      var cs=getComputedStyle(probe), vv=window.visualViewport;
-      box.textContent=[
-        'innerHeight '+innerHeight+'  innerWidth '+innerWidth,
-        'screen '+screen.width+'×'+screen.height,
-        'visualViewport '+(vv?Math.round(vv.height)+' (top '+Math.round(vv.offsetTop)+')':'n/a'),
-        'clientHeight '+document.documentElement.clientHeight,
-        '.stage '+rect('.stage'),
-        '.app '+rect('#app'),
-        '--sat '+cs.paddingTop+'  --sab '+cs.paddingBottom,
-        'fixed 100%/vh/dvh/lvh/svh '+units.map(function(u){ return u.offsetHeight; }).join(' / '),
-        'navigator.standalone '+navigator.standalone,
-        'display-mode standalone '+matchMedia('(display-mode: standalone)').matches,
-        'UA '+navigator.userAgent
-      ].join('\n');
-    }
-    function on(){
-      if(box) return;
-      probe=document.createElement('div');
-      probe.style.cssText='position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding-top:var(--sat);padding-bottom:var(--sab)';
-      box=document.createElement('pre');
-      box.style.cssText='position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 56px);z-index:9999;margin:0;padding:8px 10px;background:rgba(0,0,0,.82);color:#7CFC9A;font:11px/1.45 ui-monospace,monospace;border-radius:8px;pointer-events:none;white-space:pre-wrap;word-break:break-all';
-      units=['100%','100vh','100dvh','100lvh','100svh'].map(function(h){
-        var d=document.createElement('div'); d.style.cssText='position:fixed;left:0;top:0;width:1px;visibility:hidden;pointer-events:none;height:'+h;
-        document.body.appendChild(d); return d;
-      });
-      document.body.appendChild(probe); document.body.appendChild(box); upd();
-    }
-    function off(){ if(box){ box.remove(); probe.remove(); units.forEach(function(u){ u.remove(); }); box=probe=null; units=[]; } }
-    addEventListener('resize',upd); addEventListener('orientationchange',function(){ setTimeout(upd,300); });
-    if(window.visualViewport){ visualViewport.addEventListener('resize',upd); visualViewport.addEventListener('scroll',upd); }
-    document.addEventListener('visibilitychange',upd);
-    var taps=[];
-    document.addEventListener('click',function(e){
-      if(!e.target.closest||!e.target.closest('.wordmark')) return;
-      var now=Date.now(); taps=taps.filter(function(t){ return now-t<1500; }); taps.push(now);
-      if(taps.length>=5){ taps=[]; if(box){ off(); store(false); } else { on(); store(true); } }
-    });
-    if(/[?&]debug=vp\b/.test(location.search)||stored()) on();
   })();
 
   /* ============================================================
