@@ -2,7 +2,7 @@
 // fetch-обработчик обязателен для критерия установки на Android.
 // CACHE_VERSION поднимается перед каждым деплоем правок вёрстки (docs/bottom-gap-log.md):
 // новая версия воркера сразу активируется и стирает старые кэши.
-const CACHE_VERSION = 'nika-bottom-gap-2';
+const CACHE_VERSION = 'nika-bottom-gap-3';
 
 self.addEventListener('install', () => self.skipWaiting());
 
