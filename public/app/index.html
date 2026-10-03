@@ -72,6 +72,8 @@ if(u.size)r.fontSize=u.size+'%';if(u.weight)r.setProperty('--font-weight-body',u
 *,*::before,*::after{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html{font-size:100%}
 html,body{margin:0;padding:0;height:100%;background:#0B0B0D;overscroll-behavior:none}
+/* ВРЕМЕННО, диагностика полосы снизу (docs/bottom-gap-log.md, шаг 1): убрать после приёмки */
+html,body{background:#ff0000!important}
 body{font-family:var(--sans);font-weight:var(--font-weight-body,400);font-size:var(--t-body);line-height:var(--t-lh-body);letter-spacing:var(--t-ls-body);
   color:var(--ink);background:#0B0B0D;font-optical-sizing:auto;font-variant-numeric:tabular-nums;
   overflow:hidden}
@@ -3858,24 +3860,50 @@ button.cli:active{opacity:.65}
   })();
 
   /* ============================================================
-     ОТЛАДКА ВЬЮПОРТА: ?debug=vp (в проде без параметра не включается)
+     ОТЛАДКА ВЬЮПОРТА (docs/bottom-gap-log.md). Включается ?debug=vp или пятью
+     быстрыми тапами по знаку NIKA вверху: в установленном PWA нет адресной
+     строки. Тапы запоминают флаг, ещё пять тапов выключают.
      ============================================================ */
   (function(){
-    if(!/[?&]debug=vp\b/.test(location.search)) return;
-    var probe=document.createElement('div');
-    probe.style.cssText='position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)';
-    var box=document.createElement('pre');
-    box.style.cssText='position:fixed;left:8px;top:calc(env(safe-area-inset-top,0px) + 8px);z-index:9999;margin:0;padding:8px 10px;background:rgba(0,0,0,.78);color:#7CFC9A;font:11px/1.45 ui-monospace,monospace;border-radius:8px;pointer-events:none;white-space:pre';
-    document.body.appendChild(probe); document.body.appendChild(box);
+    var KEY='nika_debug_vp', box=null, probe=null;
+    function stored(){ try{ return localStorage.getItem(KEY)==='1'; }catch(e){ return false; } }
+    function store(on){ try{ on?localStorage.setItem(KEY,'1'):localStorage.removeItem(KEY); }catch(e){} }
+    function rect(sel){ var e=document.querySelector(sel); if(!e) return 'нет'; var r=e.getBoundingClientRect(); return Math.round(r.top)+'..'+Math.round(r.bottom)+' (h '+Math.round(r.height)+')'; }
     function upd(){
-      var cs=getComputedStyle(probe), st=document.querySelector('.stage').getBoundingClientRect(), ap=document.getElementById('app').getBoundingClientRect();
-      box.textContent=['innerHeight '+innerHeight,'screen.height '+screen.height,'visualViewport '+(window.visualViewport?Math.round(visualViewport.height):'n/a'),
-        'clientHeight '+document.documentElement.clientHeight,'stage '+Math.round(st.top)+'..'+Math.round(st.bottom),'app '+Math.round(ap.top)+'..'+Math.round(ap.bottom),
-        'safe top '+cs.paddingTop+' bottom '+cs.paddingBottom,'standalone '+(navigator.standalone||matchMedia('(display-mode: standalone)').matches)].join('\n');
+      if(!box) return;
+      var cs=getComputedStyle(probe), vv=window.visualViewport;
+      box.textContent=[
+        'innerHeight '+innerHeight+'  innerWidth '+innerWidth,
+        'screen '+screen.width+'×'+screen.height,
+        'visualViewport '+(vv?Math.round(vv.height)+' (top '+Math.round(vv.offsetTop)+')':'n/a'),
+        'clientHeight '+document.documentElement.clientHeight,
+        '.stage '+rect('.stage'),
+        '.app '+rect('#app'),
+        '--sat '+cs.paddingTop+'  --sab '+cs.paddingBottom,
+        'navigator.standalone '+navigator.standalone,
+        'display-mode standalone '+matchMedia('(display-mode: standalone)').matches,
+        'UA '+navigator.userAgent
+      ].join('\n');
     }
-    upd(); addEventListener('resize',upd); addEventListener('orientationchange',function(){ setTimeout(upd,300); });
-    if(window.visualViewport) visualViewport.addEventListener('resize',upd);
+    function on(){
+      if(box) return;
+      probe=document.createElement('div');
+      probe.style.cssText='position:fixed;left:0;top:0;width:0;height:0;visibility:hidden;padding-top:var(--sat);padding-bottom:var(--sab)';
+      box=document.createElement('pre');
+      box.style.cssText='position:fixed;left:8px;right:8px;top:calc(env(safe-area-inset-top,0px) + 56px);z-index:9999;margin:0;padding:8px 10px;background:rgba(0,0,0,.82);color:#7CFC9A;font:11px/1.45 ui-monospace,monospace;border-radius:8px;pointer-events:none;white-space:pre-wrap;word-break:break-all';
+      document.body.appendChild(probe); document.body.appendChild(box); upd();
+    }
+    function off(){ if(box){ box.remove(); probe.remove(); box=probe=null; } }
+    addEventListener('resize',upd); addEventListener('orientationchange',function(){ setTimeout(upd,300); });
+    if(window.visualViewport){ visualViewport.addEventListener('resize',upd); visualViewport.addEventListener('scroll',upd); }
     document.addEventListener('visibilitychange',upd);
+    var taps=[];
+    document.addEventListener('click',function(e){
+      if(!e.target.closest||!e.target.closest('.wordmark')) return;
+      var now=Date.now(); taps=taps.filter(function(t){ return now-t<1500; }); taps.push(now);
+      if(taps.length>=5){ taps=[]; if(box){ off(); store(false); } else { on(); store(true); } }
+    });
+    if(/[?&]debug=vp\b/.test(location.search)||stored()) on();
   })();
 
   /* ============================================================
