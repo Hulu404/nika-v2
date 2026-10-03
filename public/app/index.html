@@ -444,7 +444,7 @@ a[href^="mailto:"],a[href^="tel:"],a[x-apple-data-detectors]{color:inherit!impor
   .app{border-radius:0}
   .statusbar{display:none}
   .homebar{display:none}
-  .tabzone{position:fixed;left:16px;right:16px}
+  .tabzone{position:absolute;left:16px;right:16px}
 }
 
 /* ── Нижняя навигация: data-nav="solid" (везде) и "glass" (стекло, сейчас выключено) ── */
@@ -3855,6 +3855,25 @@ button.cli:active{opacity:.65}
       try{ if(sessionStorage.getItem('nika_cookie_synced')) return; sessionStorage.setItem('nika_cookie_synced','1'); }catch(e){ return; }
       api('/api/consents',{method:'POST',body:{entries:[{type:'cookies_analytics',granted:c.analytics}],source:'cookie_banner'}});
     });
+  })();
+
+  /* ============================================================
+     ВЫСОТА КОРНЯ В PWA НА iOS
+     В приложении с экрана «Домой» iOS отдаёт вьюпорт короче экрана (на высоту
+     статус-бара), и position:fixed;inset:0 кончается выше физического низа:
+     под нижним баром оставалась пустая полоса. Корень тянем до screen.height.
+     Большая разница (клавиатура) не трогается.
+     ============================================================ */
+  (function(){
+    var stage=document.querySelector('.stage');
+    var standalone=navigator.standalone===true||matchMedia('(display-mode: standalone)').matches;
+    if(!stage||!standalone) return;
+    function fit(){
+      var portrait=matchMedia('(orientation: portrait)').matches, gap=screen.height-innerHeight;
+      if(!portrait){ stage.style.bottom=''; stage.style.height=''; return; }
+      if(gap>0&&gap<=120){ stage.style.bottom='auto'; stage.style.height=screen.height+'px'; }
+    }
+    fit(); addEventListener('resize',fit); addEventListener('orientationchange',function(){ setTimeout(fit,300); });
   })();
 
   /* ============================================================
