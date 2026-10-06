@@ -1,5 +1,6 @@
 import { REMINDER_HOUR_MSK, dayBefore, spotName } from "../../coffeerun/run";
 import { dynamicsLines } from "../../team/copy";
+import { supabaseFactStore } from "../../team/attendance";
 import { daysUntilStart, dynamicsFor, fetchArchive, runKeysFrom, type ArchiveRow, type Dynamics } from "../../team/history";
 import { defaultRun, mergeRuns, pickRun, type TeamRun } from "../../team/runs";
 import { fetchRunSignups, summarizeSignups, viewSignups, type SignupRow, type SignupView } from "../../team/stats";
@@ -57,6 +58,19 @@ export interface RunsDeps {
   fetchRunRoster: (spot: string, date: string) => Promise<RosterRow[]>;
   setRunPlan: (spot: string, date: string, target: number, setBy: number, now: Date) => Promise<void>;
   fetchRunsTable: (fromYmd: string, toYmd: string) => Promise<RunsTableRow[]>;
+  /** Фактическая явка из «Пятницы» (team_event_facts); null — не внесена. */
+  fetchRunAttended?: (spot: string, date: string) => Promise<number | null>;
+}
+
+/** Явку вносит команда в «Пятнице»; здесь только читаем. Сбой чтения карточку не ломает. */
+async function fetchRunAttended(spot: string, date: string): Promise<number | null> {
+  try {
+    const key = `coffeerun:${spot}:${date}`;
+    return (await supabaseFactStore().getMany([key])).get(key) ?? null;
+  } catch (err) {
+    console.error("[databot] run attended:", err instanceof Error ? err.message : String(err));
+    return null;
+  }
 }
 
 const DEFAULT_DEPS: RunsDeps = {
@@ -67,6 +81,7 @@ const DEFAULT_DEPS: RunsDeps = {
   fetchRunRoster,
   setRunPlan,
   fetchRunsTable,
+  fetchRunAttended,
 };
 
 /** Таблица «все забеги» — за всю историю: забегов единицы в неделю. */
@@ -154,10 +169,11 @@ export function createRunsHandler(deps: RunsDeps = DEFAULT_DEPS): SectionHandler
 
   async function card(req: SectionRequest, run: TeamRun, archive: ArchiveRow[]): Promise<Screen> {
     const { now, subject } = req;
-    const [rows, people, plan] = await Promise.all([
+    const [rows, people, plan, attended] = await Promise.all([
       deps.fetchRunSignups(run),
       deps.fetchRunPeople(run.spot, run.date),
       deps.fetchRunPlan(run.spot, run.date),
+      run.past ? (deps.fetchRunAttended ?? (async () => null))(run.spot, run.date) : Promise.resolve(null),
     ]);
     const stats = summarizeSignups(rows, now);
     if (people.total !== stats.total) {
@@ -192,6 +208,7 @@ export function createRunsHandler(deps: RunsDeps = DEFAULT_DEPS): SectionHandler
       byPace: stats.byPace,
       byLink: people.byLink,
       plan,
+      attended,
       daysBefore,
       dynamics: dynamicsSummary(dyn),
       forecast: forecastText(f, spotWhere(run.spot, name)),

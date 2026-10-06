@@ -1,142 +1,141 @@
 import { tgAdmin } from "../telegram/supabase";
 import { localParts, DEFAULT_TZ } from "../telegram/schedule";
-import { digestsDue, type DigestKind } from "./digest-schedule";
-import { buildDigest } from "./digest-build";
-import { sendTeamMessage } from "./send";
+import { dailyDigestDue } from "./digest-schedule";
+import { buildDailyDigest, type DigestDeps } from "./digest-build";
+import { sendTeamMessage, type TeamSendResult } from "./send";
 import { teamBotConfigured } from "./config";
+import { supabaseEventStore, type TeamEventStore } from "./events";
+import { fetchRunSignups } from "./stats";
+import { dispatchAttendanceAsks, supabaseFactStore, type FactStore } from "./attendance";
+import { supabaseTeamForms, type TeamFormStore } from "./form";
+import type { InlineKeyboardMarkup } from "grammy/types";
 
 /**
- * Рассылка сводок команде: накануне забега — как отработали напоминания,
- * утром в день старта — сколько людей и по каким группам темпа.
+ * Что «Пятница» присылает сама:
+ *   • сводку дня в 8:00 МСК всем, кто не выключил её через /mute (если на день
+ *     что-то есть);
+ *   • вопрос о явке через 3 часа после начала ивента клуба — ответственному
+ *     или фаундерам, один раз.
  *
- * Живёт рядом с рассылками участников (lib/coffeerun/*-dispatch.ts) и по тем
- * же правилам: вызывается тикером из instrumentation.ts, окно проверяет сама,
- * дедуп держит в базе.
+ * Зовёт 15-минутный тикер из instrumentation.ts. Дедуп в базе (team_digests с
+ * ключом по дате, team_event_asks), а не в памяти: тикер делает первый проход
+ * на каждом деплое, и релиз в 8:15 прислал бы сводку второй раз.
  *
- * Про дедуп отдельно: он в таблице team_digests, а не в памяти процесса,
- * потому что тикер делает первый проход сразу при старте — то есть на каждом
- * деплое. Релиз в 7:15 утра в день забега прислал бы утреннюю сводку второй
- * раз, а релизы в день забега — обычное дело.
- *
- * Чего эта рассылка принципиально не умеет: сообщить, что умер процесс, в
- * котором она сама живёт. Если приложение лежит, молчат и напоминания, и эта
- * сводка. Она ловит другой случай — когда приложение работает, а рассылка
- * участникам не отработала; для «лежит всё» нужен внешний пинг, и это не
- * задача бота.
+ * Чего рассылка принципиально не умеет: сообщить, что умер процесс, в котором
+ * она сама живёт. Для «лежит всё» нужен внешний пинг, и это не задача бота.
  */
 
-/** Троттлинг под лимиты Telegram. Команда небольшая, но правило общее. */
 const THROTTLE_MS = 400;
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export interface TeamDigestResult {
   ok: true;
   skipped?: string;
-  /** Что ушло в этот проход: «morning luzhniki/2026-09-20». */
+  /** Что ушло в этот проход: «daily 2026-10-13», «attend event:5». */
   sent?: string[];
   recipients?: number;
   msk: { date: string; hour: number };
 }
 
-interface Recipient {
-  chat_id: number;
+export interface DigestDispatchDeps extends DigestDeps {
+  events: TeamEventStore;
+  facts: FactStore;
+  forms: TeamFormStore;
+  /** Кому идут сводки: команда минус /mute. */
+  recipients: () => Promise<number[]>;
+  /** Занять сводку дня под отправку. false — уже отправляли. */
+  claimDaily: (ymd: string) => Promise<boolean>;
+  markDailySent: (ymd: string, count: number) => Promise<void>;
+  send: (chatId: number, text: string, keyboard?: InlineKeyboardMarkup) => Promise<TeamSendResult>;
+  throttleMs?: number;
 }
 
-/** Кому идут сводки: команда минус те, кто их отключил (/mute). */
-async function recipients(): Promise<Recipient[]> {
-  const { data, error } = await tgAdmin()
-    .from("team_members")
-    .select("chat_id")
-    .eq("digest_opt_in", true);
+async function recipients(): Promise<number[]> {
+  const { data, error } = await tgAdmin().from("team_members").select("chat_id").eq("digest_opt_in", true);
   if (error) {
     console.error("[team-digest] recipients:", error.message);
     return [];
   }
-  return (data ?? []) as Recipient[];
+  return ((data ?? []) as Array<{ chat_id: number }>).map((r) => r.chat_id);
 }
 
 /**
- * Занять сводку под отправку. Вставка с primary key (kind, spot, run_date) —
- * она же и проверка «не отправляли»: две параллельные попытки не разойдутся,
- * вторая получит 23505 и выйдет. Читать-потом-писать здесь нельзя, тикер и
- * ручной запуск могут совпасть.
+ * Вставка с primary key (kind, spot, run_date) — она же проверка «не
+ * отправляли»: две параллельные попытки не разойдутся, вторая получит 23505.
+ * Сводка дня занимает ключ ('daily', 'all', дата).
  */
-async function claim(kind: DigestKind, spot: string, runDate: string): Promise<boolean> {
-  const { error } = await tgAdmin()
-    .from("team_digests")
-    .insert({ kind, spot, run_date: runDate, sent_to: 0 });
+async function claimDaily(ymd: string): Promise<boolean> {
+  const { error } = await tgAdmin().from("team_digests").insert({ kind: "daily", spot: "all", run_date: ymd, sent_to: 0 });
   if (!error) return true;
-  if (error.code === "23505") return false; // уже отправляли
-  console.error("[team-digest] claim:", error.message);
+  if (error.code !== "23505") console.error("[team-digest] claim:", error.message);
   return false;
 }
 
-/** Записать, скольким в итоге ушло. Не критично — только для разбирательств. */
-async function markSent(kind: DigestKind, spot: string, runDate: string, count: number) {
-  const { error } = await tgAdmin()
-    .from("team_digests")
+async function markDailySent(ymd: string, count: number): Promise<void> {
+  const { error } = await tgAdmin().from("team_digests")
     .update({ sent_to: count, sent_at: new Date().toISOString() })
-    .eq("kind", kind)
-    .eq("spot", spot)
-    .eq("run_date", runDate);
+    .eq("kind", "daily").eq("spot", "all").eq("run_date", ymd);
   if (error) console.error("[team-digest] markSent:", error.message);
+}
+
+function defaultDeps(): DigestDispatchDeps {
+  return {
+    events: supabaseEventStore(),
+    fetchSignups: fetchRunSignups,
+    facts: supabaseFactStore(),
+    forms: supabaseTeamForms(),
+    recipients,
+    claimDaily,
+    markDailySent,
+    send: (chatId, text, keyboard) => sendTeamMessage(chatId, text, { html: true, keyboard }),
+  };
 }
 
 export interface DispatchOptions {
   /** Только посчитать и построить тексты, ничего не отправляя и не помечая. */
   dryRun?: boolean;
   now?: Date;
+  deps?: DigestDispatchDeps;
 }
 
-export async function dispatchTeamDigests(
-  opts: DispatchOptions = {},
-): Promise<TeamDigestResult> {
+export async function dispatchTeamDigests(opts: DispatchOptions = {}): Promise<TeamDigestResult> {
   const now = opts.now ?? new Date();
   const { ymd, hour } = localParts(DEFAULT_TZ, now);
   const msk = { date: ymd, hour };
-
-  if (!teamBotConfigured()) return { ok: true, skipped: "TEAM_BOT_TOKEN не задан", msk };
-
-  const due = digestsDue(ymd, hour);
-  if (due.length === 0) return { ok: true, skipped: "нечего слать", msk };
-
-  const to = await recipients();
+  if (!opts.deps && !teamBotConfigured()) return { ok: true, skipped: "TEAM_BOT_TOKEN не задан", msk };
+  const deps = opts.deps ?? defaultDeps();
   const sent: string[] = [];
+  let to: number[] = [];
 
-  for (const item of due) {
-    const id = `${item.kind} ${item.run.spot}/${item.run.date}`;
-
-    if (opts.dryRun) {
-      sent.push(id);
-      continue;
-    }
-
-    // Занимаем ДО построения текста: построение ходит в базу, и за это время
-    // соседний проход успел бы отправить то же самое.
-    if (!(await claim(item.kind, item.run.spot, item.run.date))) continue;
-
-    let text: string;
+  const day = dailyDigestDue(ymd, hour);
+  if (day) {
+    let text: string | null = null;
     try {
-      text = await buildDigest(item.kind, item.run, now);
+      text = await buildDailyDigest(deps, day, now);
     } catch (err) {
-      // Текст не построился — оставляем отметку как есть (sent_to = 0) и не
-      // пытаемся снова: молчание лучше, чем сводка каждые 15 минут о том, что
-      // база не отвечает. Авария и так будет видна в логах.
       console.error("[team-digest] build failed:", err instanceof Error ? err.message : String(err));
-      continue;
     }
-
-    let delivered = 0;
-    for (const r of to) {
-      const res = await sendTeamMessage(r.chat_id, text);
-      if (res.ok) delivered++;
-      await sleep(THROTTLE_MS);
+    if (text && opts.dryRun) sent.push(`daily ${day}`);
+    else if (text && (await deps.claimDaily(day))) {
+      to = await deps.recipients();
+      let delivered = 0;
+      for (const chatId of to) {
+        if ((await deps.send(chatId, text)).ok) delivered++;
+        if (deps.throttleMs ?? THROTTLE_MS) await sleep(deps.throttleMs ?? THROTTLE_MS);
+      }
+      await deps.markDailySent(day, delivered);
+      sent.push(`daily ${day}`);
     }
-
-    await markSent(item.kind, item.run.spot, item.run.date, delivered);
-    sent.push(id);
-    console.log(`[team-digest] отправлено: ${id} → ${delivered} чел.`);
   }
 
+  if (!opts.dryRun) {
+    try {
+      for (const key of await dispatchAttendanceAsks(deps, now)) sent.push(`attend ${key}`);
+    } catch (err) {
+      console.error("[team-digest] attendance asks:", err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  if (!sent.length) return { ok: true, skipped: "нечего слать", msk };
   return { ok: true, sent, recipients: to.length, msk };
 }

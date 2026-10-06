@@ -18,6 +18,9 @@ import { canManageEvent, coffeeRunStart, eventKey, coffeeRunKey, supabaseEventSt
 import { aggregateRuns, dynamicsFor, fetchArchive, runKeysFrom, type ArchiveRow, type RunAggregate } from "./history";
 import { isPast, mergeRuns, teamRun, type RunKey, type TeamRun } from "./runs";
 import { fetchRunSignups, summarizeSignups, viewSignups, type SignupRow } from "./stats";
+import { saveAttendance, supabaseFactStore, type FactStore } from "./attendance";
+import { isFounder } from "./config";
+import { openTeamForm, supabaseTeamForms, teamFormExpired, type TeamFormStore } from "./form";
 
 /**
  * Раздел «Ивенты» (/events): предстоящие ивенты всех клубов, экран ивента,
@@ -26,26 +29,25 @@ import { fetchRunSignups, summarizeSignups, viewSignups, type SignupRow } from "
  * history.ts.
  */
 
-export interface FactReader {
-  /** Внесённая явка по ключам coffeerun:<spot>:<date> / event:<id>. */
-  getMany(keys: readonly string[]): Promise<Map<string, number>>;
-}
-
 export interface EventsDeps {
   events: TeamEventStore;
   findMember: (chatId: number) => Promise<TeamMember | null>;
   listTeam: () => Promise<TeamMember[]>;
   fetchArchive: () => Promise<ArchiveRow[]>;
   fetchSignups: (run: RunKey) => Promise<SignupRow[]>;
-  /** Явка (этап «Сводка и явка»). Без неё экраны пишут «Явка не внесена». */
-  facts?: FactReader;
-  /** Кнопка «Внести явку» и её обработчик. */
-  attend?: (ctx: Context, key: string, title: string) => Promise<void>;
+  /** Явка (миграция 047). Без неё экраны пишут «Явка не внесена», а кнопки «Внести явку» нет. */
+  facts?: FactStore;
+  forms?: TeamFormStore;
 }
 
 export function defaultEventsDeps(): EventsDeps {
-  return { events: supabaseEventStore(), findMember, listTeam, fetchArchive, fetchSignups: fetchRunSignups };
+  return {
+    events: supabaseEventStore(), findMember, listTeam, fetchArchive, fetchSignups: fetchRunSignups,
+    facts: supabaseFactStore(), forms: supabaseTeamForms(),
+  };
 }
+
+const attendable = (deps: EventsDeps) => !!(deps.facts && deps.forms);
 
 const HTML = { parse_mode: "HTML" as const, link_preview_options: { is_disabled: true } };
 const HOUR = 3_600_000;
@@ -126,14 +128,14 @@ export async function openCoffeeRunScreen(ctx: Context, deps: EventsDeps, spot: 
   }
   const stats = summarizeSignups(rows, now);
   const dyn = run.past ? null : dynamicsFor(run, archive, now);
-  await show(ctx, coffeeRunScreen(run, stats, dyn, facts.get(coffeeRunKey(run)) ?? null, !!deps.attend), edit);
+  await show(ctx, coffeeRunScreen(run, stats, dyn, facts.get(coffeeRunKey(run)) ?? null, attendable(deps), isFounder(ctx.from?.id ?? 0)), edit);
 }
 
 export async function openClubEventScreen(ctx: Context, deps: EventsDeps, ev: TeamEvent, uid: number, edit: boolean, now: Date): Promise<void> {
   const [names, facts] = await Promise.all([namesOf(deps), factsFor(deps, [eventKey(ev)])]);
   const past = Date.parse(ev.starts_at) < now.getTime();
   await show(ctx, clubEventScreen(ev, names, {
-    past, fact: facts.get(eventKey(ev)) ?? null, canManage: canManageEvent(ev, uid), attendable: !!deps.attend,
+    past, fact: facts.get(eventKey(ev)) ?? null, canManage: canManageEvent(ev, uid), attendable: attendable(deps), canFix: isFounder(uid),
   }), edit);
 }
 
@@ -145,13 +147,37 @@ export async function handleEventsUpdate(ctx: Context, providedDeps?: EventsDeps
   const command = EVENTS_COMMAND.exec(text);
   if (command?.[1] && ctx.me?.username && command[1].toLowerCase() !== ctx.me.username.toLowerCase()) return false;
   const cb = IVENT_CALLBACK_RE.exec(ctx.callbackQuery?.data ?? "");
-  if (!command && !cb) return false;
+  const isFreeText = !!text && !text.startsWith("/");
+  if (!command && !cb && !isFreeText) return false;
 
-  if (cb) await ctx.answerCallbackQuery().catch(() => {});
   const deps = providedDeps ?? defaultEventsDeps();
   const uid = ctx.from.id;
+  // Свободный текст наш, только если ждём число пришедших.
+  const form = isFreeText && deps.forms ? await deps.forms.get(uid) : null;
+  if (isFreeText && form?.kind !== "attend") return false;
+
+  if (cb) await ctx.answerCallbackQuery().catch(() => {});
   if (!(await deps.findMember(uid))) {
+    if (!command && !cb) return false;
     await ctx.reply("Ивенты доступны участникам команды. Войди через /join.");
+    return true;
+  }
+
+  if (form && isFreeText) {
+    await deps.forms!.clear(uid);
+    if (teamFormExpired(form, now)) {
+      await ctx.reply("Форма устарела. Открой ивент в /events и нажми «Внести явку».");
+      return true;
+    }
+    const res = await saveAttendance(deps.facts!, form.params.key, text, uid, now);
+    if (res.status === "bad") {
+      await deps.forms!.set(uid, form, now);
+      await ctx.reply("Нужно одно число: сколько человек пришло. Например: 17. Отмена: /cancel.");
+    } else if (res.status === "exists") {
+      await ctx.reply(`Явку уже внесли: ${res.attended}. Исправить могут только фаундеры.`);
+    } else {
+      await ctx.reply(`Записала: на «${form.params.title}» пришло ${res.attended}.`);
+    }
     return true;
   }
 
@@ -199,14 +225,26 @@ export async function handleEventsUpdate(ctx: Context, providedDeps?: EventsDeps
       }
       case "ar":
       case "ae": {
-        if (!deps.attend) return true;
+        if (!deps.facts || !deps.forms) return true;
+        let key: string;
+        let title: string;
         if (op === "ar") {
           const run = teamRun({ spot: a ?? "", date: b ?? "" }, now);
-          await deps.attend(ctx, coffeeRunKey(run), `${runTitle(run)}, ${run.date.slice(8, 10)}.${run.date.slice(5, 7)}`);
+          key = coffeeRunKey(run);
+          title = `${runTitle(run)}, ${run.date.slice(8, 10)}.${run.date.slice(5, 7)}`;
         } else {
           const ev = await deps.events.get(Number(a));
-          if (ev) await deps.attend(ctx, eventKey(ev), ev.title);
+          if (!ev) return true;
+          key = eventKey(ev);
+          title = ev.title;
         }
+        const fact = await deps.facts.get(key);
+        if (fact && !isFounder(uid)) {
+          await ctx.reply(`Явку уже внесли: ${fact.attended}. Исправить могут только фаундеры.`);
+          return true;
+        }
+        await deps.forms.set(uid, openTeamForm("attend", { key, title }, now), now);
+        await ctx.reply(`Сколько человек пришло на «${title}»?${fact ? ` Сейчас записано: ${fact.attended}.` : ""} Пришли число. Отмена: /cancel.`);
         return true;
       }
     }

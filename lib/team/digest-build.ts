@@ -1,24 +1,25 @@
-import type { CoffeeRun } from "../coffeerun/run";
-import { teamRun } from "./runs";
-import { fetchRunSignups, summarizeSignups } from "./stats";
-import { digestText } from "./digest-copy";
-import type { DigestKind } from "./digest-schedule";
+import { COFFEE_RUNS, type CoffeeRun } from "../coffeerun/run";
+import { mskMidnight } from "../databot/dates";
+import { addDays } from "../databot/time";
+import { dailyDigestText, type DigestItem } from "./digest-copy";
+import type { TeamEventStore } from "./events";
+import type { RunKey } from "./runs";
+import { summarizeSignups, type SignupRow } from "./stats";
 
-/**
- * Построение текста сводки. Отдельно и от рассылки, и от бота, потому что
- * читают его оба: рассылка — чтобы отправить, бот — чтобы показать
- * предпросмотр по команде /digest.
- *
- * Предпросмотр здесь не роскошь. Сообщение, которое уходит команде само в семь
- * утра, должно быть можно прочитать заранее, днём, — иначе единственный способ
- * увидеть опечатку в нём это получить его в семь утра.
- */
-export async function buildDigest(
-  kind: DigestKind,
-  run: CoffeeRun | { spot: string; date: string },
-  now: Date = new Date(),
-): Promise<string> {
-  const target = teamRun({ spot: run.spot, date: run.date }, now);
-  const stats = summarizeSignups(await fetchRunSignups(target), now);
-  return digestText(kind, target, stats, now);
+export interface DigestDeps {
+  events: Pick<TeamEventStore, "listBetween">;
+  fetchSignups: (run: RunKey) => Promise<SignupRow[]>;
+  runs?: readonly CoffeeRun[];
+}
+
+/** Сводка дня: все события расписания плюс кофе-раны. null — на день ничего нет. */
+export async function buildDailyDigest(deps: DigestDeps, ymd: string, now: Date): Promise<string | null> {
+  const events = await deps.events.listBetween(mskMidnight(ymd), mskMidnight(addDays(ymd, 1)));
+  const runs = (deps.runs ?? COFFEE_RUNS).filter((r) => r.date === ymd);
+  if (!events.length && !runs.length) return null;
+  const items: DigestItem[] = events.map((event) => ({ kind: "event" as const, event }));
+  for (const run of runs) {
+    items.push({ kind: "run", run, stats: summarizeSignups(await deps.fetchSignups({ spot: run.spot, date: run.date }), now) });
+  }
+  return dailyDigestText(ymd, items, now);
 }

@@ -1,4 +1,5 @@
 import { GrammyError } from "grammy";
+import type { InlineKeyboardMarkup } from "grammy/types";
 import { tgAdmin } from "../telegram/supabase";
 import { getTeamBot } from "./bot";
 
@@ -19,11 +20,18 @@ export interface TeamSendResult {
   retryAfter?: number;
 }
 
-export async function sendTeamMessage(chatId: number, text: string): Promise<TeamSendResult> {
+export async function sendTeamMessage(
+  chatId: number,
+  text: string,
+  opts: { html?: boolean; keyboard?: InlineKeyboardMarkup } = {},
+): Promise<TeamSendResult> {
   try {
     const bot = getTeamBot();
     if (!bot.isInited()) await bot.init();
-    await bot.api.sendMessage(chatId, text);
+    await bot.api.sendMessage(chatId, text, {
+      ...(opts.html ? { parse_mode: "HTML" as const, link_preview_options: { is_disabled: true } } : {}),
+      ...(opts.keyboard ? { reply_markup: opts.keyboard } : {}),
+    });
     return { ok: true };
   } catch (err) {
     if (err instanceof GrammyError) {

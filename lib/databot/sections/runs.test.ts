@@ -85,6 +85,7 @@ function deps(over: Partial<RunsDeps> & { archive: ArchiveRow[]; signups?: Signu
     fetchRunRoster: over.fetchRunRoster ?? (async () => []),
     setRunPlan: over.setRunPlan ?? (async () => {}),
     fetchRunsTable: over.fetchRunsTable ?? (async () => []),
+    fetchRunAttended: over.fetchRunAttended ?? (async () => null),
   };
 }
 
@@ -238,6 +239,18 @@ describe("карточка — строки и кнопки", () => {
     expect(lines[1]).toMatch(/^Итог: заявок 21, подтвердили в боте 0, напоминание ушло 0$/);
     expect(lines).toContain("Явку база не знает: сколько людей дошло, смотрим в строке цифр ведущей");
     expect(lines.join("\n")).not.toMatch(/Сбор|Прогноз|План явки не задан/);
+  });
+
+  it("прошедший забег с внесённой в «Пятнице» явкой: «пришло фактически» вместо строки про явку", async () => {
+    const { archive } = exampleData();
+    const past = archive.filter((r) => r.run_date === "2026-09-26") as Array<SignupRow & ArchiveRow>;
+    const asked: string[] = [];
+    const handler = createRunsHandler(deps({ archive, signups: past,
+      fetchRunAttended: async (spot, date) => { asked.push(`${spot}:${date}`); return 18; } }));
+    const lines = (await screen(handler, req("card", { spot: SPOT, date: "2026-09-26" }))).text.split("\n");
+    expect(asked).toEqual([`${SPOT}:2026-09-26`]);
+    expect(lines).toContain("Пришло фактически 18");
+    expect(lines.join("\n")).not.toContain("Явку база не знает");
   });
 
   it("забег из расписания с нулём заявок — честные нули, со сбором и адресом", async () => {

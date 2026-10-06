@@ -1,7 +1,5 @@
 import { Bot, type Api, type Context } from "grammy";
 import { isFounder, teamToken } from "./config";
-import { buildDigest } from "./digest-build";
-import { EVE_HOUR_MSK, MORNING_HOUR_MSK } from "./digest-schedule";
 import {
   findMember,
   joinTeam,
@@ -11,7 +9,7 @@ import {
   touchMember,
   type TeamMember,
 } from "./access";
-import { defaultRun, mergeRuns, pickRun, type TeamRun } from "./runs";
+import { mergeRuns, pickRun, type TeamRun } from "./runs";
 import { fetchArchive, runKeysFrom, type ArchiveRow } from "./history";
 import { NOT_A_MEMBER_TEXT, helpText, teamText } from "./copy";
 import { faqAnswerText, faqIndexText, findFaq } from "./faq";
@@ -77,27 +75,6 @@ interface Snapshot {
 async function snapshot(now: Date = new Date()): Promise<Snapshot> {
   const archive = await fetchArchive();
   return { archive, runs: mergeRuns(runKeysFrom(archive), now) };
-}
-
-/**
- * Забег по аргументу команды. Пустой аргумент — ближайший: в девяти случаях из
- * десяти спрашивают именно про него. Не найденный — не подменяем соседним, а
- * показываем список: перепутанный спот дороже лишнего нажатия.
- */
-async function resolveRun(
-  ctx: TeamContext,
-  arg: string,
-  snap: Snapshot,
-): Promise<TeamRun | null> {
-  const found = arg.trim() ? pickRun(arg, snap.runs) : defaultRun(snap.runs);
-  if (found) return found;
-
-  if (!arg.trim()) {
-    await ctx.reply("Забегов пока нет ни в расписании, ни в заявках.");
-    return null;
-  }
-  await ctx.reply(`Не нашла забег «${arg.trim()}». Все ивенты — /events.`);
-  return null;
 }
 
 /**
@@ -216,38 +193,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     await replyFaq(ctx, query);
   });
 
-  // ── Автоматические сводки ──────────────────────────────────────────────────
-  // Предпросмотр, а не отправка: сообщение, которое приходит команде само в
-  // семь утра, должно быть можно прочитать заранее — иначе единственный способ
-  // увидеть в нём опечатку это получить его в семь утра.
-  bot.command("digest", async (ctx) => {
-    if (!(await requireMember(ctx))) return;
-    await withData(ctx, async () => {
-      const snap = await snapshot();
-      const run = await resolveRun(ctx, (ctx.match ?? "").toString(), snap);
-      if (!run) return;
-      const now = new Date();
-      const [eve, morning] = await Promise.all([
-        buildDigest("eve", run, now),
-        buildDigest("morning", run, now),
-      ]);
-      await ctx.reply(
-        [
-          `Предпросмотр сводок — ${run.label}. Никому не уходит.`,
-          "",
-          `Накануне, ${EVE_HOUR_MSK}:00 МСК:`,
-          "———",
-          eve,
-          "———",
-          "",
-          `В день забега, ${MORNING_HOUR_MSK}:00 МСК:`,
-          "———",
-          morning,
-        ].join("\n"),
-      );
-    });
-  });
-
+  // ── Сводка дня ─────────────────────────────────────────────────────────────
   bot.command(["mute", "unmute"], async (ctx) => {
     const member = await requireMember(ctx);
     if (!member) return;
@@ -259,9 +205,8 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     }
     await ctx.reply(
       on
-        ? "Буду снова присылать сводки: накануне забега и утром в день старта."
-        : "Больше не присылаю автоматические сводки. Расписание по-прежнему в /schedule. " +
-            "Вернуть — /unmute.",
+        ? "Буду снова присылать сводку дня в 8:00 МСК, если на день что-то запланировано."
+        : "Больше не присылаю сводку дня. Расписание по-прежнему в /schedule. Вернуть — /unmute.",
     );
   });
 
@@ -383,7 +328,7 @@ export const TEAM_COMMANDS = [
   { command: "events", description: "Ивенты" },
   { command: "team", description: "Команда" },
   { command: "faq", description: "Быстрые ответы" },
-  { command: "digest", description: "Предпросмотр автосводок" },
+  { command: "mute", description: "Не присылать сводку" },
   { command: "help", description: "Что я умею" },
 ];
 

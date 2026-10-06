@@ -591,6 +591,8 @@ export interface RunCardModel {
   /** Код метки или "none" → заявок. */
   byLink: Readonly<Record<string, number>>;
   plan: number | null;
+  /** Фактическая явка из «Пятницы» (team_event_facts); null — не внесена. */
+  attended?: number | null;
   /** Московских дней до старта; null — забег прошёл. */
   daysBefore: number | null;
   /** Строка динамики формулировками lib/team; null — сравнивать не с чем. */
@@ -656,6 +658,8 @@ export function runCardScreen(m: RunCardModel): Screen {
     if (links) details.push(links);
   }
 
+  if (m.past && m.attended !== null && m.attended !== undefined) details.push(`Пришло фактически ${m.attended}`);
+
   if (m.plan !== null) {
     details.push(`План явки ${m.plan}, заявок ${planPercent(m.total, m.plan)} % от плана`);
     if (!m.past && needsTopUp(m)) details.push(RUN_TOPUP_LINE);
@@ -671,7 +675,7 @@ export function runCardScreen(m: RunCardModel): Screen {
   const text = answerText({
     headline,
     details,
-    blindSpot: m.past ? RUN_ATTENDANCE_UNKNOWN : null,
+    blindSpot: m.past && (m.attended === null || m.attended === undefined) ? RUN_ATTENDANCE_UNKNOWN : null,
     at: m.at,
   });
 

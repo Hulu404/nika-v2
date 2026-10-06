@@ -31,8 +31,8 @@ export interface TeamForm {
   expiresAt: string;
 }
 
-export function openTeamForm(kind: TeamFormKind, params: Record<string, string>, now: Date): TeamForm {
-  return { kind, params, expiresAt: new Date(now.getTime() + TEAM_FORM_TTL_MS).toISOString() };
+export function openTeamForm(kind: TeamFormKind, params: Record<string, string>, now: Date, ttlMs = TEAM_FORM_TTL_MS): TeamForm {
+  return { kind, params, expiresAt: new Date(now.getTime() + ttlMs).toISOString() };
 }
 
 export function teamFormExpired(form: TeamForm, now: Date): boolean {

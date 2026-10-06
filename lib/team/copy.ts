@@ -232,6 +232,9 @@ export function helpText(founder = false): string {
     "/faq — быстрые ответы на частые вопросы",
     "/mute — не присылать сводку, /unmute — снова присылать",
     "/help — что я умею",
+    "",
+    "Каждое утро в 8:00 МСК присылаю сводку дня, если на день что-то запланировано. " +
+      "Через 3 часа после ивента клуба спрошу ответственного, сколько пришло.",
   ];
   if (founder) lines.push("", "/kick @ник — убрать человека из команды (только фаундеры)");
   lines.push(
@@ -877,6 +880,7 @@ export function coffeeRunScreen(
   dyn: Dynamics | null,
   fact: number | null | undefined,
   attendable = false,
+  canFix = false,
 ): TaskScreen {
   const s = run.scheduled;
   const lines = [
@@ -894,6 +898,7 @@ export function coffeeRunScreen(
     .text("Участники", iventCb.people(run.spot, run.date))
     .text("Рассылка", iventCb.mail(run.spot, run.date)).row();
   if (attendable && run.past && (fact === null || fact === undefined)) kb.text("Внести явку", iventCb.attendRun(run.spot, run.date)).row();
+  else if (attendable && canFix && fact !== null && fact !== undefined) kb.text("Исправить явку", iventCb.attendRun(run.spot, run.date)).row();
   kb.text("← К ивентам", iventCb.list());
   return { text: lines.join("\n"), keyboard: kb };
 }
@@ -902,7 +907,7 @@ export function coffeeRunScreen(
 export function clubEventScreen(
   ev: TeamEvent,
   names: ReadonlyMap<number, string>,
-  opts: { past: boolean; fact?: number | null; canManage: boolean; attendable?: boolean },
+  opts: { past: boolean; fact?: number | null; canManage: boolean; attendable?: boolean; canFix?: boolean },
 ): TaskScreen {
   const club = clubByKey(ev.club);
   const lines = [
@@ -916,6 +921,7 @@ export function clubEventScreen(
   const kb = new InlineKeyboard();
   if (!ev.responsible_chat_id) kb.text("Я ответственный", iventCb.claim(ev.id)).row();
   if (opts.attendable && opts.past && (opts.fact === null || opts.fact === undefined)) kb.text("Внести явку", iventCb.attendEvent(ev.id)).row();
+  else if (opts.attendable && opts.canFix && opts.fact !== null && opts.fact !== undefined) kb.text("Исправить явку", iventCb.attendEvent(ev.id)).row();
   if (!opts.past && opts.canManage) kb.text("Изменить время", eventCb.time(ev.id)).text("Отменить", eventCb.cancelAsk(ev.id)).row();
   kb.text("← К ивентам", iventCb.list());
   return { text: lines.join("\n"), keyboard: kb };
