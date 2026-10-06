@@ -1,6 +1,4 @@
 import { InputFile, type Context, type Keyboard, type MiddlewareFn } from "grammy";
-import { handleAssignedUpdate } from "./assigned-handler";
-import { teamBotConfigured } from "../team/config";
 import type { InlineKeyboardMarkup, ReplyKeyboardRemove } from "grammy/types";
 import { audienceOf, can, isEnvOwner, zoneCan } from "./access";
 import { buildAuditEntry, recordAudit } from "./audit";
@@ -87,9 +85,7 @@ async function runPipeline(ctx: Context, store: DatabotStore, clock: () => Date)
   // Шаг 1. Индикатор загрузки на кнопке гасим сразу — как lib/team/bot.ts.
   if (ctx.callbackQuery) await ctx.answerCallbackQuery().catch(() => {});
 
-  if (!teamBotConfigured() && await handleAssignedUpdate(ctx, store, clock())) return;
-
-  // Шаг 2. И задачи, и отчёты доступны только в личке.
+  // Шаг 2. Отчёты доступны только в личке.
   const chat = ctx.chat;
   if (!chat) return;
   if (chat.type !== "private") {

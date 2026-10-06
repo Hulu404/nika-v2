@@ -111,7 +111,7 @@ Next.js читает `.env` и `.env.local`. Основной и командн�
 | ИИ | `ANTHROPIC_API_KEY` | Чат и генерация советов/уведомлений |
 | Адрес | `NEXT_PUBLIC_APP_URL` | Ссылки, callback URL, вебхуки; в production — публичный HTTPS URL |
 | Основной бот | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` | Токен, проверка webhook, username без `@` |
-| Командный бот | `TEAM_BOT_TOKEN`, `TEAM_WEBHOOK_SECRET`, `TEAM_BOT_SECRET` | Отдельный бот; ключ входа командой `/join` |
+| Командный бот | `TEAM_BOT_TOKEN`, `TEAM_WEBHOOK_SECRET`, `TEAM_BOT_SECRET`, `TEAM_FOUNDER_IDS` | Отдельный бот «Пятница»; ключ входа командой `/join`; Telegram ID фаундеров через запятую |
 | Бот данных | `DATABOT_TOKEN`, `DATABOT_WEBHOOK_SECRET`, `DATABOT_OWNER_IDS` | Третий бот; Telegram ID владельцев через запятую |
 | Служебный доступ | `CRON_SECRET`, `ADMIN_SECRET` | Cron API, QR-админка и административные команды основного бота |
 | Robokassa | `ROBOKASSA_MERCHANT_LOGIN`, `ROBOKASSA_PASSWORD_1`, `ROBOKASSA_PASSWORD_2` | Платежи и проверка Result URL |
@@ -137,9 +137,9 @@ Next.js читает `.env` и `.env.local`. Основной и командн�
 2. **Оба** файла `019`: `019_coffee_run_signups.sql` и `019_telegram.sql`.
 3. `020_telegram_webhook.sql`, затем `021_notification_log.sql`.
 4. **`20240710_sprints.sql` перед `022_sprint_advice.sql`**: советы ссылаются на таблицу `sprints`.
-5. `022_sprint_advice.sql` → `037_databot.sql` по номеру.
+5. `022_sprint_advice.sql` → `047_team_event_facts.sql` по номеру. Префикс `041` тоже занят **двумя** файлами: `041_app_v2.sql` и `041_avatars.sql`.
 
-Лексикографическая сортировка всех файлов нарушает зависимости. Повторяющийся префикс `019` также требует учёта при использовании Supabase CLI. На существующей базе сначала проверьте применённые изменения: ранние файлы не рассчитаны на повторный запуск.
+Лексикографическая сортировка всех файлов нарушает зависимости. Повторяющиеся префиксы `019` и `041` также требуют учёта при использовании Supabase CLI. На существующей базе сначала проверьте применённые изменения: ранние файлы не рассчитаны на повторный запуск.
 
 | Область | Основные таблицы |
 | --- | --- |
@@ -153,7 +153,7 @@ Next.js читает `.env` и `.env.local`. Основной и командн�
 | Уведомления | `notification_prefs`, `push_subscriptions`, `notification_log`, `notifications_log` |
 | Кофе-раны | `coffee_run_signups`, `coffee_run_invites` |
 | Промо и атрибуция | `qr_codes`, `qr_scans`, `promo_tokens`, `analytics_events`, `link_codes`, `link_clicks`, `user_attribution` |
-| Команда | `team_members`, `team_digests` |
+| Команда («Пятница») | `team_members`, `team_digests`, `team_events`, `team_event_facts`, `team_event_asks`; задачи — `databot_assigned_tasks` |
 | Бот данных | `databot_members`, `databot_invites`, `databot_audit`, `databot_kb`, `databot_run_plans` |
 
 `notification_log` и `notifications_log` — разные таблицы разных механизмов. Старые и новые таблицы ритма также сосуществуют. Миграции задают RLS, триггеры, индексы и функции; простого создания таблиц недостаточно.
@@ -222,9 +222,9 @@ npm test -- lib/coffeerun/landing.test.ts lib/coffeerun/run.test.ts
 
 **Основной бот** подтверждает кофе-раны, отправляет уведомления, обрабатывает привязку аккаунта, `/stop`, восстановление доступа и административные операции мероприятий. Свободного ИИ-диалога в обработчике нет: разговор с НИКОЙ ведётся в веб-приложении. Подключение уведомлений из профиля ограничено allowlist в `lib/telegram/allowlist.ts`.
 
-**Командный бот** показывает будущие и прошедшие забеги, заявки, подтверждения, контакты и состояние рассылок. Вход — `/join <ключ>` с `TEAM_BOT_SECRET`; есть управление участниками и сводками. Подробнее: [`docs/team-bot.md`](docs/team-bot.md).
+**Командный бот «Пятница»** — пять разделов: задачи (`/tasks`, `/assign`), расписание (`/schedule`, `/event`), ивенты клубов (`/events`: цифры кофе-ранов, участники, рассылка, явка), команда (`/team`) и быстрые ответы (`/faq`), плюс сводка дня в 8:00 МСК (`/mute` выключает). Вход — `/join <ключ>` с `TEAM_BOT_SECRET`. Права у всех равные; фаундеры из `TEAM_FOUNDER_IDS` дополнительно убирают людей (`/kick`), правят любое событие и исправляют явку. Задачи видны только автору и исполнителю, общего обзора нет. Миграции v2: `045`–`047`. Подробнее: [`docs/team-bot.md`](docs/team-bot.md).
 
-**Бот данных** имеет роли и зоны доступа, приглашения, справочник, аудит, формы и отчёты. Включены «Забеги», «Справочник», «Команда», а для зоны «Совет» — «Про и оплаты» и «Продукт» с выбором периода. Traffic/social пока выключен в `lib/databot/sections.ts`. Произвольный текст ищется в справочнике через `router/interim.ts`; полноценный LLM-разбор ещё не подключён. Команды и трактовка показателей описаны в [docs/databot.md](docs/databot.md).
+**Бот данных** — только аналитика: роли и зоны доступа, приглашения, справочник, аудит, формы и отчёты; задачи команды живут в «Пятнице». Включены «Забеги», «Справочник», «Команда», а для зоны «Совет» — «Про и оплаты» и «Продукт» с выбором периода. Traffic/social пока выключен в `lib/databot/sections.ts`. Произвольный текст ищется в справочнике через `router/interim.ts`; полноценный LLM-разбор ещё не подключён. Команды и трактовка показателей описаны в [docs/databot.md](docs/databot.md).
 
 Для polling используйте **тестовых ботов**: запуск снимает webhook этого токена и может отключить production-бота. У databot есть дополнительная проверка production-webhook, у остальных скриптов её нет. В `next dev` production-тикер не запускается.
 
@@ -253,7 +253,8 @@ PWA использует `public/site.webmanifest`, `public/sw.js` и `component
 | Регистрация webhook | `instrumentation.ts` | При старте production Node.js-процесса |
 | Напоминания кофе-ранов | Тикер `instrumentation.ts` | Сразу и каждые 15 минут; окно отправки накануне с 10:00 МСК |
 | Приглашения кофе-ранов | Тот же тикер | Каждые 15 минут; окно по понедельникам с 10:00 МСК |
-| Сводки организаторам | Тот же тикер | Окна в `lib/team/digest-schedule.ts` |
+| Сводка дня «Пятницы» и вопрос о явке | Тот же тикер | Сводка в 8:00 МСК (догоняет до 12:00), вопрос о явке через 3 часа после ивента клуба; `lib/team/digest.ts` |
+| Напоминания по задачам «Пятницы» | Тот же тикер | За 24, 12 и 3 часа до срока и при просрочке; `lib/databot/assigned-reminders.ts` |
 | Очистка databot | Тот же тикер | Суточная очистка после 04:00 МСК по правилам `lib/databot/cleanup.ts` |
 | Web-push | `GET /api/push/send` | `vercel.json` и GitHub workflow: 05:00 и 14:00 UTC |
 | Утреннее сообщение Telegram | `GET /api/telegram/notifications/morning` | `vercel.json`: каждые 15 минут; получателей выбирает обработчик |
@@ -304,7 +305,6 @@ Production требует применённых миграций, окруже�
 ## Текущее состояние и ограничения
 
 - **Расписание и лендинг расходятся.** В `COFFEE_RUNS` Усачёва назначена на `2026-10-04`, но `RUN_DATE` внутри шаблона `public/coffeerunsurfsport/index.html` равен `2026-09-19`. Массив содержит сначала 4 октября, затем 20 сентября, нарушая порядок. Это даёт три падения в `lib/coffeerun/landing.test.ts` и `lib/coffeerun/run.test.ts`.
-- **Тесты databot зависят от расписания.** Три падения в `lib/databot/sections/runs.test.ts` связаны с реальным забегом 4 октября там, где ожидания предполагают его отсутствие или другой список ближайших забегов.
 - **Прошедшие события остаются в конфиге.** Лужники датированы `2026-09-20`. Выбор имеет fallback на прошедший забег; старая дата сама не закрывает заявки.
 - **Восстановление пароля неполное.** Код формирует ссылки на `/reset-password`, но соответствующей страницы в `app/` нет.
 - **Незавершённые разделы.** Медитации — заглушка, часть databot отключена, Premium только задан в конфиге.
@@ -323,7 +323,7 @@ Production требует применённых миграций, окруже�
 | Онбординг | `components/onboarding/script.ts`, `components/onboarding/ChatOnboarding.tsx`, `lib/profile.ts` |
 | Дизайн и навигация | `app/globals.css`, `tailwind.config.ts`, `components/AppLayout.tsx`, `lib/nav.ts` |
 | Кофе-ран | `lib/coffeerun/run.ts`, `lib/coffeerun/pace.ts`, `public/coffeerun*/index.html` |
-| Командные инструменты | `lib/team/`, `lib/databot/`, миграции `035`–`037` |
+| Командные инструменты | `lib/team/`, `lib/databot/`, миграции `035`–`037`, `039`, `040`, `043`–`047` |
 | Оплата и промо | `lib/robokassa.ts`, `app/api/robokassa/`, `app/api/promo/`, `app/s/[code]/route.ts` |
 | Уведомления | `instrumentation.ts`, `lib/notifications.ts`, `lib/telegram/`, `app/api/cron/`, `.github/workflows/`, `vercel.json` |
 

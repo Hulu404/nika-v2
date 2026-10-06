@@ -4,7 +4,6 @@ import type { BotCommand, ReplyKeyboardRemove } from "grammy/types";
 import { cb } from "./callback";
 import { HELP_COMMAND_DESCRIPTION, SECTION_COMMAND_DESCRIPTION, SECTION_LABEL } from "./copy";
 import { isEnvOwner } from "./access";
-import { teamBotConfigured } from "../team/config";
 import { SECTION_COMMAND, visibleSections } from "./sections";
 import type { InlineButton, Section, Subject, Zone } from "./types";
 
@@ -28,17 +27,10 @@ export function replyKeyboard(sections: readonly Section[]): Keyboard | ReplyKey
 /** Для чужих: убрать клавиатуру, если у человека осталась старая. */
 export const REMOVE_KEYBOARD: ReplyKeyboardRemove = { remove_keyboard: true };
 
-/**
- * Меню команд: разделы зоны, задачи и /help. Задачи ставит любой участник,
- * общего обзора задач нет ни у кого. При настроенной «Пятнице» задачи живут там.
- */
+/** Меню команд: разделы зоны и /help. Задачи команды живут в «Пятнице». */
 export function commandsFor(sections: readonly Section[], _isOwner = false): BotCommand[] {
   return [
     ...sections.map((s) => ({ command: SECTION_COMMAND[s], description: SECTION_COMMAND_DESCRIPTION[s] })),
-    ...(!teamBotConfigured() ? [
-      { command: "assigned", description: "Назначенные мне задачи" },
-      { command: "assign", description: "Поставить задачи списком" },
-    ] : []),
     { command: "help", description: HELP_COMMAND_DESCRIPTION },
   ];
 }

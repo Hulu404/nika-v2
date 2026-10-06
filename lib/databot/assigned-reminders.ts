@@ -1,6 +1,5 @@
 import type { Api } from "grammy";
 import { overdueOwnerText, overdueText, reminderText, taskButtons } from "./assigned-view";
-import { databotConfigured } from "./config";
 import { teamBotConfigured } from "../team/config";
 import type { DatabotStore } from "./data/store";
 import { isActiveAssigned, type AssignedNoticeMark, type AssignedTask } from "./task-list";
@@ -90,16 +89,13 @@ export async function sendAssignedReminders(deps: ReminderDeps, now = new Date()
   return out;
 }
 
-/** Точка входа тикера. Без DATABOT_TOKEN — absent: бота и его таблиц здесь нет. */
+/** Точка входа тикера. Задачи живут в «Пятнице»: без TEAM_BOT_TOKEN — absent. */
 export async function dispatchAssignedReminders(now = new Date()): Promise<{ status: "absent" | "done"; reminders?: number; overdue?: number }> {
-  if (!teamBotConfigured() && !databotConfigured()) return { status: "absent" };
-  const [{ createSupabaseStore }, bot] = await Promise.all([
+  if (!teamBotConfigured()) return { status: "absent" };
+  const [{ createSupabaseStore }, { getTeamBot }] = await Promise.all([
     import("./data/supabase-store"),
-    teamBotConfigured()
-      ? import("../team/bot").then(({ getTeamBot }) => getTeamBot())
-      : import("./bot").then(({ getDatabot }) => getDatabot()),
+    import("../team/bot"),
   ]);
-  if (!bot) return { status: "absent" };
-  const res = await sendAssignedReminders({ store: createSupabaseStore(), api: bot.api }, now);
+  const res = await sendAssignedReminders({ store: createSupabaseStore(), api: getTeamBot().api }, now);
   return { status: "done", ...res };
 }

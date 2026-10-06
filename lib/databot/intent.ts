@@ -95,12 +95,6 @@ function parseCallbackIntent(data: string): ParseResult {
   if (action === "open" && params.length === 0) return sectionHome(section, "button");
 
   if (section === "tm") return parseTeamCallback(action, params);
-  if (section === "tsk") {
-    if (action === "list" && params.length === 0) return intent({ report: "tsk.list", section, action, source: "button" });
-    if ((action === "take" || action === "done" || action === "retry") && params.length === 1 && isChatId(params[0]))
-      return intent({ report: action === "done" ? "tsk.done" : "tsk.take", section, action, source: "button", params: { task: params[0] } });
-    return { kind: "stale", section, report: "tsk.list" };
-  }
   if (section === "run") return parseRunCallback(action, params);
   if (section === "kb") return parseKbCallback(action, params);
   if (section === "pro" || section === "prd") {

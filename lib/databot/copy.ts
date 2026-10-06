@@ -61,7 +61,6 @@ export const SECTION_LABEL: Record<Section, string> = {
   prd: "Продукт",
   kb: "Справочник",
   tm: "Команда",
-  tsk: "Мои задачи",
 };
 
 /** Описание команды раздела в меню Telegram. */
@@ -72,7 +71,6 @@ export const SECTION_COMMAND_DESCRIPTION: Record<Section, string> = {
   prd: "Продукт",
   kb: "Справочник команды",
   tm: "Команда: кто в боте",
-  tsk: "Мои задачи",
 };
 
 export const HELP_COMMAND_DESCRIPTION = "Что я умею";
@@ -83,7 +81,6 @@ export const HELP_COMMAND_DESCRIPTION = "Что я умею";
  */
 export const DATABOT_DEFAULT_COMMANDS = [
   { command: "help", description: HELP_COMMAND_DESCRIPTION },
-  { command: "assigned", description: "Назначенные мне задачи" },
 ] as const;
 
 /** Раздел по тексту кнопки постоянной клавиатуры. */
@@ -291,9 +288,6 @@ export const REPORT_LABEL: Record<ReportId, string> = {
   "tm.invite": "Приглашение",
   "tm.zone": "Смена зоны",
   "tm.remove": "Убрать из команды",
-  "tsk.list": "Мои задачи",
-  "tsk.take": "Взять задачу",
-  "tsk.done": "Завершить задачу",
 };
 
 /** ReportId ли строка из журнала (там же служебные значения и, в теории, старые ID). */

@@ -167,7 +167,7 @@ describe("владелец из env", () => {
     expect(row).toMatchObject({ zone: "council", is_owner: true, is_active: true });
     const cmds = commandsSetFor(calls, OWNER)!;
     expect(cmds.method).toBe("setMyCommands");
-    expect((cmds.payload.commands as { command: string }[]).map((c) => c.command)).toEqual(["runs", "pro", "product", "kb", "team", "tasks", "assigned", "assign", "help"]);
+    expect((cmds.payload.commands as { command: string }[]).map((c) => c.command)).toEqual(["runs", "pro", "product", "kb", "team", "help"]);
     const welcome = calls.find((c) => c.method === "sendMessage")!;
     expect(welcome.payload.reply_markup).toMatchObject({ is_persistent: true, resize_keyboard: true });
     expect(JSON.stringify(welcome.payload.reply_markup)).toContain("Команда");
