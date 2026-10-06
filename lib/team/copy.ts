@@ -7,6 +7,7 @@ import { runDateLabel, type RunKey, type TeamRun } from "./runs";
 import type { Dynamics, RunAggregate } from "./history";
 import type { TeamMember } from "./access";
 import { isFounder } from "./config";
+import type { AssignedTask } from "../databot/task-list";
 
 /**
  * Все тексты и клавиатуры командного бота — здесь, и здесь же ни одного
@@ -490,10 +491,8 @@ export function helpText(founder = false): string {
   const lines = [
     "Задачи команды и оперативка по забегам.",
     "",
-    "/tasks — мои задачи со сроками",
-    "/assigned — мои назначенные задачи",
+    "/tasks — задачи: мне, я поставил, выполненные",
     "/assign — поставить задачи: что делать / срок / @ник",
-    "/assign_status — общий список и выполненные задачи",
   ];
   lines.push(
     "",
@@ -520,4 +519,374 @@ export function helpText(founder = false): string {
       "основном боте, потому что люди нажимали Start именно у него.",
   );
   return lines.join("\n");
+}
+
+// ── Задачи ───────────────────────────────────────────────────────────────────
+// Всё в одном сообщении: /tasks присылает список, а переключатель вкладок,
+// карточки и «← К списку» редактируют это же сообщение. Тексты в HTML (текст
+// задачи экранируется), ни одного похода в базу: задачи и ники приходят
+// аргументами.
+
+export type TaskTab = "me" | "by" | "done";
+
+/** callback_data задач «Пятницы». Свой префикс tk: — мимо кнопок забегов и бота данных. */
+export const TASK_CALLBACK_RE = /^tk:([logsdxX]):([a-z0-9]+)(?::([a-z0-9]+))?(?::(\d+))?$/;
+
+export const taskCb = {
+  list: (tab: TaskTab, page = 0) => `tk:l:${tab}:${page}`,
+  open: (id: number, tab: TaskTab, page = 0) => `tk:o:${id}:${tab}:${page}`,
+  group: (id: number, page = 0) => `tk:g:${id}:${page}`,
+  status: (action: "take" | "done" | "decline" | "reopen", id: number) => `tk:s:${action}:${id}`,
+  due: (id: number) => `tk:d:${id}`,
+  cancelAsk: (id: number) => `tk:x:${id}`,
+  cancelDo: (id: number) => `tk:X:${id}`,
+};
+
+export type TaskCallback =
+  | { kind: "list"; tab: TaskTab; page: number }
+  | { kind: "open"; id: number; tab: TaskTab; page: number }
+  | { kind: "group"; id: number; page: number }
+  | { kind: "status"; action: "take" | "done" | "decline" | "reopen"; id: number }
+  | { kind: "due"; id: number }
+  | { kind: "cancelAsk"; id: number }
+  | { kind: "cancelDo"; id: number };
+
+const TABS: readonly TaskTab[] = ["me", "by", "done"];
+const ACTIONS = ["take", "done", "decline", "reopen"] as const;
+
+export function parseTaskCallback(data: string): TaskCallback | null {
+  const m = TASK_CALLBACK_RE.exec(data);
+  if (!m) return null;
+  const [, op, a, b, c] = m;
+  const num = (v: string | undefined) => (v && /^\d+$/.test(v) ? Number(v) : 0);
+  switch (op) {
+    case "l": return TABS.includes(a as TaskTab) ? { kind: "list", tab: a as TaskTab, page: num(b) } : null;
+    case "o": return num(a) && TABS.includes(b as TaskTab) ? { kind: "open", id: num(a), tab: b as TaskTab, page: num(c) } : null;
+    case "g": return num(a) ? { kind: "group", id: num(a), page: num(b) } : null;
+    case "s": return (ACTIONS as readonly string[]).includes(a) && num(b) ? { kind: "status", action: a as typeof ACTIONS[number], id: num(b) } : null;
+    case "d": return num(a) ? { kind: "due", id: num(a) } : null;
+    case "x": return num(a) ? { kind: "cancelAsk", id: num(a) } : null;
+    case "X": return num(a) ? { kind: "cancelDo", id: num(a) } : null;
+  }
+  return null;
+}
+
+export interface TaskScreen {
+  text: string;
+  keyboard: InlineKeyboard;
+}
+
+/** Сколько строк на странице. Под каждой строкой «Мне» и «Я поставил» своя кнопка. */
+export const TASKS_PAGE = 10;
+export const DONE_PAGE = 20;
+
+const WEEKDAYS_SHORT = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
+
+function mskParts(d: Date): { ymd: string; dd: string; mm: string; time: string; weekday: string } {
+  const f = new Intl.DateTimeFormat("en-CA", {
+    timeZone: DEFAULT_TZ, year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23", weekday: "short",
+  }).formatToParts(d);
+  const get = (t: string) => f.find((p) => p.type === t)?.value ?? "";
+  const ymd = `${get("year")}-${get("month")}-${get("day")}`;
+  const wd = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(get("weekday"));
+  return { ymd, dd: get("day"), mm: get("month"), time: `${get("hour")}:${get("minute")}`, weekday: WEEKDAYS_SHORT[wd] ?? "" };
+}
+
+/**
+ * Срок коротко: в ближайшую неделю — «пт 18:00», дальше или в прошлом —
+ * «03.10 18:00». Срок «до конца дня» (23:59) без времени: «пт», «03.10».
+ */
+export function shortDue(iso: string, now: Date): string {
+  const d = new Date(iso);
+  const p = mskParts(d);
+  const time = p.time === "23:59" ? "" : ` ${p.time}`;
+  const ahead = d.getTime() - now.getTime();
+  return ahead > 0 && ahead < 6 * 86_400_000 ? `${p.weekday}${time}` : `${p.dd}.${p.mm}${time}`;
+}
+
+/** «05.10 14:20» по Москве: когда отметили «Сделано». */
+export function doneStamp(iso: string): string {
+  const p = mskParts(new Date(iso));
+  return `${p.dd}.${p.mm} ${p.time}`;
+}
+
+const dateOnly = (iso: string) => {
+  const p = mskParts(new Date(iso));
+  return `${p.dd}.${p.mm}`;
+};
+
+const at = (name: string | undefined, fallback: string) => (name ? `@${escapeHtmlTeam(name)}` : escapeHtmlTeam(fallback));
+
+/** HTML-экранирование для текстов задач: свой текст человека не должен ломать разметку. */
+export function escapeHtmlTeam(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function cut(text: string, max: number): string {
+  const flat = text.replace(/\s+/g, " ").trim();
+  return flat.length <= max ? flat : `${flat.slice(0, max - 1)}…`;
+}
+
+const TASK_ACTIVE = (t: AssignedTask) => t.status === "open" || t.status === "taken";
+const TASK_OVERDUE = (t: AssignedTask, now: Date) => TASK_ACTIVE(t) && !!t.due_at && Date.parse(t.due_at) <= now.getTime();
+
+/** Сначала просроченные, затем по сроку, без срока в конце. */
+function byUrgency(now: Date) {
+  return (a: AssignedTask, b: AssignedTask) => {
+    const oa = TASK_OVERDUE(a, now) ? 0 : 1;
+    const ob = TASK_OVERDUE(b, now) ? 0 : 1;
+    const da = a.due_at ? Date.parse(a.due_at) : Infinity;
+    const db = b.due_at ? Date.parse(b.due_at) : Infinity;
+    return oa - ob || da - db || a.id - b.id;
+  };
+}
+
+/** Строка исходного списка: одна задача на нескольких исполнителей — одна «группа». */
+export const groupKey = (t: Pick<AssignedTask, "source_chat_id" | "source_message_id" | "line">) =>
+  `${t.source_chat_id}:${t.source_message_id}:${t.line}`;
+
+function tabsRow(kb: InlineKeyboard, current: TaskTab): void {
+  const label: Record<TaskTab, string> = { me: "Мне", by: "Я поставил", done: "Выполненные" };
+  for (const tab of TABS) kb.text(tab === current ? `• ${label[tab]}` : label[tab], taskCb.list(tab, 0));
+  kb.row();
+}
+
+function pager(kb: InlineKeyboard, tab: TaskTab, page: number, total: number, size: number): void {
+  const more = (page + 1) * size < total;
+  if (page > 0) kb.text("← Назад", taskCb.list(tab, page - 1));
+  if (more) kb.text("Ещё", taskCb.list(tab, page + 1));
+  if (page > 0 || more) kb.row();
+}
+
+/** Мои незакрытые задачи, где я исполнитель. */
+export function myTasksScreen(
+  tasks: readonly AssignedTask[],
+  me: number,
+  names: ReadonlyMap<number, string>,
+  now: Date,
+  page = 0,
+): TaskScreen {
+  const mine = tasks.filter((t) => t.assignee_id === me && TASK_ACTIVE(t)).sort(byUrgency(now));
+  const kb = new InlineKeyboard();
+  tabsRow(kb, "me");
+  if (!mine.length) return { text: "<b>Задачи · Мне</b>\n\nОткрытых задач нет.", keyboard: kb };
+  const start = Math.min(page, Math.max(0, Math.ceil(mine.length / TASKS_PAGE) - 1)) * TASKS_PAGE;
+  const shown = mine.slice(start, start + TASKS_PAGE);
+  const lines = shown.map((t, i) => {
+    const n = start + i + 1;
+    const overdue = TASK_OVERDUE(t, now) ? "⏰ " : "";
+    const due = t.due_at ? ` · до ${shortDue(t.due_at, now)}` : "";
+    const from = t.assigned_by === me ? "" : ` · от ${at(names.get(t.assigned_by), "команды")}`;
+    return `${n}. ${overdue}${escapeHtmlTeam(cut(t.what, 140))}${due}${from}`;
+  });
+  shown.forEach((t, i) => kb.text(`${start + i + 1}. ${cut(t.what, 32)}`, taskCb.open(t.id, "me", start / TASKS_PAGE)).row());
+  pager(kb, "me", start / TASKS_PAGE, mine.length, TASKS_PAGE);
+  return { text: [`<b>Задачи · Мне</b> · ${mine.length}`, "", ...lines].join("\n"), keyboard: kb };
+}
+
+const STATUS_ICON: Record<AssignedTask["status"], string> = {
+  open: "🆕", taken: "🔄", done: "✅", declined: "↩️", cancelled: "✖️",
+};
+
+/** Статус одного исполнителя в строке автора: «@bob ✅ 05.10 14:20». */
+function assigneeStatus(t: AssignedTask): string {
+  const stamp = t.status === "done" ? ` ${doneStamp(t.status_at)}` : "";
+  return `@${escapeHtmlTeam(t.username)} ${STATUS_ICON[t.status]}${stamp}`;
+}
+
+/** Задачи, где я автор, ещё не закрытые хотя бы у одного исполнителя. */
+export function authoredGroups(tasks: readonly AssignedTask[], me: number, now: Date): AssignedTask[][] {
+  const groups = new Map<string, AssignedTask[]>();
+  for (const t of tasks.filter((x) => x.assigned_by === me)) {
+    const k = groupKey(t);
+    groups.set(k, [...(groups.get(k) ?? []), t]);
+  }
+  return [...groups.values()]
+    .filter((g) => g.some(TASK_ACTIVE))
+    .map((g) => g.sort((a, b) => a.id - b.id))
+    .sort((a, b) => byUrgency(now)(a[0], b[0]));
+}
+
+export function authoredScreen(tasks: readonly AssignedTask[], me: number, now: Date, page = 0): TaskScreen {
+  const groups = authoredGroups(tasks, me, now);
+  const kb = new InlineKeyboard();
+  tabsRow(kb, "by");
+  if (!groups.length) return { text: "<b>Задачи · Я поставил</b>\n\nНезакрытых задач, которые ты поставил, нет.", keyboard: kb };
+  const start = Math.min(page, Math.max(0, Math.ceil(groups.length / TASKS_PAGE) - 1)) * TASKS_PAGE;
+  const shown = groups.slice(start, start + TASKS_PAGE);
+  const lines = shown.map((g, i) => {
+    const first = g[0];
+    const overdue = g.some((t) => TASK_OVERDUE(t, now)) ? "⏰ " : "";
+    const due = first.due_at ? ` · до ${shortDue(first.due_at, now)}` : "";
+    return `${start + i + 1}. ${overdue}${escapeHtmlTeam(cut(first.what, 120))}${due} · ${g.map(assigneeStatus).join(", ")}`;
+  });
+  shown.forEach((g, i) => kb.text(`${start + i + 1}. ${cut(g[0].what, 32)}`, taskCb.group(g[0].id, start / TASKS_PAGE)).row());
+  pager(kb, "by", start / TASKS_PAGE, groups.length, TASKS_PAGE);
+  return { text: [`<b>Задачи · Я поставил</b> · ${groups.length}`, "", ...lines].join("\n"), keyboard: kb };
+}
+
+/** Плоский архив выполненного: и где я исполнитель, и где я автор, от новых к старым. */
+export function doneScreen(tasks: readonly AssignedTask[], me: number, page = 0): TaskScreen {
+  const seen = new Set<number>();
+  const done = tasks
+    .filter((t) => t.status === "done" && (t.assignee_id === me || t.assigned_by === me))
+    .filter((t) => (seen.has(t.id) ? false : (seen.add(t.id), true)))
+    .sort((a, b) => Date.parse(b.status_at) - Date.parse(a.status_at) || b.id - a.id);
+  const kb = new InlineKeyboard();
+  tabsRow(kb, "done");
+  if (!done.length) return { text: "<b>Задачи · Выполненные</b>\n\nВыполненных задач пока нет.", keyboard: kb };
+  const start = Math.min(page, Math.max(0, Math.ceil(done.length / DONE_PAGE) - 1)) * DONE_PAGE;
+  const lines = done
+    .slice(start, start + DONE_PAGE)
+    .map((t) => `✅ ${escapeHtmlTeam(cut(t.what, 120))} · @${escapeHtmlTeam(t.username)} · ${dateOnly(t.status_at)}`);
+  pager(kb, "done", start / DONE_PAGE, done.length, DONE_PAGE);
+  return { text: [`<b>Задачи · Выполненные</b> · ${done.length}`, "", ...lines].join("\n"), keyboard: kb };
+}
+
+export function tasksScreen(
+  tab: TaskTab,
+  tasks: readonly AssignedTask[],
+  me: number,
+  names: ReadonlyMap<number, string>,
+  now: Date,
+  page = 0,
+): TaskScreen {
+  if (tab === "by") return authoredScreen(tasks, me, now, page);
+  if (tab === "done") return doneScreen(tasks, me, page);
+  return myTasksScreen(tasks, me, names, now, page);
+}
+
+const STATUS_WORD: Record<AssignedTask["status"], string> = {
+  open: "🆕 новая", taken: "🔄 в работе", done: "✅ сделано", declined: "↩️ не сможет", cancelled: "✖️ отменена",
+};
+
+function dueLineTeam(t: AssignedTask, now: Date): string | null {
+  if (!t.due_at) return null;
+  return `Срок: ${shortDue(t.due_at, now)}${TASK_OVERDUE(t, now) ? " · ⏰ просрочена" : ""}`;
+}
+
+/** Карточка задачи у исполнителя: статусные кнопки и «← К списку». */
+export function myTaskCard(
+  t: AssignedTask,
+  me: number,
+  names: ReadonlyMap<number, string>,
+  teammates: readonly string[],
+  now: Date,
+  back: { tab: TaskTab; page: number } = { tab: "me", page: 0 },
+): TaskScreen {
+  const lines = [
+    `<b>${escapeHtmlTeam(cut(t.what, 600))}</b>`,
+    dueLineTeam(t, now),
+    t.assigned_by === me ? "Поставил сам себе" : `От: ${at(names.get(t.assigned_by), "команды")}`,
+    teammates.length ? `Вместе с тобой: ${teammates.map((n) => `@${escapeHtmlTeam(n)}`).join(", ")}` : null,
+    `Статус: ${STATUS_WORD[t.status]}`,
+  ].filter((l): l is string => l !== null);
+  const kb = new InlineKeyboard();
+  if (t.assignee_id === me) {
+    if (t.status === "open") kb.text("Взял в работу", taskCb.status("take", t.id)).text("Сделано", taskCb.status("done", t.id)).row().text("Не смогу", taskCb.status("decline", t.id)).row();
+    if (t.status === "taken") kb.text("Сделано", taskCb.status("done", t.id)).text("Не смогу", taskCb.status("decline", t.id)).row();
+    if (t.status === "done") kb.text("Вернуть в работу", taskCb.status("reopen", t.id)).row();
+    if (t.status === "declined") kb.text("Всё-таки возьму", taskCb.status("reopen", t.id)).row();
+  }
+  if (t.assigned_by === me && TASK_ACTIVE(t)) kb.text("Изменить срок", taskCb.due(t.id)).text("Отменить", taskCb.cancelAsk(t.id)).row();
+  kb.text("← К списку", taskCb.list(back.tab, back.page));
+  return { text: lines.join("\n"), keyboard: kb };
+}
+
+/** Карточка задачи у автора: статус каждого исполнителя, срок и отмена. */
+export function authorTaskCard(group: readonly AssignedTask[], now: Date, page = 0): TaskScreen {
+  const first = group[0];
+  const lines = [
+    `<b>${escapeHtmlTeam(cut(first.what, 600))}</b>`,
+    dueLineTeam(group.find(TASK_ACTIVE) ?? first, now),
+    "",
+    ...group.map((t) => `${assigneeStatus(t)}${t.status === "done" ? "" : ` ${STATUS_WORD[t.status].split(" ").slice(1).join(" ")}`}`),
+  ].filter((l): l is string => l !== null);
+  const kb = new InlineKeyboard();
+  if (group.some(TASK_ACTIVE)) kb.text("Изменить срок", taskCb.due(first.id)).text("Отменить", taskCb.cancelAsk(first.id)).row();
+  kb.text("← К списку", taskCb.list("by", page));
+  return { text: lines.join("\n"), keyboard: kb };
+}
+
+export function cancelConfirmScreen(group: readonly AssignedTask[]): TaskScreen {
+  const first = group[0];
+  const who = group.filter(TASK_ACTIVE).map((t) => `@${escapeHtmlTeam(t.username)}`).join(", ");
+  return {
+    text: `Отменить задачу «${escapeHtmlTeam(cut(first.what, 200))}»?\nИсполнители (${who}) получат сообщение об отмене.`,
+    keyboard: new InlineKeyboard().text("Да, отменить", taskCb.cancelDo(first.id)).text("Нет", taskCb.group(first.id, 0)),
+  };
+}
+
+export const TASK_DUE_PROMPT =
+  "Пришли новый срок одним сообщением: «пт 18:00», «03.10», «завтра 12:00» или «18:00». " +
+  "Снять срок: «нет». Отмена: /cancel.";
+
+export const TASK_UPLOAD_PROMPT = [
+  "Пришли список задач одним сообщением. Одна строка — одно дело: что делать / срок / @ник + @ник.",
+  "<code>Подготовить макет / пт 18:00 / @alice + @bob",
+  "Проверить текст / 03.10 / @bob</code>",
+  "Каждому исполнителю создаётся своя задача, себе тоже можно. Отмена: /cancel.",
+].join("\n");
+
+/**
+ * Одно сообщение исполнителю на один /assign: все его новые задачи из этого
+ * списка. Совместные помечены «вместе с @ник».
+ */
+export function newTasksText(
+  tasks: readonly AssignedTask[],
+  authorName: string | undefined,
+  teammates: ReadonlyMap<number, readonly string[]>,
+  now: Date,
+): string {
+  const head = tasks.length === 1 ? "Новая задача" : `Новые задачи: ${tasks.length}`;
+  const from = authorName ? ` от @${escapeHtmlTeam(authorName)}` : "";
+  const lines = tasks.map((t, i) => {
+    const due = t.due_at ? ` · до ${shortDue(t.due_at, now)}` : "";
+    const mates = teammates.get(t.id) ?? [];
+    const together = mates.length ? ` · вместе с ${mates.map((n) => `@${escapeHtmlTeam(n)}`).join(", ")}` : "";
+    return `${i + 1}. ${escapeHtmlTeam(cut(t.what, 300))}${due}${together}`;
+  });
+  return [`<b>${head}${from}</b>`, "", ...lines].join("\n");
+}
+
+export const openMyTasksKeyboard = () => new InlineKeyboard().text("Открыть мои задачи", taskCb.list("me", 0));
+
+/** Автору: исполнитель нажал «Сделано», «Не смогу» или вернул задачу в работу. */
+export function authorNoticeText(t: AssignedTask, previous: AssignedTask["status"]): string | null {
+  if (previous === t.status) return null;
+  const who = `@${escapeHtmlTeam(t.username)}`;
+  const what = `«${escapeHtmlTeam(cut(t.what, 200))}»`;
+  if (t.status === "done") return `✅ ${who}: сделано, ${what}`;
+  if (t.status === "declined") return `↩️ ${who}: не сможет, ${what}\nОтменить или поставить другому можно в /tasks → «Я поставил».`;
+  if (t.status === "taken" && previous !== "open") return `🔄 ${who}: снова в работе, ${what}`;
+  return null;
+}
+
+/** Исполнителю: автор поменял срок или отменил задачу. */
+export function assigneeChangeText(t: AssignedTask, change: "due" | "cancel", now: Date): string {
+  const what = `«${escapeHtmlTeam(cut(t.what, 300))}»`;
+  if (change === "cancel") return `✖️ Задача отменена: ${what}`;
+  return t.due_at ? `🗓 Новый срок задачи ${what}: ${shortDue(t.due_at, now)}` : `🗓 У задачи ${what} больше нет срока`;
+}
+
+/** Отчёт автору после /assign: что сохранено и кому не дошло. */
+export function assignReportText(tasks: readonly AssignedTask[], now: Date): string {
+  const groups = new Map<string, AssignedTask[]>();
+  for (const t of tasks) groups.set(groupKey(t), [...(groups.get(groupKey(t)) ?? []), t]);
+  const sent = tasks.filter((t) => t.delivery_state === "sent").length;
+  const lines = [...groups.values()].map((g) => {
+    const due = g[0].due_at ? ` · до ${shortDue(g[0].due_at, now)}` : "";
+    return `• ${escapeHtmlTeam(cut(g[0].what, 160))}${due} · ${g.map((t) => `@${escapeHtmlTeam(t.username)}${t.delivery_state === "sent" ? "" : " 📭"}`).join(" + ")}`;
+  });
+  const undelivered = tasks.filter((t) => t.delivery_state !== "sent");
+  return [
+    `Сохранено задач: ${tasks.length}. Доставлено: ${sent}.`,
+    ...lines,
+    undelivered.length
+      ? `\n📭 Не дошло: ${undelivered.map((t) => `@${escapeHtmlTeam(t.username)}`).join(", ")}. ` +
+        `Человеку нужно открыть бота, потом /assign_retry ${undelivered.map((t) => t.id).join(" ")}.`
+      : "",
+    "Следить за статусом: /tasks → «Я поставил».",
+  ].filter(Boolean).join("\n");
 }

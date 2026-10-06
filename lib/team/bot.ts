@@ -573,10 +573,8 @@ async function replyFaq(
  * выносим.
  */
 export const TEAM_COMMANDS = [
-  { command: "tasks", description: "Мои задачи и сроки" },
-  { command: "assigned", description: "Мои назначенные задачи" },
-  { command: "assign", description: "Раздать задачи команде" },
-  { command: "assign_status", description: "Общий список задач" },
+  { command: "tasks", description: "Задачи" },
+  { command: "assign", description: "Поставить задачу" },
   { command: "today", description: "Что сегодня и завтра" },
   { command: "runs", description: "Забеги в работе и цифры" },
   { command: "run", description: "Карточка забега" },

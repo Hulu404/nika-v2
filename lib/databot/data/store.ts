@@ -1,6 +1,6 @@
 import type { FormState } from "../form";
 import type { TaskStore } from "../tasks";
-import type { AssignedAction, AssignedStatus, AssignedTask, AssignedTaskDraft } from "../task-list";
+import type { AssignedAction, AssignedNoticeMark, AssignedStatus, AssignedTask, AssignedTaskDraft } from "../task-list";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 
 /**
@@ -15,6 +15,8 @@ export interface DatabotStore extends TaskStore {
   importAssignedTasks(ownerId: number, messageId: number, tasks: AssignedTaskDraft[]): Promise<AssignedTask[]>;
   getAssignedTask(id: number): Promise<AssignedTask | null>;
   listAssignedTasks(userId: number): Promise<AssignedTask[]>;
+  /** Задачи, где человек исполнитель или автор. Других задач не видит никто. */
+  listMyAssigned(userId: number): Promise<AssignedTask[]>;
   /** Другие исполнители той же строки исходного списка. */
   listAssignedTeammates(task: AssignedTask): Promise<string[]>;
   assignedTaskDelivery(id: number, action: "lock" | "sent" | "failed" | "uncertain", messageId?: number): Promise<AssignedTask | null>;
@@ -24,14 +26,14 @@ export interface DatabotStore extends TaskStore {
    * изменений, previous равен текущему статусу.
    */
   setAssignedStatus(id: number, actorId: number, action: AssignedAction): Promise<{ task: AssignedTask; previous: AssignedStatus }>;
-  /** Правка владельцем; due: undefined — срок не трогать, null — снять. */
+  /** Правка автором задачи; due: undefined — срок не трогать, null — снять. */
   editAssignedTask(id: number, ownerId: number, patch: { what?: string; due?: string | null }): Promise<AssignedTask>;
   /** Всё незакрытое и закрытое начиная с since — для обзора владельца. */
   listAssignedOverview(since: Date): Promise<AssignedTask[]>;
   /** Кандидаты в напоминания: в работе, со сроком, о просрочке ещё не писали. */
   listAssignedDue(): Promise<AssignedTask[]>;
   /** Поставить отметку напоминания. true — её поставил этот вызов, и только он шлёт сообщение. */
-  markAssignedNotice(id: number, kind: "reminder" | "overdue"): Promise<boolean>;
+  markAssignedNotice(id: number, kind: AssignedNoticeMark): Promise<boolean>;
   /** Активный участник по chat_id — одна выборка по первичному ключу, без кеша. */
   findActiveMember(chatId: number): Promise<MemberRow | null>;
 

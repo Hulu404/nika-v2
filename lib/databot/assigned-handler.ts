@@ -2,7 +2,7 @@ import type { Context } from "grammy";
 import { isEnvOwner } from "./access";
 import { DueError, extractDue, formatDue, parseDue } from "./assigned-due";
 import {
-  ASSIGN_HELP, ASSIGNED_CALLBACK, STATUS_LABEL, deliveryText, overviewMessages, ownerNotice,
+  ASSIGN_HELP, ASSIGNED_CALLBACK, STATUS_LABEL, deliveryText, ownerNotice,
   ownerShouldKnow, short, taskButtons, taskCard,
 } from "./assigned-view";
 import type { DatabotStore } from "./data/store";
@@ -23,7 +23,7 @@ const markup = (buttons?: Buttons) => buttons ? { inline_keyboard: buttons } : u
 function storeError(err: unknown): string | null {
   const message = err instanceof Error ? err.message : "";
   if (message.startsWith("assigned:missing")) return "Задача не найдена.";
-  if (message.startsWith("assigned:actor")) return "Это действие доступно только исполнителю задачи или владельцу.";
+  if (message.startsWith("assigned:actor")) return "Это может только автор задачи (правка, срок, отмена) или исполнитель (статус).";
   if (message.startsWith("assigned:state")) return "Задача уже закрыта или отменена — действие недоступно.";
   if (message.startsWith("assigned:format")) return "Текст задачи — от 1 до 3000 символов.";
   return null;
@@ -112,7 +112,7 @@ export async function handleAssignedUpdate(
   ctx: Context,
   store: DatabotStore,
   now: Date = new Date(),
-  options: { isOwner?: boolean; refreshCommands?: boolean; anyoneAssigns?: boolean } = {},
+  options: { refreshCommands?: boolean } = {},
 ): Promise<boolean> {
   if (ctx.chat?.type !== "private" || !ctx.from || ctx.chat.id !== ctx.from.id) return false;
 
@@ -124,12 +124,13 @@ export async function handleAssignedUpdate(
   if (!ctx.message?.text) return false;
 
   const text = ctx.message.text.trim();
-  const command = /^\/(tasks|assign|tasks_add|assigned|assign_retry|assign_status|assign_cancel|assign_edit|assign_due)(?:@([a-z0-9_]+))?(?=\s|$)/i.exec(text);
+  const command = /^\/(tasks|assign|tasks_add|assigned|assign_retry|assign_cancel|assign_edit|assign_due)(?:@([a-z0-9_]+))?(?=\s|$)/i.exec(text);
   if (command?.[2] && command[2].toLowerCase() !== ctx.me.username.toLowerCase()) return false;
   const parsed = !command ? parseIntent({ text, callbackData: null }) : null;
   const myTasks = parsed?.kind === "intent" && parsed.intent.report === "tsk.list";
-  const owner = options.anyoneAssigns || (options.isOwner ?? isEnvOwner(ctx.from.id));
-  const form = !command && !myTasks && owner ? await store.getForm(ctx.from.id) : null;
+  // Ставить задачи может любой действующий участник; править и отменять —
+  // только автор (это держит база, 045_team_tasks_open.sql).
+  const form = !command && !myTasks ? await store.getForm(ctx.from.id) : null;
   const uploading = form?.kind === "assigned.upload" && !text.startsWith("/");
   if (!command && !myTasks && !uploading) return false;
 
@@ -139,18 +140,12 @@ export async function handleAssignedUpdate(
   // Этот обработчик идёт раньше общего конвейера. При прямом /assign или
   // /tasks обновляем сохранённое в Telegram меню даже без повторного /start.
   if (options.refreshCommands !== false && command && (command[1].toLowerCase() === "assign" || command[1].toLowerCase() === "tasks"))
-    await setChatCommands(ctx.api, ctx.from.id, owner ? "council" : member.zone);
+    await setChatCommands(ctx.api, ctx.from.id, isEnvOwner(ctx.from.id) ? "council" : member.zone);
   const reply = (body: string, buttons?: Buttons) =>
     ctx.reply(body, { parse_mode: "HTML", link_preview_options: { is_disabled: true }, reply_markup: markup(buttons) });
   const cmd = myTasks ? "tasks" : command?.[1].toLowerCase() ?? "assign";
   const args = text.slice(command?.[0].length ?? 0).trim();
 
-  const canAssign = owner && (options.anyoneAssigns || member.is_owner);
-  if (cmd === "tasks" && canAssign && !options.anyoneAssigns) {
-    await store.setForm(ctx.from.id, openForm("assigned.upload", {}, now), now);
-    await reply("Пришлите список задач одним сообщением: одна строка — одно дело в формате «что делать / дедлайн / @ник + @ник». Каждому указанному исполнителю создаётся своя задача. Например:\n<code>• Подготовить макет / пт 18:00 / @alice + @bob\n• Проверить текст / 03.10 / @bob</code>\nОтмена — /cancel.");
-    return true;
-  }
 
   if (cmd === "assigned" || cmd === "tasks") {
     const username = normalizeTaskUsername(ctx.from.username);
@@ -162,11 +157,6 @@ export async function handleAssignedUpdate(
     return true;
   }
 
-  if (!canAssign) {
-    await reply("Загружать и править задачи может только владелец бота. Свои задачи — /tasks.");
-    return true;
-  }
-
   if (uploading && formExpired(form!, now)) {
     await store.clearSession(ctx.from.id);
     await reply("Режим загрузки задач истёк. Откройте /tasks и пришлите список снова.");
@@ -174,12 +164,6 @@ export async function handleAssignedUpdate(
   }
 
   if (command) await store.clearSession(ctx.from.id);
-
-  if (cmd === "assign_status") {
-    const tasks = await store.listAssignedOverview(new Date(0));
-    for (const message of overviewMessages(tasks, now)) await reply(message);
-    return true;
-  }
 
   if (cmd === "assign_cancel" || cmd === "assign_edit" || cmd === "assign_due" || cmd === "assign_retry") {
     const m = /^([1-9]\d{0,15})(?:\s+([\s\S]*))?$/.exec(args);
@@ -228,7 +212,7 @@ export async function handleAssignedUpdate(
     return true;
   }
 
-  if (!args && command && options.anyoneAssigns && cmd === "assign") {
+  if (!args && command && cmd === "assign") {
     await store.setForm(ctx.from.id, openForm("assigned.upload", {}, now), now);
     await reply("Пришли список задач одним сообщением: одна строка — одно дело в формате «что делать / дедлайн / @ник + @ник». Каждому исполнителю создаётся своя задача. Например:\n<code>Подготовить макет / пт 18:00 / @alice + @bob\nПроверить текст / 03.10 / @bob</code>\nОтмена — /cancel.");
     return true;
@@ -237,6 +221,7 @@ export async function handleAssignedUpdate(
     await reply(ASSIGN_HELP);
     return true;
   }
+
   try {
     const drafts = parseTaskList(text, now);
     const members = await store.listMembers();
@@ -269,7 +254,6 @@ export async function handleAssignedUpdate(
       `Сохранено задач: ${tasks.length}. Доставлено в личку: ${sent}.`,
       ...lines,
       pending ? `\n📭 Не доставлено: ${pending} (${pendingTasks}). Человеку нужно открыть бота, затем /assign_retry ID.` : "",
-      "Кто что делает — /assign_status.",
     ].filter(Boolean);
     let chunk = "";
     for (const line of report) {

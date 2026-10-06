@@ -28,14 +28,16 @@ export function replyKeyboard(sections: readonly Section[]): Keyboard | ReplyKey
 /** Для чужих: убрать клавиатуру, если у человека осталась старая. */
 export const REMOVE_KEYBOARD: ReplyKeyboardRemove = { remove_keyboard: true };
 
-/** Меню команд: разделы зоны, задачи и /help. Команды списков задач — только владельцу. */
-export function commandsFor(sections: readonly Section[], isOwner = false): BotCommand[] {
+/**
+ * Меню команд: разделы зоны, задачи и /help. Задачи ставит любой участник,
+ * общего обзора задач нет ни у кого. При настроенной «Пятнице» задачи живут там.
+ */
+export function commandsFor(sections: readonly Section[], _isOwner = false): BotCommand[] {
   return [
     ...sections.map((s) => ({ command: SECTION_COMMAND[s], description: SECTION_COMMAND_DESCRIPTION[s] })),
-    ...(!teamBotConfigured() ? [{ command: "assigned", description: "Назначенные мне задачи" }] : []),
-    ...(isOwner && !teamBotConfigured() ? [
-      { command: "assign", description: "Раздать задачи списком" },
-      { command: "assign_status", description: "Кто что делает по задачам" },
+    ...(!teamBotConfigured() ? [
+      { command: "assigned", description: "Назначенные мне задачи" },
+      { command: "assign", description: "Поставить задачи списком" },
     ] : []),
     { command: "help", description: HELP_COMMAND_DESCRIPTION },
   ];

@@ -23,9 +23,17 @@ export interface AssignedTask extends AssignedTaskDraft {
   delivered_message_id: number | null;
   status: AssignedStatus;
   status_at: string;
+  /** Старая единственная отметка напоминания (бот данных без «Пятницы»). */
   reminded_at: string | null;
+  /** Отметки порогов «за 24, 12 и 3 часа до срока» (миграция 045). */
+  reminded_24_at?: string | null;
+  reminded_12_at?: string | null;
+  reminded_3_at?: string | null;
   overdue_notified_at: string | null;
 }
+
+/** Какую отметку ставит напоминание: порог до срока, просрочка или старая единая. */
+export type AssignedNoticeMark = "r24" | "r12" | "r3" | "overdue" | "reminder";
 
 /** Задача ещё в работе: по ней напоминают, её можно править и отменить. */
 export const isActiveAssigned = (t: Pick<AssignedTask, "status">): boolean =>

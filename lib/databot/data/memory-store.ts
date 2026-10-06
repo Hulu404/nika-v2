@@ -2,7 +2,7 @@ import { asFormState, type FormState } from "../form";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 import type { DatabotStore } from "./store";
 import { normalizeTaskUsername } from "../tasks";
-import { isActiveAssigned, type AssignedAction, type AssignedStatus, type AssignedTask, type AssignedTaskDraft } from "../task-list";
+import { isActiveAssigned, type AssignedAction, type AssignedNoticeMark, type AssignedStatus, type AssignedTask, type AssignedTaskDraft } from "../task-list";
 import { MemoryTasks } from "./memory-tasks";
 
 /**
@@ -44,7 +44,8 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
         task = { ...draft, id: this.assignedTasks.size + 1, source_chat_id: ownerId,
           source_message_id: messageId, assignee_id: recipients[index], assigned_by: ownerId,
           created_at: this.clock().toISOString(), delivery_state: "pending", delivered_message_id: null,
-          status: "open", status_at: this.clock().toISOString(), reminded_at: null, overdue_notified_at: null };
+          status: "open", status_at: this.clock().toISOString(), reminded_at: null,
+          reminded_24_at: null, reminded_12_at: null, reminded_3_at: null, overdue_notified_at: null };
         this.assignedTasks.set(task.id, task);
       }
       return structuredClone(task);
@@ -57,6 +58,13 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
     if (!member?.is_active || !member.username) return [];
     return structuredClone([...this.assignedTasks.values()].filter(t => t.assignee_id === userId &&
       normalizeTaskUsername(member.username) === t.username));
+  }
+
+  async listMyAssigned(userId: number): Promise<AssignedTask[]> {
+    this.maybeFail("listMyAssigned");
+    return structuredClone([...this.assignedTasks.values()]
+      .filter(t => t.assignee_id === userId || t.assigned_by === userId)
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at) || b.id - a.id));
   }
 
   async listAssignedTeammates(task: AssignedTask): Promise<string[]> {
@@ -96,7 +104,9 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
       take: ["taken", ["open"]], done: ["done", ["open", "taken"]], decline: ["declined", ["open", "taken"]],
       reopen: ["taken", ["done", "declined"]], cancel: ["cancelled", ["open", "taken", "declined"]],
     };
-    if (action === "cancel" ? !(actor?.is_active && actor.is_owner) : task.assignee_id !== actorId || !actor?.is_active)
+    // Как databot_assigned_status после 045: отменяет только автор, статусы
+    // отмечает только исполнитель.
+    if (!actor?.is_active || (action === "cancel" ? task.assigned_by !== actorId : task.assignee_id !== actorId))
       throw new Error("assigned:actor");
     const [target, allowed] = rules[action];
     const previous = task.status;
@@ -110,9 +120,10 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
   async editAssignedTask(id: number, ownerId: number, patch: { what?: string; due?: string | null }): Promise<AssignedTask> {
     this.maybeFail("editAssignedTask");
     const owner = this.members.get(ownerId);
-    if (!owner?.is_active || !owner.is_owner) throw new Error("assigned:actor");
+    if (!owner?.is_active) throw new Error("assigned:actor");
     const task = this.assignedTasks.get(id);
     if (!task) throw new Error("assigned:missing");
+    if (task.assigned_by !== ownerId) throw new Error("assigned:actor");
     if (!isActiveAssigned(task)) throw new Error("assigned:state");
     if (patch.what !== undefined) {
       if (!patch.what.trim() || patch.what.length > 3000) throw new Error("assigned:format");
@@ -121,6 +132,9 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
     if (patch.due !== undefined) {
       task.due_at = patch.due;
       task.reminded_at = null;
+      task.reminded_24_at = null;
+      task.reminded_12_at = null;
+      task.reminded_3_at = null;
       task.overdue_notified_at = null;
     }
     return structuredClone(task);
@@ -138,10 +152,11 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
       .filter(t => isActiveAssigned(t) && t.due_at && !t.overdue_notified_at));
   }
 
-  async markAssignedNotice(id: number, kind: "reminder" | "overdue"): Promise<boolean> {
+  async markAssignedNotice(id: number, kind: AssignedNoticeMark): Promise<boolean> {
     this.maybeFail("markAssignedNotice");
     const task = this.assignedTasks.get(id);
-    const field = kind === "reminder" ? "reminded_at" : "overdue_notified_at";
+    const field = ({ r24: "reminded_24_at", r12: "reminded_12_at", r3: "reminded_3_at",
+      reminder: "reminded_at", overdue: "overdue_notified_at" } as const)[kind];
     if (!task || !isActiveAssigned(task) || task[field]) return false;
     task[field] = this.clock().toISOString();
     return true;

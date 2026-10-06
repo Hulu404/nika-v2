@@ -4,7 +4,7 @@ import { asFormState, type FormState } from "../form";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 import type { DatabotStore } from "./store";
 import { TaskStoreBase, TaskError, type TaskRow } from "../tasks";
-import type { AssignedAction, AssignedStatus, AssignedTask, AssignedTaskDraft } from "../task-list";
+import type { AssignedAction, AssignedNoticeMark, AssignedStatus, AssignedTask, AssignedTaskDraft } from "../task-list";
 
 /**
  * Боевое хранилище бота данных: таблицы databot_* из 037, tg_sessions и
@@ -84,6 +84,12 @@ class SupabaseStore extends TaskStoreBase implements DatabotStore {
     return (data ?? []) as AssignedTask[];
   }
 
+  async listMyAssigned(userId: number): Promise<AssignedTask[]> {
+    const { data, error } = await this.db.rpc("databot_assigned_mine", { p_user: userId }).abortSignal(timeout());
+    if (error) fail("listMyAssigned", error.message);
+    return (data ?? []) as AssignedTask[];
+  }
+
   async listAssignedTeammates(task: AssignedTask): Promise<string[]> {
     const { data, error } = await this.db.from("databot_assigned_tasks").select("username")
       .eq("source_chat_id", task.source_chat_id).eq("source_message_id", task.source_message_id)
@@ -138,7 +144,7 @@ class SupabaseStore extends TaskStoreBase implements DatabotStore {
     return (data ?? []) as AssignedTask[];
   }
 
-  async markAssignedNotice(id: number, kind: "reminder" | "overdue"): Promise<boolean> {
+  async markAssignedNotice(id: number, kind: AssignedNoticeMark): Promise<boolean> {
     const { data, error } = await this.db.rpc("databot_assigned_notice", { p_id: id, p_kind: kind }).abortSignal(timeout());
     if (error) fail("markAssignedNotice", error.message);
     return data === true;

@@ -49,20 +49,20 @@ describe("owner task lists", () => {
     const commands = calls.find(c => c.method === "setMyCommands" &&
       (c.payload.scope as { chat_id?: number } | undefined)?.chat_id === 9);
     expect((commands?.payload.commands as Array<{ command: string }>).map(c => c.command))
-      .toEqual(expect.arrayContaining(["tasks", "assign", "assign_status"]));
+      .toEqual(expect.arrayContaining(["tasks", "assign"]));
+    expect((commands?.payload.commands as Array<{ command: string }>).map(c => c.command)).not.toContain("assign_status");
     expect(store.assignedTasks.size).toBe(2);
     expect(texts(1).some(t => t.includes("Макет") && t.includes("Срок: пт 02.10, 18:00"))).toBe(true);
     expect(texts(2).some(t => t.includes("Текст") && !t.includes("Макет"))).toBe(true);
     await press("a:done:1");
-    await send("/assign_status", 9, "owner", 12);
-    expect(texts(9).at(-1)).toMatch(/<b>@alice<\/b>\n✅ #1 Макет/);
+    expect(texts(9).at(-1)).toContain("задача #1 — сделано");
   });
 
-  it("opens upload mode with /tasks and shows each member only their own tasks", async () => {
+  it("opens upload mode with /assign and shows each member only their own tasks", async () => {
     await send("@alice — Вне режима", 9, "owner", 20);
     expect(store.assignedTasks.size).toBe(0);
-    await send("/tasks", 9, "owner", 21);
-    expect(texts(9).at(-1)).toContain("Пришлите список задач");
+    await send("/assign", 9, "owner", 21);
+    expect(texts(9).at(-1)).toContain("список задач");
     await send("1. @alice — Подготовить макет\n2. @bob — Проверить текст", 9, "owner", 22);
     expect(store.assignedTasks.size).toBe(2);
     expect(texts(1).some(t => t.includes("Подготовить макет"))).toBe(true);
@@ -79,12 +79,12 @@ describe("owner task lists", () => {
   });
 
   it("keeps upload mode after a malformed list and lets /cancel close it", async () => {
-    await send("/tasks", 9, "owner", 30);
+    await send("/assign", 9, "owner", 30);
     await send("@missing — Ошибка", 9, "owner", 31);
     expect(store.assignedTasks.size).toBe(0);
     await send("@alice — Исправленная задача", 9, "owner", 32);
     expect(store.assignedTasks.size).toBe(1);
-    await send("/tasks", 9, "owner", 33);
+    await send("/assign", 9, "owner", 33);
     await send("/cancel", 9, "owner", 34);
     await send("@bob — Отменённая загрузка", 9, "owner", 35);
     expect(store.assignedTasks.size).toBe(1);
@@ -104,12 +104,14 @@ describe("owner task lists", () => {
     expect(calls.filter(c => c.payload.chat_id === 2 && String(c.payload.text).includes("макет"))).toHaveLength(0);
   });
 
-  it("rejects non-owner and unknown recipients without partial import", async () => {
-    await send("/assign\n@bob — Чужая задача", 1, "alice");
+  it("lets any member assign, rejects unknown recipients without partial import", async () => {
+    await send("/assign\n@bob — Задача от участника", 1, "alice");
+    expect(store.assignedTasks.size).toBe(1);
+    expect(store.assignedTasks.get(1)?.assigned_by).toBe(1);
     await send("/assign\n@alice — Макет\n@missing — Текст");
-    expect(store.assignedTasks.size).toBe(0);
+    expect(store.assignedTasks.size).toBe(1);
     await send("@alice — Макет\nПроверить текст", 9, "owner", 12);
-    expect(store.assignedTasks.size).toBe(0);
+    expect(store.assignedTasks.size).toBe(1);
   });
 
   it("keeps a failed delivery and allows explicit retry", async () => {
@@ -150,7 +152,7 @@ describe("lifecycle of assigned tasks", () => {
     await send("/assign\n@alice — Макет");
     await press("a:take:1", 2, "bob");
     expect(store.assignedTasks.get(1)?.status).toBe("open");
-    expect(texts(2).at(-1)).toContain("только исполнителю");
+    expect(texts(2).at(-1)).toContain("исполнитель (статус)");
     await press("a:take:1");
     expect(store.assignedTasks.get(1)?.status).toBe("taken");
     expect(texts(9).some(t => t.includes("@alice"))).toBe(true); // только подтверждение импорта
@@ -183,18 +185,14 @@ describe("lifecycle of assigned tasks", () => {
     expect(out.some(c => String(c.payload.text).includes("✅ сделано") && String(c.payload.text).includes("Звонок"))).toBe(true);
   });
 
-  it("owner overview groups by person, marks overdue and undelivered", async () => {
-    rejectDelivery = true;
-    await send("/assign\n@alice — Макет до 18:00\n@bob — Текст до завтра");
-    rejectDelivery = false;
-    store.assignedTasks.get(1)!.due_at = "2026-10-01T08:00:00.000Z";
+  it("there is no team-wide overview: /assign_status is gone, edits belong to the author", async () => {
+    await send("/assign\n@alice — Макет");
+    const before = store.assignedTasks.size;
     await send("/assign_status", 9, "owner", 11);
-    const overview = texts(9).at(-1)!;
-    expect(overview).toContain("в работе 2, просрочено 1");
-    expect(overview).toMatch(/<b>@alice<\/b>\n⚠️ #1 Макет · до чт 01\.10, 11:00 · 📭 не доставлено/);
-    expect(overview).toContain("🆕 #2 Текст · до пт 02.10");
-    await send("/assign_status", 1, "alice", 12);
-    expect(texts(1).at(-1)).toContain("только владелец");
+    expect(texts(9).at(-1)).not.toContain("Задачи команды");
+    await send("/assign_cancel 1", 2, "bob", 12);
+    expect(store.assignedTasks.get(1)?.status).toBe("open");
+    expect(store.assignedTasks.size).toBe(before);
   });
 
   it("edit, deadline change and cancel reach the assignee", async () => {

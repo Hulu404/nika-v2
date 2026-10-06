@@ -56,6 +56,7 @@ const ALLOWED_RPC = new Set([
   "databot_task_action", "databot_task_list", "databot_task_cleanup_list", "databot_task_json",
   "databot_assigned_import", "databot_assigned_list", "databot_assigned_delivery",
   "databot_assigned_status", "databot_assigned_edit", "databot_assigned_overview", "databot_assigned_notice",
+  "databot_assigned_mine",
 ]);
 
 /**
@@ -519,7 +520,7 @@ describe("приватность бота данных: код", () => {
   it("SQL: все функции 037 на месте", () => {
     const names = extractDatabotFunctions(stripSql(read(`${MIGRATIONS_DIR}/037_databot.sql`))).map((f) => f.name);
     const taskNames = extractDatabotFunctions(stripSql(read(`${MIGRATIONS_DIR}/039_databot_tasks.sql`))).map((f) => f.name);
-    const assignedNames = ["040_databot_assigned_tasks.sql", "043_databot_assigned_lifecycle.sql"]
+    const assignedNames = ["040_databot_assigned_tasks.sql", "043_databot_assigned_lifecycle.sql", "045_team_tasks_open.sql"]
       .flatMap((f) => extractDatabotFunctions(stripSql(read(`${MIGRATIONS_DIR}/${f}`))).map((fn) => fn.name));
     for (const rpc of ALLOWED_RPC) if (rpc.startsWith("databot_"))
       expect(rpc.startsWith("databot_task_") ? taskNames : rpc.startsWith("databot_assigned_") ? assignedNames : names).toContain(rpc);

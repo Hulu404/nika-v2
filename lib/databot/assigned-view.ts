@@ -66,17 +66,23 @@ export function ownerNotice(t: AssignedTask, previous: AssignedStatus): string {
   return `${who}: задача #${t.id} — ${STATUS_LABEL[t.status]}`;
 }
 
-/** Нужно ли сообщать владельцу. «Взял в работу» видно в /assign_status, лишний пинг не нужен. */
+/** Нужно ли сообщать автору. «Взял в работу» видно в карточке задачи, лишний пинг не нужен. */
 export function ownerShouldKnow(t: AssignedTask, previous: AssignedStatus): boolean {
   return previous !== t.status && (t.status === "done" || t.status === "declined" || (t.status === "taken" && previous !== "open"));
 }
 
-export function reminderText(t: AssignedTask, now: Date, teammates: string[] = []): string {
-  return taskCard(t, now, `⏰ <b>Срок задачи #${t.id}: ${formatDue(t.due_at!)}</b>`, teammates);
+const HOURS_LABEL: Record<number, string> = { 24: "24 часа", 12: "12 часов", 3: "3 часа" };
+
+/** Напоминание называет порог: «Через 12 часов срок: пт 03.10, 18:00». */
+export function reminderText(t: AssignedTask, now: Date, teammates: string[] = [], hours?: number): string {
+  const head = hours && HOURS_LABEL[hours]
+    ? `⏰ <b>Через ${HOURS_LABEL[hours]} срок: ${formatDue(t.due_at!)}</b>`
+    : `⏰ <b>Срок задачи #${t.id}: ${formatDue(t.due_at!)}</b>`;
+  return taskCard(t, now, head, teammates);
 }
 
 export function overdueText(t: AssignedTask, now: Date, teammates: string[] = []): string {
-  return taskCard(t, now, `⚠️ <b>Срок задачи #${t.id} прошёл</b>`, teammates) + "\nЕсли не успеваешь — нажми «Не смогу», владелец увидит.";
+  return taskCard(t, now, `⚠️ <b>Срок задачи #${t.id} прошёл</b>`, teammates) + "\nЕсли не успеваешь, нажми «Не смогу», автор увидит.";
 }
 
 export function overdueOwnerText(t: AssignedTask): string {
@@ -146,10 +152,10 @@ function chunk(lines: string[], max: number): string[] {
 }
 
 export const ASSIGN_HELP = [
-  "Откройте /tasks и отправьте следующим сообщением:",
+  "Наберите /assign и отправьте следующим сообщением:",
   "<code>Подготовить макет / пт 18:00 / @alice + @bob",
   "Проверить текст / 03.10 / @bob</code>",
   "Одна строка — одно дело; каждому указанному исполнителю создаётся своя задача. Срок: «пт», «завтра 12:00», «03.10», «18:00».",
   "",
-  "Дальше: /assign_status — кто что делает · /assign_edit ID текст · /assign_due ID срок|нет · /assign_cancel ID",
+  "Дальше (только автор задачи): /assign_edit ID текст · /assign_due ID срок|нет · /assign_cancel ID",
 ].join("\n");
