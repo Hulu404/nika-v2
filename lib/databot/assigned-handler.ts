@@ -112,7 +112,7 @@ export async function handleAssignedUpdate(
   ctx: Context,
   store: DatabotStore,
   now: Date = new Date(),
-  options: { isOwner?: boolean; refreshCommands?: boolean } = {},
+  options: { isOwner?: boolean; refreshCommands?: boolean; anyoneAssigns?: boolean } = {},
 ): Promise<boolean> {
   if (ctx.chat?.type !== "private" || !ctx.from || ctx.chat.id !== ctx.from.id) return false;
 
@@ -128,7 +128,7 @@ export async function handleAssignedUpdate(
   if (command?.[2] && command[2].toLowerCase() !== ctx.me.username.toLowerCase()) return false;
   const parsed = !command ? parseIntent({ text, callbackData: null }) : null;
   const myTasks = parsed?.kind === "intent" && parsed.intent.report === "tsk.list";
-  const owner = options.isOwner ?? isEnvOwner(ctx.from.id);
+  const owner = options.anyoneAssigns || (options.isOwner ?? isEnvOwner(ctx.from.id));
   const form = !command && !myTasks && owner ? await store.getForm(ctx.from.id) : null;
   const uploading = form?.kind === "assigned.upload" && !text.startsWith("/");
   if (!command && !myTasks && !uploading) return false;
@@ -145,7 +145,8 @@ export async function handleAssignedUpdate(
   const cmd = myTasks ? "tasks" : command?.[1].toLowerCase() ?? "assign";
   const args = text.slice(command?.[0].length ?? 0).trim();
 
-  if (cmd === "tasks" && owner && member.is_owner) {
+  const canAssign = owner && (options.anyoneAssigns || member.is_owner);
+  if (cmd === "tasks" && canAssign && !options.anyoneAssigns) {
     await store.setForm(ctx.from.id, openForm("assigned.upload", {}, now), now);
     await reply("Пришлите список задач одним сообщением: одна строка — одно дело в формате «что делать / дедлайн / @ник + @ник». Каждому указанному исполнителю создаётся своя задача. Например:\n<code>• Подготовить макет / пт 18:00 / @alice + @bob\n• Проверить текст / 03.10 / @bob</code>\nОтмена — /cancel.");
     return true;
@@ -161,7 +162,7 @@ export async function handleAssignedUpdate(
     return true;
   }
 
-  if (!owner || !member.is_owner) {
+  if (!canAssign) {
     await reply("Загружать и править задачи может только владелец бота. Свои задачи — /tasks.");
     return true;
   }
@@ -227,6 +228,11 @@ export async function handleAssignedUpdate(
     return true;
   }
 
+  if (!args && command && options.anyoneAssigns && cmd === "assign") {
+    await store.setForm(ctx.from.id, openForm("assigned.upload", {}, now), now);
+    await reply("Пришли список задач одним сообщением: одна строка — одно дело в формате «что делать / дедлайн / @ник + @ник». Каждому исполнителю создаётся своя задача. Например:\n<code>Подготовить макет / пт 18:00 / @alice + @bob\nПроверить текст / 03.10 / @bob</code>\nОтмена — /cancel.");
+    return true;
+  }
   if (!args && command) {
     await reply(ASSIGN_HELP);
     return true;

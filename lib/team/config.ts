@@ -19,3 +19,25 @@ export function teamToken(): string {
 export function teamBotConfigured(): boolean {
   return !!process.env.TEAM_BOT_TOKEN;
 }
+
+/**
+ * Фаундеры — Telegram ID из TEAM_FOUNDER_IDS через запятую. Права в боте у всех
+ * равные, кроме двух вещей, которые остаются за фаундерами: /kick, правка и
+ * отмена любого события, исправление уже внесённой явки.
+ *
+ * Список в переменной, а не роль в базе: раньше владельцем становился тот, кто
+ * первым набрал /join, и права зависели от того, кто успел.
+ */
+export function founderIds(env: string | undefined = process.env.TEAM_FOUNDER_IDS): Set<number> {
+  return new Set(
+    (env ?? "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter((s) => /^-?\d+$/.test(s))
+      .map(Number),
+  );
+}
+
+export function isFounder(chatId: number, env?: string): boolean {
+  return founderIds(env).has(chatId);
+}

@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Bot, type Api } from "grammy";
 import type { Update, UserFromGetMe } from "grammy/types";
 import { MemoryStore } from "../databot/data/memory-store";
-import { handleTeamTaskUpdate, type TeamTaskDeps } from "./tasks";
+import { handleTeamTaskUpdate, syncTeamTaskMembers, type TeamTaskDeps } from "./tasks";
 import type { TeamMember } from "./access";
-import { setTeamCommands, TEAM_COMMANDS, TEAM_MEMBER_COMMANDS } from "./bot";
+import { setTeamCommands, TEAM_COMMANDS } from "./bot";
 
 const NOW = new Date("2026-10-01T09:00:00Z");
 const people: TeamMember[] = [
@@ -23,6 +23,8 @@ let press: (data: string, id?: number, username?: string) => Promise<void>;
 
 beforeEach(() => {
   vi.stubEnv("DATABOT_OWNER_IDS", "");
+  // Фаундер — owner (9). Роль в team_members на права больше не влияет.
+  vi.stubEnv("TEAM_FOUNDER_IDS", "9");
   store = new MemoryStore();
   store.clock = () => NOW;
   calls = [];
@@ -90,17 +92,26 @@ describe("Пятница: задачи команды", () => {
     await send("/assign\nМакет / завтра / @alice + @missing");
     expect(store.assignedTasks.size).toBe(0);
   });
-  it("publishes owner task commands only in the owner's chat menu", async () => {
+  it("publishes the same command menu to founders and members", async () => {
     const setMyCommands = vi.fn().mockResolvedValue(true);
     const api = { setMyCommands } as unknown as Api;
     await setTeamCommands(api, people[0]);
     expect(setMyCommands).toHaveBeenCalledWith(TEAM_COMMANDS,
       { scope: { type: "chat", chat_id: 9 } });
     await setTeamCommands(api, people[1]);
-    expect(setMyCommands).toHaveBeenCalledWith(TEAM_MEMBER_COMMANDS,
+    expect(setMyCommands).toHaveBeenCalledWith(TEAM_COMMANDS,
       { scope: { type: "chat", chat_id: 1 } });
-    expect(TEAM_COMMANDS.map(c => c.command)).toEqual(expect.arrayContaining(["assign", "assign_status", "tasks", "today"]));
-    expect(TEAM_MEMBER_COMMANDS.some(c => c.command === "assign")).toBe(false);
+    expect(TEAM_COMMANDS.map(c => c.command)).toEqual(expect.arrayContaining(["assign", "tasks"]));
+  });
+
+  it("mirrors the founder flag, not the stored role, into databot_members", async () => {
+    const roster: TeamMember[] = [
+      { ...people[1], role: "owner" },   // был первым вошедшим, но не фаундер
+      { ...people[0], role: "member" },  // фаундер по TEAM_FOUNDER_IDS
+    ];
+    await syncTeamTaskMembers({ store, findMember: async () => null, listTeam: async () => roster }, NOW, roster);
+    expect(store.members.get(1)?.is_owner).toBe(false);
+    expect(store.members.get(9)?.is_owner).toBe(true);
   });
 
   it("takes owner tasks, delivers by username, and shows completion in the owner overview", async () => {
@@ -115,13 +126,21 @@ describe("Пятница: задачи команды", () => {
     expect(calls.some(call => call.payload.chat_id === 9 && String(call.payload.text).includes("✅ #1 Подготовить макет"))).toBe(true);
   });
 
-  it("does not allow a team member to import tasks", async () => {
-    await send("/assign\nЧужая задача / завтра / @alice", 1, "alice");
+  it("lets a member without a special role assign tasks to anyone, including themselves", async () => {
+    await send("/assign\nСверстать афишу / завтра / @bob\nСебе напомнить / завтра / @alice", 1, "alice");
+    expect([...store.assignedTasks.values()].map(t => [t.assigned_by, t.assignee_id])).toEqual([[1, 2], [1, 1]]);
+  });
+
+  it("lets a member cancel the pending task list", async () => {
+    await send("/assign", 1, "alice", 20);
+    await send("/cancel", 1, "alice", 21);
+    await send("Макет / завтра / @bob", 1, "alice", 22);
     expect(store.assignedTasks.size).toBe(0);
+    expect(calls.some(call => call.payload.chat_id === 1 && call.payload.text === "Загрузка задач отменена.")).toBe(true);
   });
 
   it("lets the owner cancel the pending task list", async () => {
-    await send("/tasks", 9, "owner", 20);
+    await send("/assign", 9, "owner", 20);
     await send("/cancel", 9, "owner", 21);
     await send("Макет / завтра / @alice", 9, "owner", 22);
     expect(store.assignedTasks.size).toBe(0);

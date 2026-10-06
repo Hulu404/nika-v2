@@ -6,6 +6,7 @@ import type { RunStats, SignupView, SignupStatus } from "./stats";
 import { runDateLabel, type RunKey, type TeamRun } from "./runs";
 import type { Dynamics, RunAggregate } from "./history";
 import type { TeamMember } from "./access";
+import { isFounder } from "./config";
 
 /**
  * Все тексты и клавиатуры командного бота — здесь, и здесь же ни одного
@@ -468,7 +469,7 @@ export function teamText(members: TeamMember[], meChatId: number): string {
   if (members.length === 0) return "В команде пока никого — странно, ведь ты как-то сюда попал.";
   const line = (m: TeamMember) => {
     const who = m.username ? `@${m.username}` : (m.display_name ?? String(m.chat_id));
-    const role = m.role === "owner" ? " · владелец" : "";
+    const role = isFounder(m.chat_id) ? " · фаундер" : "";
     const me = m.chat_id === meChatId ? " · это ты" : "";
     const seen = m.last_seen_at ? ` · был ${mskDateTime(m.last_seen_at)}` : " · ещё не заходил";
     // Отписку от сводок показываем: иначе «почему мне не пришло утром» будет
@@ -485,17 +486,15 @@ export const NOT_A_MEMBER_TEXT =
   "Если ты из команды, пришли ключ одной строкой: /join твой-ключ\n" +
   "Если ты участник забега — тебе нужен основной бот, ссылка есть на странице кофе-рана.";
 
-export function helpText(role: TeamMember["role"]): string {
+export function helpText(founder = false): string {
   const lines = [
     "Задачи команды и оперативка по забегам.",
     "",
     "/tasks — мои задачи со сроками",
     "/assigned — мои назначенные задачи",
-  ];
-  if (role === "owner") lines.push(
-    "/assign — раздать список: что делать / срок / @ник",
+    "/assign — поставить задачи: что делать / срок / @ник",
     "/assign_status — общий список и выполненные задачи",
-  );
+  ];
   lines.push(
     "",
     "/today — что происходит сегодня и завтра",
@@ -510,7 +509,7 @@ export function helpText(role: TeamMember["role"]): string {
     "/mute, /unmute — не слать / снова слать сводки",
     "/team — кто в команде",
   );
-  if (role === "owner") lines.push("/kick @ник — убрать человека из команды");
+  if (founder) lines.push("/kick @ник — убрать человека из команды (только фаундеры)");
   lines.push(
     "/leave — выйти самому",
     "",

@@ -1,5 +1,6 @@
 import { tgAdmin } from "../telegram/supabase";
 import { normalizeTelegramUsername } from "../coffeerun/telegram-username";
+import { isFounder } from "./config";
 
 /**
  * Кто допущен к внутреннему боту команды.
@@ -13,9 +14,10 @@ import { normalizeTelegramUsername } from "../coffeerun/telegram-username";
  * Вход разовый: /join <ключ> (TEAM_BOT_SECRET). Дальше доступ висит на chat_id
  * и переживает и релиз, и смену ника в Telegram.
  *
- * Первый вошедший становится owner. Иначе некому было бы убрать случайного
- * человека — ключ мог утечь в переписке, а править состав через SQL в панели
- * Supabase посреди забега никто не будет.
+ * Права у всех участников равные. Особые права (/kick, правка любого события,
+ * исправление явки) только у фаундеров из TEAM_FOUNDER_IDS (config.ts).
+ * Столбец role в базе остался от прежней схемы «первый вошедший = владелец» и
+ * на права больше не влияет.
  */
 
 export type TeamRole = "owner" | "member";
@@ -87,7 +89,7 @@ export async function touchMember(chatId: number): Promise<void> {
 }
 
 export type JoinResult =
-  | { status: "joined"; member: TeamMember; first: boolean }
+  | { status: "joined"; member: TeamMember }
   | { status: "already"; member: TeamMember }
   | { status: "wrong_secret" }
   | { status: "no_secret" }
@@ -97,8 +99,7 @@ export type JoinResult =
  * /join <ключ>: впустить чат в команду.
  *
  * Идемпотентно: повторный вход уже впущенного обновляет ник и имя (человек мог
- * их сменить) и НЕ трогает роль — иначе owner, заново набравший /join, тихо
- * разжаловал бы сам себя и остался бы без права убирать людей.
+ * их сменить). Первый вошедший никем особым не становится.
  */
 export async function joinTeam(
   chatId: number,
@@ -125,16 +126,13 @@ export async function joinTeam(
 
   if (!secretMatches(entered, expected)) return { status: "wrong_secret" };
 
-  const first = (await countMembers()) === 0;
-  const role: TeamRole = first ? "owner" : "member";
-
   const { data, error } = await tgAdmin()
     .from(TABLE)
     .insert({
       chat_id: chatId,
       username: normalizeTelegramUsername(profile.username),
       display_name: profile.displayName ?? null,
-      role,
+      role: "member",
       joined_at: new Date().toISOString(),
       added_by: null,
     })
@@ -144,29 +142,14 @@ export async function joinTeam(
     console.error("[team-access] joinTeam:", error.message);
     return { status: "failed" };
   }
-  return { status: "joined", member: data as TeamMember, first };
+  return { status: "joined", member: data as TeamMember };
 }
 
-/** Сколько человек в команде. Нужно ровно для «первый становится owner». */
-async function countMembers(): Promise<number> {
-  const { count, error } = await tgAdmin()
-    .from(TABLE)
-    .select("chat_id", { count: "exact", head: true });
-  if (error) {
-    console.error("[team-access] countMembers:", error.message);
-    // Не знаем — считаем, что кто-то уже есть: лишний owner опаснее лишнего
-    // member'а, а починить роль в базе проще, чем отобрать права.
-    return 1;
-  }
-  return count ?? 0;
-}
-
-/** Состав команды: owner'ы первыми, дальше по дате входа. */
+/** Состав команды по дате входа. Фаундеров /team отмечает сам (isFounder). */
 export async function listTeam(): Promise<TeamMember[]> {
   const { data, error } = await tgAdmin()
     .from(TABLE)
     .select(COLUMNS)
-    .order("role", { ascending: true }) // owner < member по алфавиту
     .order("joined_at", { ascending: true });
   if (error) {
     console.error("[team-access] listTeam:", error.message);
@@ -178,24 +161,22 @@ export async function listTeam(): Promise<TeamMember[]> {
 export type RemoveResult =
   | { status: "removed"; member: TeamMember }
   | { status: "not_found" }
-  | { status: "last_owner" };
+  | { status: "founder" };
 
 /**
  * Убрать человека из команды. Ищем и по нику, и по chat_id: ник привычнее, но
  * человек мог его сменить или не иметь вовсе.
  *
- * Последнего owner'а убрать нельзя. Не из вежливости: без owner'а состав
- * правится только руками в SQL, а это ровно тот случай, когда правку отложат
- * «на потом» и бот останется с чужим человеком внутри.
+ * Фаундера через /kick не убрать: его права заданы переменной окружения, и
+ * убранный он всё равно остался бы фаундером. Сам выйти (/leave) может.
  */
-export async function removeMember(target: string): Promise<RemoveResult> {
+export async function removeMember(
+  target: string,
+  opts: { allowFounder?: boolean } = {},
+): Promise<RemoveResult> {
   const member = await findByUsernameOrId(target);
   if (!member) return { status: "not_found" };
-
-  if (member.role === "owner") {
-    const owners = (await listTeam()).filter((m) => m.role === "owner");
-    if (owners.length <= 1) return { status: "last_owner" };
-  }
+  if (!opts.allowFounder && isFounder(member.chat_id)) return { status: "founder" };
 
   const { error } = await tgAdmin().from(TABLE).delete().eq("chat_id", member.chat_id);
   if (error) {

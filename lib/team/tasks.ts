@@ -5,6 +5,7 @@ import { createSupabaseStore } from "../databot/data/supabase-store";
 import type { DatabotStore } from "../databot/data/store";
 import type { Zone } from "../databot/types";
 import { findMember, listTeam, type TeamMember } from "./access";
+import { isFounder } from "./config";
 
 const TASK_COMMAND = /^\/(?:tasks|assign|tasks_add|assigned|assign_retry|assign_status|assign_cancel|assign_edit|assign_due|cancel)(?:@[a-z0-9_]+)?(?=\s|$)/i;
 
@@ -26,13 +27,14 @@ function defaultDeps(): TeamTaskDeps {
 export async function syncTeamTaskMembers(deps: TeamTaskDeps, now: Date, members: TeamMember[]): Promise<void> {
   if (!members.length) throw new Error("team task roster is empty");
   for (const member of members) {
-    const zone: Zone = member.role === "owner" ? "council" : "smm";
+    const founder = isFounder(member.chat_id);
+    const zone: Zone = founder ? "council" : "smm";
     await deps.store.upsertMember({
       chat_id: member.chat_id,
       username: member.username,
       display_name: member.display_name,
       zone,
-      is_owner: member.role === "owner",
+      is_owner: founder,
       invited_by: member.added_by,
     }, now);
   }
@@ -67,7 +69,6 @@ export async function handleTeamTaskUpdate(ctx: Context, providedDeps?: TeamTask
   }
 
   if (!command && !button) {
-    if (member.role !== "owner") return false;
     const form = await deps.store.getForm(ctx.from.id);
     if (form?.kind !== "assigned.upload") return false;
   }
@@ -76,7 +77,7 @@ export async function handleTeamTaskUpdate(ctx: Context, providedDeps?: TeamTask
     const importing = (!command && !button) || /^\/assign(?:@[a-z0-9_]+)?(?=\s|$)/i.test(text);
     await syncTeamTaskMembers(deps, now, importing ? await deps.listTeam() : [member]);
     return await handleAssignedUpdate(ctx, deps.store, now,
-      { isOwner: member.role === "owner", refreshCommands: false });
+      { anyoneAssigns: true, refreshCommands: false });
   } catch (err) {
     console.error("[team-task]", err instanceof Error ? err.message : String(err));
     await ctx.reply("Не удалось открыть задачи. Попробуйте ещё раз чуть позже.");

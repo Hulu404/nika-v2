@@ -26,7 +26,7 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
   async importAssignedTasks(ownerId: number, messageId: number, drafts: AssignedTaskDraft[]): Promise<AssignedTask[]> {
     this.maybeFail("importAssignedTasks");
     const owner = this.members.get(ownerId);
-    if (!owner?.is_active || !owner.is_owner) throw new Error("assigned:owner");
+    if (!owner?.is_active) throw new Error("assigned:owner");
     const previous = [...this.assignedTasks.values()].filter(t => t.source_chat_id === ownerId && t.source_message_id === messageId);
     if ((previous.length && previous.length !== drafts.length) ||
         previous.some(t => !drafts.some(d => d.line === t.line && d.username === t.username && d.what === t.what)))

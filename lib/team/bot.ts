@@ -1,6 +1,6 @@
 import { Bot, type Api, type Context } from "grammy";
 import { spotName } from "../coffeerun/run";
-import { teamToken } from "./config";
+import { isFounder, teamToken } from "./config";
 import { buildDigest } from "./digest-build";
 import { EVE_HOUR_MSK, MORNING_HOUR_MSK } from "./digest-schedule";
 import { localParts, DEFAULT_TZ } from "../telegram/schedule";
@@ -243,7 +243,7 @@ async function showToday(ctx: TeamContext, snap: Snapshot): Promise<void> {
   await ctx.reply(todayText(ymd, hour, items), { reply_markup: runsKeyboard(active) });
 }
 
-function registerHandlers(bot: Bot<TeamContext>): void {
+export function registerHandlers(bot: Bot<TeamContext>): void {
   bot.use(async (ctx, next) => {
     if (await handleTeamTaskUpdate(ctx)) return;
     await next();
@@ -270,19 +270,17 @@ function registerHandlers(bot: Bot<TeamContext>): void {
         await setTeamCommands(bot.api, res.member);
         await ctx.reply(
           [
-            res.first
-              ? "Готово, ты в команде — и ты здесь первый, значит владелец: можешь убирать людей через /kick."
-              : "Готово, ты в команде.",
+            "Готово, ты в команде.",
             "",
             "Сообщение с ключом лучше удали из переписки.",
             "",
-            helpText(res.member.role),
+            helpText(isFounder(res.member.chat_id)),
           ].join("\n"),
         );
         break;
       case "already":
         await setTeamCommands(bot.api, res.member);
-        await ctx.reply(`Ты и так в команде.\n\n${helpText(res.member.role)}`);
+        await ctx.reply(`Ты и так в команде.\n\n${helpText(isFounder(res.member.chat_id))}`);
         break;
       case "wrong_secret":
         // Не подсказываем, что именно не так: перебирающему знать нечего.
@@ -311,7 +309,7 @@ function registerHandlers(bot: Bot<TeamContext>): void {
       member = await findMember(member.chat_id) ?? member;
     }
     await setTeamCommands(bot.api, member);
-    await ctx.reply(helpText(member.role));
+    await ctx.reply(helpText(isFounder(member.chat_id)));
     await withData(ctx, async () => showToday(ctx, await snapshot()));
   });
 
@@ -441,8 +439,8 @@ function registerHandlers(bot: Bot<TeamContext>): void {
   bot.command("kick", async (ctx) => {
     const member = await requireMember(ctx);
     if (!member) return;
-    if (member.role !== "owner") {
-      await ctx.reply("Убирать людей может только владелец. Посмотреть, кто это — /team.");
+    if (!isFounder(member.chat_id)) {
+      await ctx.reply("Убирать людей могут только фаундеры. Кто в команде, видно в /team.");
       return;
     }
     const target = (ctx.match ?? "").toString().trim();
@@ -455,10 +453,8 @@ function registerHandlers(bot: Bot<TeamContext>): void {
       await ctx.reply(
         `Убрала: ${res.member.username ? `@${res.member.username}` : res.member.chat_id}.`,
       );
-    } else if (res.status === "last_owner") {
-      await ctx.reply(
-        "Это последний владелец — убрать нельзя. Сначала сделай владельцем кого-то ещё.",
-      );
+    } else if (res.status === "founder") {
+      await ctx.reply("Фаундера убрать нельзя: его права заданы в настройках сервера.");
     } else {
       await ctx.reply(`Не нашла «${target}» в команде. Полный список — /team.`);
     }
@@ -467,14 +463,9 @@ function registerHandlers(bot: Bot<TeamContext>): void {
   bot.command("leave", async (ctx) => {
     const member = await requireMember(ctx);
     if (!member) return;
-    const res = await removeMember(String(member.chat_id));
+    const res = await removeMember(String(member.chat_id), { allowFounder: true });
     if (res.status === "removed") {
       await ctx.reply("Вышла тебя из команды. Вернуться — /join <ключ>.");
-    } else if (res.status === "last_owner") {
-      await ctx.reply(
-        "Ты последний владелец: выйдешь — состав будет некому править. " +
-          "Сначала позови кого-то ещё и сделай владельцем.",
-      );
     } else {
       await ctx.reply("Кажется, тебя уже нет в команде.");
     }
@@ -531,7 +522,7 @@ function registerHandlers(bot: Bot<TeamContext>): void {
       }
       if (await replyFaq(ctx, text, { quiet: true })) return;
       await ctx.reply(
-        `Я про цифры забегов, свободно говорить не умею.\n\n${helpText(member.role)}`,
+        `Я про цифры забегов, свободно говорить не умею.\n\n${helpText(isFounder(member.chat_id))}`,
       );
     });
   });
@@ -576,7 +567,11 @@ async function replyFaq(
   return false;
 }
 
-/** Меню команд в интерфейсе Telegram — чтобы синтаксис не держали в голове. */
+/**
+ * Меню команд в интерфейсе Telegram — чтобы синтаксис не держали в голове.
+ * Одно на всех: права у участников равные, фаундерские действия в меню не
+ * выносим.
+ */
 export const TEAM_COMMANDS = [
   { command: "tasks", description: "Мои задачи и сроки" },
   { command: "assigned", description: "Мои назначенные задачи" },
@@ -595,14 +590,10 @@ export const TEAM_COMMANDS = [
   { command: "help", description: "Что я умею" },
 ];
 
-export const TEAM_MEMBER_COMMANDS = TEAM_COMMANDS.filter(command =>
-  command.command !== "assign" && command.command !== "assign_status");
-
 /** Telegram сохраняет меню чата между релизами: обновляем на /start и /join. */
 export async function setTeamCommands(api: Api, member: TeamMember): Promise<void> {
   try {
-    await api.setMyCommands(member.role === "owner" ? TEAM_COMMANDS : TEAM_MEMBER_COMMANDS,
-      { scope: { type: "chat", chat_id: member.chat_id } });
+    await api.setMyCommands(TEAM_COMMANDS, { scope: { type: "chat", chat_id: member.chat_id } });
   } catch (err) {
     console.error("[team] setMyCommands:", err instanceof Error ? err.message : String(err));
   }
