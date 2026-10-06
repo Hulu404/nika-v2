@@ -3,7 +3,6 @@ import { spotName } from "../coffeerun/run";
 import { isFounder, teamToken } from "./config";
 import { buildDigest } from "./digest-build";
 import { EVE_HOUR_MSK, MORNING_HOUR_MSK } from "./digest-schedule";
-import { localParts, DEFAULT_TZ } from "../telegram/schedule";
 import {
   findMember,
   joinTeam,
@@ -48,12 +47,12 @@ import {
   runsKeyboard,
   runsOverviewText,
   teamText,
-  todayText,
   TEAM_CALLBACK_RE,
-  type TodayItem,
 } from "./copy";
 import { faqAnswerText, faqIndexText, findFaq } from "./faq";
 import { handleTeamTaskUpdate } from "./tasks";
+import { handleScheduleUpdate, showSchedule, defaultScheduleDeps } from "./schedule";
+import { supabaseTeamForms } from "./form";
 
 /**
  * Внутренний бот команды: сколько человек записалось, кто подтвердился, кому
@@ -222,30 +221,18 @@ async function showContacts(ctx: TeamContext, run: TeamRun): Promise<void> {
   await ctx.reply(contactsText(run, await people(run)), { reply_markup: backToRunKeyboard(run) });
 }
 
-async function showToday(ctx: TeamContext, snap: Snapshot): Promise<void> {
-  const now = new Date();
-  const { ymd, hour } = localParts(DEFAULT_TZ, now);
-  // Завтра считаем от московской даты, а не от UTC: в 02:00 МСК «завтра»
-  // сервера в UTC — это ещё сегодня в Москве, и сводка поехала бы на сутки.
-  const tomorrow = new Date(`${ymd}T00:00:00Z`);
-  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-  const tomorrowYmd = tomorrow.toISOString().slice(0, 10);
-
-  const active = snap.runs.filter((r) => !r.past);
-  const items: TodayItem[] = [];
-  for (const run of active) {
-    items.push({
-      run,
-      stats: summarizeSignups(await fetchRunSignups(run), now),
-      when: run.date === ymd ? "today" : run.date === tomorrowYmd ? "tomorrow" : "later",
-    });
-  }
-  await ctx.reply(todayText(ymd, hour, items), { reply_markup: runsKeyboard(active) });
-}
-
 export function registerHandlers(bot: Bot<TeamContext>): void {
+  // Любая команда закрывает открытую форму (кроме /cancel: её разбирает обработчик форм).
+  bot.use(async (ctx, next) => {
+    const text = ctx.message?.text?.trim() ?? "";
+    if (ctx.from && text.startsWith("/") && !/^\/cancel(?:@\w+)?$/i.test(text) && !/^\/(assign|event)\b/i.test(text)) {
+      await supabaseTeamForms().clear(ctx.from.id).catch(() => {});
+    }
+    await next();
+  });
   bot.use(async (ctx, next) => {
     if (await handleTeamTaskUpdate(ctx)) return;
+    if (await handleScheduleUpdate(ctx)) return;
     await next();
   });
 
@@ -310,7 +297,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     }
     await setTeamCommands(bot.api, member);
     await ctx.reply(helpText(isFounder(member.chat_id)));
-    await withData(ctx, async () => showToday(ctx, await snapshot()));
+    await withData(ctx, async () => showSchedule(ctx, defaultScheduleDeps(), 0, false, new Date()));
   });
 
   // ── Цифры ──────────────────────────────────────────────────────────────────
@@ -362,11 +349,6 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
       const run = await resolveRun(ctx, (ctx.match ?? "").toString(), snap);
       if (run) await showContacts(ctx, run);
     });
-  });
-
-  bot.command("today", async (ctx) => {
-    if (!(await requireMember(ctx))) return;
-    await withData(ctx, async () => showToday(ctx, await snapshot()));
   });
 
   // ── Быстрые ответы ─────────────────────────────────────────────────────────
@@ -424,7 +406,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     await ctx.reply(
       on
         ? "Буду снова присылать сводки: накануне забега и утром в день старта."
-        : "Больше не присылаю автоматические сводки. Цифры по-прежнему по /today и /run. " +
+        : "Больше не присылаю автоматические сводки. Расписание по-прежнему в /schedule. " +
             "Вернуть — /unmute.",
     );
   });
@@ -484,7 +466,6 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
       if (!parsed) return;
 
       if (parsed.kind === "all") return showRuns(ctx, snap);
-      if (parsed.kind === "day") return showToday(ctx, snap);
       if (parsed.kind === "his") return showHistory(ctx, snap, "");
 
       if (!parsed.run) {
@@ -575,7 +556,7 @@ async function replyFaq(
 export const TEAM_COMMANDS = [
   { command: "tasks", description: "Задачи" },
   { command: "assign", description: "Поставить задачу" },
-  { command: "today", description: "Что сегодня и завтра" },
+  { command: "schedule", description: "Расписание" },
   { command: "runs", description: "Забеги в работе и цифры" },
   { command: "run", description: "Карточка забега" },
   { command: "history", description: "Все прошедшие забеги" },

@@ -8,6 +8,8 @@ import type { Dynamics, RunAggregate } from "./history";
 import type { TeamMember } from "./access";
 import { isFounder } from "./config";
 import type { AssignedTask } from "../databot/task-list";
+import { CLUBS, clubByKey } from "./clubs";
+import { coffeeRunTitle, groupByDay, itemClub, type ScheduleItem, type TeamEvent, type TeamEventKind } from "./events";
 
 /**
  * Все тексты и клавиатуры командного бота — здесь, и здесь же ни одного
@@ -56,9 +58,9 @@ export function mskTime(iso: string | null): string {
 // Формат данных короткий и плоский: `<вид>:<спот>:<дата>`. Ограничение
 // Telegram — 64 байта, и в них надо поместиться вместе с датой.
 
-export const TEAM_CALLBACK_RE = /^t(run|who|rem|con|all|day|his):.*$/;
+export const TEAM_CALLBACK_RE = /^t(run|who|rem|con|all|his):.*$/;
 
-type CallbackKind = "run" | "who" | "rem" | "con" | "all" | "day" | "his";
+type CallbackKind = "run" | "who" | "rem" | "con" | "all" | "his";
 
 export function runCallback(kind: CallbackKind, run?: RunKey): string {
   return run ? `t${kind}:${run.spot}:${run.date}` : `t${kind}:`;
@@ -416,53 +418,6 @@ export function contactsText(run: TeamRun, people: SignupView[]): string {
   return lines.join("\n");
 }
 
-export interface TodayItem {
-  run: TeamRun;
-  stats: RunStats;
-  when: "today" | "tomorrow" | "later";
-}
-
-/** /today — что происходит прямо сейчас: забеги рядом и статус рассылок. */
-export function todayText(today: string, hourMsk: number, items: TodayItem[]): string {
-  const head = `Сегодня ${today}, ${String(hourMsk).padStart(2, "0")}:00 МСК.`;
-  const near = items.filter((i) => i.when !== "later");
-
-  if (near.length === 0) {
-    const next = items[0];
-    return [
-      head,
-      "",
-      "Сегодня и завтра забегов нет.",
-      next
-        ? `Ближайший: ${next.run.label}` +
-          (next.run.scheduled ? ` — ${runWhenWhere(next.run.scheduled)}` : "")
-        : "Расписание пустое.",
-    ].join("\n");
-  }
-
-  const block = (i: TodayItem) => {
-    const title = i.when === "today" ? "СЕГОДНЯ" : "ЗАВТРА";
-    const lines = [`${title}: ${i.run.label}`];
-    if (i.run.scheduled) {
-      lines.push(
-        `  сбор ${i.run.scheduled.gatherTime}, старт ${i.run.scheduled.startTime} — ${i.run.scheduled.address}`,
-      );
-    }
-    lines.push(
-      `  подтвердили ${i.stats.confirmed} из ${i.stats.total}, напомнили ${i.stats.reminded}`,
-    );
-    if (i.when === "tomorrow" && i.stats.reminded === 0 && hourMsk >= REMINDER_HOUR_MSK) {
-      lines.push("  ⚠️ окно рассылки открыто, а напоминания ещё не ушли — проверь логи");
-    }
-    if (i.stats.unconfirmed > 0) {
-      lines.push(`  ⚠️ ${i.stats.unconfirmed} чел. бот не достанет: не подтвердились`);
-    }
-    return lines.join("\n");
-  };
-
-  return [head, "", ...near.map(block)].join("\n");
-}
-
 // ── Команда ──────────────────────────────────────────────────────────────────
 
 /** /team — состав. Видно всем внутри: кто ещё читает те же цифры. */
@@ -496,7 +451,7 @@ export function helpText(founder = false): string {
   ];
   lines.push(
     "",
-    "/today — что происходит сегодня и завтра",
+    "/schedule — расписание на неделю, /event — добавить событие",
     "/runs — забеги в работе и цифры по каждому",
     "/run — карточка забега (/run luzhniki, /run 20.09)",
     "/history — все прошедшие забеги и как они набирались",
@@ -890,3 +845,151 @@ export function assignReportText(tasks: readonly AssignedTask[], now: Date): str
     "Следить за статусом: /tasks → «Я поставил».",
   ].filter(Boolean).join("\n");
 }
+
+// ── Расписание ───────────────────────────────────────────────────────────────
+// Ближайшие 7 дней одним сообщением, по дням. Навигация редактирует то же
+// сообщение. Кофе-раны из COFFEE_RUNS — как ивент «Бегового клуба», только
+// для чтения.
+
+export const EVENT_CALLBACK_RE = /^ev:([a-zA-Z]+)(?::([a-z0-9_-]+))?(?::([a-z0-9_-]+))?$/;
+
+export const eventCb = {
+  week: (offset: number) => `ev:w:${offset}`,
+  open: (id: number, offset = 0) => `ev:o:${id}:${offset}`,
+  run: (spot: string, date: string) => `ev:r:${spot}:${date}`,
+  add: () => "ev:add",
+  kind: (kind: "club" | "meeting" | "other") => `ev:k:${kind}`,
+  club: (key: string) => `ev:c:${key}`,
+  notify: (on: boolean) => `ev:n:${on ? 1 : 0}`,
+  drop: () => "ev:drop",
+  time: (id: number) => `ev:t:${id}`,
+  cancelAsk: (id: number) => `ev:x:${id}`,
+  cancelDo: (id: number, notify: boolean) => `ev:X:${id}:${notify ? 1 : 0}`,
+};
+
+const WEEKDAY_CAP = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
+
+/** «Пн 13.10» из YYYY-MM-DD. */
+export function dayHeader(ymd: string): string {
+  const wd = new Date(`${ymd}T00:00:00Z`).getUTCDay();
+  return `${WEEKDAY_CAP[wd]} ${ymd.slice(8, 10)}.${ymd.slice(5, 7)}`;
+}
+
+/** «Вт 07.10, 19:00» по Москве. */
+export function eventWhen(iso: string): string {
+  const p = mskParts(new Date(iso));
+  return `${dayHeader(p.ymd)}, ${p.time}`;
+}
+
+function itemTitle(item: ScheduleItem): string {
+  return item.source === "coffeerun" ? coffeeRunTitle(item.run) : item.event.title;
+}
+
+/** Строка расписания: «19:00 Планёрка · Zoom», «10:00 🏃 Кофе-ран Усачёва · Беговой клуб». */
+export function scheduleLine(item: ScheduleItem): string {
+  const time = mskParts(new Date(item.startsAt)).time;
+  const club = clubByKey(itemClub(item));
+  const isClub = item.source === "coffeerun" || item.event.kind === "club_event";
+  const title = escapeHtmlTeam(itemTitle(item));
+  if (isClub) return `${time} ${club?.icon ?? "📌"} ${title}${club ? ` · ${escapeHtmlTeam(club.name)}` : ""}`;
+  const place = item.source === "event" && item.event.place ? ` · ${escapeHtmlTeam(item.event.place)}` : "";
+  return `${time} ${title}${place}`;
+}
+
+export function scheduleScreen(items: readonly ScheduleItem[], days: readonly string[], offset: number): TaskScreen {
+  const head = `<b>Расписание</b> · ${dayHeader(days[0])} – ${dayHeader(days[days.length - 1])}`;
+  const kb = new InlineKeyboard();
+  const groups = groupByDay(items);
+  const lines: string[] = [head, ""];
+  if (!groups.length) {
+    lines.push(offset === 0 ? "На этой неделе ничего не запланировано." : "На следующей неделе ничего не запланировано.");
+  }
+  for (const g of groups) {
+    lines.push(`<b>${dayHeader(g.ymd)}</b>`, ...g.items.map(scheduleLine), "");
+    for (const it of g.items) {
+      const label = `${dayHeader(g.ymd).slice(0, 2)} ${mskParts(new Date(it.startsAt)).time} ${cut(itemTitle(it), 28)}`;
+      kb.text(label, it.source === "coffeerun" ? eventCb.run(it.run.spot, it.run.date) : eventCb.open(it.event.id, offset)).row();
+    }
+  }
+  kb.text(offset === 0 ? "Следующая неделя" : "Эта неделя", eventCb.week(offset === 0 ? 1 : 0))
+    .text("Добавить событие", eventCb.add());
+  return { text: lines.join("\n").trimEnd(), keyboard: kb };
+}
+
+const KIND_LABEL: Record<TeamEventKind, string> = { club_event: "Ивент клуба", meeting: "Планёрка", other: "Другое" };
+
+/** Карточка планёрки или прочего события: кто, где, когда; управление — автору, ответственному, фаундерам. */
+export function eventCard(ev: TeamEvent, names: ReadonlyMap<number, string>, canManage: boolean, offset = 0): TaskScreen {
+  const club = clubByKey(ev.club);
+  const lines = [
+    `<b>${escapeHtmlTeam(ev.title)}</b>`,
+    `${KIND_LABEL[ev.kind]}${club ? ` · ${escapeHtmlTeam(club.name)}` : ""}`,
+    eventWhen(ev.starts_at),
+    ev.place ? `Место: ${escapeHtmlTeam(ev.place)}` : null,
+    `Ответственный: ${ev.responsible_chat_id ? at(names.get(ev.responsible_chat_id), "без ника") : "не назначен"}`,
+    `Добавил в расписание: ${at(names.get(ev.created_by), "участник команды")}`,
+    ev.cancelled_at ? "❌ Отменено" : null,
+  ].filter((l): l is string => l !== null);
+  const kb = new InlineKeyboard();
+  if (canManage && !ev.cancelled_at) kb.text("Изменить время", eventCb.time(ev.id)).text("Отменить", eventCb.cancelAsk(ev.id)).row();
+  kb.text("← К расписанию", eventCb.week(offset));
+  return { text: lines.join("\n"), keyboard: kb };
+}
+
+/** Черновик события: что уже разобрано из строки /event. */
+export function eventDraftText(d: { title: string; startsAt: string; place: string | null }, responsibleName: string | null): string {
+  return [
+    `<b>${escapeHtmlTeam(d.title)}</b>`,
+    eventWhen(d.startsAt),
+    d.place ? `Место: ${escapeHtmlTeam(d.place)}` : null,
+    responsibleName ? `Ответственный: @${escapeHtmlTeam(responsibleName)}` : null,
+  ].filter((l): l is string => l !== null).join("\n");
+}
+
+export const eventKindKeyboard = () =>
+  new InlineKeyboard().text("Ивент клуба", eventCb.kind("club")).text("Планёрка", eventCb.kind("meeting")).text("Другое", eventCb.kind("other"))
+    .row().text("Не добавлять", eventCb.drop());
+
+export function eventClubKeyboard(): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  for (const c of CLUBS) kb.text(`${c.icon} ${c.name}`, eventCb.club(c.key)).row();
+  return kb.text("Не добавлять", eventCb.drop());
+}
+
+export const eventNotifyKeyboard = () =>
+  new InlineKeyboard().text("Сообщить команде", eventCb.notify(true)).text("Без рассылки", eventCb.notify(false));
+
+export function eventAnnounceText(ev: TeamEvent, names: ReadonlyMap<number, string>): string {
+  const club = clubByKey(ev.club);
+  return [
+    `📅 <b>В расписании: ${escapeHtmlTeam(ev.title)}</b>`,
+    `${eventWhen(ev.starts_at)}${ev.place ? ` · ${escapeHtmlTeam(ev.place)}` : ""}`,
+    club ? `${club.icon} ${escapeHtmlTeam(club.name)}` : KIND_LABEL[ev.kind],
+    ev.responsible_chat_id ? `Ответственный: ${at(names.get(ev.responsible_chat_id), "без ника")}` : null,
+    "Всё расписание: /schedule",
+  ].filter((l): l is string => l !== null).join("\n");
+}
+
+export function eventCancelledText(ev: TeamEvent): string {
+  return `❌ <b>Отменено: ${escapeHtmlTeam(ev.title)}</b>\n${eventWhen(ev.starts_at)}${ev.place ? ` · ${escapeHtmlTeam(ev.place)}` : ""}`;
+}
+
+export function eventCancelAskScreen(ev: TeamEvent): TaskScreen {
+  return {
+    text: `Отменить «${escapeHtmlTeam(ev.title)}», ${eventWhen(ev.starts_at)}?\nСообщить команде об отмене?`,
+    keyboard: new InlineKeyboard()
+      .text("Отменить и сообщить", eventCb.cancelDo(ev.id, true)).row()
+      .text("Отменить без рассылки", eventCb.cancelDo(ev.id, false)).row()
+      .text("Назад", eventCb.open(ev.id, 0)),
+  };
+}
+
+export const EVENT_ADD_HINT = [
+  "Пришли событие одной строкой: название / дата время / место / @ответственный.",
+  "Место и ответственный необязательны, время обязательно.",
+  "<code>Планёрка / вт 19:00 / Zoom</code>",
+  "<code>Книжный клуб / 15.10 19:30 / Surf Coffee / @masha</code>",
+  "Отмена: /cancel.",
+].join("\n");
+
+export const EVENT_TIME_PROMPT = "Пришли новое время: «пт 19:00», «завтра 12:00», «03.10 18:00». Отмена: /cancel.";

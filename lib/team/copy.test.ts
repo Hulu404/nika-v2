@@ -13,8 +13,6 @@ import {
   runCardText,
   runsOverviewText,
   runSummaryLine,
-  todayText,
-  type TodayItem,
 } from "./copy";
 import type { TeamRun } from "./runs";
 import type { RunAggregate } from "./history";
@@ -363,32 +361,3 @@ describe("список забегов и история", () => {
   });
 });
 
-describe("сегодня", () => {
-  it("сегодня и завтра — отдельные блоки, дальние забеги в них не лезут", () => {
-    const items: TodayItem[] = [
-      { run: USACH, stats: summarizeSignups([row()], NOW), when: "today" },
-      { run: LUZH, stats: summarizeSignups([row()], NOW), when: "tomorrow" },
-    ];
-    const text = todayText("2026-09-19", 9, items);
-    expect(text).toContain("СЕГОДНЯ: Surf Coffee® × Sport, Усачёва");
-    expect(text).toContain("ЗАВТРА: Surf Coffee® Лужники");
-  });
-
-  it("окно рассылки открыто, а напоминаний нет — кричим об этом в сводке дня", () => {
-    const items: TodayItem[] = [
-      { run: LUZH, stats: summarizeSignups([row()], NOW), when: "tomorrow" },
-    ];
-    expect(todayText("2026-09-19", 11, items)).toContain("проверь логи");
-    // До 10:00 МСК тревожить нечем: рассылка просто ещё не начиналась.
-    expect(todayText("2026-09-19", 8, items)).not.toContain("проверь логи");
-  });
-
-  it("забегов рядом нет — говорим, когда ближайший", () => {
-    const items: TodayItem[] = [
-      { run: LUZH, stats: summarizeSignups([], NOW), when: "later" },
-    ];
-    const text = todayText("2026-09-01", 12, items);
-    expect(text).toContain("Сегодня и завтра забегов нет");
-    expect(text).toContain("Лужники");
-  });
-});
