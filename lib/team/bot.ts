@@ -1,5 +1,4 @@
 import { Bot, type Api, type Context } from "grammy";
-import { spotName } from "../coffeerun/run";
 import { isFounder, teamToken } from "./config";
 import { buildDigest } from "./digest-build";
 import { EVE_HOUR_MSK, MORNING_HOUR_MSK } from "./digest-schedule";
@@ -12,46 +11,13 @@ import {
   touchMember,
   type TeamMember,
 } from "./access";
-import {
-  defaultRun,
-  mergeRuns,
-  pickRun,
-  type TeamRun,
-} from "./runs";
-import {
-  aggregateRuns,
-  dynamicsFor,
-  fetchArchive,
-  runKeysFrom,
-  type ArchiveRow,
-  type RunAggregate,
-} from "./history";
-import {
-  fetchInviteCount,
-  fetchRunSignups,
-  summarizeSignups,
-  viewSignups,
-  type SignupView,
-} from "./stats";
-import {
-  NOT_A_MEMBER_TEXT,
-  backToRunKeyboard,
-  contactsText,
-  helpText,
-  historyText,
-  parseTeamCallback,
-  remindersText,
-  rosterText,
-  runCardKeyboard,
-  runCardText,
-  runsKeyboard,
-  runsOverviewText,
-  teamText,
-  TEAM_CALLBACK_RE,
-} from "./copy";
+import { defaultRun, mergeRuns, pickRun, type TeamRun } from "./runs";
+import { fetchArchive, runKeysFrom, type ArchiveRow } from "./history";
+import { NOT_A_MEMBER_TEXT, helpText, teamText } from "./copy";
 import { faqAnswerText, faqIndexText, findFaq } from "./faq";
 import { handleTeamTaskUpdate } from "./tasks";
-import { handleScheduleUpdate, showSchedule, defaultScheduleDeps } from "./schedule";
+import { handleScheduleUpdate, showSchedule, defaultScheduleDeps, type ScheduleDeps } from "./schedule";
+import { defaultEventsDeps, handleEventsUpdate, openClubEventScreen, openCoffeeRunScreen } from "./ivents";
 import { supabaseTeamForms } from "./form";
 
 /**
@@ -113,22 +79,6 @@ async function snapshot(now: Date = new Date()): Promise<Snapshot> {
   return { archive, runs: mergeRuns(runKeysFrom(archive), now) };
 }
 
-/** Свод по забегу из уже прочитанного архива. Забег без заявок — честные нули. */
-function aggFor(archive: readonly ArchiveRow[], run: TeamRun): RunAggregate {
-  const found = aggregateRuns(archive).find((a) => a.spot === run.spot && a.date === run.date);
-  return (
-    found ?? {
-      spot: run.spot,
-      date: run.date,
-      total: 0,
-      confirmed: 0,
-      reminded: 0,
-      firstSignupAt: null,
-      lastSignupAt: null,
-    }
-  );
-}
-
 /**
  * Забег по аргументу команды. Пустой аргумент — ближайший: в девяти случаях из
  * десяти спрашивают именно про него. Не найденный — не подменяем соседним, а
@@ -146,9 +96,7 @@ async function resolveRun(
     await ctx.reply("Забегов пока нет ни в расписании, ни в заявках.");
     return null;
   }
-  await ctx.reply(`Не нашла забег «${arg.trim()}». Вот что есть:`, {
-    reply_markup: runsKeyboard(snap.runs),
-  });
+  await ctx.reply(`Не нашла забег «${arg.trim()}». Все ивенты — /events.`);
   return null;
 }
 
@@ -167,58 +115,14 @@ async function withData(ctx: TeamContext, work: () => Promise<void>): Promise<vo
   }
 }
 
-// ── Экраны ───────────────────────────────────────────────────────────────────
-// Каждый экран доступен и командой, и кнопкой, поэтому тело вынесено в функцию,
-// а хендлеры — тонкие.
-
-/** /runs — забеги, которые ещё в работе. Прошедшие живут в /history. */
-async function showRuns(ctx: TeamContext, snap: Snapshot): Promise<void> {
-  const active = snap.runs.filter((r) => !r.past);
-  const items = active.map((run) => ({ run, agg: aggFor(snap.archive, run) }));
-  await ctx.reply(runsOverviewText(items), { reply_markup: runsKeyboard(active) });
-}
-
-/** /history — весь архив, сгруппированный по спотам. */
-async function showHistory(ctx: TeamContext, snap: Snapshot, filter: string): Promise<void> {
-  let runs = snap.runs;
-  if (filter.trim()) {
-    const picked = pickRun(filter, snap.runs);
-    if (!picked) {
-      await ctx.reply(`Не нашла спот «${filter.trim()}». Показываю всё.`);
-    } else {
-      runs = snap.runs.filter((r) => r.spot === picked.spot);
-    }
-  }
-  const items = runs.map((run) => ({ run, agg: aggFor(snap.archive, run) }));
-  await ctx.reply(historyText(items, spotName));
-}
-
-async function showRunCard(ctx: TeamContext, run: TeamRun, snap: Snapshot): Promise<void> {
-  const now = new Date();
-  const [rows, invites] = await Promise.all([fetchRunSignups(run), fetchInviteCount(run)]);
-  const dyn = dynamicsFor(run, snap.archive, now);
-  await ctx.reply(runCardText(run, summarizeSignups(rows, now), invites, dyn, now), {
-    reply_markup: runCardKeyboard(run),
-  });
-}
-
-async function people(run: TeamRun): Promise<SignupView[]> {
-  return viewSignups(await fetchRunSignups(run));
-}
-
-async function showRoster(ctx: TeamContext, run: TeamRun): Promise<void> {
-  await ctx.reply(rosterText(run, await people(run)), { reply_markup: backToRunKeyboard(run) });
-}
-
-async function showReminders(ctx: TeamContext, run: TeamRun): Promise<void> {
-  const rows = await fetchRunSignups(run);
-  await ctx.reply(remindersText(run, viewSignups(rows), summarizeSignups(rows)), {
-    reply_markup: backToRunKeyboard(run),
-  });
-}
-
-async function showContacts(ctx: TeamContext, run: TeamRun): Promise<void> {
-  await ctx.reply(contactsText(run, await people(run)), { reply_markup: backToRunKeyboard(run) });
+/** Расписание со ссылками на экраны ивентов: кофе-ран и ивент клуба открываются в «Ивентах». */
+function scheduleDeps(): ScheduleDeps {
+  const events = defaultEventsDeps();
+  return {
+    ...defaultScheduleDeps(),
+    openClubEvent: (ctx, ev) => openClubEventScreen(ctx, events, ev, ctx.from!.id, true, new Date()),
+    openCoffeeRun: (ctx, spot, date) => openCoffeeRunScreen(ctx, events, spot, date, true, new Date()),
+  };
 }
 
 export function registerHandlers(bot: Bot<TeamContext>): void {
@@ -232,7 +136,8 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
   });
   bot.use(async (ctx, next) => {
     if (await handleTeamTaskUpdate(ctx)) return;
-    if (await handleScheduleUpdate(ctx)) return;
+    if (await handleScheduleUpdate(ctx, scheduleDeps())) return;
+    if (await handleEventsUpdate(ctx)) return;
     await next();
   });
 
@@ -298,57 +203,6 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     await setTeamCommands(bot.api, member);
     await ctx.reply(helpText(isFounder(member.chat_id)));
     await withData(ctx, async () => showSchedule(ctx, defaultScheduleDeps(), 0, false, new Date()));
-  });
-
-  // ── Цифры ──────────────────────────────────────────────────────────────────
-  bot.command("runs", async (ctx) => {
-    if (!(await requireMember(ctx))) return;
-    await withData(ctx, async () => showRuns(ctx, await snapshot()));
-  });
-
-  bot.command(["history", "hist"], async (ctx) => {
-    if (!(await requireMember(ctx))) return;
-    await withData(ctx, async () =>
-      showHistory(ctx, await snapshot(), (ctx.match ?? "").toString()),
-    );
-  });
-
-  bot.command("run", async (ctx) => {
-    if (!(await requireMember(ctx))) return;
-    await withData(ctx, async () => {
-      const snap = await snapshot();
-      const run = await resolveRun(ctx, (ctx.match ?? "").toString(), snap);
-      if (run) await showRunCard(ctx, run, snap);
-    });
-  });
-
-  bot.command("who", async (ctx) => {
-    if (!(await requireMember(ctx))) return;
-    await withData(ctx, async () => {
-      const snap = await snapshot();
-      const run = await resolveRun(ctx, (ctx.match ?? "").toString(), snap);
-      if (run) await showRoster(ctx, run);
-    });
-  });
-
-  // /notif и /notify — одно и то же: команда набирает по памяти, и промах по
-  // окончанию не должен выглядеть как «бот не понял».
-  bot.command(["notif", "notify"], async (ctx) => {
-    if (!(await requireMember(ctx))) return;
-    await withData(ctx, async () => {
-      const snap = await snapshot();
-      const run = await resolveRun(ctx, (ctx.match ?? "").toString(), snap);
-      if (run) await showReminders(ctx, run);
-    });
-  });
-
-  bot.command(["contacts", "contact"], async (ctx) => {
-    if (!(await requireMember(ctx))) return;
-    await withData(ctx, async () => {
-      const snap = await snapshot();
-      const run = await resolveRun(ctx, (ctx.match ?? "").toString(), snap);
-      if (run) await showContacts(ctx, run);
-    });
   });
 
   // ── Быстрые ответы ─────────────────────────────────────────────────────────
@@ -453,37 +307,6 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     }
   });
 
-  // ── Кнопки ─────────────────────────────────────────────────────────────────
-  bot.callbackQuery(TEAM_CALLBACK_RE, async (ctx) => {
-    // «Часик» гасим сразу: иначе Telegram крутит его все те секунды, пока мы
-    // ходим в базу, и человек жмёт кнопку второй раз.
-    await ctx.answerCallbackQuery().catch(() => {});
-    if (!(await requireMember(ctx))) return;
-
-    await withData(ctx, async () => {
-      const snap = await snapshot();
-      const parsed = parseTeamCallback(ctx.callbackQuery.data ?? "", snap.runs);
-      if (!parsed) return;
-
-      if (parsed.kind === "all") return showRuns(ctx, snap);
-      if (parsed.kind === "his") return showHistory(ctx, snap, "");
-
-      if (!parsed.run) {
-        // Кнопка из старого сообщения: забега нет ни в расписании, ни в базе.
-        await ctx.reply("Про этот забег я больше ничего не знаю. Вот что есть сейчас:", {
-          reply_markup: runsKeyboard(snap.runs),
-        });
-        return;
-      }
-
-      const run = parsed.run;
-      if (parsed.kind === "run") return showRunCard(ctx, run, snap);
-      if (parsed.kind === "who") return showRoster(ctx, run);
-      if (parsed.kind === "rem") return showReminders(ctx, run);
-      if (parsed.kind === "con") return showContacts(ctx, run);
-    });
-  });
-
   // ── Свободный текст ────────────────────────────────────────────────────────
   // Разговаривать бот не умеет и не притворяется. Но набранное словом «дождь»
   // или «лужники 13.09» — это почти всегда либо вопрос из FAQ, либо название
@@ -498,12 +321,12 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
       const snap = await snapshot();
       const run = pickRun(text, snap.runs);
       if (run) {
-        await showRunCard(ctx, run, snap);
+        await openCoffeeRunScreen(ctx, defaultEventsDeps(), run.spot, run.date, false, new Date());
         return;
       }
       if (await replyFaq(ctx, text, { quiet: true })) return;
       await ctx.reply(
-        `Я про цифры забегов, свободно говорить не умею.\n\n${helpText(isFounder(member.chat_id))}`,
+        `Свободно говорить не умею.\n\n${helpText(isFounder(member.chat_id))}`,
       );
     });
   });
@@ -557,15 +380,10 @@ export const TEAM_COMMANDS = [
   { command: "tasks", description: "Задачи" },
   { command: "assign", description: "Поставить задачу" },
   { command: "schedule", description: "Расписание" },
-  { command: "runs", description: "Забеги в работе и цифры" },
-  { command: "run", description: "Карточка забега" },
-  { command: "history", description: "Все прошедшие забеги" },
-  { command: "who", description: "Кто записался" },
-  { command: "notif", description: "Кому ушло напоминание" },
-  { command: "contacts", description: "Контакты участников" },
+  { command: "events", description: "Ивенты" },
+  { command: "team", description: "Команда" },
   { command: "faq", description: "Быстрые ответы" },
   { command: "digest", description: "Предпросмотр автосводок" },
-  { command: "team", description: "Кто в команде" },
   { command: "help", description: "Что я умею" },
 ];
 

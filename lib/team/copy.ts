@@ -1,15 +1,15 @@
 import { InlineKeyboard } from "grammy";
-import { runWhenWhere, REMINDER_HOUR_MSK, dayBefore } from "../coffeerun/run";
+import { REMINDER_HOUR_MSK, dayBefore, spotName } from "../coffeerun/run";
 import { formatPace } from "../coffeerun/pace";
 import { DEFAULT_TZ } from "../telegram/schedule";
 import type { RunStats, SignupView, SignupStatus } from "./stats";
-import { runDateLabel, type RunKey, type TeamRun } from "./runs";
+import { runDateLabel, type TeamRun } from "./runs";
 import type { Dynamics, RunAggregate } from "./history";
 import type { TeamMember } from "./access";
 import { isFounder } from "./config";
 import type { AssignedTask } from "../databot/task-list";
 import { CLUBS, clubByKey } from "./clubs";
-import { coffeeRunTitle, groupByDay, itemClub, type ScheduleItem, type TeamEvent, type TeamEventKind } from "./events";
+import { coffeeRunStart, coffeeRunTitle, groupByDay, itemClub, type ScheduleItem, type TeamEvent, type TeamEventKind } from "./events";
 
 /**
  * Все тексты и клавиатуры командного бота — здесь, и здесь же ни одного
@@ -54,67 +54,6 @@ export function mskTime(iso: string | null): string {
   }).format(d);
 }
 
-// ── Клавиатуры и callback_data ───────────────────────────────────────────────
-// Формат данных короткий и плоский: `<вид>:<спот>:<дата>`. Ограничение
-// Telegram — 64 байта, и в них надо поместиться вместе с датой.
-
-export const TEAM_CALLBACK_RE = /^t(run|who|rem|con|all|his):.*$/;
-
-type CallbackKind = "run" | "who" | "rem" | "con" | "all" | "his";
-
-export function runCallback(kind: CallbackKind, run?: RunKey): string {
-  return run ? `t${kind}:${run.spot}:${run.date}` : `t${kind}:`;
-}
-
-/** Разбор нажатия. null — данные не наши; run: null — забега больше не знаем. */
-export function parseTeamCallback(
-  data: string,
-  runs: readonly TeamRun[],
-): { kind: CallbackKind; run: TeamRun | null } | null {
-  if (!TEAM_CALLBACK_RE.test(data)) return null;
-  const [head, spot, date] = data.split(":");
-  const kind = head.slice(1) as CallbackKind;
-  if (!spot || !date) return { kind, run: null };
-  return { kind, run: runs.find((r) => r.spot === spot && r.date === date) ?? null };
-}
-
-/** Кнопки под карточкой забега: всё, что про этот же забег. */
-export function runCardKeyboard(run: TeamRun): InlineKeyboard {
-  return new InlineKeyboard()
-    .text("Список участников", runCallback("who", run))
-    .row()
-    .text("Напоминания", runCallback("rem", run))
-    .text("Контакты", runCallback("con", run))
-    .row()
-    .text("Все забеги", runCallback("all"))
-    .text("История", runCallback("his"));
-}
-
-/**
- * Сколько забегов показываем кнопками. Их набралось уже восемь и будет больше;
- * простыня кнопок до низа экрана — не список, а препятствие. Остальное живёт
- * в /history, где оно текстом и читается быстрее.
- */
-const KEYBOARD_RUNS = 6;
-
-export function runsKeyboard(runs: readonly TeamRun[]): InlineKeyboard | undefined {
-  if (runs.length === 0) return undefined;
-  const kb = new InlineKeyboard();
-  for (const run of runs.slice(0, KEYBOARD_RUNS)) {
-    kb.text(run.label, runCallback("run", run)).row();
-  }
-  if (runs.length > KEYBOARD_RUNS) kb.text("История целиком", runCallback("his")).row();
-  return kb;
-}
-
-/** Кнопка «назад к забегу» под любым его подсписком. */
-export function backToRunKeyboard(run: TeamRun): InlineKeyboard {
-  return new InlineKeyboard()
-    .text(`← ${run.label}`, runCallback("run", run))
-    .row()
-    .text("Все забеги", runCallback("all"));
-}
-
 // ── Сводки ───────────────────────────────────────────────────────────────────
 
 const ICON: Record<SignupStatus, string> = {
@@ -142,79 +81,7 @@ function nameList(people: SignupView[], limit = LIST_LIMIT): string {
   return shown.join("\n");
 }
 
-/**
- * Одна строка забега в общем списке: название и три цифры.
- *
- * Берёт свод из архива, а не полную статистику забега: список и история
- * считаются одним запросом сразу по всем забегам, и ходить в базу ещё раз
- * ради трёх чисел на каждый забег незачем.
- */
-export function runSummaryLine(run: TeamRun, agg: RunAggregate): string {
-  return (
-    `${run.label}${run.past ? " · прошёл" : ""}\n` +
-    `  заявок ${agg.total} · подтвердили ${agg.confirmed} · напомнили ${agg.reminded}`
-  );
-}
-
-/** /runs — забеги, которые в работе. Первый экран для всех, кто открыл бота. */
-export function runsOverviewText(items: Array<{ run: TeamRun; agg: RunAggregate }>): string {
-  if (items.length === 0) {
-    return (
-      "Забегов в расписании нет.\n\n" +
-      "Новый заводится записью в lib/coffeerun/run.ts — до этого ни лендинг, " +
-      "ни бот про него не знают. Что было раньше — /history."
-    );
-  }
-  return [
-    "Забеги в работе:",
-    "",
-    ...items.map(({ run, agg }) => runSummaryLine(run, agg)),
-    "",
-    "Подробности — кнопкой ниже. Прошедшие забеги — /history.",
-  ].join("\n");
-}
-
 // ── История и динамика ───────────────────────────────────────────────────────
-
-/**
- * /history — все забеги, которые знает база, сгруппированные по споту.
- *
- * По споту, а не одной лентой по датам: набор в Лужниках и на Усачёвой живёт
- * своей жизнью, и перемешанный список читается как шум. Внутри спота — от
- * свежих к старым, потому что сравнивают обычно с прошлым разом.
- */
-export function historyText(
-  items: Array<{ run: TeamRun; agg: RunAggregate }>,
-  spotLabel: (spot: string) => string,
-): string {
-  if (items.length === 0) return "В базе нет ни одной заявки — историю строить не из чего.";
-
-  const bySpot = new Map<string, Array<{ run: TeamRun; agg: RunAggregate }>>();
-  for (const item of items) {
-    const list = bySpot.get(item.run.spot) ?? [];
-    list.push(item);
-    bySpot.set(item.run.spot, list);
-  }
-
-  const blocks: string[] = [];
-  for (const [spot, list] of bySpot) {
-    const lines = list.map(({ run, agg }) => {
-      const share = agg.total ? Math.round((agg.confirmed / agg.total) * 100) : 0;
-      const dateOnly = run.label.split(", ").at(-1) ?? run.date;
-      return (
-        `  ${dateOnly}${run.past ? "" : " (впереди)"} — ` +
-        `${agg.total} заявок, подтвердили ${agg.confirmed} (${share}%)`
-      );
-    });
-    const totals = list.reduce((n, i) => n + i.agg.total, 0);
-    const head =
-      `${spotLabel(spot)} — ${list.length} ${plural(list.length, "забег", "забега", "забегов")}, ` +
-      `${totals} ${plural(totals, "заявка", "заявки", "заявок")}`;
-    blocks.push([head, ...lines].join("\n"));
-  }
-
-  return ["История забегов:", "", blocks.join("\n\n")].join("\n");
-}
 
 /**
  * Блок динамики: «сейчас столько, а в прошлые разы на этот же момент было
@@ -271,63 +138,12 @@ export function plural(n: number, one: string, few: string, many: string): strin
 }
 
 /** Разбивка по темпам — списком групп, как их видит пейсер на старте. */
-function paceLines(stats: RunStats): string[] {
+export function paceLines(stats: RunStats): string[] {
   const filled = stats.byPace.filter((b) => b.count > 0);
   if (filled.length === 0) return ["  —"];
   return filled.map((b) =>
     b.pace ? `  ${formatPace(b.pace)} — ${b.count}` : `  без темпа — ${b.count}`,
   );
-}
-
-/** /run — карточка забега: когда, где, сколько людей и что с рассылками. */
-export function runCardText(
-  run: TeamRun,
-  stats: RunStats,
-  invites: number,
-  dyn: Dynamics | null = null,
-  now: Date = new Date(),
-): string {
-  const lines = [
-    run.label,
-    // Время и адрес знает только расписание. У прошедшего забега его уже нет —
-    // и выдумывать «обычное» время не будем: сводка про то, что было.
-    run.scheduled ? runWhenWhere(run.scheduled) : "Забег прошёл.",
-  ];
-  if (run.scheduled) lines.push(`Дистанция ${run.scheduled.distance}.`);
-
-  lines.push(
-    "",
-    `Заявок: ${stats.total}` + (stats.last24h ? ` (+${stats.last24h} за сутки)` : ""),
-    `Подтвердили в боте: ${stats.confirmed}`,
-    `Напоминание ушло: ${stats.reminded}`,
-    `Ждут напоминания: ${stats.waiting}`,
-    `Не подтвердились: ${stats.unconfirmed}`,
-    "",
-    "По темпу:",
-    ...paceLines(stats),
-  );
-
-  if (dyn) lines.push("", ...dynamicsLines(dyn));
-
-  lines.push(
-    "",
-    `Последняя заявка: ${mskDateTime(stats.lastSignupAt)}`,
-    `Приглашений разослано: ${invites}`,
-  );
-
-  // Почему ещё нет напоминаний — самый частый вопрос по забегу, который ещё не
-  // наступил. Отвечаем до того, как его зададут.
-  if (stats.reminded === 0) {
-    lines.push("", reminderWindowNote(run, now));
-  }
-  if (stats.unconfirmed > 0) {
-    lines.push(
-      "",
-      `⚠️ ${stats.unconfirmed} чел. оставили заявку, но не подтвердились в боте — ` +
-        "до них не дойдёт ни напоминание, ни перенос, ни отмена. Список — «Контакты».",
-    );
-  }
-  return lines.join("\n");
 }
 
 /** Когда по этому забегу уходит напоминание — одной строкой. */
@@ -342,25 +158,7 @@ export function reminderWindowNote(run: TeamRun, now: Date = new Date()): string
         "рассылка идёт сама, раз в 15 минут проверяет окно.";
 }
 
-/** /who — поимённый список участников забега. */
-export function rosterText(run: TeamRun, people: SignupView[]): string {
-  if (people.length === 0) return `${run.label}\n\nЗаявок пока нет.`;
-  const by = (s: SignupStatus) => people.filter((p) => p.status === s);
-  return [
-    `${run.label} — ${people.length} чел.`,
-    "",
-    `⚠️ Не подтвердились: ${by("unconfirmed").length}`,
-    nameList(by("unconfirmed")),
-    "",
-    `⏳ Ждут напоминания: ${by("waiting").length}`,
-    nameList(by("waiting")),
-    "",
-    `✅ Напоминание ушло: ${by("reminded").length}`,
-    nameList(by("reminded")),
-  ].join("\n");
-}
-
-/** /notif — кому ушло напоминание и во сколько, а кому не уйдёт и почему. */
+/** «Рассылка» в экране кофе-рана: кому ушло напоминание и во сколько, а кому не уйдёт и почему. */
 export function remindersText(
   run: TeamRun,
   people: SignupView[],
@@ -398,26 +196,6 @@ export function remindersText(
   return lines.join("\n");
 }
 
-/**
- * /contacts — телефоны и ники. Отдельной командой, а не строкой в общем
- * списке: это персональные данные участников, и открывать их надо намеренно,
- * а не задевать глазом, пролистывая сводку.
- */
-export function contactsText(run: TeamRun, people: SignupView[]): string {
-  if (people.length === 0) return `${run.label}\n\nЗаявок пока нет.`;
-  const shown = people.slice(0, LIST_LIMIT);
-  const lines = [
-    `Контакты — ${run.label}`,
-    "Персональные данные участников. Пересылать не надо.",
-    "",
-    ...shown.map((p) => `${ICON[p.status]} ${p.name} — ${p.contact}`),
-  ];
-  if (people.length > shown.length) {
-    lines.push(`… и ещё ${people.length - shown.length}`);
-  }
-  return lines.join("\n");
-}
-
 // ── Команда ──────────────────────────────────────────────────────────────────
 
 /** /team — состав. Видно всем внутри: кто ещё читает те же цифры. */
@@ -444,31 +222,20 @@ export const NOT_A_MEMBER_TEXT =
 
 export function helpText(founder = false): string {
   const lines = [
-    "Задачи команды и оперативка по забегам.",
+    "«Пятница» — бот команды НИКИ.",
     "",
     "/tasks — задачи: мне, я поставил, выполненные",
-    "/assign — поставить задачи: что делать / срок / @ник",
-  ];
-  lines.push(
-    "",
+    "/assign — поставить задачу: что делать / срок / @ник",
     "/schedule — расписание на неделю, /event — добавить событие",
-    "/runs — забеги в работе и цифры по каждому",
-    "/run — карточка забега (/run luzhniki, /run 20.09)",
-    "/history — все прошедшие забеги и как они набирались",
-    "/who — поимённо: кто подтвердился, кто нет",
-    "/notif — кому ушло напоминание и во сколько",
-    "/contacts — телефоны и ники участников",
-    "/faq — быстрые ответы на частые вопросы",
-    "/digest — предпросмотр автоматических сводок",
-    "/mute, /unmute — не слать / снова слать сводки",
+    "/events — ивенты клубов: цифры, участники, явка",
     "/team — кто в команде",
-  );
-  if (founder) lines.push("/kick @ник — убрать человека из команды (только фаундеры)");
+    "/faq — быстрые ответы на частые вопросы",
+    "/mute — не присылать сводку, /unmute — снова присылать",
+    "/help — что я умею",
+  ];
+  if (founder) lines.push("", "/kick @ник — убрать человека из команды (только фаундеры)");
   lines.push(
     "/leave — выйти самому",
-    "",
-    "Без аргумента любая команда берёт ближайший забег. Прошедший тоже можно: " +
-      "/who лужники 13.09.",
     "",
     "Рассылки участникам — не здесь: перенос, отмена и перекличка живут в " +
       "основном боте, потому что люди нажимали Start именно у него.",
@@ -993,3 +760,187 @@ export const EVENT_ADD_HINT = [
 ].join("\n");
 
 export const EVENT_TIME_PROMPT = "Пришли новое время: «пт 19:00», «завтра 12:00», «03.10 18:00». Отмена: /cancel.";
+
+// ── Ивенты ───────────────────────────────────────────────────────────────────
+// Один раздел /events вместо /runs, /run, /who, /notif, /contacts, /history.
+// Список предстоящих ивентов всех клубов (team_events + кофе-раны), экран
+// ивента, участники и рассылка кофе-рана, прошедшие по 10 на страницу.
+
+export const IVENT_CALLBACK_RE = /^ie:([a-z]+)(?::([a-z0-9_-]+))?(?::([a-z0-9_-]+))?$/;
+
+export const iventCb = {
+  list: () => "ie:l",
+  past: (page: number) => `ie:p:${page}`,
+  run: (spot: string, date: string) => `ie:r:${spot}:${date}`,
+  event: (id: number) => `ie:e:${id}`,
+  people: (spot: string, date: string) => `ie:u:${spot}:${date}`,
+  mail: (spot: string, date: string) => `ie:m:${spot}:${date}`,
+  claim: (id: number) => `ie:me:${id}`,
+  attendRun: (spot: string, date: string) => `ie:ar:${spot}:${date}`,
+  attendEvent: (id: number) => `ie:ae:${id}`,
+};
+
+export type IventItem =
+  | { kind: "run"; run: TeamRun; startsAt: string; agg: RunAggregate | null; fact?: number | null }
+  | { kind: "event"; event: TeamEvent; fact?: number | null };
+
+export const PAST_PAGE = 10;
+
+/** «вс 11.10» по Москве. */
+function shortDay(iso: string): string {
+  const p = mskParts(new Date(iso));
+  return `${p.weekday} ${p.dd}.${p.mm}`;
+}
+
+/** Кофе-ран по ключу (спот, дата): «Кофе-ран Усачёва», даже если его уже нет в расписании. */
+export function runTitle(run: TeamRun): string {
+  return coffeeRunTitle({ spotName: run.scheduled?.spotName ?? spotName(run.spot) });
+}
+
+function iventTitle(item: IventItem): string {
+  return item.kind === "run" ? runTitle(item.run) : item.event.title;
+}
+
+function iventIcon(item: IventItem): string {
+  return clubByKey(item.kind === "run" ? "run" : item.event.club)?.icon ?? "📌";
+}
+
+const iventStarts = (item: IventItem) => (item.kind === "run" ? item.startsAt : item.event.starts_at);
+
+/** «🏃 Кофе-ран Усачёва · вс 11.10 · 23 заявки, 18 подтв.» или «📚 Книжный клуб · ср 15.10 · отв. @masha». */
+export function iventLine(item: IventItem, names: ReadonlyMap<number, string>): string {
+  const head = `${iventIcon(item)} ${escapeHtmlTeam(iventTitle(item))} · ${shortDay(iventStarts(item))}`;
+  if (item.kind === "run") {
+    const a = item.agg;
+    return a ? `${head} · ${a.total} ${plural(a.total, "заявка", "заявки", "заявок")}, ${a.confirmed} подтв.` : `${head} · заявок пока нет`;
+  }
+  const resp = item.event.responsible_chat_id;
+  return resp ? `${head} · отв. ${at(names.get(resp), "без ника")}` : head;
+}
+
+function openIvent(item: IventItem): string {
+  return item.kind === "run" ? iventCb.run(item.run.spot, item.run.date) : iventCb.event(item.event.id);
+}
+
+/** /events: предстоящие ивенты всех клубов, каждая строка — кнопка. */
+export function iventsScreen(items: readonly IventItem[], names: ReadonlyMap<number, string>): TaskScreen {
+  const kb = new InlineKeyboard();
+  if (!items.length) {
+    return {
+      text: "<b>Ивенты</b>\n\nБлижайших ивентов нет.",
+      keyboard: kb.text("Прошедшие", iventCb.past(0)).text("Добавить событие", eventCb.add()),
+    };
+  }
+  for (const it of items) kb.text(`${iventIcon(it)} ${cut(iventTitle(it), 26)} · ${shortDay(iventStarts(it))}`, openIvent(it)).row();
+  kb.text("Прошедшие", iventCb.past(0));
+  return { text: ["<b>Ивенты</b> · ближайшие", "", ...items.map((it) => iventLine(it, names))].join("\n"), keyboard: kb };
+}
+
+/** «Пришло: 17 из 23 заявок» / «Пришло: 12» / «Явка не внесена». */
+export function factLine(fact: number | null | undefined, total?: number): string {
+  if (fact === null || fact === undefined) return "Явка не внесена";
+  return total ? `Пришло: ${fact} из ${total} ${plural(total, "заявки", "заявок", "заявок")}` : `Пришло: ${fact}`;
+}
+
+/** Прошедшие ивенты, по 10 на страницу: «Кофе-ран Лужники · 20.09 · заявок 31, пришло 22». */
+export function pastIventsScreen(items: readonly IventItem[], page: number): TaskScreen {
+  const kb = new InlineKeyboard();
+  if (!items.length) return { text: "<b>Прошедшие ивенты</b>\n\nПока ни одного.", keyboard: kb.text("← К ивентам", iventCb.list()) };
+  const pages = Math.max(1, Math.ceil(items.length / PAST_PAGE));
+  const p = Math.min(Math.max(page, 0), pages - 1);
+  const shown = items.slice(p * PAST_PAGE, (p + 1) * PAST_PAGE);
+  const lines = shown.map((it) => {
+    const day = dateOnly(iventStarts(it));
+    const fact = it.fact === null || it.fact === undefined ? "явка не внесена" : `пришло ${it.fact}`;
+    if (it.kind === "run") return `${escapeHtmlTeam(iventTitle(it))} · ${day} · заявок ${it.agg?.total ?? 0}, ${fact}`;
+    return `${escapeHtmlTeam(iventTitle(it))} · ${day} · ${fact}`;
+  });
+  for (const it of shown) kb.text(`${cut(iventTitle(it), 30)} · ${dateOnly(iventStarts(it))}`, openIvent(it)).row();
+  if (p > 0) kb.text("← Новее", iventCb.past(p - 1));
+  if (p < pages - 1) kb.text("Ещё", iventCb.past(p + 1));
+  if (p > 0 || p < pages - 1) kb.row();
+  kb.text("← К ивентам", iventCb.list());
+  return { text: ["<b>Прошедшие ивенты</b>", "", ...lines].join("\n"), keyboard: kb };
+}
+
+/** Динамика набора одной строкой: «За 3 дня до старта: 15, в прошлый сравнимый раз 12». */
+export function dynamicsOneLine(dyn: Dynamics): string {
+  const head = `За ${dyn.daysBefore} ${plural(dyn.daysBefore, "день", "дня", "дней")} до старта: ${dyn.now}`;
+  if (dyn.typical === null) return `${head}, сравнить не с чем`;
+  return dyn.comparable === 1 ? `${head}, в прошлый сравнимый раз ${dyn.typical}` : `${head}, обычно к этому дню ${dyn.typical}`;
+}
+
+/** Экран кофе-рана: шапка, 2–3 строки цифр, динамика одной строкой; у прошедшего — явка. */
+export function coffeeRunScreen(
+  run: TeamRun,
+  stats: RunStats,
+  dyn: Dynamics | null,
+  fact: number | null | undefined,
+  attendable = false,
+): TaskScreen {
+  const s = run.scheduled;
+  const lines = [
+    `<b>${escapeHtmlTeam(runTitle(run))}</b>`,
+    "🏃 Беговой клуб",
+    s ? `${eventWhen(coffeeRunStart(s))} (сбор ${s.gatherTime})` : `${dayHeader(run.date)}`,
+    s ? `Место: ${escapeHtmlTeam(s.address)}` : null,
+    run.past ? factLine(fact, stats.total) : null,
+    "",
+    `Заявок ${stats.total} · подтвердились ${stats.confirmed}`,
+    `⚠️ Не подтвердились ${stats.unconfirmed} · напоминание ушло ${stats.reminded}`,
+    dyn && !run.past ? dynamicsOneLine(dyn) : null,
+  ].filter((l): l is string => l !== null);
+  const kb = new InlineKeyboard()
+    .text("Участники", iventCb.people(run.spot, run.date))
+    .text("Рассылка", iventCb.mail(run.spot, run.date)).row();
+  if (attendable && run.past && (fact === null || fact === undefined)) kb.text("Внести явку", iventCb.attendRun(run.spot, run.date)).row();
+  kb.text("← К ивентам", iventCb.list());
+  return { text: lines.join("\n"), keyboard: kb };
+}
+
+/** Экран ивента клуба без записи через сайт: шапка, ответственный, явка у прошедшего. */
+export function clubEventScreen(
+  ev: TeamEvent,
+  names: ReadonlyMap<number, string>,
+  opts: { past: boolean; fact?: number | null; canManage: boolean; attendable?: boolean },
+): TaskScreen {
+  const club = clubByKey(ev.club);
+  const lines = [
+    `<b>${escapeHtmlTeam(ev.title)}</b>`,
+    club ? `${club.icon} ${escapeHtmlTeam(club.name)}` : null,
+    eventWhen(ev.starts_at),
+    ev.place ? `Место: ${escapeHtmlTeam(ev.place)}` : null,
+    `Ответственный: ${ev.responsible_chat_id ? at(names.get(ev.responsible_chat_id), "без ника") : "не назначен"}`,
+    opts.past ? factLine(opts.fact) : null,
+  ].filter((l): l is string => l !== null);
+  const kb = new InlineKeyboard();
+  if (!ev.responsible_chat_id) kb.text("Я ответственный", iventCb.claim(ev.id)).row();
+  if (opts.attendable && opts.past && (opts.fact === null || opts.fact === undefined)) kb.text("Внести явку", iventCb.attendEvent(ev.id)).row();
+  if (!opts.past && opts.canManage) kb.text("Изменить время", eventCb.time(ev.id)).text("Отменить", eventCb.cancelAsk(ev.id)).row();
+  kb.text("← К ивентам", iventCb.list());
+  return { text: lines.join("\n"), keyboard: kb };
+}
+
+/**
+ * «Участники» кофе-рана: один список вместо прежних /who и /contacts — имя,
+ * статус, телефон или ник. Персональные данные: открываются только кнопкой.
+ */
+export function participantsText(run: TeamRun, people: readonly SignupView[]): string {
+  if (!people.length) return `<b>Участники · ${escapeHtmlTeam(runTitle(run))}</b>\n\nЗаявок пока нет.`;
+  const order: SignupStatus[] = ["unconfirmed", "waiting", "reminded"];
+  const sorted = [...people].sort((a, b) => order.indexOf(a.status) - order.indexOf(b.status));
+  const shown = sorted.slice(0, LIST_LIMIT).map((p) => {
+    const nick = p.tg_username && !p.contact.includes(p.tg_username) ? ` · @${escapeHtmlTeam(p.tg_username)}` : "";
+    return `${ICON[p.status]} ${escapeHtmlTeam(p.name)} — ${escapeHtmlTeam(p.contact)}${nick}`;
+  });
+  if (sorted.length > LIST_LIMIT) shown.push(`… и ещё ${sorted.length - LIST_LIMIT}`);
+  return [
+    `<b>Участники · ${escapeHtmlTeam(runTitle(run))}</b> · ${people.length}`,
+    "⚠️ не подтвердился · ⏳ ждёт напоминания · ✅ напомнили",
+    "Персональные данные участников, пересылать не надо.",
+    "",
+    ...shown,
+  ].join("\n");
+}
+
+export const backToRunKeyboard = (run: TeamRun) => new InlineKeyboard().text("← К ивенту", iventCb.run(run.spot, run.date));

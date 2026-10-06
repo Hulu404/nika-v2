@@ -213,6 +213,7 @@ describe("Пятница: роли и меню", () => {
     expect(names).not.toContain("assigned");
     expect(names).not.toContain("assign_status");
     expect(names).not.toContain("assign_retry");
+    for (const gone of ["today", "runs", "run", "who", "notif", "contacts", "history"]) expect(names).not.toContain(gone);
   });
 
   it("в databot_members.is_owner пишется признак фаундера, а не роль", async () => {

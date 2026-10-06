@@ -1,21 +1,22 @@
 import { describe, it, expect } from "vitest";
 import type { CoffeeRun } from "../coffeerun/run";
 import {
-  contactsText,
+  clubEventScreen,
+  coffeeRunScreen,
   dynamicsLines,
-  historyText,
+  dynamicsOneLine,
+  iventCb,
+  iventsScreen,
   mskDateTime,
   mskTime,
-  parseTeamCallback,
+  participantsText,
+  pastIventsScreen,
   remindersText,
-  rosterText,
-  runCallback,
-  runCardText,
-  runsOverviewText,
-  runSummaryLine,
+  type IventItem,
 } from "./copy";
 import type { TeamRun } from "./runs";
 import type { RunAggregate } from "./history";
+import type { TeamEvent } from "./events";
 import { summarizeSignups, viewSignups, type SignupRow } from "./stats";
 
 const SCHEDULED: CoffeeRun = {
@@ -101,82 +102,6 @@ describe("время по Москве", () => {
   it("пустое и битое время — прочерк, а не Invalid Date в сообщении", () => {
     expect(mskTime(null)).toBe("—");
     expect(mskDateTime("не время")).toBe("—");
-  });
-});
-
-describe("callback кнопок", () => {
-  it("данные умещаются в лимит Telegram (64 байта)", () => {
-    expect(Buffer.byteLength(runCallback("rem", LUZH), "utf8")).toBeLessThanOrEqual(64);
-  });
-
-  it("разбирается обратно в тот же забег", () => {
-    expect(parseTeamCallback(runCallback("who", USACH), RUNS)).toEqual({
-      kind: "who",
-      run: USACH,
-    });
-  });
-
-  it("кнопка без забега (общий список, история) разбирается тоже", () => {
-    expect(parseTeamCallback(runCallback("all"), RUNS)).toEqual({ kind: "all", run: null });
-    expect(parseTeamCallback(runCallback("his"), RUNS)).toEqual({ kind: "his", run: null });
-  });
-
-  it("кнопка ведёт и в прошедший забег — история открывается теми же экранами", () => {
-    expect(parseTeamCallback(runCallback("con", LUZH_PAST), RUNS)?.run).toBe(LUZH_PAST);
-  });
-
-  it("забег, о котором не знает даже база → run: null", () => {
-    expect(parseTeamCallback("trun:sokolniki:2020-01-01", RUNS)).toEqual({
-      kind: "run",
-      run: null,
-    });
-  });
-
-  it("чужие данные не трогаем — их разберёт основной бот", () => {
-    expect(parseTeamCallback("rc_go_2026-09-19_10:00", RUNS)).toBeNull();
-    expect(parseTeamCallback("optin_yes", RUNS)).toBeNull();
-  });
-});
-
-describe("карточка забега", () => {
-  const rows = [
-    row({ name: "Первый", reminder_sent_at: "2026-09-18T07:00:00Z", pace: "6:30" }),
-    row({ name: "Второй", confirmed_at: "2026-09-11T10:00:00Z", tg_chat_id: 7, pace: "7:00" }),
-    row({ name: "Третий" }),
-  ];
-
-  it("называет все четыре цифры воронки", () => {
-    const text = runCardText(LUZH, summarizeSignups(rows, NOW), 42, null, NOW);
-    expect(text).toContain("Заявок: 3");
-    expect(text).toContain("Подтвердили в боте: 2");
-    expect(text).toContain("Напоминание ушло: 1");
-    expect(text).toContain("Не подтвердились: 1");
-    expect(text).toContain("Приглашений разослано: 42");
-  });
-
-  it("про неподтвердившихся говорит прямым текстом — это и есть главная строка", () => {
-    const text = runCardText(LUZH, summarizeSignups(rows, NOW), 0, null, NOW);
-    expect(text).toContain("не дойдёт ни напоминание, ни перенос, ни отмена");
-  });
-
-  it("когда все подтвердились — не пугает предупреждением", () => {
-    const ok = [row({ confirmed_at: "2026-09-11T10:00:00Z", tg_chat_id: 7 })];
-    expect(runCardText(LUZH, summarizeSignups(ok, NOW), 0, null, NOW)).not.toContain("⚠️");
-  });
-
-  it("если напоминаний ещё нет — сам объясняет, когда они уйдут", () => {
-    const text = runCardText(LUZH, summarizeSignups([row()], NOW), 0, null, NOW);
-    expect(text).toContain("2026-09-19"); // накануне забега 20-го
-    expect(text).toContain("10:00 МСК");
-  });
-
-  it("у прошедшего забега не выдумывает время и адрес", () => {
-    // Записи в расписании больше нет, и «сбор в 9:30» здесь был бы не фактом,
-    // а привычкой автора кода.
-    const text = runCardText(LUZH_PAST, summarizeSignups([row()], NOW), 0, null, NOW);
-    expect(text).toContain("Забег прошёл");
-    expect(text).not.toContain("сбор");
-    expect(text).not.toContain("Дистанция");
   });
 });
 
@@ -267,97 +192,136 @@ describe("динамика набора", () => {
     expect(five).toContain("За 5 дней до старта");
   });
 
-  it("попадает в карточку забега целиком", () => {
-    const text = runCardText(LUZH, summarizeSignups([row()], NOW), 0, {
-      daysBefore: 2,
-      now: 10,
-      previous: [{ date: "2026-09-13", atSameLead: 12, final: 37, opened: true }],
-      typical: 12,
-      comparable: 2,
-    }, NOW);
-    expect(text).toContain("За 2 дня до старта");
-    expect(text).toContain("в итоге 37");
+});
+
+const ev = (over: Partial<TeamEvent> = {}): TeamEvent => ({
+  id: 7, kind: "club_event", club: "run", title: "Интервалы", starts_at: "2026-09-19T05:00:00Z", place: "Лужники",
+  notes: null, responsible_chat_id: null, created_by: 1, created_at: "2026-09-10T09:00:00Z",
+  updated_at: "2026-09-10T09:00:00Z", cancelled_at: null, ...over,
+});
+
+describe("кнопки ивентов", () => {
+  it("callback_data умещаются в лимит Telegram (64 байта)", () => {
+    for (const data of [iventCb.people("usachevo", "2026-10-04"), iventCb.attendRun("usachevo", "2026-10-04"), iventCb.claim(123456789), iventCb.past(12)])
+      expect(Buffer.byteLength(data, "utf8")).toBeLessThanOrEqual(64);
   });
 });
 
-describe("списки людей", () => {
+describe("экран кофе-рана", () => {
+  const rows = [
+    row({ name: "Первый", reminder_sent_at: "2026-09-18T07:00:00Z", pace: "6:30" }),
+    row({ name: "Второй", confirmed_at: "2026-09-11T10:00:00Z", tg_chat_id: 7, pace: "7:00" }),
+    row({ name: "Третий" }),
+  ];
+
+  it("шапка и цифры в 2–3 строки, динамика одной строкой", () => {
+    const dyn = { daysBefore: 2, now: 3, previous: [{ date: "2026-09-13", atSameLead: 2, final: 37, opened: true }], typical: 2, comparable: 1 };
+    const { text, keyboard } = coffeeRunScreen(LUZH, summarizeSignups(rows, NOW), dyn, null);
+    expect(text).toContain("<b>Кофе-ран Лужники</b>");
+    expect(text).toContain("🏃 Беговой клуб");
+    expect(text).toContain("Вс 20.09, 10:00 (сбор 9:30)");
+    expect(text).toContain("Заявок 3 · подтвердились 2");
+    expect(text).toContain("⚠️ Не подтвердились 1 · напоминание ушло 1");
+    expect(text).toContain("За 2 дня до старта: 3, в прошлый сравнимый раз 2");
+    expect(text).not.toContain("Явка");
+    expect(keyboard.inline_keyboard.flat().map((b) => b.text)).toEqual(["Участники", "Рассылка", "← К ивентам"]);
+  });
+
+  it("у прошедшего — явка в шапке, без времени и адреса", () => {
+    const past = coffeeRunScreen(LUZH_PAST, summarizeSignups(rows, NOW), null, 2, true);
+    expect(past.text).toContain("Пришло: 2 из 3 заявок");
+    expect(past.text).not.toContain("сбор");
+    const none = coffeeRunScreen(LUZH_PAST, summarizeSignups(rows, NOW), null, null, true);
+    expect(none.text).toContain("Явка не внесена");
+    expect(none.keyboard.inline_keyboard.flat().map((b) => b.text)).toContain("Внести явку");
+  });
+});
+
+describe("экран ивента без записи через сайт", () => {
+  it("рендерится без цифр: клуб, время, ответственный и «Я ответственный»", () => {
+    const { text, keyboard } = clubEventScreen(ev(), new Map(), { past: false, canManage: false });
+    expect(text).toContain("<b>Интервалы</b>");
+    expect(text).toContain("🏃 Беговой клуб");
+    expect(text).toContain("Ответственный: не назначен");
+    expect(text).not.toContain("Заявок");
+    expect(keyboard.inline_keyboard.flat().map((b) => b.text)).toEqual(["Я ответственный", "← К ивентам"]);
+  });
+
+  it("прошедший: явка, а ответственный по нику", () => {
+    const { text } = clubEventScreen(ev({ responsible_chat_id: 5 }), new Map([[5, "masha"]]), { past: true, fact: 12, canManage: true });
+    expect(text).toContain("Ответственный: @masha");
+    expect(text).toContain("Пришло: 12");
+  });
+});
+
+describe("список ивентов", () => {
+  it("два ивента разных клубов и кофе-ран в одну неделю", () => {
+    const items: IventItem[] = [
+      { kind: "event", event: ev({ id: 1, title: "Интервалы", starts_at: "2026-09-19T05:00:00Z" }) },
+      { kind: "run", run: LUZH, startsAt: "2026-09-20T07:00:00Z", agg: agg({ total: 23, confirmed: 18 }) },
+      { kind: "event", event: ev({ id: 2, club: "book", title: "Книжный клуб", starts_at: "2026-09-23T16:30:00Z", responsible_chat_id: 5 }) },
+    ];
+    const { text, keyboard } = iventsScreen(items, new Map([[5, "masha"]]));
+    expect(text).toContain("🏃 Интервалы · сб 19.09");
+    expect(text).toContain("🏃 Кофе-ран Лужники · вс 20.09 · 23 заявки, 18 подтв.");
+    expect(text).toContain("Книжный клуб · ср 23.09 · отв. @masha");
+    expect(keyboard.inline_keyboard.flat().map((b) => (b as { callback_data?: string }).callback_data)).toEqual(["ie:e:1", "ie:r:luzhniki:2026-09-20", "ie:e:2", "ie:p:0"]);
+  });
+
+  it("пусто: «Ближайших ивентов нет», «Прошедшие» и «Добавить событие»", () => {
+    const { text, keyboard } = iventsScreen([], new Map());
+    expect(text).toContain("Ближайших ивентов нет");
+    expect(keyboard.inline_keyboard.flat().map((b) => b.text)).toEqual(["Прошедшие", "Добавить событие"]);
+  });
+
+  it("прошедшие по 10 на страницу, от новых к старым, с явкой", () => {
+    const items: IventItem[] = Array.from({ length: 12 }, (_, i) => ({
+      kind: "run" as const, run: { ...LUZH_PAST, date: `2026-08-${String(30 - i).padStart(2, "0")}` },
+      startsAt: `2026-08-${String(30 - i).padStart(2, "0")}T07:00:00Z`, agg: agg({ total: 31 }), fact: i === 0 ? 22 : null,
+    }));
+    const first = pastIventsScreen(items, 0);
+    expect(first.text).toContain("Кофе-ран Лужники · 30.08 · заявок 31, пришло 22");
+    expect(first.text).toContain("Кофе-ран Лужники · 29.08 · заявок 31, явка не внесена");
+    expect(first.text).not.toContain("19.08");
+    expect(first.keyboard.inline_keyboard.flat().map((b) => b.text)).toContain("Ещё");
+    expect(pastIventsScreen(items, 1).text).toContain("19.08");
+  });
+
+  it("динамика одной строкой: «обычно» только при нескольких сравнимых", () => {
+    expect(dynamicsOneLine({ daysBefore: 3, now: 15, previous: [], typical: 12, comparable: 2 })).toBe("За 3 дня до старта: 15, обычно к этому дню 12");
+    expect(dynamicsOneLine({ daysBefore: 1, now: 5, previous: [], typical: null, comparable: 0 })).toBe("За 1 день до старта: 5, сравнить не с чем");
+  });
+});
+
+describe("участники и рассылка кофе-рана", () => {
   const views = viewSignups([
     row({ name: "Напомнили", tg_username: "one", reminder_sent_at: "2026-09-18T07:00:00Z" }),
     row({ name: "Ждёт", tg_username: "two", confirmed_at: "2026-09-11T10:00:00Z", tg_chat_id: 2 }),
     row({ name: "Висит", tg_username: null }),
   ]);
 
-  it("/who разводит людей по трём группам с одинаковыми значками", () => {
-    const text = rosterText(LUZH, views);
-    expect(text).toContain("⚠️ Не подтвердились: 1");
-    expect(text).toContain("⏳ Ждут напоминания: 1");
-    expect(text).toContain("✅ Напоминание ушло: 1");
-    expect(text).toContain("@one");
-    // Без ника показываем имя, а не «@null».
-    expect(text).toContain("Висит");
+  it("«Участники»: один список со статусом и контактом, неподтверждённые первыми", () => {
+    const text = participantsText(LUZH, views);
+    expect(text).toContain("Персональные данные");
+    const lines = text.split("\n");
+    expect(lines.findIndex((l) => l.startsWith("⚠️ Висит"))).toBeLessThan(lines.findIndex((l) => l.startsWith("✅ Напомнили")));
+    expect(text).toContain("⚠️ Висит — +7 999 000-00-00");
+    expect(text).toContain("✅ Напомнили — +7 999 000-00-00 · @one");
     expect(text).not.toContain("@null");
   });
 
-  it("/notif называет время каждого напоминания по Москве", () => {
-    const text = remindersText(
-      LUZH,
-      views,
-      summarizeSignups([row({ reminder_sent_at: "2026-09-18T07:00:00Z" })], NOW),
-      NOW,
-    );
+  it("«Рассылка» называет время каждого напоминания по Москве", () => {
+    const text = remindersText(LUZH, views, summarizeSignups([row({ reminder_sent_at: "2026-09-18T07:00:00Z" })], NOW), NOW);
     expect(text).toContain("✅ Напомнили (@one) — 10:00");
     expect(text).toContain("Не уйдёт — не подтвердились в боте: 1");
   });
 
-  it("/contacts предупреждает, что это персональные данные", () => {
-    const text = contactsText(LUZH, views);
-    expect(text).toContain("Персональные данные");
-    expect(text).toContain("+7 999 000-00-00");
-  });
-
-  it("пустой забег не притворяется списком", () => {
-    expect(rosterText(LUZH, [])).toContain("Заявок пока нет");
-    expect(contactsText(LUZH, [])).toContain("Заявок пока нет");
-  });
-
-  it("длинный список обрезается с честным хвостом и влезает в сообщение Telegram", () => {
-    const many = viewSignups(
-      Array.from({ length: 120 }, (_, i) => row({ name: `Бегун ${i}`, tg_username: `run${i}` })),
-    );
-    const text = rosterText(LUZH, many);
+  it("пустой забег и длинный список", () => {
+    expect(participantsText(LUZH, [])).toContain("Заявок пока нет");
+    const many = viewSignups(Array.from({ length: 120 }, (_, i) => row({ name: `Бегун ${i}`, tg_username: `run${i}` })));
+    const text = participantsText(LUZH, many);
     expect(text).toContain("и ещё 60");
     expect(text.length).toBeLessThan(4096);
-  });
-});
-
-describe("список забегов и история", () => {
-  it("строка забега несёт три цифры, у прошедшего — пометку", () => {
-    expect(runSummaryLine(LUZH, agg())).toContain("заявок 10");
-    expect(runSummaryLine(LUZH_PAST, agg({ date: "2026-09-13" }))).toContain("прошёл");
-    expect(runSummaryLine(LUZH, agg())).not.toContain("прошёл");
-  });
-
-  it("пустой список отправляет в историю, а не в тупик", () => {
-    expect(runsOverviewText([])).toContain("/history");
-  });
-
-  it("история группирует по спотам и считает долю подтвердившихся", () => {
-    const text = historyText(
-      [
-        { run: LUZH_PAST, agg: agg({ date: "2026-09-13", total: 37, confirmed: 37 }) },
-        { run: USACH, agg: agg({ spot: "usachevo", date: "2026-09-19", total: 5, confirmed: 4 }) },
-      ],
-      (s) => (s === "luzhniki" ? "Лужники" : "Усачёва"),
-    );
-    expect(text).toContain("Лужники — 1 забег, 37 заявок");
-    expect(text).toContain("(100%)");
-    expect(text).toContain("Усачёва");
-    // Будущий забег в истории помечен: его цифры ещё не окончательные.
-    expect(text).toContain("(впереди)");
-  });
-
-  it("пустая база не притворяется историей", () => {
-    expect(historyText([], (s) => s)).toContain("нет ни одной заявки");
   });
 });
 
