@@ -173,10 +173,10 @@ describe("Пятница: права на задачу", () => {
     expect(store.assignedTasks.get(1)?.status).toBe("open");
   });
 
-  it("отменить и поменять срок может только автор, даже фаундер — нет", async () => {
-    await send("/assign_cancel 1", 9, "owner", 40);
+  it("отменить и поменять срок может автор или фаундер, другой участник — нет", async () => {
+    await send("/assign_cancel 1", 3, "carol", 40);
     await send("/assign_due 1 сб 18:00", 2, "bob", 41);
-    await press("tk:x:1", 9, "owner");
+    await press("tk:x:1", 3, "carol");
     expect(store.assignedTasks.get(1)?.status).toBe("open");
     expect(store.assignedTasks.get(1)?.due_at).toBe("2026-10-02T15:00:00.000Z");
 
@@ -226,5 +226,55 @@ describe("Пятница: роли и меню", () => {
   it("участник без особой роли ставит задачу себе и другим", async () => {
     await send("/assign\nСверстать афишу / завтра / @bob\nСебе напомнить / завтра / @carol", 3, "carol", 50);
     expect([...store.assignedTasks.values()].map((t) => [t.assigned_by, t.assignee_id])).toEqual([[3, 2], [3, 3]]);
+  });
+});
+
+describe("Пятница: фаундеры видят и меняют все задачи", () => {
+  beforeEach(async () => {
+    // alice ставит bob, carol ставит себе; фаундер (9) ни при чём
+    await send("/assign\nМакет / пт 18:00 / @bob", 1, "alice", 10);
+    await send("/assign\nСвоё дело / сб 12:00 / @carol", 3, "carol", 11);
+    await press("tk:s:done:2", 3, "carol");
+  });
+
+  it("участнику чужая задача не видна ни в одном экране, вкладки «Вся команда» нет", async () => {
+    for (const data of ["tk:l:me:0", "tk:l:by:0", "tk:l:done:0", "tk:l:all:0"]) {
+      await press(data, 2, "bob");
+      expect(String(lastScreen(2).payload.text)).not.toContain("Своё дело");
+    }
+    expect(buttons(lastScreen(2)).map((b) => b.text)).not.toContain("Вся команда");
+    await press("tk:o:2:me:0", 2, "bob");
+    expect(texts(2).at(-1)).toBe("Задача не найдена.");
+  });
+
+  it("фаундеру видна вся команда по исполнителям и выполненное всех", async () => {
+    await send("/tasks", 9, "owner", 20);
+    expect(buttons(lastScreen(9)).map((b) => b.text)).toContain("Вся команда");
+    await press("tk:l:all:0", 9, "owner");
+    const all = String(lastScreen(9).payload.text);
+    expect(all).toContain("<b>Задачи · Вся команда</b> · 1");
+    expect(all).toContain("<b>@bob</b>\n1. Макет · до пт 18:00 · от @alice · 🆕");
+    expect(all).not.toContain("Своё дело"); // уже сделано
+    await press("tk:l:done:0", 9, "owner");
+    expect(String(lastScreen(9).payload.text)).toContain("✅ Своё дело · @carol");
+  });
+
+  it("фаундер отменяет чужую задачу, автор и исполнитель узнают; участник не может", async () => {
+    await press("tk:x:1", 3, "carol");
+    expect(store.assignedTasks.get(1)?.status).toBe("open");
+    await press("tk:o:1:all:0", 9, "owner");
+    expect(buttons(lastScreen(9)).map((b) => b.text)).toEqual(["Изменить срок", "Отменить", "← К списку"]);
+    await press("tk:x:1", 9, "owner");
+    await press("tk:X:1", 9, "owner");
+    expect(store.assignedTasks.get(1)?.status).toBe("cancelled");
+    expect(texts(2).at(-1)).toContain("✖️ Задача отменена: «Макет»");
+    expect(texts(1).at(-1)).toBe("✖️ Задача «Макет» для @bob отменена (фаундер @owner).");
+  });
+
+  it("фаундер меняет срок чужой задачи", async () => {
+    await press("tk:d:1", 9, "owner");
+    await send("сб 10:00", 9, "owner", 21);
+    expect(store.assignedTasks.get(1)?.due_at).toBe("2026-10-03T07:00:00.000Z");
+    expect(texts(1).at(-1)).toContain("новый срок: сб 10:00 (фаундер @owner)");
   });
 });

@@ -27,10 +27,17 @@ export function teamBotConfigured(): boolean {
  *
  * Список в переменной, а не роль в базе: раньше владельцем становился тот, кто
  * первым набрал /join, и права зависели от того, кто успел.
+ *
+ * Если TEAM_FOUNDER_IDS не задана, берём DATABOT_OWNER_IDS: фаундеры в обоих
+ * ботах одни и те же люди.
  */
-export function founderIds(env: string | undefined = process.env.TEAM_FOUNDER_IDS): Set<number> {
+export function founderIds(
+  env: string | undefined = process.env.TEAM_FOUNDER_IDS,
+  fallback: string | undefined = process.env.DATABOT_OWNER_IDS,
+): Set<number> {
+  const raw = env?.trim() ? env : fallback;
   return new Set(
-    (env ?? "")
+    (raw ?? "")
       .split(",")
       .map((s) => s.trim())
       .filter((s) => /^-?\d+$/.test(s))
@@ -39,5 +46,5 @@ export function founderIds(env: string | undefined = process.env.TEAM_FOUNDER_ID
 }
 
 export function isFounder(chatId: number, env?: string): boolean {
-  return founderIds(env).has(chatId);
+  return (env === undefined ? founderIds() : founderIds(env, "")).has(chatId);
 }

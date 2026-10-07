@@ -104,9 +104,9 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
       take: ["taken", ["open"]], done: ["done", ["open", "taken"]], decline: ["declined", ["open", "taken"]],
       reopen: ["taken", ["done", "declined"]], cancel: ["cancelled", ["open", "taken", "declined"]],
     };
-    // Как databot_assigned_status после 045: отменяет только автор, статусы
-    // отмечает только исполнитель.
-    if (!actor?.is_active || (action === "cancel" ? task.assigned_by !== actorId : task.assignee_id !== actorId))
+    // Как databot_assigned_status после 048: отменяет автор или фаундер
+    // (is_owner), статусы отмечает только исполнитель.
+    if (!actor?.is_active || (action === "cancel" ? task.assigned_by !== actorId && !actor.is_owner : task.assignee_id !== actorId))
       throw new Error("assigned:actor");
     const [target, allowed] = rules[action];
     const previous = task.status;
@@ -123,7 +123,7 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
     if (!owner?.is_active) throw new Error("assigned:actor");
     const task = this.assignedTasks.get(id);
     if (!task) throw new Error("assigned:missing");
-    if (task.assigned_by !== ownerId) throw new Error("assigned:actor");
+    if (task.assigned_by !== ownerId && !owner.is_owner) throw new Error("assigned:actor");
     if (!isActiveAssigned(task)) throw new Error("assigned:state");
     if (patch.what !== undefined) {
       if (!patch.what.trim() || patch.what.length > 3000) throw new Error("assigned:format");

@@ -22,6 +22,7 @@ import {
   newTasksText,
   openMyTasksKeyboard,
   parseTaskCallback,
+  shortDue,
   taskCb,
   tasksScreen,
   type TaskScreen,
@@ -33,9 +34,10 @@ import { openTeamForm, supabaseTeamForms, teamFormExpired, type TeamFormStore } 
  * Задачи «Пятницы».
  *
  * Права: ставить задачи может любой участник (кому угодно и себе); править
- * текст, срок и отменять — только автор; отмечать статус — только исполнитель.
- * Человек видит только задачи, где он автор или исполнитель, фаундеры тоже.
- * Те же правила держит база (045_team_tasks_open.sql), здесь — понятные ответы.
+ * текст, срок и отменять — автор или фаундер; отмечать статус — только
+ * исполнитель. Участник видит только задачи, где он автор или исполнитель;
+ * фаундер видит все задачи команды (вкладка «Вся команда», «Выполненные»).
+ * Те же правила держит база (045, 048), здесь — понятные ответы.
  *
  * Экраны живут в одном сообщении: /tasks присылает список, всё остальное
  * (вкладки, карточки, «← К списку») редактирует его же.
@@ -254,14 +256,19 @@ export async function handleTeamTaskUpdate(ctx: Context, providedDeps?: TeamTask
   return false;
 }
 
+/** Задачи, которые человек видит: свои, а у фаундера — все задачи команды. */
+async function visibleTasks(deps: TeamTaskDeps, uid: number): Promise<AssignedTask[]> {
+  return isFounder(uid) ? deps.store.listAssignedOverview(new Date(0)) : deps.store.listMyAssigned(uid);
+}
+
 async function showList(ctx: Context, deps: TeamTaskDeps, uid: number, tab: TaskTab, page: number, edit: boolean, now: Date): Promise<boolean> {
-  const [tasks, names] = await Promise.all([deps.store.listMyAssigned(uid), namesOf(deps)]);
-  await show(ctx, tasksScreen(tab, tasks, uid, names, now, page), edit);
+  const [tasks, names] = await Promise.all([visibleTasks(deps, uid), namesOf(deps)]);
+  await show(ctx, tasksScreen(tab, tasks, uid, names, now, page, isFounder(uid)), edit);
   return true;
 }
 
 async function myTask(deps: TeamTaskDeps, uid: number, id: number): Promise<{ task: AssignedTask; all: AssignedTask[] } | null> {
-  const all = await deps.store.listMyAssigned(uid);
+  const all = await visibleTasks(deps, uid);
   const task = all.find((t) => t.id === id);
   return task ? { task, all } : null;
 }
@@ -273,7 +280,7 @@ async function openCard(ctx: Context, deps: TeamTaskDeps, uid: number, id: numbe
     return true;
   }
   const [names, mates] = await Promise.all([namesOf(deps), deps.store.listAssignedTeammates(found.task)]);
-  await show(ctx, myTaskCard(found.task, uid, names, mates, now, back), true);
+  await show(ctx, myTaskCard(found.task, uid, names, mates, now, back, isFounder(uid)), true);
   return true;
 }
 
@@ -299,7 +306,7 @@ async function pressStatus(ctx: Context, deps: TeamTaskDeps, uid: number, action
   }
   const { task, previous } = result;
   const [names, mates] = await Promise.all([namesOf(deps), deps.store.listAssignedTeammates(task)]);
-  await show(ctx, myTaskCard(task, uid, names, mates, now), true);
+  await show(ctx, myTaskCard(task, uid, names, mates, now, { tab: "me", page: 0 }, isFounder(uid)), true);
   const notice = authorNoticeText(task, previous);
   if (notice && task.assigned_by !== uid) {
     await ctx.api.sendMessage(task.assigned_by, notice, {
@@ -310,16 +317,33 @@ async function pressStatus(ctx: Context, deps: TeamTaskDeps, uid: number, action
   return true;
 }
 
+/**
+ * Чем человек может управлять (срок, отмена): автор — всей строкой списка,
+ * фаундер чужую задачу — только ею самой. null — права нет.
+ */
 async function authoredGroup(deps: TeamTaskDeps, uid: number, id: number): Promise<AssignedTask[] | null> {
   const found = await myTask(deps, uid, id);
-  if (!found || found.task.assigned_by !== uid) return null;
-  return groupOf(found.all, found.task);
+  if (!found) return null;
+  if (found.task.assigned_by === uid) return groupOf(found.all.filter((t) => t.assigned_by === uid), found.task);
+  return isFounder(uid) ? [found.task] : null;
+}
+
+/** Автору: фаундер поменял срок или отменил его задачу. */
+async function tellAuthor(ctx: Context, deps: TeamTaskDeps, uid: number, task: AssignedTask, change: "due" | "cancel", now: Date): Promise<void> {
+  if (task.assigned_by === uid) return;
+  const name = (await namesOf(deps)).get(uid);
+  const by = name ? `фаундер @${escapeHtmlTeam(name)}` : "фаундер";
+  const what = `«${escapeHtmlTeam(task.what)}» для @${escapeHtmlTeam(task.username)}`;
+  const text = change === "cancel"
+    ? `✖️ Задача ${what} отменена (${by}).`
+    : task.due_at ? `🗓 У задачи ${what} новый срок: ${shortDue(task.due_at, now)} (${by}).` : `🗓 У задачи ${what} снят срок (${by}).`;
+  await ctx.api.sendMessage(task.assigned_by, text, HTML).catch(() => {});
 }
 
 async function askDue(ctx: Context, deps: TeamTaskDeps, uid: number, id: number, now: Date): Promise<boolean> {
   const group = await authoredGroup(deps, uid, id);
   if (!group) {
-    await ctx.reply("Срок может поменять только автор задачи.");
+    await ctx.reply("Срок может поменять только автор задачи или фаундер.");
     return true;
   }
   if (!group.some(isActiveAssigned)) {
@@ -335,7 +359,7 @@ async function applyDue(ctx: Context, deps: TeamTaskDeps, uid: number, id: numbe
   const group = await authoredGroup(deps, uid, id);
   if (!group) {
     await deps.forms.clear(uid);
-    await ctx.reply("Срок может поменять только автор задачи.");
+    await ctx.reply("Срок может поменять только автор задачи или фаундер.");
     return true;
   }
   let due: string | null;
@@ -354,8 +378,10 @@ async function applyDue(ctx: Context, deps: TeamTaskDeps, uid: number, id: numbe
     if (updated.assignee_id !== uid)
       await ctx.api.sendMessage(updated.assignee_id, assigneeChangeText(updated, "due", now),
         { ...HTML, reply_markup: openMyTasksKeyboard() }).catch(() => {});
+    await tellAuthor(ctx, deps, uid, updated, "due", now);
   }
-  const fresh = groupOf(await deps.store.listMyAssigned(uid), group[0]);
+  const ids = new Set(group.map((t) => t.id));
+  const fresh = (await visibleTasks(deps, uid)).filter((t) => ids.has(t.id)).sort((a, b) => a.id - b.id);
   await ctx.reply(due ? "Срок обновлён, исполнители предупреждены." : "Срок снят, исполнители предупреждены.");
   await show(ctx, authorTaskCard(fresh.length ? fresh : group, now), false);
   return true;
@@ -364,7 +390,7 @@ async function applyDue(ctx: Context, deps: TeamTaskDeps, uid: number, id: numbe
 async function askCancel(ctx: Context, deps: TeamTaskDeps, uid: number, id: number): Promise<boolean> {
   const group = await authoredGroup(deps, uid, id);
   if (!group) {
-    await ctx.reply("Отменить задачу может только её автор.");
+    await ctx.reply("Отменить задачу может только её автор или фаундер.");
     return true;
   }
   await show(ctx, cancelConfirmScreen(group), true);
@@ -374,16 +400,19 @@ async function askCancel(ctx: Context, deps: TeamTaskDeps, uid: number, id: numb
 async function doCancel(ctx: Context, deps: TeamTaskDeps, uid: number, id: number, now: Date): Promise<boolean> {
   const group = await authoredGroup(deps, uid, id);
   if (!group) {
-    await ctx.reply("Отменить задачу может только её автор.");
+    await ctx.reply("Отменить задачу может только её автор или фаундер.");
     return true;
   }
   for (const t of group.filter((x) => x.status !== "done" && x.status !== "cancelled")) {
     const { task, previous } = await deps.store.setAssignedStatus(t.id, uid, "cancel");
     if (previous !== "cancelled" && task.assignee_id !== uid)
       await ctx.api.sendMessage(task.assignee_id, assigneeChangeText(task, "cancel", now), HTML).catch(() => {});
+    if (previous !== "cancelled") await tellAuthor(ctx, deps, uid, task, "cancel", now);
   }
-  const [tasks, names] = await Promise.all([deps.store.listMyAssigned(uid), namesOf(deps)]);
-  await show(ctx, tasksScreen("by", tasks, uid, names, now), true);
+  const founder = isFounder(uid);
+  const [tasks, names] = await Promise.all([visibleTasks(deps, uid), namesOf(deps)]);
+  const tab: TaskTab = group[0].assigned_by === uid ? "by" : "all";
+  await show(ctx, tasksScreen(tab, tasks, uid, names, now, 0, founder), true);
   return true;
 }
 

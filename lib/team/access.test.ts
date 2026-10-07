@@ -30,7 +30,13 @@ const member = (chat_id: number, username: string, role: TeamMember["role"] = "m
 describe("фаундеры из TEAM_FOUNDER_IDS", () => {
   it("разбирает ID через запятую, с пробелами и мусором", () => {
     expect([...founderIds(" 111, 222 ,abc,,-333")]).toEqual([111, 222, -333]);
-    expect(founderIds(undefined).size).toBe(0);
+    expect(founderIds("", "").size).toBe(0);
+  });
+
+  it("без TEAM_FOUNDER_IDS фаундеры — владельцы «Цифр команды» (DATABOT_OWNER_IDS)", () => {
+    expect([...founderIds("", "5, 6")]).toEqual([5, 6]);
+    expect([...founderIds("  ", "5")]).toEqual([5]);
+    expect([...founderIds("1", "5")]).toEqual([1]);
   });
 
   it("фаундер — тот, чей ID в списке, а не тот, у кого role=owner", () => {

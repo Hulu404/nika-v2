@@ -252,7 +252,7 @@ export function helpText(founder = false): string {
 // задачи экранируется), ни одного похода в базу: задачи и ники приходят
 // аргументами.
 
-export type TaskTab = "me" | "by" | "done";
+export type TaskTab = "me" | "by" | "done" | "all";
 
 /** callback_data задач «Пятницы». Свой префикс tk: — мимо кнопок забегов и бота данных. */
 export const TASK_CALLBACK_RE = /^tk:([logsdxX]):([a-z0-9]+)(?::([a-z0-9]+))?(?::(\d+))?$/;
@@ -276,7 +276,7 @@ export type TaskCallback =
   | { kind: "cancelAsk"; id: number }
   | { kind: "cancelDo"; id: number };
 
-const TABS: readonly TaskTab[] = ["me", "by", "done"];
+const TABS: readonly TaskTab[] = ["me", "by", "done", "all"];
 const ACTIONS = ["take", "done", "decline", "reopen"] as const;
 
 export function parseTaskCallback(data: string): TaskCallback | null {
@@ -371,10 +371,12 @@ function byUrgency(now: Date) {
 export const groupKey = (t: Pick<AssignedTask, "source_chat_id" | "source_message_id" | "line">) =>
   `${t.source_chat_id}:${t.source_message_id}:${t.line}`;
 
-function tabsRow(kb: InlineKeyboard, current: TaskTab): void {
-  const label: Record<TaskTab, string> = { me: "Мне", by: "Я поставил", done: "Выполненные" };
-  for (const tab of TABS) kb.text(tab === current ? `• ${label[tab]}` : label[tab], taskCb.list(tab, 0));
+/** Вкладки задач. «Вся команда» — только у фаундеров. */
+function tabsRow(kb: InlineKeyboard, current: TaskTab, founder = false): void {
+  const label: Record<TaskTab, string> = { me: "Мне", by: "Я поставил", done: "Выполненные", all: "Вся команда" };
+  for (const tab of TABS.filter((t) => t !== "all")) kb.text(tab === current ? `• ${label[tab]}` : label[tab], taskCb.list(tab, 0));
   kb.row();
+  if (founder) kb.text(current === "all" ? `• ${label.all}` : label.all, taskCb.list("all", 0)).row();
 }
 
 function pager(kb: InlineKeyboard, tab: TaskTab, page: number, total: number, size: number): void {
@@ -391,10 +393,11 @@ export function myTasksScreen(
   names: ReadonlyMap<number, string>,
   now: Date,
   page = 0,
+  founder = false,
 ): TaskScreen {
   const mine = tasks.filter((t) => t.assignee_id === me && TASK_ACTIVE(t)).sort(byUrgency(now));
   const kb = new InlineKeyboard();
-  tabsRow(kb, "me");
+  tabsRow(kb, "me", founder);
   if (!mine.length) return { text: "<b>Задачи · Мне</b>\n\nОткрытых задач нет.", keyboard: kb };
   const start = Math.min(page, Math.max(0, Math.ceil(mine.length / TASKS_PAGE) - 1)) * TASKS_PAGE;
   const shown = mine.slice(start, start + TASKS_PAGE);
@@ -433,10 +436,10 @@ export function authoredGroups(tasks: readonly AssignedTask[], me: number, now: 
     .sort((a, b) => byUrgency(now)(a[0], b[0]));
 }
 
-export function authoredScreen(tasks: readonly AssignedTask[], me: number, now: Date, page = 0): TaskScreen {
+export function authoredScreen(tasks: readonly AssignedTask[], me: number, now: Date, page = 0, founder = false): TaskScreen {
   const groups = authoredGroups(tasks, me, now);
   const kb = new InlineKeyboard();
-  tabsRow(kb, "by");
+  tabsRow(kb, "by", founder);
   if (!groups.length) return { text: "<b>Задачи · Я поставил</b>\n\nНезакрытых задач, которые ты поставил, нет.", keyboard: kb };
   const start = Math.min(page, Math.max(0, Math.ceil(groups.length / TASKS_PAGE) - 1)) * TASKS_PAGE;
   const shown = groups.slice(start, start + TASKS_PAGE);
@@ -451,15 +454,18 @@ export function authoredScreen(tasks: readonly AssignedTask[], me: number, now: 
   return { text: [`<b>Задачи · Я поставил</b> · ${groups.length}`, "", ...lines].join("\n"), keyboard: kb };
 }
 
-/** Плоский архив выполненного: и где я исполнитель, и где я автор, от новых к старым. */
-export function doneScreen(tasks: readonly AssignedTask[], me: number, page = 0): TaskScreen {
+/**
+ * Плоский архив выполненного: и где я исполнитель, и где я автор, от новых к
+ * старым. У фаундера — выполненное всей команды.
+ */
+export function doneScreen(tasks: readonly AssignedTask[], me: number, page = 0, founder = false): TaskScreen {
   const seen = new Set<number>();
   const done = tasks
-    .filter((t) => t.status === "done" && (t.assignee_id === me || t.assigned_by === me))
+    .filter((t) => t.status === "done" && (founder || t.assignee_id === me || t.assigned_by === me))
     .filter((t) => (seen.has(t.id) ? false : (seen.add(t.id), true)))
     .sort((a, b) => Date.parse(b.status_at) - Date.parse(a.status_at) || b.id - a.id);
   const kb = new InlineKeyboard();
-  tabsRow(kb, "done");
+  tabsRow(kb, "done", founder);
   if (!done.length) return { text: "<b>Задачи · Выполненные</b>\n\nВыполненных задач пока нет.", keyboard: kb };
   const start = Math.min(page, Math.max(0, Math.ceil(done.length / DONE_PAGE) - 1)) * DONE_PAGE;
   const lines = done
@@ -469,6 +475,51 @@ export function doneScreen(tasks: readonly AssignedTask[], me: number, page = 0)
   return { text: [`<b>Задачи · Выполненные</b> · ${done.length}`, "", ...lines].join("\n"), keyboard: kb };
 }
 
+/**
+ * «Вся команда» (только фаундеры): все незакрытые задачи по исполнителям,
+ * сначала просроченные. «Проверить текст · до 03.10 ⏰ · от @ali · 🔄».
+ */
+export function teamTasksScreen(
+  tasks: readonly AssignedTask[],
+  names: ReadonlyMap<number, string>,
+  now: Date,
+  page = 0,
+): TaskScreen {
+  const active = tasks.filter(TASK_ACTIVE);
+  const kb = new InlineKeyboard();
+  tabsRow(kb, "all", true);
+  if (!active.length) return { text: "<b>Задачи · Вся команда</b>\n\nОткрытых задач в команде нет.", keyboard: kb };
+  const byPerson = new Map<string, AssignedTask[]>();
+  for (const t of active) byPerson.set(t.username, [...(byPerson.get(t.username) ?? []), t]);
+  // Люди с просрочкой первыми, внутри — по срочности.
+  const people = [...byPerson.entries()]
+    .map(([u, list]) => [u, list.sort(byUrgency(now))] as const)
+    .sort(([a, la], [b, lb]) => (TASK_OVERDUE(la[0], now) ? 0 : 1) - (TASK_OVERDUE(lb[0], now) ? 0 : 1) || a.localeCompare(b));
+  const flat = people.flatMap(([, list]) => list);
+  const start = Math.min(page, Math.max(0, Math.ceil(flat.length / TASKS_PAGE) - 1)) * TASKS_PAGE;
+  const shown = new Set(flat.slice(start, start + TASKS_PAGE).map((t) => t.id));
+  const lines = [`<b>Задачи · Вся команда</b> · ${active.length}`];
+  let n = 0;
+  for (const [username, list] of people) {
+    const visible = list.filter((t) => shown.has(t.id));
+    if (!visible.length) continue;
+    lines.push("", `<b>@${escapeHtmlTeam(username)}</b>`);
+    for (const t of visible) {
+      n++;
+      const due = t.due_at ? ` · до ${shortDue(t.due_at, now)}${TASK_OVERDUE(t, now) ? " ⏰" : ""}` : "";
+      lines.push(`${start + n}. ${escapeHtmlTeam(cut(t.what, 120))}${due} · от ${at(names.get(t.assigned_by), "команды")} · ${STATUS_ICON[t.status]}`);
+    }
+  }
+  let i = 0;
+  for (const [username, list] of people) for (const t of list) {
+    if (!shown.has(t.id)) continue;
+    i++;
+    kb.text(`${start + i}. @${cut(username, 12)} · ${cut(t.what, 22)}`, taskCb.open(t.id, "all", start / TASKS_PAGE)).row();
+  }
+  pager(kb, "all", start / TASKS_PAGE, flat.length, TASKS_PAGE);
+  return { text: lines.join("\n"), keyboard: kb };
+}
+
 export function tasksScreen(
   tab: TaskTab,
   tasks: readonly AssignedTask[],
@@ -476,10 +527,12 @@ export function tasksScreen(
   names: ReadonlyMap<number, string>,
   now: Date,
   page = 0,
+  founder = false,
 ): TaskScreen {
-  if (tab === "by") return authoredScreen(tasks, me, now, page);
-  if (tab === "done") return doneScreen(tasks, me, page);
-  return myTasksScreen(tasks, me, names, now, page);
+  if (tab === "all" && founder) return teamTasksScreen(tasks, names, now, page);
+  if (tab === "by") return authoredScreen(tasks, me, now, page, founder);
+  if (tab === "done") return doneScreen(tasks, me, page, founder);
+  return myTasksScreen(tasks, me, names, now, page, founder);
 }
 
 const STATUS_WORD: Record<AssignedTask["status"], string> = {
@@ -499,11 +552,13 @@ export function myTaskCard(
   teammates: readonly string[],
   now: Date,
   back: { tab: TaskTab; page: number } = { tab: "me", page: 0 },
+  founder = false,
 ): TaskScreen {
   const lines = [
     `<b>${escapeHtmlTeam(cut(t.what, 600))}</b>`,
     dueLineTeam(t, now),
-    t.assigned_by === me ? "Поставил сам себе" : `От: ${at(names.get(t.assigned_by), "команды")}`,
+    t.assignee_id !== me ? `Исполнитель: @${escapeHtmlTeam(t.username)}` : null,
+    t.assigned_by === me ? (t.assignee_id === me ? "Поставил сам себе" : "Поставил ты") : `От: ${at(names.get(t.assigned_by), "команды")}`,
     teammates.length ? `Вместе с тобой: ${teammates.map((n) => `@${escapeHtmlTeam(n)}`).join(", ")}` : null,
     `Статус: ${STATUS_WORD[t.status]}`,
   ].filter((l): l is string => l !== null);
@@ -514,7 +569,7 @@ export function myTaskCard(
     if (t.status === "done") kb.text("Вернуть в работу", taskCb.status("reopen", t.id)).row();
     if (t.status === "declined") kb.text("Всё-таки возьму", taskCb.status("reopen", t.id)).row();
   }
-  if (t.assigned_by === me && TASK_ACTIVE(t)) kb.text("Изменить срок", taskCb.due(t.id)).text("Отменить", taskCb.cancelAsk(t.id)).row();
+  if ((t.assigned_by === me || founder) && TASK_ACTIVE(t)) kb.text("Изменить срок", taskCb.due(t.id)).text("Отменить", taskCb.cancelAsk(t.id)).row();
   kb.text("← К списку", taskCb.list(back.tab, back.page));
   return { text: lines.join("\n"), keyboard: kb };
 }
