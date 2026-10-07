@@ -161,11 +161,11 @@ export interface FounderDigestDeps {
   send: (chatId: number, text: string, keyboard?: InlineKeyboardMarkup) => Promise<unknown>;
 }
 
-async function socialLine(deps: FounderDigestDeps, platform: Platform, now: Date, extra: Partial<SocialLine> = {}): Promise<SocialLine> {
+async function socialLine(store: SocialStore, platform: Platform, now: Date, extra: Partial<SocialLine> = {}): Promise<SocialLine> {
   const [latest, dayAgo, weekAgo] = await Promise.all([
-    deps.social.latest(platform),
-    deps.social.latestAtOrBefore(platform, new Date(now.getTime() - DAY)),
-    deps.social.latestAtOrBefore(platform, new Date(now.getTime() - 7 * DAY)),
+    store.latest(platform),
+    store.latestAtOrBefore(platform, new Date(now.getTime() - DAY)),
+    store.latestAtOrBefore(platform, new Date(now.getTime() - 7 * DAY)),
   ]);
   return { platform, latest, dayAgo, weekAgo, ...extra };
 }
@@ -193,10 +193,30 @@ export async function dispatchFounderDigest(deps: FounderDigestDeps, now: Date):
   }
   const [tasks, team] = await Promise.all([deps.tasks(slot.from), deps.team()]);
   const social = [
-    await socialLine(deps, "telegram", now, { failed: tgFailed, notConfigured: !channel }),
-    await socialLine(deps, "instagram", now),
+    await socialLine(deps.social, "telegram", now, { failed: tgFailed, notConfigured: !channel }),
+    await socialLine(deps.social, "instagram", now),
   ];
   const text = founderDigestText({ slot, now, tasks, team, founders: deps.founders(), social });
   for (const chatId of deps.founders()) await Promise.resolve(deps.send(chatId, text)).catch(() => {});
   return `${slot.key} ${slot.ymd}`;
+}
+
+/**
+ * «Сводка сейчас» из раздела «Соцсети»: окно — с последней сводки по
+ * расписанию до этой минуты. Без отметки дедупа и без записи снимка канала:
+ * плановые сводки она не трогает.
+ */
+export async function buildFounderDigestNow(
+  deps: Pick<FounderDigestDeps, "tasks" | "team" | "founders" | "social">,
+  now: Date,
+): Promise<string> {
+  const last = currentSlot(now);
+  const slot: DigestSlot = { key: hhmm(now), ymd: mskToday(now), at: now, from: last.at };
+  const [tasks, team] = await Promise.all([deps.tasks(slot.from), deps.team()]);
+  const channel = telegramChannel();
+  const social = [
+    await socialLine(deps.social, "telegram", now, { notConfigured: !channel }),
+    await socialLine(deps.social, "instagram", now),
+  ];
+  return founderDigestText({ slot, now, tasks, team, founders: deps.founders(), social });
 }

@@ -3,6 +3,7 @@ import { handleKb } from "./sections/kb";
 import { handleRuns } from "./sections/runs";
 import { handleTeam } from "./sections/team";
 import { handlePro, handleProduct } from "./sections/summaries";
+import { handleSocial } from "./sections/social";
 import type { Section } from "./types";
 
 /**
@@ -15,4 +16,5 @@ export const SECTION_HANDLERS: Partial<Record<Section, SectionHandler>> = {
   tm: handleTeam,
   pro: handlePro,
   prd: handleProduct,
+  tr: handleSocial,
 };

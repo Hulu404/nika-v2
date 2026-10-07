@@ -10,7 +10,7 @@ import { SECTIONS, type ReportId, type Section, type Subject } from "./types";
  */
 export const SECTION_READY: Record<Section, boolean> = {
   run: true,
-  tr: false,
+  tr: true,
   pro: true,
   prd: true,
   kb: true,
