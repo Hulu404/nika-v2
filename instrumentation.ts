@@ -65,6 +65,20 @@ async function tickTeamDigests(): Promise<void> {
 }
 
 /**
+ * «Цифры команды» фаундерам: снимок Telegram-канала и вопрос про Instagram в
+ * 21:00 МСК, сводка в 10:00 и 22:30. Окна и дедуп — в lib/databot/founders/.
+ */
+async function tickFounderReports(): Promise<void> {
+  try {
+    const { dispatchFounderReports } = await import("./lib/databot/founders/dispatch");
+    const res = await dispatchFounderReports();
+    if (res.done?.length) console.log("[founders] сделано:", res.done.join(", "));
+  } catch (err) {
+    console.error("[founders] тик упал:", err instanceof Error ? err.message : String(err));
+  }
+}
+
+/**
  * Уборка бота данных: старые приглашения, raw_text журнала старше 30 дней,
  * журнал старше 180, брошенные формы. Раз в сутки, первый проход после 04:00
  * МСК — окно и отметку «сегодня убрано» проверяет сама. Без DATABOT_TOKEN
@@ -142,12 +156,14 @@ export async function register(): Promise<void> {
   void tickReminders();
   void tickInvites();
   void tickTeamDigests();
+  void tickFounderReports();
   void tickDatabotCleanup();
   void tickDatabotTaskReminders();
   const timer = setInterval(() => {
     void tickReminders();
     void tickInvites();
     void tickTeamDigests();
+    void tickFounderReports();
     void tickDatabotCleanup();
     void tickDatabotTaskReminders();
   }, REMINDER_TICK_MS);

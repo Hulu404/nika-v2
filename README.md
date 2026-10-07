@@ -113,6 +113,7 @@ Next.js читает `.env` и `.env.local`. Основной и командн�
 | Основной бот | `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, `NEXT_PUBLIC_TELEGRAM_BOT_USERNAME` | Токен, проверка webhook, username без `@` |
 | Командный бот | `TEAM_BOT_TOKEN`, `TEAM_WEBHOOK_SECRET`, `TEAM_BOT_SECRET`, `TEAM_FOUNDER_IDS` | Отдельный бот «Пятница»; ключ входа командой `/join`; Telegram ID фаундеров через запятую |
 | Бот данных | `DATABOT_TOKEN`, `DATABOT_WEBHOOK_SECRET`, `DATABOT_OWNER_IDS` | Третий бот; Telegram ID владельцев через запятую |
+| Соцсети | `NIKA_TG_CHANNEL` | `@username` Telegram-канала НИКИ: «Цифры команды» снимают число подписчиков через `getChatMemberCount`. **Бота данных нужно добавить в канал администратором без прав на публикацию**, иначе Telegram не отдаст число |
 | Служебный доступ | `CRON_SECRET`, `ADMIN_SECRET` | Cron API, QR-админка и административные команды основного бота |
 | Robokassa | `ROBOKASSA_MERCHANT_LOGIN`, `ROBOKASSA_PASSWORD_1`, `ROBOKASSA_PASSWORD_2` | Платежи и проверка Result URL |
 | Режим оплаты | `ROBOKASSA_IS_TEST`, `ROBOKASSA_HASH_ALGO`, `ROBOKASSA_DEBUG` | Тестовый режим при `1`, хеш по умолчанию `md5`, отладка при `1` |

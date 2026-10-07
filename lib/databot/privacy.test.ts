@@ -41,6 +41,8 @@ const ALLOWED_TABLES = new Set([
   "subscriptions", "robokassa_payments",
   "users", "profiles", "tg_bindings", "runs", "conversations", "checkins", "sprints",
   "notifications_log",
+  // Соцсети и сводка фаундерам (049): числа подписчиков и настройки, без персональных данных.
+  "social_snapshots", "team_settings", "team_digests",
 ]);
 
 /**
