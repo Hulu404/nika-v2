@@ -102,3 +102,32 @@ describe("/social в «Пятнице»", () => {
     expect(lines).toContain("Метка IGST-0310 (сторис): 50 переходов");
   });
 });
+
+describe("/social, когда база не готова", () => {
+  it("экран открывается, а сломанные блоки говорят, в чём дело", async () => {
+    vi.stubEnv("TEAM_FOUNDER_IDS", "9");
+    const missing = new Error("social_snapshots: Could not find the table 'public.social_snapshots' in the schema cache");
+    const broken = {
+      latest: async () => { throw missing; }, latestAtOrBefore: async () => { throw missing; },
+      getSetting: async () => { throw new Error("team_settings: relation \"public.team_settings\" does not exist"); },
+      setSetting: async () => {}, addSnapshot: async () => {}, claim: async () => true,
+    };
+    const deps: SocialSectionDeps = {
+      store: broken, forms: new MemoryTeamForms(), fetchTraffic: async () => [],
+      findMember: async (id) => team.find((m) => m.chat_id === id) ?? null, listTeam: async () => team, tasks: async () => [],
+    };
+    const texts: string[] = [];
+    const bot = new Bot("1:x", { botInfo: { id: 1, is_bot: true, first_name: "П", username: "t_bot" } as UserFromGetMe });
+    bot.api.config.use(async (_prev, method, payload) => {
+      if (method === "sendMessage") texts.push(String((payload as { text: string }).text));
+      return { ok: true, result: true } as never;
+    });
+    bot.use((ctx) => handleSocialSectionUpdate(ctx, deps, NOW).then(() => {}));
+    await bot.handleUpdate({ update_id: 1, message: { message_id: 1, date: 1, text: "/social",
+      chat: { id: 5, type: "private", first_name: "x" }, from: { id: 5, is_bot: false, first_name: "x" } } } as Update);
+    expect(texts[0]).toContain("TG-канал: нет таблицы social_snapshots: примени миграцию 049_social_snapshots.sql в Supabase");
+    expect(texts[0]).toContain("Кто вносит Instagram: нет таблицы team_settings");
+    expect(texts[0]).toContain("Переходов по меткам за период нет");
+    vi.unstubAllEnvs();
+  });
+});

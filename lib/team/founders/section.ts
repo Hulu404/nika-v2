@@ -114,23 +114,49 @@ async function ownerLabel(deps: SocialSectionDeps): Promise<string> {
   return m?.username ? `@${escapeHtmlTeam(m.username)}` : m?.display_name ? escapeHtmlTeam(m.display_name) : "участник вне команды";
 }
 
+/**
+ * Почему блок не загрузился — словами, а не «попробуй позже». Чаще всего это
+ * не применённая миграция: таблицы ещё нет, и ждать бессмысленно.
+ */
+export function blockError(err: unknown): string {
+  const msg = err instanceof Error ? err.message : String(err);
+  const table = /(social_snapshots|team_settings)/.exec(msg)?.[1];
+  if (table && /does not exist|could not find|schema cache|relation/i.test(msg)) {
+    return `нет таблицы ${table}: примени миграцию 049_social_snapshots.sql в Supabase`;
+  }
+  if (/databot_traffic/.test(msg) && /does not exist|could not find|schema cache|function/i.test(msg)) {
+    return "нет функции databot_traffic: примени миграцию 037_databot.sql";
+  }
+  return "не удалось получить, ошибка записана в логи сервера";
+}
+
+/** Один блок экрана: его ошибка не роняет остальные. */
+async function safe<T>(label: string, work: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; error: string }> {
+  try {
+    return { ok: true, value: await work() };
+  } catch (err) {
+    console.error(`[team-social] ${label}:`, err instanceof Error ? err.message : String(err));
+    return { ok: false, error: blockError(err) };
+  }
+}
+
 export async function socialScreen(deps: SocialSectionDeps, uid: number, code: string, now: Date): Promise<TaskScreen> {
   const period = periodFromCode(code, now) ?? periodFromCode(DEFAULT_PERIOD, now)!;
   const [tg, ig, owner, traffic] = await Promise.all([
-    followersLine(deps.store, "telegram", now),
-    followersLine(deps.store, "instagram", now),
-    ownerLabel(deps),
-    deps.fetchTraffic(period.from, period.to),
+    safe("tg", () => followersLine(deps.store, "telegram", now)),
+    safe("ig", () => followersLine(deps.store, "instagram", now)),
+    safe("owner", () => ownerLabel(deps)),
+    safe("traffic", () => deps.fetchTraffic(period.from, period.to)),
   ]);
   const text = [
     "<b>Соцсети</b>",
     "",
-    tg,
-    ig,
-    `Кто вносит Instagram: ${owner}`,
+    tg.ok ? tg.value : `TG-канал: ${tg.error}`,
+    ig.ok ? ig.value : `Instagram: ${ig.error}`,
+    `Кто вносит Instagram: ${owner.ok ? owner.value : owner.error}`,
     "",
     `<b>Метки и переходы</b> · ${ddmmYmd(period.fromYmd)}–${ddmmYmd(period.toYmd)}`,
-    ...trafficLines(traffic),
+    ...(traffic.ok ? trafficLines(traffic.value) : [`Переходы: ${traffic.error}`]),
   ].join("\n");
   const kb = new InlineKeyboard();
   PERIODS.forEach((p, i) => {
@@ -221,7 +247,7 @@ export async function handleSocialSectionUpdate(ctx: Context, providedDeps?: Soc
     return true;
   } catch (err) {
     console.error("[team-social]", err instanceof Error ? err.message : String(err));
-    await ctx.reply("Не получилось достать цифры по соцсетям. Попробуй ещё раз чуть позже.");
+    await ctx.reply(`Не получилось: ${blockError(err)}.`);
     return true;
   }
 }
