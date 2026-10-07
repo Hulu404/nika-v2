@@ -65,12 +65,12 @@ async function tickTeamDigests(): Promise<void> {
 }
 
 /**
- * «Цифры команды» фаундерам: снимок Telegram-канала и вопрос про Instagram в
- * 21:00 МСК, сводка в 10:00 и 22:30. Окна и дедуп — в lib/databot/founders/.
+ * «Пятница» фаундерам: снимок Telegram-канала и вопрос про Instagram в
+ * 21:00 МСК, сводка в 10:00 и 22:30. Окна и дедуп — в lib/team/founders/.
  */
 async function tickFounderReports(): Promise<void> {
   try {
-    const { dispatchFounderReports } = await import("./lib/databot/founders/dispatch");
+    const { dispatchFounderReports } = await import("./lib/team/founders/dispatch");
     const res = await dispatchFounderReports();
     if (res.done?.length) console.log("[founders] сделано:", res.done.join(", "));
   } catch (err) {

@@ -209,7 +209,7 @@ describe("Пятница: роли и меню", () => {
     expect(setMyCommands).toHaveBeenNthCalledWith(1, TEAM_COMMANDS, { scope: { type: "chat", chat_id: 9 } });
     expect(setMyCommands).toHaveBeenNthCalledWith(2, TEAM_COMMANDS, { scope: { type: "chat", chat_id: 1 } });
     const names = TEAM_COMMANDS.map((c) => c.command);
-    expect(names).toEqual(expect.arrayContaining(["assign", "tasks"]));
+    expect(names).toEqual(expect.arrayContaining(["assign", "tasks", "social"]));
     expect(names).not.toContain("assigned");
     expect(names).not.toContain("assign_status");
     expect(names).not.toContain("assign_retry");

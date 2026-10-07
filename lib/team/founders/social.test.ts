@@ -3,10 +3,10 @@ import type { Update, UserFromGetMe } from "grammy/types";
 import { Bot } from "grammy";
 import { INSTAGRAM_OWNER_SETTING } from "./constants";
 import { MemorySocialStore } from "./social-store";
+import { MemoryTeamForms } from "../form";
 import {
-  MemorySocialForms,
   dispatchSocialDaily,
-  handleSocialUpdate,
+  handleInstagramInput,
   isSuspiciousJump,
   parseFollowers,
   snapshotTelegram,
@@ -37,7 +37,7 @@ describe("проверка на 20%", () => {
 
 describe("21:00: снимок канала и вопрос про Instagram", () => {
   let store: MemorySocialStore;
-  let forms: MemorySocialForms;
+  let forms: MemoryTeamForms;
   let sent: Array<{ chat: number; text: string }>;
   const deps = (): SocialDeps => ({
     store, forms, founders: () => [9, 10],
@@ -47,7 +47,7 @@ describe("21:00: снимок канала и вопрос про Instagram", ()
   beforeEach(() => {
     vi.stubEnv("NIKA_TG_CHANNEL", "@nika_channel");
     store = new MemorySocialStore();
-    forms = new MemorySocialForms();
+    forms = new MemoryTeamForms();
     sent = [];
   });
   afterEach(() => vi.unstubAllEnvs());
@@ -89,6 +89,7 @@ describe("21:00: снимок канала и вопрос про Instagram", ()
 
 describe("ответ про Instagram", () => {
   let store: MemorySocialStore;
+  let forms: MemoryTeamForms;
   let replies: string[];
   let send: (text: string, from?: number) => Promise<void>;
   let press: (data: string, from?: number) => Promise<void>;
@@ -96,17 +97,15 @@ describe("ответ про Instagram", () => {
 
   beforeEach(async () => {
     store = new MemorySocialStore();
+    forms = new MemoryTeamForms();
     replies = [];
-    const forms = new MemorySocialForms();
-    const deps: SocialDeps = { store, forms, founders: () => [9], send: async () => {}, memberCount: async () => 0 };
-    store.settings.set(INSTAGRAM_OWNER_SETTING, "5");
     await store.addSnapshot({ platform: "instagram", followers: 3870, source: "manual", entered_by: 5 }, msk("2026-10-06T21:10"));
-    const bot = new Bot("1:x", { botInfo: { id: 1, is_bot: true, first_name: "Ц", username: "d_bot" } as UserFromGetMe });
+    const bot = new Bot("1:x", { botInfo: { id: 1, is_bot: true, first_name: "П", username: "t_bot" } as UserFromGetMe });
     bot.api.config.use(async (_prev, method, payload) => {
       if (method === "sendMessage") replies.push(String((payload as { text: string }).text));
       return { ok: true, result: true } as never;
     });
-    bot.use(async (ctx, next) => { if (!(await handleSocialUpdate(ctx, deps, NOW))) await next(); });
+    bot.use(async (ctx, next) => { if (!(await handleInstagramInput(ctx, { store, forms }, NOW))) await next(); });
     let id = 0;
     const user = (from: number) => ({ id: from, is_bot: false, first_name: "x" });
     const chat = (from: number) => ({ id: from, type: "private" as const, first_name: "x" });
@@ -130,14 +129,14 @@ describe("ответ про Instagram", () => {
     expect(store.snapshots.at(-1)).toMatchObject({ platform: "instagram", followers: 3895, source: "manual", entered_by: 5 });
   });
 
-  it("«Да» сохраняет большое число; посторонний внести не может", async () => {
+  it("«Да» сохраняет большое число", async () => {
     await press("so:yes:38700");
     expect(store.snapshots.at(-1)?.followers).toBe(38700);
-    await press("so:ig", 7);
-    expect(replies.at(-1)).toContain("фаундеры и назначенный ответственный");
   });
 
-  it("не число — просит целое и ждёт дальше", async () => {
+  it("не число — просит целое и ждёт дальше; без формы текст не трогает", async () => {
+    await send("3 900");
+    expect(store.snapshots).toHaveLength(1);
     await press("so:ig");
     await send("около четырёх тысяч");
     expect(replies.at(-1)).toContain("Нужно целое число");

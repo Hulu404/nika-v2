@@ -2,7 +2,6 @@ import { autoRetry } from "@grammyjs/auto-retry";
 import { Bot, type Context } from "grammy";
 import type { Update, UserFromGetMe } from "grammy/types";
 import { databotToken, databotTaskConfig } from "./config";
-import { defaultSocialDeps, socialMiddleware, type SocialDeps } from "./founders/social";
 import type { DatabotStore } from "./data/store";
 import { createSupabaseStore } from "./data/supabase-store";
 import { createPipeline } from "./pipeline";
@@ -29,11 +28,6 @@ export interface CreateDatabotOptions {
   store?: DatabotStore;
   /** Часы — в тестах (срок приглашения). */
   now?: () => Date;
-  /**
-   * Приём числа подписчиков Instagram (founders/social.ts). По умолчанию —
-   * боевой, если хранилище не подменено; в тестах конвейера — выключен.
-   */
-  social?: SocialDeps | null;
 }
 
 /**
@@ -62,8 +56,6 @@ export function createDatabot(token: string, opts: CreateDatabotOptions = {}): B
     });
   }
 
-  const social = opts.social !== undefined ? opts.social : opts.store ? null : defaultSocialDeps(bot.api);
-  if (social) bot.use(socialMiddleware(social));
   bot.use(createPipeline({ store: opts.store ?? createSupabaseStore(), now: opts.now }));
 
   bot.catch((err) => {

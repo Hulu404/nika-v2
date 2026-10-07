@@ -17,6 +17,7 @@ import { handleScheduleUpdate, showSchedule, defaultScheduleDeps, type ScheduleD
 import { defaultEventsDeps, handleEventsUpdate, openClubEventScreen, openCoffeeRunScreen } from "./ivents";
 import { supabaseTeamForms } from "./form";
 import { touchSeen } from "./seen";
+import { handleSocialSectionUpdate } from "./founders/section";
 
 /**
  * Внутренний бот команды: сколько человек записалось, кто подтвердился, кому
@@ -120,6 +121,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     if (await handleTeamTaskUpdate(ctx)) return;
     if (await handleScheduleUpdate(ctx, scheduleDeps())) return;
     if (await handleEventsUpdate(ctx)) return;
+    if (await handleSocialSectionUpdate(ctx)) return;
     await next();
   });
 
@@ -331,6 +333,7 @@ export const TEAM_COMMANDS = [
   { command: "assign", description: "Поставить задачу" },
   { command: "schedule", description: "Расписание" },
   { command: "events", description: "Ивенты" },
+  { command: "social", description: "Соцсети" },
   { command: "team", description: "Команда" },
   { command: "faq", description: "Быстрые ответы" },
   { command: "mute", description: "Не присылать сводку" },

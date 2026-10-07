@@ -97,16 +97,12 @@ export const ACCESS_MATRIX: Readonly<Record<ReportId, Rule>> = {
     audience: COUNCIL_EVENTS,
     ctx: (_s, c) => c.runDate === undefined || c.today === undefined || c.runDate >= c.today,
   },
-  // «Соцсети»: только фаундерам (владельцы из DATABOT_OWNER_IDS).
-  "tr.section": { audience: "owner" },
-  "tr.channels": { audience: "owner" },
-  "tr.codes": { audience: "owner" },
-  "tr.code": { audience: "owner" },
-  "tr.csv": { audience: "owner" },
-  "tr.issue": { audience: "owner" },
-  "tr.ig": { audience: "owner" },
-  "tr.owner": { audience: "owner" },
-  "tr.digest": { audience: "owner" },
+  "tr.section": { audience: ALL },
+  "tr.channels": { audience: ALL },
+  "tr.codes": { audience: ALL },
+  "tr.code": { audience: ALL },
+  "tr.csv": { audience: ALL },
+  "tr.issue": { audience: ALL },
   "pro.summary": { audience: COUNCIL },
   "prd.summary": { audience: COUNCIL },
   "kb.list": { audience: ALL },
@@ -148,9 +144,9 @@ export function can(subject: Subject, report: ReportId, ctx: AccessContext = {})
   return check ? check(subject, ctx) : true;
 }
 
-const SECTION_AUDIENCE: Readonly<Record<Section, readonly Zone[] | "owner">> = {
+const SECTION_AUDIENCE: Readonly<Record<Section, readonly Zone[]>> = {
   run: ALL,
-  tr: "owner",
+  tr: ALL,
   kb: ALL,
   pro: COUNCIL,
   prd: COUNCIL,
@@ -159,9 +155,7 @@ const SECTION_AUDIENCE: Readonly<Record<Section, readonly Zone[] | "owner">> = {
 
 /** Виден ли раздел в клавиатуре и меню команд зоны. */
 export function canOpenSection(subject: Subject, section: Section): boolean {
-  const audience = SECTION_AUDIENCE[section];
-  if (audience === "owner") return subject.isOwner;
-  return audience?.includes(subject.zone) ?? false;
+  return SECTION_AUDIENCE[section]?.includes(subject.zone) ?? false;
 }
 
 /** Кто видит отчёт — для текста отказа «Это видит совет…». */

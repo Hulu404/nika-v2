@@ -97,7 +97,6 @@ function parseCallbackIntent(data: string): ParseResult {
   if (section === "tm") return parseTeamCallback(action, params);
   if (section === "run") return parseRunCallback(action, params);
   if (section === "kb") return parseKbCallback(action, params);
-  if (section === "tr") return parseSocialCallback(action, params);
   if (section === "pro" || section === "prd") {
     const [period, page, ...extra] = params;
     if (action !== "summary" || !["7d", "pw", "tm", "30d"].includes(period) ||
@@ -112,35 +111,6 @@ function parseCallbackIntent(data: string): ParseResult {
   // Остальные разделы подключаются своими промтами; до тех пор их кнопок
   // быть не может, и любая такая кнопка — устаревшая.
   return { kind: "stale", section };
-}
-
-/**
- * «Соцсети» (только фаундеры):
- *   d:tr:summary:<период>[:стр] · d:tr:ig · d:tr:own[:<id>|0] · d:tr:dig
- */
-function parseSocialCallback(action: string, params: string[]): ParseResult {
-  const stale: ParseResult = { kind: "stale", section: "tr" };
-  const tr = (report: Intent["report"], act: string, p: Record<string, string> = {}) =>
-    intent({ report, section: "tr", action: act, source: "button", params: p });
-  switch (action) {
-    case "summary": {
-      const [period, page, ...extra] = params;
-      if (!["7d", "pw", "tm", "30d"].includes(period) || extra.length || (page !== undefined && !isPage(page))) return stale;
-      return tr("tr.section", "summary", { period, ...(page ? { page } : {}) });
-    }
-    case "ig":
-      return params.length === 0 ? tr("tr.ig", "ig") : stale;
-    case "own": {
-      if (params.length === 0) return tr("tr.owner", "own");
-      const [target, ...extra] = params;
-      if (extra.length || !(target === "0" || isChatId(target))) return stale;
-      return tr("tr.owner", "own", { target });
-    }
-    case "dig":
-      return params.length === 0 ? tr("tr.digest", "dig") : stale;
-    default:
-      return stale;
-  }
 }
 
 /**

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { AssignedTask } from "../task-list";
-import type { TeamMember } from "../../team/access";
+import type { AssignedTask } from "../../databot/task-list";
+import type { TeamMember } from "../access";
 import { currentSlot, dispatchFounderDigest, founderDigestText, relativeDue, socialText, type FounderDigestDeps } from "./digest";
 import { MemorySocialStore } from "./social-store";
 

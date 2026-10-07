@@ -167,7 +167,7 @@ describe("владелец из env", () => {
     expect(row).toMatchObject({ zone: "council", is_owner: true, is_active: true });
     const cmds = commandsSetFor(calls, OWNER)!;
     expect(cmds.method).toBe("setMyCommands");
-    expect((cmds.payload.commands as { command: string }[]).map((c) => c.command)).toEqual(["runs", "social", "pro", "product", "kb", "team", "help"]);
+    expect((cmds.payload.commands as { command: string }[]).map((c) => c.command)).toEqual(["runs", "pro", "product", "kb", "team", "help"]);
     const welcome = calls.find((c) => c.method === "sendMessage")!;
     expect(welcome.payload.reply_markup).toMatchObject({ is_persistent: true, resize_keyboard: true });
     expect(JSON.stringify(welcome.payload.reply_markup)).toContain("Команда");
@@ -285,13 +285,10 @@ describe("смена зоны и удаление", () => {
 });
 
 describe("разделы и разбор", () => {
-  it("«Соцсети» — только фаундерам: совету раздел закрыт и не показан", async () => {
+  it("неготовый раздел из доступных — «ещё собираю»", async () => {
     const t = setup();
     await t.text(OWNER, "/start");
-    await t.text(ALICE, `/start inv_${await invite(t, "council")}`);
-    const reply = texts(await t.text(ALICE, "/social"))[0];
-    expect(reply).toMatch(/^Это /);
-    expect(reply).not.toContain("Соцсети");
+    expect(texts(await t.text(OWNER, "/social"))).toEqual([NOT_READY_TEXT]);
   });
 
   it("чужой раздел командой — отказ с доступными разделами", async () => {

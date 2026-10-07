@@ -21,9 +21,10 @@ export type TeamFormKind =
   | "event.new"     // ждём строку события после «Добавить событие»
   | "event.draft"   // событие разобрано, ждём кнопки типа, клуба и рассылки
   | "event.time"    // новое время события: params.id
-  | "attend";       // число пришедших: params.key
+  | "attend"        // число пришедших: params.key
+  | "social.ig";    // число подписчиков Instagram: params.pending — ждёт «Да»
 
-const KINDS: readonly TeamFormKind[] = ["task.upload", "task.due", "event.new", "event.draft", "event.time", "attend"];
+const KINDS: readonly TeamFormKind[] = ["task.upload", "task.due", "event.new", "event.draft", "event.time", "attend", "social.ig"];
 
 export interface TeamForm {
   kind: TeamFormKind;

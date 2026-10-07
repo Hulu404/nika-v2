@@ -1,14 +1,14 @@
 import type { InlineKeyboardMarkup } from "grammy/types";
-import type { AssignedTask } from "../task-list";
-import { mskMidnight } from "../dates";
-import { addDays, mskToday } from "../time";
-import type { TeamMember } from "../../team/access";
+import type { AssignedTask } from "../../databot/task-list";
+import { mskMidnight } from "../../databot/dates";
+import { addDays, mskToday } from "../../databot/time";
+import type { TeamMember } from "../access";
 import { AWAY_DAYS, DIGEST_LIST_LIMIT, FOUNDER_DIGEST_SLOTS } from "./constants";
 import { formatNumber, takenToday, telegramChannel } from "./social";
 import type { Platform, Snapshot, SocialStore } from "./social-store";
 
 /**
- * Сводка фаундерам от «Цифр команды»: дважды в день, 10:00 и 22:30 МСК,
+ * Сводка фаундерам от «Пятницы»: дважды в день, 10:00 и 22:30 МСК,
  * одним сообщением, только фаундерам. Окно — с прошлой сводки: 10:00
  * охватывает 22:30 прошлого дня – 10:00, 22:30 охватывает 10:00 – 22:30.
  * Тихих часов нет. Дедуп — team_digests с ключом ('founders', слот, дата):
