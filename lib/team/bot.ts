@@ -6,7 +6,6 @@ import {
   listTeam,
   removeMember,
   setDigestOptIn,
-  touchMember,
   type TeamMember,
 } from "./access";
 import { mergeRuns, pickRun, type TeamRun } from "./runs";
@@ -17,6 +16,7 @@ import { handleTeamTaskUpdate } from "./tasks";
 import { handleScheduleUpdate, showSchedule, defaultScheduleDeps, type ScheduleDeps } from "./schedule";
 import { defaultEventsDeps, handleEventsUpdate, openClubEventScreen, openCoffeeRunScreen } from "./ivents";
 import { supabaseTeamForms } from "./form";
+import { touchSeen } from "./seen";
 
 /**
  * Внутренний бот команды: сколько человек записалось, кто подтвердился, кому
@@ -52,8 +52,6 @@ async function requireMember(ctx: TeamContext): Promise<TeamMember | null> {
     await ctx.reply(NOT_A_MEMBER_TEXT);
     return null;
   }
-  // Метка «был в боте» — для /team. Не ждём: ответ важнее метки.
-  void touchMember(chatId);
   return member;
 }
 
@@ -103,6 +101,13 @@ function scheduleDeps(): ScheduleDeps {
 }
 
 export function registerHandlers(bot: Bot<TeamContext>): void {
+  // «Был в боте» — на любое действие: команды, текст, кнопки, ответы в формах.
+  // Обработчики задач, расписания и ивентов отвечают раньше команд, поэтому
+  // метка ставится здесь, до них. В базу не чаще раза в 5 минут (seen.ts).
+  bot.use(async (ctx, next) => {
+    if (ctx.from) void touchSeen(ctx.from.id);
+    await next();
+  });
   // Любая команда закрывает открытую форму (кроме /cancel: её разбирает обработчик форм).
   bot.use(async (ctx, next) => {
     const text = ctx.message?.text?.trim() ?? "";

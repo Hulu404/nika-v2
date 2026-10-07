@@ -6,9 +6,12 @@ import type { TeamMember } from "./access";
 // Состав команды вместо Supabase: проверяем права, а не базу.
 const roster = new Map<number, TeamMember>();
 const removed: string[] = [];
+const touched: Array<{ id: number; at: number }> = [];
 vi.mock("./access", () => ({
   findMember: async (id: number) => roster.get(id) ?? null,
-  touchMember: async () => {},
+  touchMember: async (id: number, now: Date) => {
+    touched.push({ id, at: now.getTime() });
+  },
   joinTeam: async () => ({ status: "failed" }),
   listTeam: async () => [...roster.values()],
   setDigestOptIn: async () => true,
@@ -19,8 +22,21 @@ vi.mock("./access", () => ({
   },
 }));
 
+// Хранилища задач и форм — в памяти: обработчик задач идёт в базу раньше, чем ответить.
+vi.mock("../databot/data/supabase-store", async () => {
+  const { MemoryStore } = await import("../databot/data/memory-store");
+  const store = new MemoryStore();
+  return { createSupabaseStore: () => store };
+});
+vi.mock("./form", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./form")>();
+  const forms = new real.MemoryTeamForms();
+  return { ...real, supabaseTeamForms: () => forms };
+});
+
 import { founderIds, isFounder } from "./config";
 import { registerHandlers } from "./bot";
+import { resetSeenCache, shouldTouch, TOUCH_EVERY_MS } from "./seen";
 
 const member = (chat_id: number, username: string, role: TeamMember["role"] = "member"): TeamMember => ({
   chat_id, username, display_name: username, role, joined_at: "2026-10-01T00:00:00Z",
@@ -84,5 +100,47 @@ describe("/kick", () => {
     await send("/kick @bob", 9);
     expect(removed).toEqual(["@bob"]);
     expect(replies.at(-1)?.text).toContain("Убрала: @bob");
+  });
+});
+
+describe("последний визит", () => {
+  let press: (data: string, from: number) => Promise<void>;
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2026-10-07T09:00:00Z"));
+    resetSeenCache();
+    touched.length = 0;
+    roster.clear();
+    roster.set(2, member(2, "bob"));
+    const bot = new Bot("999:test", { botInfo: { id: 999, is_bot: true, first_name: "Пятница", username: "t_bot" } as UserFromGetMe });
+    bot.api.config.use(async () => ({ ok: true, result: { message_id: 1 } }) as never);
+    registerHandlers(bot);
+    let id = 0;
+    press = async (data, from) => {
+      await bot.handleUpdate({ update_id: ++id, callback_query: { id: `c${id}`, chat_instance: "x", data,
+        from: { id: from, is_bot: false, first_name: "x" },
+        message: { message_id: 5, date: 1, text: "x", chat: { id: from, type: "private", first_name: "x" } } } } as Update);
+    };
+  });
+  afterEach(() => vi.useRealTimers());
+
+  it("нажатие кнопки в карточке задачи обновляет last_seen_at, но не чаще раза в 5 минут", async () => {
+    await press("tk:o:1:me:0", 2);
+    expect(touched).toEqual([{ id: 2, at: Date.parse("2026-10-07T09:00:00Z") }]);
+    vi.setSystemTime(new Date("2026-10-07T09:03:00Z"));
+    await press("tk:l:done:0", 2);
+    expect(touched).toHaveLength(1);
+    vi.setSystemTime(new Date("2026-10-07T09:05:00Z"));
+    await press("tk:l:me:0", 2);
+    expect(touched).toHaveLength(2);
+  });
+
+  it("кэш раз в 5 минут — на человека, а не на всех", () => {
+    const cache = new Map<number, number>();
+    const t0 = new Date("2026-10-07T09:00:00Z");
+    expect(shouldTouch(1, t0, cache)).toBe(true);
+    expect(shouldTouch(2, t0, cache)).toBe(true);
+    expect(shouldTouch(1, new Date(t0.getTime() + TOUCH_EVERY_MS - 1), cache)).toBe(false);
+    expect(shouldTouch(1, new Date(t0.getTime() + TOUCH_EVERY_MS), cache)).toBe(true);
   });
 });

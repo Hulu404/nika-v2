@@ -80,10 +80,10 @@ export async function findMember(chatId: number): Promise<TeamMember | null> {
  * это метка для /team, а не условие ответа — из-за неё команда не должна
  * остаться без цифр в 9:29 на старте.
  */
-export async function touchMember(chatId: number): Promise<void> {
+export async function touchMember(chatId: number, now: Date = new Date()): Promise<void> {
   const { error } = await tgAdmin()
     .from(TABLE)
-    .update({ last_seen_at: new Date().toISOString() })
+    .update({ last_seen_at: now.toISOString() })
     .eq("chat_id", chatId);
   if (error) console.error("[team-access] touchMember:", error.message);
 }
