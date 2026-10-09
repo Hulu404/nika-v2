@@ -1,5 +1,5 @@
 import { InlineKeyboard } from "grammy";
-import { runWhenWhere, type CoffeeRun } from "../coffeerun/run";
+import type { CoffeeRun } from "../coffeerun/run";
 import { publicOriginFromEnv } from "../public-origin";
 import { SUPPORT_LABEL, SUPPORT_URL } from "./cta";
 
@@ -34,14 +34,21 @@ export function landingUrlFor(run: CoffeeRun): string | null {
  */
 export function inviteText(participant: { name: string }, run: CoffeeRun): string {
   return [
-    `${participant.name}, открыли запись на новый забег!`,
+    `${participant.name}, открыли запись на новый забег для тебя!🤍`,
     "",
-    `${run.spotName} — ${runWhenWhere(run)}.`,
-    `${run.distance} в разговорном темпе, с пейсерами. Кофе на финише.`,
+    run.spotName,
+    "🟠Когда?",
+    `${run.dateLabel} (${run.weekday})`,
+    "🟠Во сколько?",
+    `сбор в ${run.gatherTime}, старт в ${run.startTime}`,
+    "🟠Где?",
+    `${run.address}, ${run.place}`,
     "",
-    "Бежишь? Заполни заявку — так я буду знать, кого ждать на старте.",
+    `${run.distance} в разговорном темпе, с пейсерами. Кофе на финише. ☕️`,
     "",
-    "Не хочешь получать приглашения — напиши /stop, больше звать не буду.",
+    "Бежишь? Заполни заявку — так я буду знать, кого ждать на старте!",
+    "",
+    "Не хочешь получать приглашения — напиши /stop, больше звать не буду",
   ].join("\n");
 }
 
