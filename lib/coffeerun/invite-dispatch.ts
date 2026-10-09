@@ -101,7 +101,7 @@ export interface InviteDispatchResult {
 }
 
 /** Чаты, которые просили не писать (/stop). Множество маленькое — берём целиком. */
-async function optedOutChats(): Promise<Set<number>> {
+export async function optedOutChats(): Promise<Set<number>> {
   const { data, error } = await tgAdmin()
     .from("tg_bindings")
     .select("chat_id")

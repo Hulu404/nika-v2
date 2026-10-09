@@ -25,6 +25,7 @@ import { parseTime } from "./notice-copy";
 import { cancelledWarning } from "./coffeerun-notice";
 import { runByDate, nextRun } from "../coffeerun/run";
 import { dispatchCoffeeRunPoll } from "../coffeerun/poll-dispatch";
+import { clearAdminCommands, setAdminCommands } from "./admin-menu";
 import type { BotContext } from "./bot";
 
 /**
@@ -84,10 +85,12 @@ export async function handlePollAdminCommand(ctx: BotContext): Promise<void> {
   }
 
   addAdminChat(chatId);
+  await setAdminCommands(ctx.api, chatId);
   await ctx.reply(
     [
-      "Готово — буду присылать ответы сюда.",
+      "Готово — буду присылать ответы сюда. Команды — в кнопке «Меню».",
       "",
+      "/say — общее сообщение всем, кто с нами бегал",
       "/rollcall — перекличка «кто придёт сегодня»; время беру из последнего переноса " +
         "(/rollcall 19:00 — своё время)",
       "/moved — перенести старт на 18:00 сегодня (/moved 19:00 дождь — своё время и причина)",
@@ -106,6 +109,7 @@ export async function handlePollStopCommand(ctx: BotContext): Promise<void> {
   const chatId = ctx.chat?.id;
   if (chatId === undefined || !isAdminChat(chatId)) return;
   removeAdminChat(chatId);
+  await clearAdminCommands(ctx.api, chatId);
   await ctx.reply("Больше не присылаю сюда ответы. Вернуться — /admin <ключ>.");
 }
 

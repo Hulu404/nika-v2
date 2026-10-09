@@ -16,6 +16,12 @@ import {
 import { POLL_CALLBACK_RE, ROLLCALL_CALLBACK_RE } from "./poll-copy";
 import { CANCEL_CALLBACK_RE, MOVED_CALLBACK_RE } from "./notice-copy";
 import { INVITE_CALLBACK_RE } from "./invite-copy";
+import { BROADCAST_CALLBACK_RE } from "./broadcast-copy";
+import {
+  handleBroadcastCallback,
+  handleBroadcastDraft,
+  handleSayCommand,
+} from "./coffeerun-broadcast";
 import { handleOpenCallback, handleOpenCommand } from "./coffeerun-invite";
 import {
   handleCancelCallback,
@@ -147,6 +153,8 @@ function registerHandlers(bot: Bot<BotContext>): void {
   // (instrumentation.ts → lib/coffeerun/invite-dispatch.ts); команда — ручной
   // запуск с предпросмотром, когда расписание не годится.
   bot.command("open", (ctx) => handleOpenCommand(ctx));
+  // Общее сообщение всем, кто бегал: /say, затем само сообщение — с предпросмотром.
+  bot.command("say", (ctx) => handleSayCommand(ctx));
   bot.command("help", async (ctx) => {
     await ctx.reply(
       `${BOT_ROLE}\n\nКоманды:\n` +
@@ -167,6 +175,8 @@ function registerHandlers(bot: Bot<BotContext>): void {
   bot.callbackQuery(CANCEL_CALLBACK_RE, (ctx) => handleCancelCallback(ctx));
   // Подтверждение рассылки приглашения на новый забег — для организатора.
   bot.callbackQuery(INVITE_CALLBACK_RE, (ctx) => handleOpenCallback(ctx));
+  // Подтверждение общей рассылки (/say) — для организатора.
+  bot.callbackQuery(BROADCAST_CALLBACK_RE, (ctx) => handleBroadcastCallback(ctx));
   // Подтверждение рассылки переклички — для организатора.
   bot.callbackQuery(ROLLCALL_CALLBACK_RE, (ctx) => handleRollcallCallback(ctx));
   // pure-push: интерактивного чек-ина больше нет. Хендлер оставлен пустым
@@ -176,6 +186,8 @@ function registerHandlers(bot: Bot<BotContext>): void {
 
   // ── Любой прочий ввод: это не чат-бот — объясняем роль и даём кнопки ─────────
   bot.on("message", async (ctx) => {
+    // После /say следующее сообщение организатора — это текст рассылки.
+    if (await handleBroadcastDraft(ctx)) return;
     await ctx.reply(
       `${BOT_ROLE}\n\nСвободно общаться я не умею — но если нужен живой человек, ` +
         "нажми «Служба поддержки».",
