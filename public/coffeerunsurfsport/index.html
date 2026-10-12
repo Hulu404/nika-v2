@@ -367,7 +367,7 @@ footer{background:var(--ink);color:rgba(255,255,255,.6);padding:56px 0 calc(60px
   .f-legal{margin-top:18px}
 }
 </style>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;1,400&family=Caveat:wght@600&display=swap" rel="stylesheet">
 <style id="nika-brandbook-design">
 /* Visual restyling only. Existing section order, grids and content retained. */
 :root {
@@ -811,6 +811,15 @@ a.tk-qr .qr{width:15cqw;height:15cqw;flex:none;fill:#141414}
 html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:nika-unblur .4s ease 4s forwards}
 @keyframes nika-unblur{to{filter:none;opacity:1}}
 @media(prefers-reduced-motion:reduce){html.js:not(.ready) .r{filter:none;opacity:1;animation:none}}
+
+/* подвал: «продукт just business, darling™», как на mynika.online, ™ терракотой */
+.f-bottom{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:12px 24px;margin-top:26px}
+.f-bottom .f-legal{margin-top:0}
+.jbd{display:inline-flex;align-items:baseline;gap:.45em;color:var(--ink-2);font-size:13px;line-height:1;white-space:nowrap}
+.jbd-mark{font-family:'Caveat','Segoe Print',cursive;font-weight:600;font-size:24px;color:var(--ink);line-height:1.2;display:inline-block}
+.jbd .tm{font-family:var(--sans);font-size:.5em;font-weight:500;color:#D4703F;margin-left:.06em;line-height:0;vertical-align:1em}
+.jbd:hover .jbd-mark{opacity:.85}
+@media (max-width:600px){.f-bottom{margin-top:18px}.jbd-mark{font-size:21px}}
 </style>
 </head>
 <body>
@@ -843,7 +852,7 @@ html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:n
                 <dt>SPOT</dt><dd class="tk-spot">Surf Coffee<sup>®</sup> × Sport</dd>
                 <dt>TIME</dt><dd>10:30 <small>старт 11:00</small></dd>
               </dl>
-              <span class="tk-ed">EDITION № 001</span>
+              <span class="tk-ed">EDITION № 008</span>
               <span class="tk-by">SURF COFFEE<sup>®</sup> × SPORT <b>×</b> NIKA</span>
               <i class="tk-perf"></i>
             </div>
@@ -1007,7 +1016,10 @@ html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:n
         <a href="#reg">Регистрация</a>
       </div>
     </div>
-    <div class="f-legal">© 2026 NIKA · ИП Серебряков Дмитрий Сергеевич · ИНН 645053987663 · ОГРНИП 326645700053239</div>
+    <div class="f-bottom">
+      <div class="f-legal">© 2026 NIKA · ИП Серебряков Дмитрий Сергеевич · ИНН 645053987663 · ОГРНИП 326645700053239</div>
+      <a class="jbd" href="https://just-business-darling.ru" target="_blank" rel="noopener">продукт <span class="jbd-mark">just business, darling<span class="tm">™</span></span></a>
+    </div>
   </div>
 </footer>
 
