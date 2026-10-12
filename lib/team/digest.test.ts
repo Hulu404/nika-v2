@@ -26,7 +26,7 @@ describe("сводка дня", () => {
   let runs: CoffeeRun[];
   let signups: SignupRow[];
   const deps = (): DigestDispatchDeps => ({
-    events, facts, forms: new MemoryTeamForms(), runs, throttleMs: 0,
+    events, facts, forms: new MemoryTeamForms(), throttleMs: 0,
     fetchSignups: async () => signups,
     recipients: async () => [1, 2],
     claimDaily: async (ymd) => (claimed.has(ymd) ? false : (claimed.add(ymd), true)),
@@ -70,7 +70,8 @@ describe("сводка дня", () => {
   });
 
   it("два события в один день и кофе-ран: темпы, неподтверждённые, тревога о рассылке", async () => {
-    runs = [run];
+    await events.create({ kind: "club_event", club: "run", title: "Кофе-ран · Усачёва", format: "coffee_run", spot: "usachevo",
+      starts_at: msk("2026-10-13T10:00").toISOString(), place: null, responsible_chat_id: null, created_by: 1 }, msk("2026-10-10T12:00"));
     signups = [
       signup({ confirmed_at: "2026-10-06T10:00:00Z", tg_chat_id: 7, pace: "6:30" }),
       signup({ confirmed_at: "2026-10-06T10:00:00Z", tg_chat_id: 8, pace: "7:00" }),
@@ -80,15 +81,17 @@ describe("сводка дня", () => {
     await events.create({ kind: "club_event", club: "run", title: "Интервалы", starts_at: msk("2026-10-13T08:30").toISOString(), place: null, responsible_chat_id: null, created_by: 1 }, msk("2026-10-10T12:00"));
     await dispatchTeamDigests({ now: msk("2026-10-13T08:05"), deps: deps() });
     const text = sent[0].text;
-    const order = ["08:30 🏃 Интервалы", "10:00 🏃 Кофе-ран Усачёва · Беговой клуб", "19:00 Планёрка"].map((s) => text.indexOf(s));
+    const order = ["08:30 🏃 Интервалы", "10:00 🏃 Кофе-ран · Усачёва · Беговой клуб", "19:00 Планёрка"].map((s) => text.indexOf(s));
     expect(order.every((i, n) => i >= 0 && (n === 0 || i > order[n - 1]))).toBe(true);
     expect(text).toContain("ждём 2 из 3: 6:30 мин/км — 1, 7:00 мин/км — 1, без темпа — 1");
     expect(text).toContain("⚠️ не подтвердились 1");
-    expect(text).toContain("🚨 Кофе-ран Усачёва: вчера окно рассылки напоминаний прошло, а не ушло ни одного");
+    expect(text).toContain("🚨 Кофе-ран · Усачёва: вчера окно рассылки напоминаний прошло, а не ушло ни одного");
   });
 
   it("если напоминания ушли — без тревоги", () => {
-    const text = dailyDigestText("2026-10-13", [{ kind: "run", run, stats: {
+    const coffee = { id: 1, kind: "club_event" as const, club: "run", title: "Кофе-ран · Усачёва", starts_at: msk("2026-10-13T10:00").toISOString(),
+      place: null, notes: null, responsible_chat_id: null, created_by: 1, created_at: "", updated_at: "", cancelled_at: null, format: "coffee_run" as const, spot: "usachevo" };
+    const text = dailyDigestText("2026-10-13", [{ kind: "event", event: coffee, runDate: "2026-10-13", stats: {
       total: 2, reminded: 2, waiting: 0, unconfirmed: 0, confirmed: 2, byPace: [{ pace: "6:30", count: 2 }],
       last24h: 0, lastSignupAt: null, lastReminderAt: "2026-10-12T07:00:00Z" } }], msk("2026-10-13T08:00"));
     expect(text).not.toContain("🚨");

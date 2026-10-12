@@ -878,11 +878,14 @@ export const iventCb = {
   claim: (id: number) => `ie:me:${id}`,
   attendRun: (spot: string, date: string) => `ie:ar:${spot}:${date}`,
   attendEvent: (id: number) => `ie:ae:${id}`,
+  peopleEvent: (id: number) => `ie:pe:${id}`,
+  mailEvent: (id: number) => `ie:ml:${id}`,
 };
 
 export type IventItem =
   | { kind: "run"; run: TeamRun; startsAt: string; agg: RunAggregate | null; fact?: number | null }
-  | { kind: "event"; event: TeamEvent; fact?: number | null };
+  /** agg — заявки кофе-рана по (спот, дата); у обычного ивента не задано. */
+  | { kind: "event"; event: TeamEvent; fact?: number | null; agg?: RunAggregate | null };
 
 export const PAST_PAGE = 10;
 
@@ -911,6 +914,10 @@ const iventStarts = (item: IventItem) => (item.kind === "run" ? item.startsAt : 
 export function iventLine(item: IventItem, names: ReadonlyMap<number, string>): string {
   const head = `${iventIcon(item)} ${escapeHtmlTeam(iventTitle(item))} · ${shortDay(iventStarts(item))}`;
   if (item.kind === "run") {
+    const a = item.agg;
+    return a ? `${head} · ${a.total} ${plural(a.total, "заявка", "заявки", "заявок")}, ${a.confirmed} подтв.` : `${head} · заявок пока нет`;
+  }
+  if (item.agg !== undefined) {
     const a = item.agg;
     return a ? `${head} · ${a.total} ${plural(a.total, "заявка", "заявки", "заявок")}, ${a.confirmed} подтв.` : `${head} · заявок пока нет`;
   }
@@ -1047,3 +1054,40 @@ export function participantsText(run: TeamRun, people: readonly SignupView[]): s
 }
 
 export const backToRunKeyboard = (run: TeamRun) => new InlineKeyboard().text("← К ивенту", iventCb.run(run.spot, run.date));
+export const backToEventKeyboard = (id: number) => new InlineKeyboard().text("← К ивенту", iventCb.event(id));
+
+/**
+ * Экран кофе-рана недели (team_events, format = coffee_run): шапка события,
+ * заявки и подтверждения по (спот, дата) из таблицы заявок, динамика набора,
+ * кто из команды будет; у прошедшего — явка.
+ */
+export function coffeeEventScreen(
+  ev: TeamEvent,
+  names: ReadonlyMap<number, string>,
+  stats: RunStats | null,
+  dyn: Dynamics | null,
+  opts: { past: boolean; fact?: number | null; canManage: boolean; attendable?: boolean; canFix?: boolean; rsvp?: string | null },
+): TaskScreen {
+  const lines = [
+    `<b>${escapeHtmlTeam(ev.title)}</b>`,
+    "🏃 Беговой клуб",
+    eventWhen(ev.starts_at),
+    ev.place ? `Место: ${escapeHtmlTeam(ev.place)}` : null,
+    `Ответственный: ${ev.responsible_chat_id ? at(names.get(ev.responsible_chat_id), "без ника") : "не назначен"}`,
+    opts.past ? factLine(opts.fact, stats?.total) : null,
+    stats ? "" : null,
+    stats ? `Заявок ${stats.total} · подтвердились ${stats.confirmed}` : null,
+    stats ? `⚠️ Не подтвердились ${stats.unconfirmed} · напоминание ушло ${stats.reminded}` : null,
+    dyn && !opts.past ? dynamicsOneLine(dyn) : null,
+    opts.rsvp ? "" : null,
+    opts.rsvp ? escapeHtmlTeam(opts.rsvp) : null,
+  ].filter((l): l is string => l !== null);
+  const kb = new InlineKeyboard();
+  if (ev.spot) kb.text("Участники", iventCb.peopleEvent(ev.id)).text("Рассылка", iventCb.mailEvent(ev.id)).row();
+  if (!ev.responsible_chat_id) kb.text("Я ответственный", iventCb.claim(ev.id)).row();
+  if (opts.attendable && opts.past && (opts.fact === null || opts.fact === undefined)) kb.text("Внести явку", iventCb.attendEvent(ev.id)).row();
+  else if (opts.attendable && opts.canFix && opts.fact !== null && opts.fact !== undefined) kb.text("Исправить явку", iventCb.attendEvent(ev.id)).row();
+  if (!opts.past && opts.canManage) kb.text("Изменить время", eventCb.time(ev.id)).text("Отменить", eventCb.cancelAsk(ev.id)).row();
+  kb.text("← К ивентам", iventCb.list());
+  return { text: lines.join("\n"), keyboard: kb };
+}

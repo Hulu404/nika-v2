@@ -58,7 +58,7 @@ describe("расписание недели", () => {
     const late = event({ id: 2, title: "Поздний созвон", starts_at: msk("2026-10-09T23:30").toISOString() });
     const early = event({ id: 3, title: "Ранний", starts_at: msk("2026-10-10T00:30").toISOString() });
     const { days } = weekRange(NOW);
-    const groups = groupByDay(scheduleItems([late, early], days, []));
+    const groups = groupByDay(scheduleItems([late, early], days));
     expect(groups.map((g) => g.ymd)).toEqual(["2026-10-09", "2026-10-10"]);
   });
 
@@ -67,15 +67,17 @@ describe("расписание недели", () => {
     expect(weekRange(NOW, 1).fromYmd).toBe("2026-10-15");
   });
 
-  it("подмешивает кофе-раны из COFFEE_RUNS как ивент «Бегового клуба», только на этой неделе", () => {
+  it("кофе-ран — одно событие team_events; COFFEE_RUNS не подмешиваются, дубля нет", () => {
     const { days } = weekRange(NOW);
-    const items = scheduleItems([event({})], days, [run({}), run({ spot: "luzhniki", spotName: "Surf Coffee® Лужники", date: "2026-10-25" })]);
-    expect(items.map((i) => i.source)).toEqual(["event", "coffeerun"]);
+    const coffee = event({ id: 7, kind: "club_event", club: "run", title: "Кофе-ран · Усачёва", format: "coffee_run", spot: "usachevo",
+      starts_at: msk("2026-10-11T10:00").toISOString(), place: "Москва, ул. Усачёва, 62" });
+    const items = scheduleItems([event({}), coffee], days);
+    expect(items.map((i) => i.source)).toEqual(["event", "event"]);
     const screen = scheduleScreen(items, days, 0);
     expect(screen.text).toContain("<b>Пт 09.10</b>\n19:00 Планёрка · Zoom");
-    expect(screen.text).toContain("<b>Вс 11.10</b>\n10:00 🏃 Кофе-ран Усачёва · Беговой клуб");
-    expect(screen.text).not.toContain("Лужники");
-    expect(coffeeRunTitle({ spotName: "Surf Coffee® Лужники" })).toBe("Кофе-ран Лужники");
+    expect(screen.text).toContain("<b>Вс 11.10</b>\n10:00 🏃 Кофе-ран · Усачёва · Беговой клуб");
+    expect(screen.text.match(/Кофе-ран/g)).toHaveLength(1);
+    expect(coffeeRunTitle({ spotName: "Surf Coffee® Лужники" })).toBe("Кофе-ран · Лужники");
   });
 
   it("два ивента разных клубов и кофе-ран в одну неделю", () => {
@@ -83,7 +85,8 @@ describe("расписание недели", () => {
     const items = scheduleItems([
       event({ id: 5, kind: "club_event", club: "run", title: "Интервалы", starts_at: msk("2026-10-10T08:00").toISOString() }),
       event({ id: 6, kind: "club_event", club: "book", title: "Книжный клуб", starts_at: msk("2026-10-10T19:00").toISOString() }),
-    ], days, [run({})]);
+      event({ id: 7, kind: "club_event", club: "run", title: "Кофе-ран · Усачёва", format: "coffee_run", spot: "usachevo", starts_at: msk("2026-10-11T10:00").toISOString() }),
+    ], days);
     expect(items).toHaveLength(3);
     expect(scheduleScreen(items, days, 0).text).toContain("08:00 🏃 Интервалы · Беговой клуб");
   });

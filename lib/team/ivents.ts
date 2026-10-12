@@ -1,10 +1,11 @@
 import type { Context } from "grammy";
-import { COFFEE_RUNS } from "../coffeerun/run";
 import { findMember, listTeam, type TeamMember } from "./access";
 import {
   IVENT_CALLBACK_RE,
+  backToEventKeyboard,
   backToRunKeyboard,
   clubEventScreen,
+  coffeeEventScreen,
   coffeeRunScreen,
   iventsScreen,
   participantsText,
@@ -15,9 +16,10 @@ import {
   type IventItem,
   type TaskScreen,
 } from "./copy";
-import { canManageEvent, coffeeRunStart, eventKey, coffeeRunKey, supabaseEventStore, type TeamEvent, type TeamEventStore } from "./events";
+import { canManageEvent, coffeeRunStart, eventKey, coffeeRunKey, isCoffeeRunEvent, supabaseEventStore, type TeamEvent, type TeamEventStore } from "./events";
+import { mskToday } from "../databot/time";
 import { aggregateRuns, dynamicsFor, fetchArchive, runKeysFrom, type ArchiveRow, type RunAggregate } from "./history";
-import { isPast, mergeRuns, teamRun, type RunKey, type TeamRun } from "./runs";
+import { mergeRuns, teamRun, type RunKey, type TeamRun } from "./runs";
 import { fetchRunSignups, summarizeSignups, viewSignups, type SignupRow } from "./stats";
 import { attendanceNoticeText, saveAttendance, supabaseFactStore, type FactStore } from "./attendance";
 import { founderIds, isFounder } from "./config";
@@ -39,6 +41,8 @@ export interface EventsDeps {
   /** Явка (миграция 047). Без неё экраны пишут «Явка не внесена», а кнопки «Внести явку» нет. */
   facts?: FactStore;
   forms?: TeamFormStore;
+  /** «Из команды будут: … · не смогут: … · не ответили: N» для кофе-рана недели. */
+  rsvpLine?: (ev: TeamEvent) => Promise<string | null>;
 }
 
 export function defaultEventsDeps(): EventsDeps {
@@ -84,31 +88,48 @@ async function factsFor(deps: EventsDeps, keys: string[]): Promise<Map<string, n
   return deps.facts.getMany(keys);
 }
 
-/** Предстоящие ивенты: team_events (club_event) с этой минуты плюс непрошедшие кофе-раны. */
+/** Пара (спот, дата) кофе-рана недели — по ней заявки в coffee_run_signups. */
+export function coffeeRunKeyOf(ev: TeamEvent): RunKey | null {
+  return isCoffeeRunEvent(ev) && ev.spot ? { spot: ev.spot, date: mskToday(new Date(ev.starts_at)) } : null;
+}
+
+/**
+ * Предстоящие ивенты: только team_events (club_event). Кофе-ран недели — тоже
+ * событие team_events (format = coffee_run); COFFEE_RUNS сюда не подмешиваются.
+ */
 export async function upcomingIvents(deps: EventsDeps, now: Date): Promise<IventItem[]> {
   const [archive, events] = await Promise.all([
     deps.fetchArchive(),
     deps.events.listBetween(new Date(now.getTime() - 3 * HOUR), new Date(now.getTime() + 365 * 24 * HOUR)),
   ]);
   const aggs = aggregateRuns(archive);
-  const runs: IventItem[] = COFFEE_RUNS.filter((r) => !isPast(r.date, now)).map((r) => {
-    const run = teamRun({ spot: r.spot, date: r.date }, now);
-    return { kind: "run" as const, run, startsAt: coffeeRunStart(r), agg: aggFor(aggs, run) };
-  });
-  const clubEvents: IventItem[] = events.filter((e) => e.kind === "club_event").map((event) => ({ kind: "event" as const, event }));
-  return [...runs, ...clubEvents].sort((a, b) => Date.parse(start(a)) - Date.parse(start(b)));
+  return events
+    .filter((e) => e.kind === "club_event")
+    .map((event) => {
+      const key = coffeeRunKeyOf(event);
+      return key ? { kind: "event" as const, event, agg: aggFor(aggs, key) } : { kind: "event" as const, event };
+    })
+    .sort((a, b) => Date.parse(start(a)) - Date.parse(start(b)));
 }
 
 const start = (it: IventItem) => (it.kind === "run" ? it.startsAt : it.event.starts_at);
 
-/** Прошедшие: кофе-раны из базы заявок и ивенты клубов, от новых к старым. */
+/**
+ * Прошедшие: ивенты клубов и кофе-раны из базы заявок, от новых к старым.
+ * Забег из базы, у которого есть свой кофе-ран недели в team_events, второй
+ * строкой не показывается.
+ */
 export async function pastIvents(deps: EventsDeps, now: Date): Promise<IventItem[]> {
   const [archive, events] = await Promise.all([deps.fetchArchive(), deps.events.listPastClubEvents(now, 500)]);
   const aggs = aggregateRuns(archive);
-  const runs: IventItem[] = mergeRuns(runKeysFrom(archive), now).filter((r) => r.past)
+  const covered = new Set(events.map(coffeeRunKeyOf).filter((k): k is RunKey => !!k).map((k) => `${k.spot}:${k.date}`));
+  const runs: IventItem[] = mergeRuns(runKeysFrom(archive), now).filter((r) => r.past && !covered.has(`${r.spot}:${r.date}`))
     .map((run) => ({ kind: "run" as const, run, startsAt: runMoment(run), agg: aggFor(aggs, run) }));
-  const items: IventItem[] = [...runs, ...events.map((event) => ({ kind: "event" as const, event }))]
-    .sort((a, b) => Date.parse(start(b)) - Date.parse(start(a)));
+  const evItems: IventItem[] = events.map((event) => {
+    const key = coffeeRunKeyOf(event);
+    return key ? { kind: "event" as const, event, agg: aggFor(aggs, key) } : { kind: "event" as const, event };
+  });
+  const items: IventItem[] = [...runs, ...evItems].sort((a, b) => Date.parse(start(b)) - Date.parse(start(a)));
   const facts = await factsFor(deps, items.map((it) => (it.kind === "run" ? coffeeRunKey(it.run) : eventKey(it.event))));
   return items.map((it) => ({ ...it, fact: facts.get(it.kind === "run" ? coffeeRunKey(it.run) : eventKey(it.event)) ?? null }));
 }
@@ -135,6 +156,21 @@ export async function openCoffeeRunScreen(ctx: Context, deps: EventsDeps, spot: 
 export async function openClubEventScreen(ctx: Context, deps: EventsDeps, ev: TeamEvent, uid: number, edit: boolean, now: Date): Promise<void> {
   const [names, facts] = await Promise.all([namesOf(deps), factsFor(deps, [eventKey(ev)])]);
   const past = Date.parse(ev.starts_at) < now.getTime();
+  if (isCoffeeRunEvent(ev)) {
+    const key = coffeeRunKeyOf(ev);
+    let stats: ReturnType<typeof summarizeSignups> | null = null;
+    let dyn = null;
+    if (key) {
+      const [rows, archive] = await Promise.all([deps.fetchSignups(key), deps.fetchArchive()]);
+      stats = summarizeSignups(rows, now);
+      dyn = past ? null : dynamicsFor(teamRun(key, now), archive, now);
+    }
+    const rsvp = deps.rsvpLine ? await deps.rsvpLine(ev) : null;
+    await show(ctx, coffeeEventScreen(ev, names, stats, dyn, {
+      past, fact: facts.get(eventKey(ev)) ?? null, canManage: canManageEvent(ev, uid), attendable: attendable(deps), canFix: isFounder(uid), rsvp,
+    }), edit);
+    return;
+  }
   await show(ctx, clubEventScreen(ev, names, {
     past, fact: facts.get(eventKey(ev)) ?? null, canManage: canManageEvent(ev, uid), attendable: attendable(deps), canFix: isFounder(uid),
   }), edit);
@@ -145,7 +181,9 @@ async function attendanceTarget(deps: EventsDeps, key: string, now: Date): Promi
   const [kind, a, b] = key.split(":");
   if (kind === "event") {
     const ev = await deps.events.get(Number(a));
-    return ev ? { title: ev.title, day: shortDay(ev.starts_at), total: null } : null;
+    if (!ev) return null;
+    const run = coffeeRunKeyOf(ev);
+    return { title: ev.title, day: shortDay(ev.starts_at), total: run ? (await deps.fetchSignups(run)).length : null };
   }
   if (kind === "coffeerun" && a && b) {
     const run = teamRun({ spot: a, date: b }, now);
@@ -237,6 +275,20 @@ export async function handleEventsUpdate(ctx: Context, providedDeps?: EventsDeps
         const ev = await deps.events.get(Number(a));
         if (!ev || ev.cancelled_at) await ctx.reply("Такого ивента больше нет.");
         else await openClubEventScreen(ctx, deps, ev, uid, true, now);
+        return true;
+      }
+      case "pe":
+      case "ml": {
+        const ev = await deps.events.get(Number(a));
+        const key = ev ? coffeeRunKeyOf(ev) : null;
+        if (!ev || !key) {
+          await ctx.reply("У этого ивента нет заявок через сайт.");
+          return true;
+        }
+        const run = teamRun(key, now);
+        const rows = await deps.fetchSignups(run);
+        if (op === "pe") await show(ctx, { text: participantsText(run, viewSignups(rows)), keyboard: backToEventKeyboard(ev.id) }, true);
+        else await show(ctx, { text: remindersText(run, viewSignups(rows), summarizeSignups(rows, now), now), keyboard: backToEventKeyboard(ev.id) }, true, false);
         return true;
       }
       case "u": {

@@ -26,9 +26,17 @@ export interface TeamEvent {
   created_at: string;
   updated_at: string;
   cancelled_at: string | null;
+  /** coffee_run — кофе-ран недели (миграция 051); null — обычное событие. */
+  format?: "coffee_run" | null;
+  /** Слаг спота кофе-рана (lib/team/spots.ts); null — другое место. */
+  spot?: string | null;
+  confirm_asked_at?: string | null;
+  confirmed_at?: string | null;
+  confirm_nag_at?: string | null;
 }
 
-export type NewTeamEvent = Pick<TeamEvent, "kind" | "club" | "title" | "starts_at" | "place" | "responsible_chat_id" | "created_by">;
+export type NewTeamEvent = Pick<TeamEvent, "kind" | "club" | "title" | "starts_at" | "place" | "responsible_chat_id" | "created_by">
+  & Partial<Pick<TeamEvent, "format" | "spot">>;
 
 export interface TeamEventStore {
   create(row: NewTeamEvent, now: Date): Promise<TeamEvent>;
@@ -39,10 +47,16 @@ export interface TeamEventStore {
   listPastClubEvents(before: Date, limit: number): Promise<TeamEvent[]>;
   setTime(id: number, startsAt: string, now: Date): Promise<TeamEvent | null>;
   setResponsible(id: number, chatId: number, now: Date): Promise<TeamEvent | null>;
+  /** Назначить ответственного, даже если он уже есть (фаундер выбирает после решения «Да»). */
+  assignResponsible(id: number, chatId: number, now: Date): Promise<TeamEvent | null>;
   cancel(id: number, now: Date): Promise<TeamEvent | null>;
+  /** Поставить отметку подтверждения кофе-рана (confirm_asked_at, confirmed_at, confirm_nag_at). Только если её ещё нет. */
+  mark(id: number, field: "confirm_asked_at" | "confirmed_at" | "confirm_nag_at", now: Date): Promise<boolean>;
 }
 
-const COLUMNS = "id, kind, club, title, starts_at, place, notes, responsible_chat_id, created_by, created_at, updated_at, cancelled_at";
+// Читаем все колонки, без перечисления: колонки из 051 появятся в базе только
+// после миграции, и явный список уронил бы расписание до её применения.
+const COLUMNS = "*";
 
 export function supabaseEventStore(): TeamEventStore {
   const t = () => tgAdmin().from("team_events");
@@ -85,11 +99,22 @@ export function supabaseEventStore(): TeamEventStore {
       if (error) throw new Error(`team_events: ${error.message}`);
       return one(data);
     },
+    async assignResponsible(id, chatId, now) {
+      const { data, error } = await t().update({ responsible_chat_id: chatId, updated_at: now.toISOString() })
+        .eq("id", id).is("cancelled_at", null).select(COLUMNS).maybeSingle();
+      if (error) throw new Error(`team_events: ${error.message}`);
+      return one(data);
+    },
     async cancel(id, now) {
       const { data, error } = await t().update({ cancelled_at: now.toISOString(), updated_at: now.toISOString() })
         .eq("id", id).is("cancelled_at", null).select(COLUMNS).maybeSingle();
       if (error) throw new Error(`team_events: ${error.message}`);
       return one(data);
+    },
+    async mark(id, field, now) {
+      const { data, error } = await t().update({ [field]: now.toISOString() }).eq("id", id).is(field, null).select("id");
+      if (error) throw new Error(`team_events: ${error.message}`);
+      return (data ?? []).length === 1;
     },
   };
 }
@@ -99,7 +124,7 @@ export class MemoryEventStore implements TeamEventStore {
   events = new Map<number, TeamEvent>();
   private next = 1;
   async create(row: NewTeamEvent, now: Date) {
-    const ev: TeamEvent = { ...row, id: this.next++, notes: null, created_at: now.toISOString(), updated_at: now.toISOString(), cancelled_at: null };
+    const ev: TeamEvent = { format: null, spot: null, ...row, id: this.next++, notes: null, created_at: now.toISOString(), updated_at: now.toISOString(), cancelled_at: null };
     this.events.set(ev.id, ev);
     return { ...ev };
   }
@@ -128,6 +153,18 @@ export class MemoryEventStore implements TeamEventStore {
     if (!ev || ev.responsible_chat_id !== null) return null;
     Object.assign(ev, { responsible_chat_id: chatId, updated_at: now.toISOString() });
     return { ...ev };
+  }
+  async assignResponsible(id: number, chatId: number, now: Date) {
+    const ev = this.events.get(id);
+    if (!ev || ev.cancelled_at) return null;
+    Object.assign(ev, { responsible_chat_id: chatId, updated_at: now.toISOString() });
+    return { ...ev };
+  }
+  async mark(id: number, field: "confirm_asked_at" | "confirmed_at" | "confirm_nag_at", now: Date) {
+    const ev = this.events.get(id);
+    if (!ev || ev[field]) return false;
+    ev[field] = now.toISOString();
+    return true;
   }
   async cancel(id: number, now: Date) {
     const ev = this.events.get(id);
@@ -205,11 +242,14 @@ export type ScheduleItem =
   | { source: "event"; startsAt: string; event: TeamEvent }
   | { source: "coffeerun"; startsAt: string; run: CoffeeRun };
 
-/** Кофе-ран коротко: «Кофе-ран Усачёва», «Кофе-ран Лужники». */
+/** Кофе-ран коротко, как везде в «Пятнице»: «Кофе-ран · Усачёва». */
 export function coffeeRunTitle(run: Pick<CoffeeRun, "spotName">): string {
   const name = run.spotName.includes(",") ? run.spotName.split(",").at(-1)!.trim() : run.spotName.replace(/^Surf Coffee®?\s*/i, "").trim();
-  return `Кофе-ран ${name || run.spotName}`;
+  return `Кофе-ран · ${name || run.spotName}`;
 }
+
+/** Кофе-ран недели — событие team_events с format = coffee_run. */
+export const isCoffeeRunEvent = (ev: Pick<TeamEvent, "format">) => ev.format === "coffee_run";
 
 /** Момент старта кофе-рана по Москве. */
 export function coffeeRunStart(run: Pick<CoffeeRun, "date" | "startTime">): string {
@@ -226,19 +266,17 @@ export function weekRange(now: Date, offset = 0): { fromYmd: string; days: strin
   return { fromYmd, days: Array.from({ length: 7 }, (_, i) => addDays(fromYmd, i)) };
 }
 
-/** События и кофе-раны недели, по времени. Кофе-раны — как ивент «Бегового клуба». */
-export function scheduleItems(
-  events: readonly TeamEvent[],
-  days: readonly string[],
-  runs: readonly CoffeeRun[] = COFFEE_RUNS,
-): ScheduleItem[] {
+/**
+ * События недели по времени. Кофе-раны из COFFEE_RUNS сюда больше не
+ * подмешиваются: в «Пятнице» кофе-ран — это событие team_events
+ * (format = coffee_run), иначе рядом с ним вставал второй такой же.
+ */
+export function scheduleItems(events: readonly TeamEvent[], days: readonly string[]): ScheduleItem[] {
   const set = new Set(days);
-  const items: ScheduleItem[] = [
-    ...events.filter((e) => !e.cancelled_at && set.has(mskToday(new Date(e.starts_at))))
-      .map((event) => ({ source: "event" as const, startsAt: event.starts_at, event })),
-    ...runs.filter((r) => set.has(r.date)).map((run) => ({ source: "coffeerun" as const, startsAt: coffeeRunStart(run), run })),
-  ];
-  return items.sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
+  return events
+    .filter((e) => !e.cancelled_at && set.has(mskToday(new Date(e.starts_at))))
+    .map((event) => ({ source: "event" as const, startsAt: event.starts_at, event }))
+    .sort((a, b) => Date.parse(a.startsAt) - Date.parse(b.startsAt));
 }
 
 /** Группировка по московским дням; пустые дни выпадают. */

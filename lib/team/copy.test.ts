@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { CoffeeRun } from "../coffeerun/run";
 import {
   clubEventScreen,
+  coffeeEventScreen,
   coffeeRunScreen,
   dynamicsLines,
   dynamicsOneLine,
@@ -217,7 +218,7 @@ describe("экран кофе-рана", () => {
   it("шапка и цифры в 2–3 строки, динамика одной строкой", () => {
     const dyn = { daysBefore: 2, now: 3, previous: [{ date: "2026-09-13", atSameLead: 2, final: 37, opened: true }], typical: 2, comparable: 1 };
     const { text, keyboard } = coffeeRunScreen(LUZH, summarizeSignups(rows, NOW), dyn, null);
-    expect(text).toContain("<b>Кофе-ран Лужники</b>");
+    expect(text).toContain("<b>Кофе-ран · Лужники</b>");
     expect(text).toContain("🏃 Беговой клуб");
     expect(text).toContain("Вс 20.09, 10:00 (сбор 9:30)");
     expect(text).toContain("Заявок 3 · подтвердились 2");
@@ -234,6 +235,22 @@ describe("экран кофе-рана", () => {
     const none = coffeeRunScreen(LUZH_PAST, summarizeSignups(rows, NOW), null, null, true);
     expect(none.text).toContain("Явка не внесена");
     expect(none.keyboard.inline_keyboard.flat().map((b) => b.text)).toContain("Внести явку");
+  });
+});
+
+describe("экран кофе-рана недели (событие team_events)", () => {
+  it("шапка события, заявки по (спот, дата), кто из команды будет, кнопки участников и рассылки", () => {
+    const coffee = ev({ id: 11, title: "Кофе-ран · Усачёва", format: "coffee_run", spot: "usachevo", place: "Москва, ул. Усачёва, 62",
+      starts_at: "2026-10-18T07:00:00Z", responsible_chat_id: 5 });
+    const stats = summarizeSignups([row({ confirmed_at: "2026-10-12T10:00:00Z", tg_chat_id: 7 }), row({})], NOW);
+    const { text, keyboard } = coffeeEventScreen(coffee, new Map([[5, "masha"]]), stats, null,
+      { past: false, canManage: false, rsvp: "Из команды будут: @vika · не смогут: — · не ответили: 3" });
+    expect(text).toContain("<b>Кофе-ран · Усачёва</b>\n🏃 Беговой клуб\nВс 18.10, 10:00");
+    expect(text).toContain("Ответственный: @masha");
+    expect(text).toContain("Заявок 2 · подтвердились 1");
+    expect(text).toContain("Из команды будут: @vika");
+    expect(keyboard.inline_keyboard.flat().map((b) => (b as { callback_data?: string }).callback_data))
+      .toEqual(["ie:pe:11", "ie:ml:11", "ie:l"]);
   });
 });
 
@@ -263,7 +280,7 @@ describe("список ивентов", () => {
     ];
     const { text, keyboard } = iventsScreen(items, new Map([[5, "masha"]]));
     expect(text).toContain("🏃 Интервалы · сб 19.09");
-    expect(text).toContain("🏃 Кофе-ран Лужники · вс 20.09 · 23 заявки, 18 подтв.");
+    expect(text).toContain("🏃 Кофе-ран · Лужники · вс 20.09 · 23 заявки, 18 подтв.");
     expect(text).toContain("Книжный клуб · ср 23.09 · отв. @masha");
     expect(keyboard.inline_keyboard.flat().map((b) => (b as { callback_data?: string }).callback_data)).toEqual(["ie:e:1", "ie:r:luzhniki:2026-09-20", "ie:e:2", "ie:p:0"]);
   });
@@ -280,8 +297,8 @@ describe("список ивентов", () => {
       startsAt: `2026-08-${String(30 - i).padStart(2, "0")}T07:00:00Z`, agg: agg({ total: 31 }), fact: i === 0 ? 22 : null,
     }));
     const first = pastIventsScreen(items, 0);
-    expect(first.text).toContain("Кофе-ран Лужники · 30.08 · заявок 31, пришло 22");
-    expect(first.text).toContain("Кофе-ран Лужники · 29.08 · заявок 31, явка не внесена");
+    expect(first.text).toContain("Кофе-ран · Лужники · 30.08 · заявок 31, пришло 22");
+    expect(first.text).toContain("Кофе-ран · Лужники · 29.08 · заявок 31, явка не внесена");
     expect(first.text).not.toContain("19.08");
     expect(first.keyboard.inline_keyboard.flat().map((b) => b.text)).toContain("Ещё");
     expect(pastIventsScreen(items, 1).text).toContain("19.08");

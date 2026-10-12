@@ -98,7 +98,7 @@ export async function showSchedule(ctx: Context, deps: ScheduleDeps, offset: num
   const from = mskMidnight(fromYmd);
   const to = mskMidnight(addDays(fromYmd, 7));
   const events = await deps.events.listBetween(from, to);
-  await show(ctx, scheduleScreen(scheduleItems(events, days, COFFEE_RUNS), days, offset), edit);
+  await show(ctx, scheduleScreen(scheduleItems(events, days), days, offset), edit);
 }
 
 const SCHEDULE_COMMAND = /^\/(schedule|event)(?:@([a-z0-9_]+))?(?=\s|$)/i;
