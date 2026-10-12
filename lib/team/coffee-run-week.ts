@@ -416,7 +416,7 @@ export async function decideYes(
   const pick: InlineKeyboardMarkup = {
     inline_keyboard: team.map((m) => [{ text: nameOf(m), callback_data: `cr:${ev.id}:${m.chat_id}` }]),
   };
-  await api.sendMessage(by, `Кто ответственный за ${ev.title.toLowerCase()} ${shortDay(ev.starts_at)}?`, { reply_markup: pick }).catch(() => {});
+  await api.sendMessage(by, `Кто ответственный за ${lcFirst(ev.title)} ${shortDay(ev.starts_at)}?`, { reply_markup: pick }).catch(() => {});
 
   // 4. Задачи отделам.
   await createCoffeeTasks(deps, api, week, ev, by, team, now);
@@ -488,7 +488,7 @@ export async function dispatchConfirmations(deps: CoffeeWeekDeps, api: WeekApi, 
     const left = Date.parse(ev.starts_at) - now.getTime();
     if (left <= CONFIRM_BEFORE_MS && !ev.confirm_asked_at && (await deps.events.mark(ev.id, "confirm_asked_at", now))) {
       const to = ev.responsible_chat_id ?? ev.created_by;
-      await api.sendMessage(to, `Завтра ${ev.title.toLowerCase()}, ${hhmmOf(ev.starts_at)}. Проводим?`, { reply_markup: confirmKeyboard(ev.id) }).catch(() => {});
+      await api.sendMessage(to, `Завтра ${lcFirst(ev.title)}, ${hhmmOf(ev.starts_at)}. Проводим?`, { reply_markup: confirmKeyboard(ev.id) }).catch(() => {});
       done.push(`confirm ${ev.id}`);
       continue;
     }
@@ -541,6 +541,9 @@ function spotButtons(week: string, ymd: string, hhmm: string): InlineKeyboardMar
     ],
   };
 }
+
+/** «Кофе-ран · Усачёва» посреди фразы: строчная только первая буква. */
+const lcFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
 
 const fmtHHMM = (hhmm: string) => `${hhmm.slice(0, 2)}:${hhmm.slice(2)}`;
 
@@ -620,14 +623,14 @@ export async function handleCoffeeWeekUpdate(ctx: Context, deps: CoffeeWeekDeps,
     const team = await deps.listTeam();
     if (ans === "y") {
       if (!(await deps.events.mark(ev.id, "confirmed_at", now))) {
-        await edit(`Уже подтверждено: ${ev.title.toLowerCase()}, ${shortDay(ev.starts_at)} ${hhmmOf(ev.starts_at)}.`);
+        await edit(`Уже подтверждено: ${lcFirst(ev.title)}, ${shortDay(ev.starts_at)} ${hhmmOf(ev.starts_at)}.`);
         return true;
       }
-      await edit(`✅ Проводим: ${ev.title.toLowerCase()}, ${shortDay(ev.starts_at)} ${hhmmOf(ev.starts_at)}.`);
+      await edit(`✅ Проводим: ${lcFirst(ev.title)}, ${shortDay(ev.starts_at)} ${hhmmOf(ev.starts_at)}.`);
       await sendAll(api, team.map((m) => m.chat_id), `✅ Кофе-ран завтра в ${hhmmOf(ev.starts_at)} подтверждён\n\n${coffeeCardText(ev, await rsvpLine(deps, ev))}`);
     } else {
       await cancelCoffeeRun(deps, ev, now);
-      await edit(`❌ Отменено: ${ev.title.toLowerCase()}, ${shortDay(ev.starts_at)}.`);
+      await edit(`❌ Отменено: ${lcFirst(ev.title)}, ${shortDay(ev.starts_at)}.`);
       await sendAll(api, team.map((m) => m.chat_id), "❌ Кофе-ран завтра отменён");
       await ctx.reply("Участникам отмену нужно разослать через основного бота командой /cancel.");
     }
@@ -645,7 +648,7 @@ export async function handleCoffeeWeekUpdate(ctx: Context, deps: CoffeeWeekDeps,
     const updated = await deps.events.assignResponsible(ev.id, Number(chat), now);
     const team = await deps.listTeam();
     const who = nameOf(team.find((m) => m.chat_id === Number(chat)));
-    await edit(`Ответственный за ${ev.title.toLowerCase()}: ${who}.`);
+    await edit(`Ответственный за ${lcFirst(ev.title)}: ${who}.`);
     if (updated) {
       await api.sendMessage(Number(chat), `Ты ответственный за кофе-ран.\n\n${coffeeCardText(updated, null)}`, { parse_mode: "HTML" }).catch(() => {});
     }

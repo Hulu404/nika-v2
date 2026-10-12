@@ -286,7 +286,7 @@ describe("кофе-ран недели", () => {
       expect(calls).toEqual([]);
       await dispatchCoffeeRunWeek(deps, api, msk("2026-10-17T10:00"));
       await dispatchCoffeeRunWeek(deps, api, msk("2026-10-17T10:15"));
-      expect(sentTo(/^Завтра кофе-ран · усачёва, 10:00\. Проводим\?$/)).toEqual([3]);
+      expect(sentTo(/^Завтра кофе-ран · Усачёва, 10:00\. Проводим\?$/)).toEqual([3]);
       await press(`cc:${id}:y`, 3, msk("2026-10-17T11:00"));
       expect(sentTo(/^✅ Кофе-ран завтра в 10:00 подтверждён/)).toEqual([1, 2, 3, 8, 9]);
       // Подтверждено — фаундеров за 12 часов не дёргаем.
