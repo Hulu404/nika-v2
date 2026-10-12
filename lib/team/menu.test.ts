@@ -21,7 +21,12 @@ vi.mock("../databot/data/supabase-store", async () => {
   const store = new MemoryStore();
   return { createSupabaseStore: () => store };
 });
-const shared = vi.hoisted(() => ({ forms: null as unknown, facts: null as unknown, events: null as unknown }));
+const shared = vi.hoisted(() => ({ forms: null as unknown, facts: null as unknown, events: null as unknown, drafts: null as unknown }));
+vi.mock("./ai/stores", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./ai/stores")>();
+  shared.drafts = new real.MemoryDraftStore();
+  return { ...real, supabaseDraftStore: () => shared.drafts };
+});
 vi.mock("./form", async (importOriginal) => {
   const real = await importOriginal<typeof import("./form")>();
   shared.forms = new real.MemoryTeamForms();
@@ -44,6 +49,7 @@ import { registerHandlers, resetMenuShown, TEAM_COMMANDS } from "./bot";
 import { MENU } from "./copy";
 import { openTeamForm, type MemoryTeamForms } from "./form";
 import type { MemoryFactStore } from "./attendance";
+import type { MemoryDraftStore } from "./ai/stores";
 
 const member = (chat_id: number, username: string): TeamMember => ({
   chat_id, username, display_name: username, role: "member", joined_at: "2026-10-01T00:00:00Z",
@@ -119,6 +125,19 @@ describe("постоянное меню «Пятницы»", () => {
     // и следующее число уже не уходит в закрытую форму
     await send("17");
     expect((shared.facts as MemoryFactStore).facts.size).toBe(0);
+  });
+
+  it("кнопка меню посреди «✏️ Изменить» закрывает черновик", async () => {
+    const forms = shared.forms as MemoryTeamForms;
+    const drafts = shared.drafts as MemoryDraftStore;
+    const draft = await drafts.create({ chat_id: 1, source_text: "x", intent: { parsed: { intent: "show_my_day" }, picks: {} } }, new Date());
+    await drafts.setMessage(draft.id, 77);
+    await forms.set(1, openTeamForm("ai.edit", { draft: String(draft.id) }, new Date()));
+    await send(MENU.schedule);
+    expect(await forms.get(1)).toBeNull();
+    expect(drafts.drafts.size).toBe(0);
+    expect(sent.find((s) => s.method === "editMessageText")?.text).toBe("Черновик закрыт.");
+    expect(sent.map((s) => s.text).join("\n")).toMatch(/Расписание/);
   });
 
   it("меню слэш-команд — только /start и /help", () => {

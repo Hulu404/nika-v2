@@ -258,6 +258,15 @@ export async function handleTeamTaskUpdate(ctx: Context, providedDeps?: TeamTask
   return false;
 }
 
+/** «📋 Мои задачи» по запросу голосом или текстом: тот же экран, вкладка «Мне». */
+export async function showMyTasks(ctx: Context, uid: number, providedDeps?: TeamTaskDeps, now = new Date()): Promise<void> {
+  const deps = providedDeps ?? defaultDeps();
+  const member = await deps.findMember(uid);
+  if (!member) return;
+  await syncTeamTaskMembers(deps, now, [member]);
+  await showList(ctx, deps, uid, "me", 0, false, now);
+}
+
 /** Задачи, которые человек видит: свои, а у фаундера — все задачи команды. */
 async function visibleTasks(deps: TeamTaskDeps, uid: number): Promise<AssignedTask[]> {
   return isFounder(uid) ? deps.store.listAssignedOverview(new Date(0)) : deps.store.listMyAssigned(uid);

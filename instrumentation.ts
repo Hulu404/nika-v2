@@ -80,6 +80,21 @@ async function tickCoffeeRunWeek(): Promise<void> {
 }
 
 /**
+ * «Пятница» раз в минуту: личные напоминания («напомни мне в 14:00…») уходят
+ * в 14:00, а не на ближайшем 15-минутном проходе; черновики старше часа
+ * удаляются. Дедуп — отметка sent_at (lib/team/ai/assistant.ts).
+ */
+async function tickTeamMinute(): Promise<void> {
+  try {
+    const { tickTeamMinute: tick } = await import("./lib/team/ai/assistant");
+    const done = await tick();
+    if (done.length) console.log("[team-minute] сделано:", done.join(", "));
+  } catch (err) {
+    console.error("[team-minute] тик упал:", err instanceof Error ? err.message : String(err));
+  }
+}
+
+/**
  * «Пятница» фаундерам: снимок Telegram-канала и вопрос про Instagram в
  * 21:00 МСК, сводка в 10:00 и 22:30. Окна и дедуп — в lib/team/founders/.
  */
@@ -196,6 +211,9 @@ export async function register(): Promise<void> {
   }, REMINDER_TICK_MS);
   // Не держим процесс живым только ради тикера.
   timer.unref?.();
+  void tickTeamMinute();
+  const minuteTimer = setInterval(() => void tickTeamMinute(), 60_000);
+  minuteTimer.unref?.();
   // Явный след в логах: молчание бота однажды уже прошло незамеченным именно
   // потому, что о незапущенном слушателе нигде не было сказано.
   console.log(

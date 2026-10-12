@@ -13,7 +13,7 @@ import { mergeRuns, pickRun, type TeamRun } from "./runs";
 import { fetchArchive, runKeysFrom, type ArchiveRow } from "./history";
 import { NOT_A_MEMBER_TEXT, helpText, menuCommand, menuKeyboard, menuSection } from "./copy";
 import { faqAnswerText, faqIndexText, findFaq } from "./faq";
-import { handleTeamTaskUpdate } from "./tasks";
+import { handleTeamTaskUpdate, showMyTasks } from "./tasks";
 import { handleScheduleUpdate, showSchedule, defaultScheduleDeps, type ScheduleDeps } from "./schedule";
 import { defaultEventsDeps, handleEventsUpdate, openClubEventScreen, openCoffeeRunScreen } from "./ivents";
 import { supabaseTeamForms } from "./form";
@@ -21,6 +21,12 @@ import { touchSeen } from "./seen";
 import { handleSocialSectionUpdate } from "./founders/section";
 import { defaultTeamScreenDeps, handleTeamScreenUpdate, showTeam } from "./team-screen";
 import { defaultCoffeeWeekDeps, handleCoffeeWeekUpdate } from "./coffee-run-week";
+import { closeAiDraft, defaultAssistantDeps, handleAiMessage, handleAiUpdate, type AssistantDeps } from "./ai/assistant";
+import { supabaseDraftStore, supabaseParticipantStore } from "./ai/stores";
+import { teamAiConfig } from "./ai/yandex";
+import { buildMyDay } from "./my-day";
+import { supabaseEventStore } from "./events";
+import { createSupabaseStore } from "../databot/data/supabase-store";
 
 /**
  * Внутренний бот команды: сколько человек записалось, кто подтвердился, кому
@@ -104,6 +110,27 @@ function scheduleDeps(): ScheduleDeps {
   };
 }
 
+/** Голос и свободный текст: экраны — те же, что у кнопок. */
+function assistantDeps(): AssistantDeps {
+  return defaultAssistantDeps({
+    showMyTasks: (ctx, uid) => showMyTasks(ctx, uid),
+    showSchedule: (ctx) => showSchedule(ctx, scheduleDeps(), 0, false, new Date()),
+    myDay: (member, now) => buildMyDay(
+      { events: supabaseEventStore(), participants: supabaseParticipantStore(), tasks: createSupabaseStore() },
+      member, now, { footer: !!teamAiConfig() },
+    ),
+  });
+}
+
+/** Закрыть открытую форму; черновик с открытым «Изменить» закрывается вместе с ней. */
+async function closeForm(ctx: TeamContext, uid: number): Promise<void> {
+  const forms = supabaseTeamForms();
+  const form = await forms.get(uid).catch(() => null);
+  if (!form) return;
+  await forms.clear(uid).catch(() => {});
+  await closeAiDraft(ctx.api, supabaseDraftStore(), uid, form);
+}
+
 /** Кому клавиатура меню уже ушла в этом процессе: остальным прикрепим её к первому ответу. */
 const menuShown = new Set<number>();
 
@@ -120,7 +147,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     const section = menuSection(ctx.message?.text);
     if (section && ctx.message && ctx.from) {
       const command = menuCommand(section);
-      await supabaseTeamForms().clear(ctx.from.id).catch(() => {});
+      await closeForm(ctx, ctx.from.id);
       ctx.message.text = command;
       ctx.message.entities = [{ type: "bot_command", offset: 0, length: command.length }];
     }
@@ -152,7 +179,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
   bot.use(async (ctx, next) => {
     const text = ctx.message?.text?.trim() ?? "";
     if (ctx.from && text.startsWith("/") && !/^\/cancel(?:@\w+)?$/i.test(text) && !/^\/(assign|event)\b/i.test(text)) {
-      await supabaseTeamForms().clear(ctx.from.id).catch(() => {});
+      await closeForm(ctx, ctx.from.id);
     }
     await next();
   });
@@ -163,6 +190,8 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     if (await handleSocialSectionUpdate(ctx)) return;
     if (await handleTeamScreenUpdate(ctx)) return;
     if (await handleCoffeeWeekUpdate(ctx, defaultCoffeeWeekDeps())) return;
+    // Кнопки черновика и «✏️ Изменить» — после всех форм: уточнение ждём, только если открыто именно оно.
+    if (await handleAiUpdate(ctx, assistantDeps)) return;
     await next();
   });
 
@@ -318,6 +347,13 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     if (!member) return;
 
     const text = ctx.message.text.trim();
+    // С голосом и текстом короткое («лужники 13.09», «дождь») по-прежнему ищем
+    // среди забегов и в FAQ, всё длиннее — сразу в разбор фразы.
+    const ai = teamAiConfig() ? assistantDeps() : null;
+    if (ai && text.split(/\s+/).length > 3) {
+      await handleAiMessage(ctx, member, ai);
+      return;
+    }
 
     await withData(ctx, async () => {
       const snap = await snapshot();
@@ -327,10 +363,18 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
         return;
       }
       if (await replyFaq(ctx, text, { quiet: true })) return;
+      if (ai && (await handleAiMessage(ctx, member, ai))) return;
       await ctx.reply(
         `Свободно говорить не умею.\n\n${helpText(isFounder(member.chat_id))}`,
       );
     });
+  });
+
+  bot.on("message:voice", async (ctx, next) => {
+    const member = await requireMember(ctx);
+    if (!member) return;
+    if (teamAiConfig() && (await handleAiMessage(ctx, member, assistantDeps()))) return;
+    await next();
   });
 
   bot.on("message", async (ctx) => {
