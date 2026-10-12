@@ -887,7 +887,7 @@ export type IventItem =
 export const PAST_PAGE = 10;
 
 /** «вс 11.10» по Москве. */
-function shortDay(iso: string): string {
+export function shortDay(iso: string): string {
   const p = mskParts(new Date(iso));
   return `${p.weekday} ${p.dd}.${p.mm}`;
 }

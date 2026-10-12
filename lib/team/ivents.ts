@@ -11,6 +11,7 @@ import {
   pastIventsScreen,
   remindersText,
   runTitle,
+  shortDay,
   type IventItem,
   type TaskScreen,
 } from "./copy";
@@ -18,8 +19,8 @@ import { canManageEvent, coffeeRunStart, eventKey, coffeeRunKey, supabaseEventSt
 import { aggregateRuns, dynamicsFor, fetchArchive, runKeysFrom, type ArchiveRow, type RunAggregate } from "./history";
 import { isPast, mergeRuns, teamRun, type RunKey, type TeamRun } from "./runs";
 import { fetchRunSignups, summarizeSignups, viewSignups, type SignupRow } from "./stats";
-import { saveAttendance, supabaseFactStore, type FactStore } from "./attendance";
-import { isFounder } from "./config";
+import { attendanceNoticeText, saveAttendance, supabaseFactStore, type FactStore } from "./attendance";
+import { founderIds, isFounder } from "./config";
 import { openTeamForm, supabaseTeamForms, teamFormExpired, type TeamFormStore } from "./form";
 
 /**
@@ -139,6 +140,39 @@ export async function openClubEventScreen(ctx: Context, deps: EventsDeps, ev: Te
   }), edit);
 }
 
+/** Что за ивент у ключа явки: название, день и сколько было заявок (только у кофе-ранов). */
+async function attendanceTarget(deps: EventsDeps, key: string, now: Date): Promise<{ title: string; day: string; total: number | null } | null> {
+  const [kind, a, b] = key.split(":");
+  if (kind === "event") {
+    const ev = await deps.events.get(Number(a));
+    return ev ? { title: ev.title, day: shortDay(ev.starts_at), total: null } : null;
+  }
+  if (kind === "coffeerun" && a && b) {
+    const run = teamRun({ spot: a, date: b }, now);
+    return { title: runTitle(run), day: shortDay(`${b}T12:00:00+03:00`), total: (await deps.fetchSignups(run)).length };
+  }
+  return null;
+}
+
+/**
+ * Всем фаундерам — одно сообщение о внесённой явке. Тому, кто внёс, не шлём:
+ * он и так знает. Других уведомлений про явку фаундерам нет.
+ */
+async function notifyFounders(ctx: Context, deps: EventsDeps, key: string, attended: number, previous: number | null, by: number, now: Date): Promise<void> {
+  try {
+    const target = await attendanceTarget(deps, key, now);
+    if (!target) return;
+    const who = (await deps.listTeam()).find((m) => m.chat_id === by);
+    const text = attendanceNoticeText({ ...target, attended, previous, by: who?.username ? `@${who.username}` : (who?.display_name ?? "участника команды") });
+    for (const chatId of founderIds()) {
+      if (chatId === by) continue;
+      await ctx.api.sendMessage(chatId, text).catch(() => {});
+    }
+  } catch (err) {
+    console.error("[team-events] attendance notice:", err instanceof Error ? err.message : String(err));
+  }
+}
+
 const EVENTS_COMMAND = /^\/events(?:@([a-z0-9_]+))?(?=\s|$)/i;
 
 export async function handleEventsUpdate(ctx: Context, providedDeps?: EventsDeps, now = new Date()): Promise<boolean> {
@@ -177,6 +211,7 @@ export async function handleEventsUpdate(ctx: Context, providedDeps?: EventsDeps
       await ctx.reply(`Явку уже внесли: ${res.attended}. Исправить могут только фаундеры.`);
     } else {
       await ctx.reply(`Записала: на «${form.params.title}» пришло ${res.attended}.`);
+      await notifyFounders(ctx, deps, form.params.key, res.attended, res.previous, uid, now);
     }
     return true;
   }

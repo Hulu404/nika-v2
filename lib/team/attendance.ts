@@ -1,8 +1,7 @@
-import { COFFEE_RUNS, type CoffeeRun } from "../coffeerun/run";
 import { tgAdmin } from "../telegram/supabase";
-import { founderIds, isFounder } from "./config";
+import { isFounder } from "./config";
 import type { InlineKeyboardMarkup } from "grammy/types";
-import { coffeeRunKey, coffeeRunStart, coffeeRunTitle, eventKey, type TeamEvent, type TeamEventStore } from "./events";
+import { eventKey, type TeamEvent, type TeamEventStore } from "./events";
 import { openTeamForm, type TeamFormStore } from "./form";
 
 /**
@@ -10,7 +9,8 @@ import { openTeamForm, type TeamFormStore } from "./form";
  *
  * Вносит любой участник, если явки ещё нет; исправить уже внесённую могут
  * только фаундеры. Через 3 часа после начала ивента бот один раз спрашивает
- * ответственного, а если его нет — фаундеров.
+ * ответственного, а если его нет — автора события. После внесения всем
+ * фаундерам — одно уведомление.
  */
 
 export interface Fact {
@@ -103,31 +103,22 @@ export interface AskTarget {
 
 /**
  * Каким ивентам клубов пора задать вопрос о явке: прошло 3 часа с начала
- * (и не больше трёх суток), явки ещё нет. Отметку «спросили» ставит
- * dispatchAttendanceAsks.
+ * (и не больше трёх суток), явки ещё нет. Спрашиваем ответственного, а если
+ * его нет — автора события. Фаундеры вопрос не получают, если они не
+ * ответственный и не автор. Отметку «спросили» ставит dispatchAttendanceAsks.
  */
 export function attendanceAsksDue(
   events: readonly TeamEvent[],
   facts: ReadonlyMap<string, number>,
   now: Date,
-  runs: readonly CoffeeRun[] = COFFEE_RUNS,
-  founders: readonly number[] = [...founderIds()],
 ): AskTarget[] {
   const due = (startsAt: string) => {
     const age = now.getTime() - Date.parse(startsAt);
     return age >= ASK_AFTER_MS && age < ASK_WINDOW_MS;
   };
-  const out: AskTarget[] = [];
-  for (const ev of events) {
-    if (ev.kind !== "club_event" || ev.cancelled_at || !due(ev.starts_at) || facts.has(eventKey(ev))) continue;
-    out.push({ key: eventKey(ev), title: ev.title, to: ev.responsible_chat_id ? [ev.responsible_chat_id] : [...founders] });
-  }
-  for (const run of runs) {
-    if (!due(coffeeRunStart(run)) || facts.has(coffeeRunKey(run))) continue;
-    // У кофе-ранов ответственного в базе нет — спрашиваем фаундеров.
-    out.push({ key: coffeeRunKey(run), title: `${coffeeRunTitle(run)}, ${run.date.slice(8, 10)}.${run.date.slice(5, 7)}`, to: [...founders] });
-  }
-  return out.filter((t) => t.to.length > 0);
+  return events
+    .filter((ev) => ev.kind === "club_event" && !ev.cancelled_at && due(ev.starts_at) && !facts.has(eventKey(ev)))
+    .map((ev) => ({ key: eventKey(ev), title: ev.title, to: [ev.responsible_chat_id ?? ev.created_by] }));
 }
 
 /** Число пришедших из сообщения: «17», «пришло 17». */
@@ -138,19 +129,42 @@ export function parseAttended(text: string): number | null {
   return n >= 0 && n <= 10_000 ? n : null;
 }
 
-export type SaveOutcome = { status: "saved"; attended: number } | { status: "exists"; attended: number } | { status: "bad" };
+export type SaveOutcome =
+  /** previous — прежнее значение, если фаундер исправил уже внесённую явку. */
+  | { status: "saved"; attended: number; previous: number | null }
+  | { status: "exists"; attended: number }
+  | { status: "bad" };
 
 /** Внести явку: любой участник, если её ещё нет; исправить — только фаундер. */
 export async function saveAttendance(store: FactStore, key: string, text: string, by: number, now: Date): Promise<SaveOutcome> {
   const attended = parseAttended(text);
   if (attended === null) return { status: "bad" };
   const founder = isFounder(by);
+  const before = founder ? await store.get(key) : null;
   const res = await store.save(key, attended, by, now, founder);
   if (res === "exists") {
     const current = await store.get(key);
     return { status: "exists", attended: current?.attended ?? attended };
   }
-  return { status: "saved", attended };
+  return { status: "saved", attended, previous: before?.attended ?? null };
+}
+
+/**
+ * Фаундерам после внесения явки — одно сообщение:
+ * «✅ Явка внесена · Кофе-ран · Усачёва, вс 11.10 · пришло 17 из 23 заявок · от @salma».
+ * Без заявок — «пришло 17». Исправление — с пометкой «исправлено, было 15».
+ */
+export function attendanceNoticeText(n: {
+  title: string;
+  day: string;
+  attended: number;
+  total: number | null;
+  previous: number | null;
+  by: string;
+}): string {
+  const came = n.total !== null ? `пришло ${n.attended} из ${n.total} ${n.total % 10 === 1 && n.total % 100 !== 11 ? "заявки" : "заявок"}` : `пришло ${n.attended}`;
+  const fixed = n.previous !== null && n.previous !== n.attended ? ` · исправлено, было ${n.previous}` : "";
+  return `✅ Явка внесена · ${n.title}, ${n.day} · ${came}${fixed} · от ${n.by}`;
 }
 
 export interface AskDeps {
@@ -177,7 +191,7 @@ export function attendCallback(key: string): string {
  */
 export async function dispatchAttendanceAsks(deps: AskDeps, now: Date): Promise<string[]> {
   const events = await deps.events.listBetween(new Date(now.getTime() - ASK_WINDOW_MS), new Date(now.getTime() - ASK_AFTER_MS + 1));
-  const keys = [...events.map(eventKey), ...COFFEE_RUNS.map(coffeeRunKey)];
+  const keys = events.map(eventKey);
   const facts = await deps.facts.getMany(keys);
   const asked: string[] = [];
   for (const target of attendanceAsksDue(events, facts, now)) {
