@@ -10,7 +10,7 @@ import {
 } from "./access";
 import { mergeRuns, pickRun, type TeamRun } from "./runs";
 import { fetchArchive, runKeysFrom, type ArchiveRow } from "./history";
-import { NOT_A_MEMBER_TEXT, helpText, teamText } from "./copy";
+import { NOT_A_MEMBER_TEXT, helpText, menuCommand, menuKeyboard, menuSection, teamText } from "./copy";
 import { faqAnswerText, faqIndexText, findFaq } from "./faq";
 import { handleTeamTaskUpdate } from "./tasks";
 import { handleScheduleUpdate, showSchedule, defaultScheduleDeps, type ScheduleDeps } from "./schedule";
@@ -101,7 +101,43 @@ function scheduleDeps(): ScheduleDeps {
   };
 }
 
+/** Кому клавиатура меню уже ушла в этом процессе: остальным прикрепим её к первому ответу. */
+const menuShown = new Set<number>();
+
+/** Для тестов. */
+export function resetMenuShown(): void {
+  menuShown.clear();
+}
+
 export function registerHandlers(bot: Bot<TeamContext>): void {
+  // Кнопка меню — это команда. Подменяем текст на команду раздела до всех
+  // обработчиков: открытая форма (явка, Instagram, список задач) закрывается
+  // так же, как от любой команды, и текст кнопки никогда не станет ответом.
+  bot.use(async (ctx, next) => {
+    const section = menuSection(ctx.message?.text);
+    if (section && ctx.message && ctx.from) {
+      const command = menuCommand(section);
+      await supabaseTeamForms().clear(ctx.from.id).catch(() => {});
+      ctx.message.text = command;
+      ctx.message.entities = [{ type: "bot_command", offset: 0, length: command.length }];
+    }
+    await next();
+  });
+  // Клавиатура меню — с первым ответом человеку из команды, у которого её ещё не было.
+  bot.use(async (ctx, next) => {
+    const id = ctx.chat?.type === "private" ? ctx.chat.id : undefined;
+    if (id !== undefined && !menuShown.has(id) && (await findMember(id).catch(() => null))) {
+      ctx.api.config.use(async (prev, method, payload, signal) => {
+        const p = payload as { chat_id?: number; reply_markup?: unknown };
+        if (method === "sendMessage" && p.chat_id === id && !p.reply_markup && !menuShown.has(id)) {
+          menuShown.add(id);
+          return prev(method, { ...payload, reply_markup: menuKeyboard() } as typeof payload, signal);
+        }
+        return prev(method, payload, signal);
+      });
+    }
+    await next();
+  });
   // «Был в боте» — на любое действие: команды, текст, кнопки, ответы в формах.
   // Обработчики задач, расписания и ивентов отвечают раньше команд, поэтому
   // метка ставится здесь, до них. В базу не чаще раза в 5 минут (seen.ts).
@@ -144,6 +180,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     switch (res.status) {
       case "joined":
         await setTeamCommands(bot.api, res.member);
+        menuShown.add(chatId);
         await ctx.reply(
           [
             "Готово, ты в команде.",
@@ -152,11 +189,13 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
             "",
             helpText(isFounder(res.member.chat_id)),
           ].join("\n"),
+          { reply_markup: menuKeyboard() },
         );
         break;
       case "already":
         await setTeamCommands(bot.api, res.member);
-        await ctx.reply(`Ты и так в команде.\n\n${helpText(isFounder(res.member.chat_id))}`);
+        menuShown.add(chatId);
+        await ctx.reply(`Ты и так в команде.\n\n${helpText(isFounder(res.member.chat_id))}`, { reply_markup: menuKeyboard() });
         break;
       case "wrong_secret":
         // Не подсказываем, что именно не так: перебирающему знать нечего.
@@ -185,8 +224,11 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
       member = await findMember(member.chat_id) ?? member;
     }
     await setTeamCommands(bot.api, member);
-    await ctx.reply(helpText(isFounder(member.chat_id)));
-    await withData(ctx, async () => showSchedule(ctx, defaultScheduleDeps(), 0, false, new Date()));
+    menuShown.add(member.chat_id);
+    await ctx.reply(helpText(isFounder(member.chat_id)), { reply_markup: menuKeyboard() });
+    if (ctx.message?.text?.startsWith("/start")) {
+      await withData(ctx, async () => showSchedule(ctx, defaultScheduleDeps(), 0, false, new Date()));
+    }
   });
 
   // ── Быстрые ответы ─────────────────────────────────────────────────────────
@@ -324,19 +366,12 @@ async function replyFaq(
 }
 
 /**
- * Меню команд в интерфейсе Telegram — чтобы синтаксис не держали в голове.
- * Одно на всех: права у участников равные, фаундерские действия в меню не
- * выносим.
+ * Меню слэш-команд: только /start и /help. Разделы открываются кнопками
+ * постоянной клавиатуры (menuKeyboard в copy.ts); остальные команды
+ * (/tasks, /faq, /mute…) работают, но в меню не выносятся.
  */
 export const TEAM_COMMANDS = [
-  { command: "tasks", description: "Задачи" },
-  { command: "assign", description: "Поставить задачу" },
-  { command: "schedule", description: "Расписание" },
-  { command: "events", description: "Ивенты" },
-  { command: "social", description: "Соцсети" },
-  { command: "team", description: "Команда" },
-  { command: "faq", description: "Быстрые ответы" },
-  { command: "mute", description: "Не присылать сводку" },
+  { command: "start", description: "Меню" },
   { command: "help", description: "Что я умею" },
 ];
 

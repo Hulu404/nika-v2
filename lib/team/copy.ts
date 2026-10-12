@@ -1,4 +1,4 @@
-import { InlineKeyboard } from "grammy";
+import { InlineKeyboard, Keyboard } from "grammy";
 import { REMINDER_HOUR_MSK, dayBefore, spotName } from "../coffeerun/run";
 import { formatPace } from "../coffeerun/pace";
 import { DEFAULT_TZ } from "../telegram/schedule";
@@ -214,6 +214,45 @@ export function teamText(members: TeamMember[], meChatId: number): string {
   return [`В команде ${members.length} чел.:`, "", ...members.map(line)].join("\n");
 }
 
+// ── Постоянное меню ──────────────────────────────────────────────────────────
+// Клавиатура внизу чата, одна для всех. Кнопка открывает тот же экран, что и
+// команда; сопоставление подписи с командой — только здесь.
+
+export const MENU = {
+  tasks: "📋 Мои задачи",
+  assign: "➕ Поставить задачу",
+  schedule: "🗓 Расписание",
+  events: "🏃 Ивенты",
+  team: "👥 Команда",
+} as const;
+
+export type MenuSection = keyof typeof MENU;
+
+const MENU_COMMAND: Record<MenuSection, string> = {
+  tasks: "/tasks",
+  assign: "/assign",
+  schedule: "/schedule",
+  events: "/events",
+  team: "/team",
+};
+
+/** Раздел по тексту кнопки меню; null — это не кнопка. */
+export function menuSection(text: string | undefined | null): MenuSection | null {
+  const t = (text ?? "").trim();
+  return (Object.keys(MENU) as MenuSection[]).find((k) => MENU[k] === t) ?? null;
+}
+
+export const menuCommand = (section: MenuSection) => MENU_COMMAND[section];
+
+export function menuKeyboard(): Keyboard {
+  return new Keyboard()
+    .text(MENU.tasks).text(MENU.assign).row()
+    .text(MENU.schedule).text(MENU.events).row()
+    .text(MENU.team)
+    .resized()
+    .persistent();
+}
+
 /** Первый экран для чужого: как войти. Ключ, разумеется, не называем. */
 export const NOT_A_MEMBER_TEXT =
   "Это внутренний бот команды НИКИ — задачи и цифры по забегам.\n\n" +
@@ -222,7 +261,7 @@ export const NOT_A_MEMBER_TEXT =
 
 export function helpText(founder = false): string {
   const lines = [
-    "«Пятница» — бот команды НИКИ.",
+    "«Пятница» — бот команды НИКИ. Разделы — кнопками внизу чата.",
     "",
     "/tasks — задачи: мне, я поставил, выполненные",
     "/assign — поставить задачу: что делать / срок / @ник",
