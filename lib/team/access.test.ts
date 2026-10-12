@@ -16,6 +16,8 @@ vi.mock("./access", () => ({
   listTeam: async () => [...roster.values()],
   setDigestOptIn: async () => true,
   toggleDepartment: async () => [],
+  applyRoster: async () => {},
+  updateProfile: async () => {},
   removeMember: async (target: string) => {
     removed.push(target);
     const m = [...roster.values()].find((x) => `@${x.username}` === target);

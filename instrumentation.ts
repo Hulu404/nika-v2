@@ -154,6 +154,16 @@ export async function register(): Promise<void> {
   const { ensureTeamWebhook } = await import("./lib/team/ensure-webhook");
   const team = await ensureTeamWebhook();
   console.log(`[team] webhook: ${team.status}${team.detail ? ` — ${team.detail}` : ""}`);
+  // Имена, должности и отделы из lib/team/roster.ts — тем, у кого поля пустые.
+  if (team.status !== "skipped") {
+    try {
+      const { applyRosterAll } = await import("./lib/team/access");
+      const n = await applyRosterAll();
+      if (n) console.log(`[team] roster: дописаны профили ${n} чел.`);
+    } catch (err) {
+      console.error("[team] roster:", err instanceof Error ? err.message : String(err));
+    }
+  }
 
   // Бот данных команды — то же правило. Без DATABOT_TOKEN ни строки в логе:
   // бота в этом окружении просто нет. Сбой регистрации приложение не роняет.

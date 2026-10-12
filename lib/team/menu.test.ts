@@ -13,6 +13,8 @@ vi.mock("./access", () => ({
   setDigestOptIn: async () => true,
   removeMember: async () => ({ status: "not_found" }),
   toggleDepartment: async () => [],
+  applyRoster: async () => {},
+  updateProfile: async () => {},
 }));
 vi.mock("../databot/data/supabase-store", async () => {
   const { MemoryStore } = await import("../databot/data/memory-store");
@@ -101,8 +103,9 @@ describe("постоянное меню «Пятницы»", () => {
   });
 
   it("клавиатура приходит с первым ответом тому, у кого её ещё не было, и только один раз", async () => {
-    await send(MENU.team);
-    await send(MENU.team);
+    // «Поставить задачу» отвечает без inline-кнопок — к такому ответу клавиатура и цепляется.
+    await send(MENU.assign);
+    await send(MENU.assign);
     expect(sent.filter((s) => (s.markup as { keyboard?: unknown })?.keyboard)).toHaveLength(1);
   });
 

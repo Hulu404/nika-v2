@@ -10,6 +10,7 @@ import { isFounder } from "./config";
 import type { AssignedTask } from "../databot/task-list";
 import { CLUBS, clubByKey } from "./clubs";
 import { DEPARTMENTS, departmentName } from "./departments";
+import { personName } from "./roster";
 import { coffeeRunStart, coffeeRunTitle, groupByDay, itemClub, type ScheduleItem, type TeamEvent, type TeamEventKind } from "./events";
 
 /**
@@ -203,8 +204,10 @@ export function remindersText(
 export function teamText(members: TeamMember[], meChatId: number): string {
   if (members.length === 0) return "В команде пока никого — странно, ведь ты как-то сюда попал.";
   const line = (m: TeamMember) => {
-    const who = m.username ? `@${m.username}` : (m.display_name ?? String(m.chat_id));
-    const role = isFounder(m.chat_id) ? " · фаундер" : "";
+    // «Маша · Главный дизайнер · @mouserdyuk»; без имени и должности — как раньше, ник.
+    const who = [m.first_name, m.title, m.username ? `@${m.username}` : null].filter(Boolean).join(" · ")
+      || (m.display_name ?? String(m.chat_id));
+    const role = isFounder(m.chat_id) && !/фаундер/i.test(m.title ?? "") ? " · фаундер" : "";
     const me = m.chat_id === meChatId ? " · это ты" : "";
     const seen = m.last_seen_at ? ` · был ${mskDateTime(m.last_seen_at)}` : " · ещё не заходил";
     // Отписку от сводок показываем: иначе «почему мне не пришло утром» будет
@@ -216,28 +219,52 @@ export function teamText(members: TeamMember[], meChatId: number): string {
   return [`В команде ${members.length} чел.:`, "", ...members.map(line)].join("\n");
 }
 
-/** «👥 Команда»: список; фаундеру — кнопка на каждого человека, чтобы разложить по отделам. */
+/**
+ * «👥 Команда»: список; фаундеру — кнопка на каждого человека (имя, должность,
+ * отделы, варианты имени), остальным — кнопка своих вариантов имени.
+ */
 export function teamScreen(members: TeamMember[], meChatId: number, founder: boolean): TaskScreen {
   const kb = new InlineKeyboard();
   if (founder) {
-    for (const m of members) kb.text(m.username ? `@${m.username}` : (m.display_name ?? String(m.chat_id)), `dp:m:${m.chat_id}`).row();
+    for (const m of members) kb.text(personName(m) + (m.username ? ` · @${m.username}` : ""), `dp:m:${m.chat_id}`).row();
+  } else if (members.some((m) => m.chat_id === meChatId)) {
+    kb.text("Мои варианты имени", `dp:m:${meChatId}`).row();
   }
-  const hint = founder && members.length ? "\n\nНажми на человека, чтобы включить или выключить отделы." : "";
+  const hint = founder && members.length ? "\n\nНажми на человека, чтобы поменять имя, должность, отделы или варианты имени." : "";
   return { text: escapeHtmlTeam(teamText(members, meChatId)) + hint, keyboard: kb };
 }
 
-/** Карточка человека для фаундера: отделы кнопками-переключателями. */
-export function memberDepartmentsScreen(m: TeamMember): TaskScreen {
+export type ProfileField = "name" | "title" | "aliases";
+
+/** Карточка человека. Фаундер меняет всё, участник — только свои варианты имени. */
+export function memberDepartmentsScreen(m: TeamMember, founder = true): TaskScreen {
   const who = m.username ? `@${m.username}` : (m.display_name ?? String(m.chat_id));
   const current = m.departments ?? [];
+  const aliases = m.name_aliases ?? [];
   const kb = new InlineKeyboard();
-  for (const d of DEPARTMENTS) kb.text(`${current.includes(d.key) ? "✓ " : ""}${d.name}`, `dp:t:${m.chat_id}:${d.key}`).row();
+  if (founder) {
+    for (const d of DEPARTMENTS) kb.text(`${current.includes(d.key) ? "✓ " : ""}${d.name}`, `dp:t:${m.chat_id}:${d.key}`).row();
+    kb.text("Имя", `dp:e:${m.chat_id}:name`).text("Должность", `dp:e:${m.chat_id}:title`).row();
+  }
+  kb.text("Варианты имени", `dp:e:${m.chat_id}:aliases`).row();
   kb.text("← К команде", "dp:l");
   return {
-    text: `<b>${escapeHtmlTeam(who)}</b>\nОтделы: ${current.length ? current.map(departmentName).join(", ") : "пока ни одного"}`,
+    text: [
+      `<b>${escapeHtmlTeam(who)}</b>`,
+      `Имя: ${escapeHtmlTeam(m.first_name ?? "—")}`,
+      `Должность: ${escapeHtmlTeam(m.title ?? "—")}`,
+      `Отделы: ${current.length ? current.map(departmentName).join(", ") : "пока ни одного"}`,
+      `Варианты имени: ${aliases.length ? escapeHtmlTeam(aliases.join(", ")) : "—"}`,
+    ].join("\n"),
     keyboard: kb,
   };
 }
+
+export const PROFILE_PROMPT: Record<ProfileField, string> = {
+  name: "Пришли имя одним сообщением, например «Маша». Отмена: /cancel.",
+  title: "Пришли должность одним сообщением, например «Ивент-отдел». «-» — очистить. Отмена: /cancel.",
+  aliases: "Пришли варианты имени через запятую, например «Дима, Димон». «-» — очистить. Отмена: /cancel.",
+};
 
 // ── Постоянное меню ──────────────────────────────────────────────────────────
 // Клавиатура внизу чата, одна для всех. Кнопка открывает тот же экран, что и

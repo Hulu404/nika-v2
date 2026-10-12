@@ -1,6 +1,7 @@
 import { Bot, type Api, type Context } from "grammy";
 import { isFounder, teamToken } from "./config";
 import {
+  applyRoster,
   findMember,
   joinTeam,
   listTeam,
@@ -183,6 +184,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
 
     switch (res.status) {
       case "joined":
+        await applyRoster(res.member);
         await setTeamCommands(bot.api, res.member);
         menuShown.add(chatId);
         await ctx.reply(
@@ -197,6 +199,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
         );
         break;
       case "already":
+        await applyRoster(res.member);
         await setTeamCommands(bot.api, res.member);
         menuShown.add(chatId);
         await ctx.reply(`Ты и так в команде.\n\n${helpText(isFounder(res.member.chat_id))}`, { reply_markup: menuKeyboard() });
@@ -226,6 +229,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
         displayName: ctx.from?.first_name ?? null,
       });
       member = await findMember(member.chat_id) ?? member;
+      await applyRoster(member);
     }
     await setTeamCommands(bot.api, member);
     menuShown.add(member.chat_id);

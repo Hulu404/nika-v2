@@ -1,6 +1,7 @@
 import { tgAdmin } from "../telegram/supabase";
 import { normalizeTelegramUsername } from "../coffeerun/telegram-username";
 import { isFounder } from "./config";
+import { rosterPatch, type ProfilePatch } from "./roster";
 
 /**
  * Кто допущен к внутреннему боту команды.
@@ -34,6 +35,12 @@ export interface TeamMember {
   digest_opt_in: boolean;
   /** Отделы (lib/team/departments.ts); до миграции 051 поля нет. */
   departments?: string[];
+  /** Имя, должность, варианты имени (миграция 053; начальные — roster.ts). */
+  first_name?: string | null;
+  title?: string | null;
+  name_aliases?: string[];
+  /** Когда профиль меняли в боте: roster.ts его больше не трогает. */
+  profile_edited_at?: string | null;
 }
 
 const TABLE = "team_members";
@@ -236,7 +243,31 @@ export async function toggleDepartment(chatId: number, department: string): Prom
   if (!member) return null;
   const current = member.departments ?? [];
   const next = current.includes(department) ? current.filter((d) => d !== department) : [...current, department];
-  const { error } = await tgAdmin().from(TABLE).update({ departments: next }).eq("chat_id", chatId);
-  if (error) throw new Error(`team_members: ${error.message}`);
+  await updateProfile(chatId, { departments: next });
   return next;
+}
+
+/** Правка профиля в боте (имя, должность, отделы, варианты имени). После неё roster.ts профиль не трогает. */
+export async function updateProfile(chatId: number, patch: ProfilePatch, now: Date = new Date()): Promise<void> {
+  const { error } = await tgAdmin().from(TABLE).update({ ...patch, profile_edited_at: now.toISOString() }).eq("chat_id", chatId);
+  if (error) throw new Error(`team_members: ${error.message}`);
+}
+
+/** Дописать человеку пустые поля из roster.ts (при /join и /start). До миграции 053 — молча ничего. */
+export async function applyRoster(member: TeamMember): Promise<void> {
+  const patch = rosterPatch(member);
+  if (!patch) return;
+  const { error } = await tgAdmin().from(TABLE).update(patch).eq("chat_id", member.chat_id).is("profile_edited_at", null);
+  if (error) console.error("[team-access] applyRoster:", error.message);
+}
+
+/** Один раз при старте приложения: всем, кто уже в команде. */
+export async function applyRosterAll(): Promise<number> {
+  let n = 0;
+  for (const m of await listTeam()) {
+    if (!rosterPatch(m)) continue;
+    await applyRoster(m);
+    n++;
+  }
+  return n;
 }

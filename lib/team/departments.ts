@@ -11,6 +11,8 @@ export interface Department {
 export const DEPARTMENTS: readonly Department[] = [
   { key: "smm", name: "СММ" },
   { key: "events", name: "Ивенты" },
+  { key: "design", name: "Дизайн" },
+  { key: "dev", name: "Разработка" },
 ];
 
 export function departmentName(key: string): string {
