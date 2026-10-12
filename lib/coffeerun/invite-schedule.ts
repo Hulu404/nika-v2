@@ -1,3 +1,4 @@
+import { localParts, DEFAULT_TZ } from "../telegram/schedule";
 import { upcomingRuns, type CoffeeRun } from "./run";
 
 /**
@@ -20,6 +21,17 @@ export const INVITE_WEEKDAY = 1;
  * напоминаний: не будим утром и не пишем в ночь.
  */
 export const INVITE_HOUR_MSK = 10;
+
+/**
+ * Разовые переносы дня приглашений: забег (`spot:date`) → московская дата,
+ * в которую звать вместо понедельника. В понедельник такой забег пропускается.
+ *
+ * 18.10 на Усачёвой выложили в понедельник 12.10 днём; Дмитрий попросил
+ * разослать приглашения во вторник 13.10, а не сразу после деплоя.
+ */
+export const INVITE_DAY_OVERRIDES: Readonly<Record<string, string>> = {
+  "usachevo:2026-10-18": "2026-10-13",
+};
 
 /**
  * Ближайший будущий забег каждого спота. Именно он «только что открылся»:
@@ -55,8 +67,12 @@ export function runsDueForInvite(
   weekday: number,
   hour: number,
   now: Date = new Date(),
+  ymd: string = localParts(DEFAULT_TZ, now).ymd,
+  overrides: Readonly<Record<string, string>> = INVITE_DAY_OVERRIDES,
 ): CoffeeRun[] {
-  if (weekday !== INVITE_WEEKDAY) return [];
   if (hour < INVITE_HOUR_MSK) return [];
-  return nextRunPerSpot(upcomingRuns(now));
+  return nextRunPerSpot(upcomingRuns(now)).filter((run) => {
+    const moved = overrides[`${run.spot}:${run.date}`];
+    return moved ? moved === ymd : weekday === INVITE_WEEKDAY;
+  });
 }

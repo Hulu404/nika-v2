@@ -212,7 +212,7 @@ function targetRuns(opts: InviteDispatchOptions, now: Date): CoffeeRun[] {
     return run ? [run] : [];
   }
   const msk = localParts(DEFAULT_TZ, now);
-  return runsDueForInvite(msk.weekday, msk.hour, now);
+  return runsDueForInvite(msk.weekday, msk.hour, now, msk.ymd);
 }
 
 export async function dispatchCoffeeRunInvites(
@@ -230,7 +230,7 @@ export async function dispatchCoffeeRunInvites(
       : opts.spot
         ? `нет забега на споте ${opts.spot}`
         : msk.weekday !== INVITE_WEEKDAY
-          ? "не понедельник"
+          ? "не понедельник (и не день переноса)"
           : msk.hour < INVITE_HOUR_MSK
             ? `рано: зовём с ${INVITE_HOUR_MSK}:00 МСК`
             : "звать не на что — будущих забегов нет";

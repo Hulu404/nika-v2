@@ -185,7 +185,7 @@ Next.js читает `.env` и `.env.local`. Основной и командн�
 
 - `spot=usachevo` соответствует `/coffeerunsurfsport`.
 - `spot=luzhniki` соответствует `/coffeerunluzhniki`.
-- Форма отправляет имя, email, Telegram username, источник, спот, дату и необязательный темп в `POST /api/coffeerun-signup`.
+- Форма отправляет имя, email, Telegram username, источник, спот, дату и необязательный темп в `POST /api/coffeerun-signup`. Страница Усачёвой дополнительно шлёт `consent: true` (без галочки согласия форма не уходит); сервер пишет момент согласия в `coffee_run_signups.consent_at` (миграция `050`).
 - API нормализует username и определяет мероприятие по серверному конфигу. При устаревшей дате страницы ориентируется на спот.
 - Заявка сохраняется в `coffee_run_signups`; повтор для того же username, спота и даты обновляет запись.
 - Ответ содержит `confirmUrl` вида `https://t.me/<bot>?start=cr_<token>`. Основной бот подтверждает заявку и связывает её с Telegram.
@@ -193,17 +193,19 @@ Next.js читает `.env` и `.env.local`. Основной и командн�
 
 ### Редактирование лендингов
 
-Оба `public/coffeerun*/index.html` — самораспаковывающиеся HTML-бандлы с manifest ресурсов и JSON-строкой `__bundler/template`. Используйте скрипт:
+`public/coffeerunsurfsport/index.html` (спот `usachevo`) — **обычный самодостаточный HTML**: стили, скрипты и картинки внутри, шрифты с Google Fonts. Правится напрямую; бандлером его не упаковывать — бандл показывал «Unpacking...» и голый текст при загрузке. Отдаётся с `Cache-Control: no-cache` (`next.config.mjs`).
+
+`public/coffeerunluzhniki/index.html` пока остаётся самораспаковывающимся бандлом с JSON-строкой `__bundler/template`:
 
 ```sh
-node scripts/coffeerun-landing.mjs extract surfsport page.html
+node scripts/coffeerun-landing.mjs extract luzhniki page.html
 # Отредактировать page.html
-node scripts/coffeerun-landing.mjs pack surfsport page.html
+node scripts/coffeerun-landing.mjs pack luzhniki page.html
 ```
 
-Для Лужников замените `surfsport` на `luzhniki`. Аргумент скрипта **`surfsport`**, а спот в БД **`usachevo`**. `pack` проверяет обратную распаковку. Временный `page.html` не является исходником приложения и не должен случайно попасть в коммит.
+`pack` проверяет обратную распаковку. Временный `page.html` не является исходником приложения и не должен случайно попасть в коммит.
 
-При переносе забега синхронно обновляются `COFFEE_RUNS`, видимые тексты, метаданные и `RUN_DATE`/`RUN_SPOT` внутри шаблона. Конфиг сам не пересобирает HTML. Поддерживайте хронологический порядок массива и убирайте прошедшие события из активного расписания.
+При переносе забега синхронно обновляются `COFFEE_RUNS`, видимые тексты, метаданные и `RUN_DATE`/`RUN_SPOT` на странице. Конфиг сам не пересобирает HTML. Поддерживайте хронологический порядок массива и убирайте прошедшие события из активного расписания.
 
 ```sh
 npm test -- lib/coffeerun/landing.test.ts lib/coffeerun/run.test.ts
@@ -306,7 +308,6 @@ Production требует применённых миграций, окруже�
 
 ## Текущее состояние и ограничения
 
-- **Расписание и лендинг расходятся.** В `COFFEE_RUNS` Усачёва назначена на `2026-10-04`, но `RUN_DATE` внутри шаблона `public/coffeerunsurfsport/index.html` равен `2026-09-19`. Массив содержит сначала 4 октября, затем 20 сентября, нарушая порядок. Это даёт три падения в `lib/coffeerun/landing.test.ts` и `lib/coffeerun/run.test.ts`.
 - **Прошедшие события остаются в конфиге.** Лужники датированы `2026-09-20`. Выбор имеет fallback на прошедший забег; старая дата сама не закрывает заявки.
 - **Восстановление пароля неполное.** Код формирует ссылки на `/reset-password`, но соответствующей страницы в `app/` нет.
 - **Незавершённые разделы.** Медитации — заглушка, часть databot отключена, Premium только задан в конфиге.

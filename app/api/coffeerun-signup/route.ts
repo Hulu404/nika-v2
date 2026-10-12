@@ -39,6 +39,9 @@ export async function POST(req: Request) {
     string,
     string
   >;
+  // Согласие на обработку ПД: новая страница без него форму не отправляет.
+  // Старые страницы его не присылают — заявка всё равно валидна, без отметки.
+  const consent = (body as { consent?: unknown }).consent === true;
 
   // contact — совместимость со старой (закешированной) версией страницы.
   const tgUsername = normalizeTelegramUsername(telegram ?? contact);
@@ -107,11 +110,23 @@ export async function POST(req: Request) {
     // Темп дописываем, только когда он пришёл: повторная отправка со старой
     // страницы не должна стирать группу, которую человек уже выбрал.
     ...(chosenPace ? { pace: chosenPace } : {}),
+    // Момент согласия пишем, только когда оно пришло: повторная отправка со
+    // старой страницы не должна стирать уже данное согласие.
+    ...(consent ? { consent_at: new Date().toISOString() } : {}),
   };
 
-  const { error } = existing
-    ? await supabase.from("coffee_run_signups").update(fields).eq("id", existing.id)
-    : await supabase.from("coffee_run_signups").insert(fields);
+  const write = (row: typeof fields) =>
+    existing
+      ? supabase.from("coffee_run_signups").update(row).eq("id", existing.id)
+      : supabase.from("coffee_run_signups").insert(row);
+  let { error } = await write(fields);
+  // Миграция 050 (consent_at) могла ещё не доехать до базы. Заявка важнее
+  // отметки: пишем без неё и шумим в лог, а не роняем запись на забег.
+  if (error && consent && /consent_at/.test(error.message)) {
+    console.error("coffee_run_signups: нет consent_at, примени 050_coffee_run_consent.sql:", error.message);
+    const { consent_at: _skip, ...withoutConsent } = fields as typeof fields & { consent_at?: string };
+    ({ error } = await write(withoutConsent as typeof fields));
+  }
 
   if (error) {
     console.error("coffee_run_signups write error:", error.message);

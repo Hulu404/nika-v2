@@ -284,11 +284,12 @@ describe("экран раздела и поиск забега", () => {
     const s = await screen(createRunsHandler(deps({ archive: twoOnDate() })), req("list", {}));
     const data = buttonData(s);
     const cards = data.filter((d) => d.startsWith("d:run:card"));
+    // 18.10 на Усачёвой — из расписания COFFEE_RUNS, остальные — из заявок.
     expect(cards).toEqual([
-      "d:run:card:usachevo:2026-10-04",
       "d:run:card:luzhniki:2026-10-10",
       "d:run:card:usachevo:2026-10-10",
       "d:run:card:luzhniki:2026-10-17",
+      "d:run:card:usachevo:2026-10-18",
     ]);
     expect(data).toContain("d:run:past");
     expect(data).toContain("d:run:table");
@@ -312,7 +313,7 @@ describe("экран раздела и поиск забега", () => {
   it("пустая база не скрывает ближайший забег из расписания", async () => {
     const s = await screen(createRunsHandler(deps({ archive: [] })), req("list", {}));
     expect(s.text).toContain("Ближайшие — кнопками ниже");
-    expect(buttonData(s)).toContain("d:run:card:usachevo:2026-10-04");
+    expect(buttonData(s)).toContain("d:run:card:usachevo:2026-10-18");
   });
 });
 

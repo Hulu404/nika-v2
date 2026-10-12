@@ -75,6 +75,12 @@ const nextConfig = {
         ],
       },
       { source: "/start", headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }] },
+      // Лендинг Усачёвой: раньше закешированная страница присылала старую дату.
+      // no-cache — браузер и прокси каждый раз сверяются с сервером.
+      ...["/coffeerunsurfsport", "/coffeerunsurfsport/index.html"].map((source) => ({
+        source,
+        headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }],
+      })),
       { source: "/app", headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }, { key: "X-Robots-Tag", value: "noindex, nofollow" }] },
       // Звук практик и иконки меняются только с новым именем файла
       { source: "/app/audio/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800" }] },

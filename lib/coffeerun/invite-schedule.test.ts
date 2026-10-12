@@ -99,3 +99,26 @@ describe("runsDueForInvite — окно «понедельник с 10:00 МСК
     expect(new Set(spots).size).toBe(spots.length);
   });
 });
+
+describe("runsDueForInvite — разовый перенос дня приглашений", () => {
+  const monday = new Date("2026-10-12T14:00:00+03:00");
+  const tuesday = new Date("2026-10-13T10:05:00+03:00");
+  const overrides = { "usachevo:2026-10-18": "2026-10-13" };
+
+  it("забег с переносом не зовут в понедельник", () => {
+    const got = runsDueForInvite(INVITE_WEEKDAY, 14, monday, "2026-10-12", overrides);
+    expect(got.map((r) => r.spot)).not.toContain("usachevo");
+  });
+
+  it("зовут в день переноса с 10:00, хоть это и не понедельник", () => {
+    expect(runsDueForInvite(2, 9, tuesday, "2026-10-13", overrides)).toEqual([]);
+    const got = runsDueForInvite(2, 10, tuesday, "2026-10-13", overrides);
+    expect(got.map((r) => [r.spot, r.date])).toEqual([["usachevo", "2026-10-18"]]);
+  });
+
+  it("18.10 на Усачёвой перенесён на 13.10 в боевом расписании", () => {
+    const got = runsDueForInvite(2, 11, tuesday, "2026-10-13");
+    expect(got.map((r) => r.date)).toContain("2026-10-18");
+    expect(runsDueForInvite(INVITE_WEEKDAY, 14, monday, "2026-10-12").map((r) => r.spot)).not.toContain("usachevo");
+  });
+});

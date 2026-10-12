@@ -9,17 +9,19 @@ import { COFFEE_RUNS, runForSignup } from "./run";
  * подтверждает. Тест читает сами бандлы, а не копию их кода: сломать её можно
  * только правкой страницы, и тогда падает здесь, а не в личке участника.
  *
- * Страницы — самораспаковывающиеся бандлы, разметка лежит JSON-строкой в
+ * Лужники — самораспаковывающийся бандл: разметка лежит JSON-строкой в
  * <script type="__bundler/template"> (распаковка — scripts/coffeerun-landing.mjs).
+ * Усачёва (/coffeerunsurfsport) — обычный HTML без бандлера: бандл показывал
+ * «Unpacking...» и голый текст, пока распаковывался.
  */
 const ROOT = path.join(__dirname, "..", "..");
 const TEMPLATE_RE = /<script type="__bundler\/template"[^>]*>([\s\S]*?)<\/script>/;
 
 function landingSource(landing: string): string {
   const file = path.join(ROOT, "public", landing.replace(/^\//, ""), "index.html");
-  const match = TEMPLATE_RE.exec(readFileSync(file, "utf8"));
-  if (!match) throw new Error(`не нашла шаблон бандла в ${file}`);
-  return JSON.parse(match[1]) as string;
+  const html = readFileSync(file, "utf8");
+  const match = TEMPLATE_RE.exec(html);
+  return match ? (JSON.parse(match[1]) as string) : html;
 }
 
 /** Значение JS-константы вида `var RUN_SPOT='luzhniki', ...` со страницы. */
@@ -88,5 +90,15 @@ describe("лендинги кофе-рана — какой забег уезж�
       expect(src).toContain(street);
       expect(src).toContain(run.dateLabel);
     }
+  });
+
+  it("/coffeerunsurfsport — обычный HTML: без бандлера, с согласием и реальной отправкой", () => {
+    const html = readFileSync(path.join(ROOT, "public", "coffeerunsurfsport", "index.html"), "utf8");
+    expect(html).not.toContain("__bundler");
+    expect(html).toContain('id="i-ok"');
+    expect(html).toContain("consent:true");
+    expect(html).not.toContain("Демонстрация: заявка не отправлена");
+    expect(html).not.toContain("Прототип: подтверждение в Telegram не отправляется");
+    expect(html).toContain("https://www.mynika.online/legal/privacy");
   });
 });
