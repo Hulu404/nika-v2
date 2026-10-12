@@ -834,7 +834,7 @@ html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:n
   <div class="wrap">
     <div class="hero-top">
       <div class="p-top">
-        <span class="p-ev">NIKA EVENTS <i>№ 001</i></span>
+        <span class="p-ev">NIKA EVENTS <i data-edition>№ 008</i></span>
         <span class="p-with"><span class="sxs">Surf Coffee<sup>®</sup><i class="x">×</i>Sport</span></span>
       </div>
       <h1 class="poster" aria-label="Coffee run: кофе-ран NIKA Events и Surf Coffee × Sport">
@@ -852,7 +852,7 @@ html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:n
                 <dt>SPOT</dt><dd class="tk-spot">Surf Coffee<sup>®</sup> × Sport</dd>
                 <dt>TIME</dt><dd>10:30 <small>старт 11:00</small></dd>
               </dl>
-              <span class="tk-ed">EDITION № 008</span>
+              <span class="tk-ed">EDITION <span data-edition>№ 008</span></span>
               <span class="tk-by">SURF COFFEE<sup>®</sup> × SPORT <b>×</b> NIKA</span>
               <i class="tk-perf"></i>
             </div>
@@ -1031,6 +1031,10 @@ html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:n
    опознают ИМЕННО этот забег, даже если страница закеширована со старой
    датой (см. lib/coffeerun/run.ts → runForSignup). */
 var RUN_SPOT='usachevo', RUN_DATE='2026-10-18', RUN_SOURCE='coffeerunsurfsport';
+/* Номер кофе-рана по счёту: один источник для «NIKA EVENTS № …» и билета «EDITION № …».
+   Следующий забег — поменять цифру здесь (и в разметке, чтобы при загрузке не мелькала старая). */
+var RUN_EDITION=8;
+[].forEach.call(document.querySelectorAll('[data-edition]'),function(el){el.textContent='№ '+('00'+RUN_EDITION).slice(-3)});
 /* появление блоков */
 var revealItems=[].slice.call(document.querySelectorAll('.r'));
 function showAll(){revealItems.forEach(function(el){el.classList.add('in')})}

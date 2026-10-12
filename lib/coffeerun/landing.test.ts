@@ -101,4 +101,13 @@ describe("лендинги кофе-рана — какой забег уезж�
     expect(html).not.toContain("Прототип: подтверждение в Telegram не отправляется");
     expect(html).toContain("https://www.mynika.online/legal/privacy");
   });
+
+  it("/coffeerunsurfsport: номер забега из RUN_EDITION совпадает с разметкой во всех местах", () => {
+    const html = readFileSync(path.join(ROOT, "public", "coffeerunsurfsport", "index.html"), "utf8");
+    const edition = Number(/var RUN_EDITION=(\d+);/.exec(html)?.[1]);
+    expect(edition).toBeGreaterThan(0);
+    const shown = [...html.matchAll(/data-edition>([^<]*)</g)].map((m) => m[1]);
+    expect(shown.length).toBe(2);
+    for (const text of shown) expect(text).toBe(`№ ${String(edition).padStart(3, "0")}`);
+  });
 });
