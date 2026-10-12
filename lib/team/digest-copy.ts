@@ -1,17 +1,17 @@
 import { REMINDER_HOUR_MSK, dayBefore } from "../coffeerun/run";
 import { formatPace } from "../coffeerun/pace";
-import { dayHeader, escapeHtmlTeam, scheduleLine } from "./copy";
+import { escapeHtmlTeam, eventWhen } from "./copy";
 import type { TeamEvent } from "./events";
 import type { RunStats } from "./stats";
 
 /**
- * Текст сводки дня. Сообщение, которое человек не просил, имеет право прийти,
- * только если сразу отвечает «что сегодня» и «надо ли что-то делать».
+ * Кофе-ран в утренней сводке фаундерам. Сама сводка — «Мой день»
+ * (lib/team/my-day.ts): события и задачи каждого человека.
  *
  * Для кофе-рана две строки: сколько ждём и по каким группам темпа (это нужно
  * пейсерам, пока они ещё дома) и сколько не подтвердились. Отдельная строка-
  * тревога — если накануне окно рассылки напоминаний участникам прошло, а не
- * ушло ничего: единственная полезная часть прежней вечерней сводки.
+ * ушло ничего.
  */
 
 /** Событие дня; у кофе-рана недели — заявки по (спот, дата). */
@@ -31,16 +31,19 @@ function paceSummary(stats: RunStats): string {
   return filled.map((b) => `${b.pace ? formatPace(b.pace) : "без темпа"} — ${b.count}`).join(", ");
 }
 
-export function dailyDigestText(ymd: string, items: readonly DigestItem[], now: Date): string {
-  const sorted = [...items].sort((a, b) => Date.parse(startOf(a)) - Date.parse(startOf(b)));
-  const lines = [`<b>Сегодня, ${dayHeader(ymd)}</b>`, ""];
+/**
+ * Блоки фаундерам про кофе-ран дня в «Моём дне»: сколько ждём и по каким
+ * группам темпа, сколько не подтвердились, тревога, если накануне не ушло ни
+ * одного напоминания. Пусто — кофе-рана сегодня нет.
+ */
+export function founderCoffeeLines(items: readonly DigestItem[], now: Date): string[] {
+  const lines: string[] = [];
   const alarms: string[] = [];
-  for (const it of sorted) {
-    lines.push(scheduleLine({ source: "event", startsAt: it.event.starts_at, event: it.event }));
+  for (const it of [...items].sort((a, b) => Date.parse(startOf(a)) - Date.parse(startOf(b)))) {
     const { stats, runDate } = it;
     if (!stats || !runDate) continue;
-    lines.push(`  ждём ${stats.confirmed} из ${stats.total}: ${paceSummary(stats)}`);
-    if (stats.unconfirmed > 0) lines.push(`  ⚠️ не подтвердились ${stats.unconfirmed}: до них не дошли ни напоминание, ни адрес`);
+    lines.push(`🏃 ${escapeHtmlTeam(it.event.title)}, ${eventWhen(it.event.starts_at).split(", ")[1]}: ждём ${stats.confirmed} из ${stats.total} — ${paceSummary(stats)}`);
+    if (stats.unconfirmed > 0) lines.push(`⚠️ не подтвердились ${stats.unconfirmed}: до них не дошли ни напоминание, ни адрес`);
     if (reminderWindowPassed(runDate, now) && stats.confirmed > 0 && stats.reminded === 0) {
       alarms.push(
         `🚨 ${escapeHtmlTeam(it.event.title)}: вчера окно рассылки напоминаний прошло, а не ушло ни одного ` +
@@ -48,7 +51,5 @@ export function dailyDigestText(ymd: string, items: readonly DigestItem[], now: 
       );
     }
   }
-  if (alarms.length) lines.push("", ...alarms);
-  lines.push("", "Расписание: /schedule · ивенты: /events");
-  return lines.join("\n");
+  return [...lines, ...alarms];
 }

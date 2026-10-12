@@ -25,6 +25,9 @@ import { closeAiDraft, defaultAssistantDeps, handleAiMessage, handleAiUpdate, ty
 import { supabaseDraftStore, supabaseParticipantStore } from "./ai/stores";
 import { teamAiConfig } from "./ai/yandex";
 import { buildMyDay } from "./my-day";
+import { buildCoffeeBlock } from "./digest-build";
+import { fetchRunSignups } from "./stats";
+import { mskToday } from "../databot/time";
 import { supabaseEventStore } from "./events";
 import { createSupabaseStore } from "../databot/data/supabase-store";
 
@@ -115,9 +118,15 @@ function assistantDeps(): AssistantDeps {
   return defaultAssistantDeps({
     showMyTasks: (ctx, uid) => showMyTasks(ctx, uid),
     showSchedule: (ctx) => showSchedule(ctx, scheduleDeps(), 0, false, new Date()),
-    myDay: (member, now) => buildMyDay(
+    // То же, что утренняя сводка: фаундерам — с блоками про кофе-ран.
+    myDay: async (member, now) => buildMyDay(
       { events: supabaseEventStore(), participants: supabaseParticipantStore(), tasks: createSupabaseStore() },
-      member, now, { footer: !!teamAiConfig() },
+      member, now, {
+        footer: !!teamAiConfig(),
+        extra: isFounder(member.chat_id)
+          ? await buildCoffeeBlock({ events: supabaseEventStore(), fetchSignups: fetchRunSignups }, mskToday(now), now).catch(() => [])
+          : [],
+      },
     ),
   });
 }
@@ -222,7 +231,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
             "",
             "Сообщение с ключом лучше удали из переписки.",
             "",
-            helpText(isFounder(res.member.chat_id)),
+            helpText(isFounder(res.member.chat_id), !!teamAiConfig()),
           ].join("\n"),
           { reply_markup: menuKeyboard() },
         );
@@ -231,7 +240,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
         await applyRoster(res.member);
         await setTeamCommands(bot.api, res.member);
         menuShown.add(chatId);
-        await ctx.reply(`Ты и так в команде.\n\n${helpText(isFounder(res.member.chat_id))}`, { reply_markup: menuKeyboard() });
+        await ctx.reply(`Ты и так в команде.\n\n${helpText(isFounder(res.member.chat_id), !!teamAiConfig())}`, { reply_markup: menuKeyboard() });
         break;
       case "wrong_secret":
         // Не подсказываем, что именно не так: перебирающему знать нечего.
@@ -262,7 +271,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     }
     await setTeamCommands(bot.api, member);
     menuShown.add(member.chat_id);
-    await ctx.reply(helpText(isFounder(member.chat_id)), { reply_markup: menuKeyboard() });
+    await ctx.reply(helpText(isFounder(member.chat_id), !!teamAiConfig()), { reply_markup: menuKeyboard() });
     if (ctx.message?.text?.startsWith("/start")) {
       await withData(ctx, async () => showSchedule(ctx, defaultScheduleDeps(), 0, false, new Date()));
     }
@@ -291,8 +300,8 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     }
     await ctx.reply(
       on
-        ? "Буду снова присылать сводку дня в 8:00 МСК, если на день что-то запланировано."
-        : "Больше не присылаю сводку дня. Расписание по-прежнему в /schedule. Вернуть — /unmute.",
+        ? "Буду снова присылать план на день в 8:00 МСК."
+        : "Больше не присылаю план на день. Расписание по-прежнему в /schedule. Вернуть — /unmute.",
     );
   });
 
@@ -365,7 +374,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
       if (await replyFaq(ctx, text, { quiet: true })) return;
       if (ai && (await handleAiMessage(ctx, member, ai))) return;
       await ctx.reply(
-        `Свободно говорить не умею.\n\n${helpText(isFounder(member.chat_id))}`,
+        `Свободно говорить не умею.\n\n${helpText(isFounder(member.chat_id), !!teamAiConfig())}`,
       );
     });
   });

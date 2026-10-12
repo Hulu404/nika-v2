@@ -1,9 +1,13 @@
 import { tgAdmin } from "../telegram/supabase";
 import { localParts, DEFAULT_TZ } from "../telegram/schedule";
 import { dailyDigestDue } from "./digest-schedule";
-import { buildDailyDigest, type DigestDeps } from "./digest-build";
+import { buildCoffeeBlock, type DigestDeps } from "./digest-build";
 import { sendTeamMessage, type TeamSendResult } from "./send";
-import { teamBotConfigured } from "./config";
+import { isFounder, teamBotConfigured } from "./config";
+import { buildMyDay, type MyDayDeps } from "./my-day";
+import { supabaseParticipantStore } from "./ai/stores";
+import { teamAiConfig } from "./ai/yandex";
+import { createSupabaseStore } from "../databot/data/supabase-store";
 import { supabaseEventStore, type TeamEventStore } from "./events";
 import { fetchRunSignups } from "./stats";
 import { dispatchAttendanceAsks, supabaseFactStore, type FactStore } from "./attendance";
@@ -12,8 +16,9 @@ import type { InlineKeyboardMarkup } from "grammy/types";
 
 /**
  * Что «Пятница» присылает сама:
- *   • сводку дня в 8:00 МСК всем, кто не выключил её через /mute (если на день
- *     что-то есть);
+ *   • «Мой день» в 8:00 МСК каждому, кто не выключил сводку через /mute:
+ *     события дня, встречи, где он участник, и его задачи на сегодня
+ *     (lib/team/my-day.ts); фаундерам — ещё блоки про кофе-ран;
  *   • вопрос о явке через 3 часа после начала ивента клуба — ответственному
  *     или фаундерам, один раз.
  *
@@ -37,8 +42,10 @@ export interface TeamDigestResult {
   msk: { date: string; hour: number };
 }
 
-export interface DigestDispatchDeps extends DigestDeps {
+export interface DigestDispatchDeps extends DigestDeps, Pick<MyDayDeps, "participants" | "tasks"> {
   events: TeamEventStore;
+  /** Голос и текст включены — в конце «Напиши или надиктуй…». */
+  aiEnabled?: boolean;
   facts: FactStore;
   forms: TeamFormStore;
   /** Кому идут сводки: команда минус /mute. */
@@ -84,6 +91,9 @@ function defaultDeps(): DigestDispatchDeps {
     fetchSignups: fetchRunSignups,
     facts: supabaseFactStore(),
     forms: supabaseTeamForms(),
+    participants: supabaseParticipantStore(),
+    tasks: createSupabaseStore(),
+    aiEnabled: !!teamAiConfig(),
     recipients,
     claimDaily,
     markDailySent,
@@ -108,24 +118,28 @@ export async function dispatchTeamDigests(opts: DispatchOptions = {}): Promise<T
   let to: number[] = [];
 
   const day = dailyDigestDue(ymd, hour);
-  if (day) {
-    let text: string | null = null;
+  if (day && opts.dryRun) sent.push(`daily ${day}`);
+  else if (day && (await deps.claimDaily(day))) {
+    // Каждому своё сообщение, даже пустое: «На сегодня ничего не запланировано».
+    let coffee: string[] = [];
     try {
-      text = await buildDailyDigest(deps, day, now);
+      coffee = await buildCoffeeBlock(deps, day, now);
     } catch (err) {
-      console.error("[team-digest] build failed:", err instanceof Error ? err.message : String(err));
+      console.error("[team-digest] coffee block:", err instanceof Error ? err.message : String(err));
     }
-    if (text && opts.dryRun) sent.push(`daily ${day}`);
-    else if (text && (await deps.claimDaily(day))) {
-      to = await deps.recipients();
-      let delivered = 0;
-      for (const chatId of to) {
+    to = await deps.recipients();
+    let delivered = 0;
+    for (const chatId of to) {
+      try {
+        const text = await buildMyDay(deps, { chat_id: chatId }, now, { footer: deps.aiEnabled, extra: isFounder(chatId) ? coffee : [] });
         if ((await deps.send(chatId, text)).ok) delivered++;
-        if (deps.throttleMs ?? THROTTLE_MS) await sleep(deps.throttleMs ?? THROTTLE_MS);
+      } catch (err) {
+        console.error("[team-digest] my day:", chatId, err instanceof Error ? err.message : String(err));
       }
-      await deps.markDailySent(day, delivered);
-      sent.push(`daily ${day}`);
+      if (deps.throttleMs ?? THROTTLE_MS) await sleep(deps.throttleMs ?? THROTTLE_MS);
     }
+    await deps.markDailySent(day, delivered);
+    sent.push(`daily ${day}`);
   }
 
   if (!opts.dryRun) {
