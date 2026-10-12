@@ -32,11 +32,14 @@ export interface TeamMember {
   last_seen_at: string | null;
   /** Слать ли автоматические сводки. Выключается командой /mute. */
   digest_opt_in: boolean;
+  /** Отделы (lib/team/departments.ts); до миграции 051 поля нет. */
+  departments?: string[];
 }
 
 const TABLE = "team_members";
-const COLUMNS =
-  "chat_id, username, display_name, role, joined_at, added_by, last_seen_at, digest_opt_in";
+// Все колонки: departments появится в базе только после миграции 051, и явный
+// список уронил бы вход в бот до её применения.
+const COLUMNS = "*";
 
 /** Ключ входа. Пустой — в команду не пустим никого (и так и скажем). */
 export function teamSecret(): string {
@@ -225,4 +228,15 @@ export async function setDigestOptIn(chatId: number, optIn: boolean): Promise<bo
     return false;
   }
   return true;
+}
+
+/** Включить или выключить человеку отдел. Возвращает новый список; null — человека нет. */
+export async function toggleDepartment(chatId: number, department: string): Promise<string[] | null> {
+  const member = await findMember(chatId);
+  if (!member) return null;
+  const current = member.departments ?? [];
+  const next = current.includes(department) ? current.filter((d) => d !== department) : [...current, department];
+  const { error } = await tgAdmin().from(TABLE).update({ departments: next }).eq("chat_id", chatId);
+  if (error) throw new Error(`team_members: ${error.message}`);
+  return next;
 }

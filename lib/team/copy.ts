@@ -9,6 +9,7 @@ import type { TeamMember } from "./access";
 import { isFounder } from "./config";
 import type { AssignedTask } from "../databot/task-list";
 import { CLUBS, clubByKey } from "./clubs";
+import { DEPARTMENTS, departmentName } from "./departments";
 import { coffeeRunStart, coffeeRunTitle, groupByDay, itemClub, type ScheduleItem, type TeamEvent, type TeamEventKind } from "./events";
 
 /**
@@ -209,9 +210,33 @@ export function teamText(members: TeamMember[], meChatId: number): string {
     // Отписку от сводок показываем: иначе «почему мне не пришло утром» будет
     // выясняться в переписке, а ответ всё это время лежит в одной строке.
     const muted = m.digest_opt_in ? "" : " · сводки выключены";
-    return `• ${who}${role}${me}${muted}${seen}`;
+    const deps = m.departments?.length ? ` · ${m.departments.map(departmentName).join(", ")}` : "";
+    return `• ${who}${role}${deps}${me}${muted}${seen}`;
   };
   return [`В команде ${members.length} чел.:`, "", ...members.map(line)].join("\n");
+}
+
+/** «👥 Команда»: список; фаундеру — кнопка на каждого человека, чтобы разложить по отделам. */
+export function teamScreen(members: TeamMember[], meChatId: number, founder: boolean): TaskScreen {
+  const kb = new InlineKeyboard();
+  if (founder) {
+    for (const m of members) kb.text(m.username ? `@${m.username}` : (m.display_name ?? String(m.chat_id)), `dp:m:${m.chat_id}`).row();
+  }
+  const hint = founder && members.length ? "\n\nНажми на человека, чтобы включить или выключить отделы." : "";
+  return { text: escapeHtmlTeam(teamText(members, meChatId)) + hint, keyboard: kb };
+}
+
+/** Карточка человека для фаундера: отделы кнопками-переключателями. */
+export function memberDepartmentsScreen(m: TeamMember): TaskScreen {
+  const who = m.username ? `@${m.username}` : (m.display_name ?? String(m.chat_id));
+  const current = m.departments ?? [];
+  const kb = new InlineKeyboard();
+  for (const d of DEPARTMENTS) kb.text(`${current.includes(d.key) ? "✓ " : ""}${d.name}`, `dp:t:${m.chat_id}:${d.key}`).row();
+  kb.text("← К команде", "dp:l");
+  return {
+    text: `<b>${escapeHtmlTeam(who)}</b>\nОтделы: ${current.length ? current.map(departmentName).join(", ") : "пока ни одного"}`,
+    keyboard: kb,
+  };
 }
 
 // ── Постоянное меню ──────────────────────────────────────────────────────────

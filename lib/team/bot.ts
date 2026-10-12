@@ -10,7 +10,7 @@ import {
 } from "./access";
 import { mergeRuns, pickRun, type TeamRun } from "./runs";
 import { fetchArchive, runKeysFrom, type ArchiveRow } from "./history";
-import { NOT_A_MEMBER_TEXT, helpText, menuCommand, menuKeyboard, menuSection, teamText } from "./copy";
+import { NOT_A_MEMBER_TEXT, helpText, menuCommand, menuKeyboard, menuSection } from "./copy";
 import { faqAnswerText, faqIndexText, findFaq } from "./faq";
 import { handleTeamTaskUpdate } from "./tasks";
 import { handleScheduleUpdate, showSchedule, defaultScheduleDeps, type ScheduleDeps } from "./schedule";
@@ -18,6 +18,7 @@ import { defaultEventsDeps, handleEventsUpdate, openClubEventScreen, openCoffeeR
 import { supabaseTeamForms } from "./form";
 import { touchSeen } from "./seen";
 import { handleSocialSectionUpdate } from "./founders/section";
+import { defaultTeamScreenDeps, handleTeamScreenUpdate, showTeam } from "./team-screen";
 
 /**
  * Внутренний бот команды: сколько человек записалось, кто подтвердился, кому
@@ -158,6 +159,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     if (await handleScheduleUpdate(ctx, scheduleDeps())) return;
     if (await handleEventsUpdate(ctx)) return;
     if (await handleSocialSectionUpdate(ctx)) return;
+    if (await handleTeamScreenUpdate(ctx)) return;
     await next();
   });
 
@@ -263,7 +265,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
   bot.command("team", async (ctx) => {
     const member = await requireMember(ctx);
     if (!member) return;
-    await ctx.reply(teamText(await listTeam(), member.chat_id));
+    await showTeam(ctx, defaultTeamScreenDeps(), member.chat_id, false);
   });
 
   bot.command("kick", async (ctx) => {

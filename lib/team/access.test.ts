@@ -15,6 +15,7 @@ vi.mock("./access", () => ({
   joinTeam: async () => ({ status: "failed" }),
   listTeam: async () => [...roster.values()],
   setDigestOptIn: async () => true,
+  toggleDepartment: async () => [],
   removeMember: async (target: string) => {
     removed.push(target);
     const m = [...roster.values()].find((x) => `@${x.username}` === target);

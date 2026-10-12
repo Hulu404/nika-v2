@@ -12,6 +12,7 @@ vi.mock("./access", () => ({
   listTeam: async () => [...roster.values()],
   setDigestOptIn: async () => true,
   removeMember: async () => ({ status: "not_found" }),
+  toggleDepartment: async () => [],
 }));
 vi.mock("../databot/data/supabase-store", async () => {
   const { MemoryStore } = await import("../databot/data/memory-store");
