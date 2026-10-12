@@ -1,0 +1,178 @@
+import { describe, expect, it } from "vitest";
+import { validateIntent, checkWhen, normalizeLocal } from "./intent";
+import {
+  AI_FAIL_TEXT,
+  AI_LIMIT_TEXT,
+  LLM_LIMIT_PER_HOUR,
+  LLM_URL,
+  MemoryAiUsage,
+  STT_URL,
+  TeamAiError,
+  aiErrorText,
+  createTeamAi,
+  systemPrompt,
+  teamAiConfig,
+  type FetchLike,
+} from "./yandex";
+
+const msk = (local: string) => new Date(`${local}+03:00`);
+const NOW = msk("2026-10-13T14:05"); // вт 13.10
+const CONFIG = { apiKey: "k", folderId: "f1", modelUri: "gpt://f1/yandexgpt-lite/latest" };
+
+type Call = { url: string; headers: Record<string, string>; body: string | Uint8Array };
+
+function fakeFetch(responses: Array<{ status: number; body?: unknown } | Error>): { fetch: FetchLike; calls: Call[] } {
+  const calls: Call[] = [];
+  const fetch: FetchLike = async (url, init) => {
+    calls.push({ url, headers: init.headers, body: init.body });
+    const next = responses.shift();
+    if (!next) throw new Error("no more responses");
+    if (next instanceof Error) throw next;
+    return { ok: next.status < 300, status: next.status, json: async () => next.body, text: async () => JSON.stringify(next.body ?? "") };
+  };
+  return { fetch, calls };
+}
+
+const llmAnswer = (obj: unknown, usage = { inputTextTokens: "120", completionTokens: "30" }) => ({
+  status: 200, body: { result: { alternatives: [{ message: { role: "assistant", text: typeof obj === "string" ? obj : JSON.stringify(obj) } }], usage } },
+});
+
+describe("проверка ответа модели", () => {
+  it("задача: имена, срок, лишние поля отбрасываются", () => {
+    expect(validateIntent({ intent: "create_task", what: "Найти пейсеров", due: "2026-10-15T20:00",
+      assignees: [{ name: "Маше", qualifier: "из ивента" }], author: "Настя" })).toEqual({
+      intent: "create_task", what: "Найти пейсеров", due: "2026-10-15T20:00", assignees: [{ name: "Маше", qualifier: "из ивента" }],
+    });
+  });
+
+  it("срок без времени — 23:59; пустой срок — без срока", () => {
+    expect(normalizeLocal("2026-10-13")).toBe("2026-10-13T23:59");
+    expect(validateIntent({ intent: "create_task", what: "x", due: "", assignees: [{ name: "мне" }] })).toMatchObject({ due: null });
+  });
+
+  it("невалидное — unknown, без исключений", () => {
+    expect(validateIntent(null).intent).toBe("unknown");
+    expect(validateIntent({ intent: "drop_table" }).intent).toBe("unknown");
+    expect(validateIntent({ intent: "create_task", what: "x", assignees: [] }).intent).toBe("unknown");
+    expect(validateIntent({ intent: "create_task", what: "x", assignees: [{ name: "мне" }], due: "в четверг" }).intent).toBe("unknown");
+    expect(validateIntent({ intent: "create_reminder", text: "x", remind_at: "2026-02-30T10:00" }).intent).toBe("unknown");
+    expect(validateIntent({ intent: "create_event", title: "x", starts_at: "2026-10-13T25:00" }).intent).toBe("unknown");
+    expect(validateIntent([1, 2]).intent).toBe("unknown");
+  });
+
+  it("чтение: show_schedule по умолчанию неделя", () => {
+    expect(validateIntent({ intent: "show_schedule", range: "tomorrow" })).toEqual({ intent: "show_schedule", range: "tomorrow" });
+    expect(validateIntent({ intent: "show_schedule" })).toEqual({ intent: "show_schedule", range: "week" });
+  });
+
+  it("дата в прошлом и дальше года", () => {
+    expect(checkWhen("2026-10-13T14:00", NOW)).toEqual({ ok: false, error: "past" });
+    expect(checkWhen("2027-10-20T10:00", NOW)).toEqual({ ok: false, error: "far" });
+    expect(checkWhen("2026-10-13T16:00", NOW)).toEqual({ ok: true, at: msk("2026-10-13T16:00") });
+  });
+});
+
+describe("конфигурация", () => {
+  it("выключено без флага или ключей; модель по умолчанию — YandexGPT Lite", () => {
+    expect(teamAiConfig({ YANDEX_API_KEY: "k", YANDEX_FOLDER_ID: "f" })).toBeNull();
+    expect(teamAiConfig({ TEAM_AI_ENABLED: "true", YANDEX_FOLDER_ID: "f" })).toBeNull();
+    expect(teamAiConfig({ TEAM_AI_ENABLED: "true", YANDEX_API_KEY: "k", YANDEX_FOLDER_ID: "f" }))
+      .toEqual({ apiKey: "k", folderId: "f", modelUri: "gpt://f/yandexgpt-lite/latest" });
+    expect(teamAiConfig({ TEAM_AI_ENABLED: "true", YANDEX_API_KEY: "k", YANDEX_FOLDER_ID: "f", YANDEX_LLM_MODEL: "yandexgpt/rc" })!.modelUri)
+      .toBe("gpt://f/yandexgpt/rc");
+  });
+
+  it("выключенный флаг: клиент не ходит в сеть", async () => {
+    const { fetch, calls } = fakeFetch([]);
+    const ai = createTeamAi({ config: null, usage: new MemoryAiUsage(), fetch, now: () => NOW });
+    await expect(ai.parseIntent({ chatId: 1, text: "привет", now: NOW, team: [] })).rejects.toMatchObject({ code: "disabled" });
+    expect(calls).toHaveLength(0);
+  });
+});
+
+describe("запросы к Яндексу", () => {
+  it("разбор: схема, ключ, контекст даты и команды; расход записан без текста", async () => {
+    const usage = new MemoryAiUsage();
+    const { fetch, calls } = fakeFetch([llmAnswer({ intent: "show_my_day" })]);
+    const ai = createTeamAi({ config: CONFIG, usage, fetch, now: () => NOW });
+    const team = [{ name: "Маша", title: "Ивент-отдел", departments: ["Ивенты"], username: "gusarovame" }];
+    expect(await ai.parseIntent({ chatId: 7, text: "что у меня сегодня?", now: NOW, team })).toEqual({ intent: "show_my_day" });
+    expect(calls[0].url).toBe(LLM_URL);
+    expect(calls[0].headers.Authorization).toBe("Api-Key k");
+    const body = JSON.parse(String(calls[0].body));
+    expect(body.modelUri).toBe("gpt://f1/yandexgpt-lite/latest");
+    expect(body.jsonSchema.schema.required).toEqual(["intent"]);
+    expect(body.messages[0].text).toContain("Сейчас вторник 2026-10-13, 14:05 по Москве");
+    expect(body.messages[0].text).toContain("пятница 2026-10-16");
+    expect(body.messages[0].text).toContain("- Маша, Ивент-отдел, отделы: Ивенты, @gusarovame");
+    expect(usage.rows).toEqual([{ chat_id: 7, kind: "llm", tokens_in: 120, tokens_out: 30, created_at: NOW.toISOString() }]);
+  });
+
+  it("ответ не JSON или не по схеме — unknown", async () => {
+    const { fetch } = fakeFetch([llmAnswer("Конечно! Вот задача: ..."), llmAnswer({ intent: "create_task" }), { status: 200, body: {} }]);
+    const ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch, now: () => NOW });
+    for (let i = 0; i < 3; i++) expect((await ai.parseIntent({ chatId: 1, text: "x", now: NOW, team: [] })).intent).toBe("unknown");
+  });
+
+  it("JSON в ```-обёртке принимается", async () => {
+    const { fetch } = fakeFetch([llmAnswer("```json\n{\"intent\":\"show_my_tasks\"}\n```")]);
+    const ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch, now: () => NOW });
+    expect(await ai.parseIntent({ chatId: 1, text: "x", now: NOW, team: [] })).toEqual({ intent: "show_my_tasks" });
+  });
+
+  it("один повтор при 429, 5xx и сетевой ошибке; 400 не повторяется", async () => {
+    let f = fakeFetch([{ status: 503 }, llmAnswer({ intent: "show_my_day" })]);
+    let ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch: f.fetch, now: () => NOW });
+    expect((await ai.parseIntent({ chatId: 1, text: "x", now: NOW, team: [] })).intent).toBe("show_my_day");
+    expect(f.calls).toHaveLength(2);
+
+    f = fakeFetch([new Error("ECONNRESET"), { status: 429 }]);
+    ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch: f.fetch, now: () => NOW });
+    const err = await ai.parseIntent({ chatId: 1, text: "x", now: NOW, team: [] }).catch((e) => e);
+    expect(err).toBeInstanceOf(TeamAiError);
+    expect(aiErrorText(err)).toBe(AI_FAIL_TEXT);
+    expect(f.calls).toHaveLength(2);
+
+    f = fakeFetch([{ status: 400, body: { error: "bad" } }]);
+    ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch: f.fetch, now: () => NOW });
+    await expect(ai.parseIntent({ chatId: 1, text: "x", now: NOW, team: [] })).rejects.toMatchObject({ code: "api" });
+    expect(f.calls).toHaveLength(1);
+  });
+
+  it("лимит: 40 запросов к LLM в час на человека, дальше — без запроса", async () => {
+    const usage = new MemoryAiUsage();
+    for (let i = 0; i < LLM_LIMIT_PER_HOUR; i++) await usage.record({ chat_id: 5, kind: "llm" }, new Date(NOW.getTime() - 30 * 60_000));
+    await usage.record({ chat_id: 5, kind: "llm" }, new Date(NOW.getTime() - 2 * 3_600_000));
+    const { fetch, calls } = fakeFetch([llmAnswer({ intent: "show_my_day" })]);
+    const ai = createTeamAi({ config: CONFIG, usage, fetch, now: () => NOW });
+    const err = await ai.parseIntent({ chatId: 5, text: "x", now: NOW, team: [] }).catch((e) => e);
+    expect(aiErrorText(err)).toBe(AI_LIMIT_TEXT);
+    expect(calls).toHaveLength(0);
+    // У другого человека свой лимит.
+    expect((await ai.parseIntent({ chatId: 6, text: "x", now: NOW, team: [] })).intent).toBe("show_my_day");
+  });
+
+  it("распознавание: oggopus, ru-RU, без folderId; секунды в учёте", async () => {
+    const usage = new MemoryAiUsage();
+    const { fetch, calls } = fakeFetch([{ status: 200, body: { result: "поставь маше задачу" } }]);
+    const ai = createTeamAi({ config: CONFIG, usage, fetch, now: () => NOW });
+    expect(await ai.transcribe(3, new Uint8Array([1, 2, 3]), 4.2)).toBe("поставь маше задачу");
+    expect(calls[0].url).toBe(`${STT_URL}?lang=ru-RU&format=oggopus`);
+    expect(calls[0].url).not.toContain("folderId");
+    expect(usage.rows[0]).toMatchObject({ chat_id: 3, kind: "stt", audio_seconds: 5 });
+  });
+
+  it("голосовое длиннее 30 секунд или больше 1 МБ не отправляется", async () => {
+    const { fetch, calls } = fakeFetch([]);
+    const ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch, now: () => NOW });
+    await expect(ai.transcribe(1, new Uint8Array(10), 31)).rejects.toBeInstanceOf(TeamAiError);
+    await expect(ai.transcribe(1, new Uint8Array(1024 * 1024 + 1), 10)).rejects.toBeInstanceOf(TeamAiError);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("в инструкции нет ничего, кроме имени, должности, отделов и ника", () => {
+    const text = systemPrompt(NOW, [{ name: "Сальма", title: "Ивент-отдел", departments: ["Ивенты"], username: "salmasxsx" }]);
+    expect(text).toContain("- Сальма, Ивент-отдел, отделы: Ивенты, @salmasxsx");
+    expect(text).not.toMatch(/\+7|телефон/i);
+  });
+});
