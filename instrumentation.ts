@@ -65,6 +65,21 @@ async function tickTeamDigests(): Promise<void> {
 }
 
 /**
+ * «Пятница»: кофе-ран недели — вопрос фаундерам по понедельникам в 12:00 МСК,
+ * напоминание в 16:00, подтверждение за сутки. Дедуп — coffee_run_weeks и
+ * отметки в team_events (lib/team/coffee-run-week.ts).
+ */
+async function tickCoffeeRunWeek(): Promise<void> {
+  try {
+    const { tickCoffeeRunWeek: tick } = await import("./lib/team/coffee-run-week");
+    const done = await tick();
+    if (done.length) console.log("[coffee-week] сделано:", done.join(", "));
+  } catch (err) {
+    console.error("[coffee-week] тик упал:", err instanceof Error ? err.message : String(err));
+  }
+}
+
+/**
  * «Пятница» фаундерам: снимок Telegram-канала и вопрос про Instagram в
  * 21:00 МСК, сводка в 10:00 и 22:30. Окна и дедуп — в lib/team/founders/.
  */
@@ -157,6 +172,7 @@ export async function register(): Promise<void> {
   void tickInvites();
   void tickTeamDigests();
   void tickFounderReports();
+  void tickCoffeeRunWeek();
   void tickDatabotCleanup();
   void tickDatabotTaskReminders();
   const timer = setInterval(() => {
@@ -164,6 +180,7 @@ export async function register(): Promise<void> {
     void tickInvites();
     void tickTeamDigests();
     void tickFounderReports();
+    void tickCoffeeRunWeek();
     void tickDatabotCleanup();
     void tickDatabotTaskReminders();
   }, REMINDER_TICK_MS);

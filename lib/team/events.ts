@@ -52,6 +52,8 @@ export interface TeamEventStore {
   cancel(id: number, now: Date): Promise<TeamEvent | null>;
   /** Поставить отметку подтверждения кофе-рана (confirm_asked_at, confirmed_at, confirm_nag_at). Только если её ещё нет. */
   mark(id: number, field: "confirm_asked_at" | "confirmed_at" | "confirm_nag_at", now: Date): Promise<boolean>;
+  /** Последний неотменённый кофе-ран недели, начавшийся до before. */
+  lastCoffeeRun(before: Date): Promise<TeamEvent | null>;
 }
 
 // Читаем все колонки, без перечисления: колонки из 051 появятся в базе только
@@ -116,6 +118,13 @@ export function supabaseEventStore(): TeamEventStore {
       if (error) throw new Error(`team_events: ${error.message}`);
       return (data ?? []).length === 1;
     },
+    async lastCoffeeRun(before) {
+      const { data, error } = await t().select(COLUMNS).eq("format", "coffee_run").is("cancelled_at", null)
+        .lt("starts_at", before.toISOString()).order("starts_at", { ascending: false }).limit(1).maybeSingle();
+      // До миграции 051 колонки format нет: считаем, что кофе-ранов в team_events ещё не было.
+      if (error) return null;
+      return one(data);
+    },
   };
 }
 
@@ -165,6 +174,12 @@ export class MemoryEventStore implements TeamEventStore {
     if (!ev || ev[field]) return false;
     ev[field] = now.toISOString();
     return true;
+  }
+  async lastCoffeeRun(before: Date) {
+    const list = [...this.events.values()]
+      .filter((e) => e.format === "coffee_run" && !e.cancelled_at && Date.parse(e.starts_at) < before.getTime())
+      .sort((a, b) => Date.parse(b.starts_at) - Date.parse(a.starts_at));
+    return list[0] ? { ...list[0] } : null;
   }
   async cancel(id: number, now: Date) {
     const ev = this.events.get(id);

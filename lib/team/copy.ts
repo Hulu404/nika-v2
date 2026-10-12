@@ -685,6 +685,7 @@ export function newTasksText(
   authorName: string | undefined,
   teammates: ReadonlyMap<number, readonly string[]>,
   now: Date,
+  late: ReadonlySet<number> = new Set(),
 ): string {
   const head = tasks.length === 1 ? "Новая задача" : `Новые задачи: ${tasks.length}`;
   const from = authorName ? ` от @${escapeHtmlTeam(authorName)}` : "";
@@ -692,7 +693,8 @@ export function newTasksText(
     const due = t.due_at ? ` · до ${shortDue(t.due_at, now)}` : "";
     const mates = teammates.get(t.id) ?? [];
     const together = mates.length ? ` · вместе с ${mates.map((n) => `@${escapeHtmlTeam(n)}`).join(", ")}` : "";
-    return `${i + 1}. ${escapeHtmlTeam(cut(t.what, 300))}${due}${together}`;
+    const moved = late.has(t.id) ? " · срок сдвинут: решение принято поздно" : "";
+    return `${i + 1}. ${escapeHtmlTeam(cut(t.what, 300))}${due}${moved}${together}`;
   });
   return [`<b>${head}${from}</b>`, "", ...lines].join("\n");
 }

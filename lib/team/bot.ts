@@ -19,6 +19,7 @@ import { supabaseTeamForms } from "./form";
 import { touchSeen } from "./seen";
 import { handleSocialSectionUpdate } from "./founders/section";
 import { defaultTeamScreenDeps, handleTeamScreenUpdate, showTeam } from "./team-screen";
+import { defaultCoffeeWeekDeps, handleCoffeeWeekUpdate } from "./coffee-run-week";
 
 /**
  * Внутренний бот команды: сколько человек записалось, кто подтвердился, кому
@@ -160,6 +161,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     if (await handleEventsUpdate(ctx)) return;
     if (await handleSocialSectionUpdate(ctx)) return;
     if (await handleTeamScreenUpdate(ctx)) return;
+    if (await handleCoffeeWeekUpdate(ctx, defaultCoffeeWeekDeps())) return;
     await next();
   });
 

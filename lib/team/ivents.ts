@@ -1,5 +1,6 @@
 import type { Context } from "grammy";
 import { findMember, listTeam, type TeamMember } from "./access";
+import { rsvpLine, supabaseRsvpStore } from "./coffee-run-week";
 import {
   IVENT_CALLBACK_RE,
   backToEventKeyboard,
@@ -49,6 +50,8 @@ export function defaultEventsDeps(): EventsDeps {
   return {
     events: supabaseEventStore(), findMember, listTeam, fetchArchive, fetchSignups: fetchRunSignups,
     facts: supabaseFactStore(), forms: supabaseTeamForms(),
+    // До миграции 051 таблицы team_event_rsvp нет — строку просто не показываем.
+    rsvpLine: (ev) => rsvpLine({ rsvp: supabaseRsvpStore(), listTeam }, ev).catch(() => null),
   };
 }
 

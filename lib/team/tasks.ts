@@ -130,6 +130,8 @@ export async function deliverAssigned(
   tasks: readonly AssignedTask[],
   authorName: string | undefined,
   now: Date,
+  /** Задачи, чей срок сдвинут: решение принято поздно (кофе-ран недели). */
+  late: ReadonlySet<number> = new Set(),
 ): Promise<void> {
   const byAssignee = new Map<number, AssignedTask[]>();
   for (const t of tasks) byAssignee.set(t.assignee_id, [...(byAssignee.get(t.assignee_id) ?? []), t]);
@@ -143,7 +145,7 @@ export async function deliverAssigned(
     const mates = new Map<number, string[]>();
     for (const t of locked) mates.set(t.id, await store.listAssignedTeammates(t));
     try {
-      const sent = await api.sendMessage(assignee, newTasksText(locked, authorName, mates, now),
+      const sent = await api.sendMessage(assignee, newTasksText(locked, authorName, mates, now, late),
         { ...HTML, reply_markup: openMyTasksKeyboard() });
       for (const t of locked) await store.assignedTaskDelivery(t.id, "sent", sent.message_id);
     } catch (err) {
