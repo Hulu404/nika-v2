@@ -5,7 +5,7 @@ import { mskWeekday } from "../../databot/dates";
 import type { TeamMember } from "../access";
 import { DEPARTMENTS } from "../departments";
 import { escapeHtmlTeam, eventWhen } from "../copy";
-import { personName, personWithTitle, resolveMention } from "../roster";
+import { nameInstr, personLabel, personName, resolveMention } from "../roster";
 import { missingOf, mskLocalToDate, type Intent, type MissingField } from "./intent";
 import { aiCb, slotsOf, whenText } from "./preview";
 import type { DraftBody } from "./stores";
@@ -31,29 +31,67 @@ const localOf = (d: Date) => {
 
 // ── Подстановки по умолчанию ─────────────────────────────────────────────────
 
-const GENERIC_TITLE = /^(онлайн[- ]?)?(встреча|встречу|созвон|встреча онлайн)?$/i;
-
 /** «Онлайн», «созвон», «в зуме» — место, если другое не сказано. */
 function placeFrom(text: string): string | null {
   const t = text.toLowerCase();
   return /zoom|зум/.test(t) ? "Zoom" : /онлайн|online|созвон/.test(t) ? "Онлайн" : null;
 }
 
+const KIND_WORDS: Array<[RegExp, string]> = [[/созвон/, "Созвон"], [/сбивк/, "Сбивка"], [/планерк|планёрк/, "Планёрка"], [/встреч/, "Встреча"]];
+
+/** Первое слово названия — как сказали: «созвон», «встреча», «сбивка», «планёрка». */
+function kindWord(text: string, title: string): string {
+  const t = text.toLowerCase();
+  const said = KIND_WORDS.map(([re, w]) => [t.search(re), w] as const).filter(([i]) => i >= 0).sort((a, b) => a[0] - b[0]);
+  if (said.length) return said[0][1];
+  return KIND_WORDS.find(([re]) => re.test(title.toLowerCase()))?.[1] ?? "Встреча";
+}
+
+/** Только вид встречи («Онлайн-встреча», «созвон») — название собираем сами. */
+const GENERIC_TITLE = /^(онлайн[- ]?)?(встреч|созвон|сбивк|планерк|планёрк)\S*( онлайн)?$/i;
+
 /**
- * Всё, что не обязательно, подставляется, а не спрашивается: название встречи
- * («Встреча с ивент-отделом», «Созвон»), место «Онлайн», текст напоминания.
+ * Встреча: участники и название — из распознанных сущностей, а не из сырых
+ * слов модели (кривое «сальва» в название не попадёт, падеж код не собирает).
+ *   • назван отдел — участники = отдел; названные люди из него отдельно не
+ *     добавляются; название «Созвон с ивент-отделом»;
+ *   • только люди — «Созвон с Машей и Сальмой» (готовый творительный из
+ *     roster.ts), больше двух или формы нет — «Созвон: Маша, Сальма, Вика»;
+ *   • сказана тема («сбивка по дизайну») — это и есть название.
  */
-export function fillDefaults(parsed: Intent, text: string): Intent {
-  if (parsed.intent === "create_event") {
-    const place = parsed.place ?? placeFrom(text);
-    let title = parsed.title.trim();
-    if (GENERIC_TITLE.test(title)) {
-      const base = /созвон/i.test(text) || /созвон/i.test(title) ? "Созвон" : "Встреча";
-      const who = parsed.participants.map((m) => m.name).filter((n) => !/^(со?\s+)?(мной|мне|меня|себе)$/i.test(n));
-      title = who.length ? `${base} с ${who.join(" и ")}` : base;
+function eventDefaults(p: Extract<Intent, { intent: "create_event" }>, text: string, team: readonly TeamMember[], senderId: number): Intent {
+  const resolved = p.participants.map((m) => ({ m, r: resolveMention(team, m, senderId) }));
+  const depts = resolved.flatMap((x) => (x.r.kind === "department" ? [x.r.department] : []));
+  const inDept = (m: TeamMember) => depts.some((d) => (m.departments ?? []).includes(d.key));
+  const kept = depts.length
+    ? resolved.filter((x) => x.r.kind === "department" || x.r.kind === "none"
+      || (x.r.kind === "one" && (x.r.member.chat_id === senderId || !inDept(x.r.member)))
+      || (x.r.kind === "many" && !x.r.options.some(inDept)))
+    : resolved;
+
+  const topic = p.title.replace(/\s+(с|со)\s+.*$/i, "").replace(/:.*$/, "").trim();
+  let title = topic;
+  if (!topic || GENERIC_TITLE.test(topic)) {
+    const base = kindWord(text, p.title);
+    if (depts.length) title = `${base} с ${depts.map((d) => d.groupInstr).join(" и ")}`;
+    else {
+      const people = kept.flatMap((x) => x.r.kind === "one" ? (x.r.member.chat_id === senderId ? [] : [x.r.member])
+        : x.r.kind === "many" ? [x.r.options[0]] : []);
+      const instr = people.map(nameInstr);
+      title = !people.length ? base
+        : people.length <= 2 && instr.every(Boolean) ? `${base} с ${instr.join(" и ")}`
+          : `${base}: ${people.map(personName).join(", ")}`;
     }
-    return { ...parsed, title, place };
   }
+  return { ...p, title, place: p.place ?? placeFrom(text), participants: kept.map((x) => x.m) };
+}
+
+/**
+ * Всё, что не обязательно, подставляется, а не спрашивается: название и
+ * участники встречи, место «Онлайн», текст напоминания.
+ */
+export function fillDefaults(parsed: Intent, text: string, team: readonly TeamMember[] = [], senderId = 0): Intent {
+  if (parsed.intent === "create_event") return eventDefaults(parsed, text, team, senderId);
   if (parsed.intent === "create_reminder" && !parsed.text.trim()) {
     const after = /напомни(?:те)?\s+(?:мне\s+)?(.+)/i.exec(text)?.[1]?.trim();
     return { ...parsed, text: after || "Напоминание" };
@@ -162,18 +200,24 @@ const dayLabel = (ymd: string, now: Date) => {
   return ymd === today ? `сегодня, ${day}` : ymd === addDays(today, 1) ? `завтра, ${day}` : day;
 };
 
-/** «Поняла: встреча сегодня, вт 13.10 · онлайн · с ивент-отделом (Маша, Сальма)». */
+const lcFirst = (t: string) => t.charAt(0).toLowerCase() + t.slice(1);
+
+/**
+ * «Поняла: созвон с ивент-отделом сегодня, вт 13.10, онлайн.» Имена — только
+ * в именительном и без предлогов; если название уже говорит, с кем встреча,
+ * участников отдельно не перечисляем.
+ */
 export function understoodLine(body: DraftBody, team: readonly TeamMember[], senderId: number, now: Date): string {
   const p = body.parsed;
   const parts: string[] = [];
   if (p.intent === "create_event") {
-    parts.push(/^(Встреча|Созвон)( с |$)/.test(p.title) ? (p.title.startsWith("Созвон") ? "созвон" : "встреча") : `встреча «${escapeHtmlTeam(p.title)}»`);
-    if (p.date) parts[0] += ` ${dayLabel(p.date, now)}`;
+    parts.push(`${escapeHtmlTeam(lcFirst(p.title))}${p.date ? ` ${dayLabel(p.date, now)}` : ""}`);
     if (p.place) parts.push(escapeHtmlTeam(p.place === "Онлайн" ? "онлайн" : p.place));
-    const who = slotsOf(body, team, senderId).filter((s) => s.member?.chat_id !== senderId).map((s) =>
-      s.department ? `с ${escapeHtmlTeam(s.mention.name)} (${s.people.map((m) => escapeHtmlTeam(personName(m))).join(", ") || "никого"})`
-        : `с ${escapeHtmlTeam(s.member ? personName(s.member) : s.mention.name)}`);
-    if (who.length) parts.push(who.join(", "));
+    if (!/\s(с|со)\s|:/.test(p.title)) {
+      const who = slotsOf(body, team, senderId).filter((s) => s.member?.chat_id !== senderId).map((s) =>
+        s.department ? `${s.department.group}: ${s.people.map(personName).join(", ") || "никого"}` : s.member ? personName(s.member) : s.mention.name);
+      if (who.length) parts.push(`участники: ${escapeHtmlTeam(who.join(", "))}`);
+    }
   } else if (p.intent === "create_reminder") {
     parts.push(`напоминание «${escapeHtmlTeam(p.text)}»`);
     if (p.date) parts.push(dayLabel(p.date, now));
@@ -181,13 +225,19 @@ export function understoodLine(body: DraftBody, team: readonly TeamMember[], sen
     parts.push(`задача «${escapeHtmlTeam(p.what)}»`);
     if (p.due) parts.push(`срок ${whenText(mskLocalToDate(p.due).toISOString())}`);
   }
-  return `Поняла: ${parts.join(" · ")}`;
+  return `Поняла: ${parts.join(", ")}.`;
 }
 
 const QUESTION: Record<MissingField, string> = {
   starts_at: "Во сколько?",
   remind_at: "Когда напомнить?",
   assignees: "Кому поставить задачу?",
+};
+
+const HINT: Record<MissingField, string> = {
+  starts_at: "Напиши или надиктуй время, например «в 18:30».",
+  remind_at: "Напиши или надиктуй, например «в 18:30» или «через час».",
+  assignees: "Напиши или надиктуй имя или отдел, или выбери кнопкой.",
 };
 
 const RETRY: Record<MissingField, string> = {
@@ -205,7 +255,7 @@ export function answerButtons(draftId: number, body: DraftBody, field: MissingFi
   if (field === "assignees") {
     return [
       ...DEPARTMENTS.map((d) => [{ text: `👥 ${d.group}`, callback_data: aiCb.assignDept(draftId, d.key) }]),
-      ...team.map((m) => [{ text: personWithTitle(m), callback_data: aiCb.assignPerson(draftId, m.chat_id) }]),
+      ...team.map((m) => [{ text: personLabel(m), callback_data: aiCb.assignPerson(draftId, m.chat_id) }]),
     ];
   }
   const future = (local: string) => mskLocalToDate(local).getTime() > now.getTime();
@@ -232,13 +282,10 @@ export function answerButtons(draftId: number, body: DraftBody, field: MissingFi
 
 /** Вопрос (первый раз) или «Не поняла …» (повтор) с теми же кнопками. */
 export function clarifyMessage(
-  draftId: number, body: DraftBody, field: MissingField, team: readonly TeamMember[], senderId: number, now: Date,
-  sourceText: string | null, retry: boolean,
+  draftId: number, body: DraftBody, field: MissingField, team: readonly TeamMember[], senderId: number, now: Date, retry: boolean,
 ): { text: string; keyboard: InlineKeyboardMarkup } {
   const rows = [...answerButtons(draftId, body, field, team, now), [{ text: "✖️ Отмена", callback_data: aiCb.cancel(draftId) }]];
   if (retry) return { text: RETRY[field], keyboard: { inline_keyboard: rows } };
-  const lines: string[] = [];
-  if (body.voice && sourceText) lines.push(`🗣 «${escapeHtmlTeam(sourceText.length > 300 ? `${sourceText.slice(0, 299)}…` : sourceText)}»`, "");
-  lines.push(understoodLine(body, team, senderId, now), QUESTION[field]);
-  return { text: lines.join("\n"), keyboard: { inline_keyboard: rows } };
+  // Расшифровку голосового не повторяем: Telegram показывает её у самого голосового.
+  return { text: [understoodLine(body, team, senderId, now), QUESTION[field], HINT[field]].join("\n"), keyboard: { inline_keyboard: rows } };
 }

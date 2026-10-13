@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { TeamMember } from "./access";
-import { ROSTER, personWithTitle, resolveMention, rosterPatch, stem } from "./roster";
+import { ROSTER, nameInstr, personLabel, personShort, resolveMention, rosterPatch, stem } from "./roster";
 
 const base = (chat_id: number, username: string, patch: Partial<TeamMember> = {}): TeamMember => ({
   chat_id, username, display_name: username, role: "member", joined_at: "2026-10-01T00:00:00Z",
@@ -14,7 +14,7 @@ const team: TeamMember[] = ROSTER.map((r, i) => base(i + 1, r.username, {
 const who = (name: string, qualifier: string | null = null, sender = 999) => {
   const res = resolveMention(team, { name, qualifier }, sender);
   if (res.kind === "one") return res.member.username;
-  if (res.kind === "many") return res.options.map(personWithTitle);
+  if (res.kind === "many") return res.options.map((m) => personLabel(m));
   return null;
 };
 
@@ -31,12 +31,12 @@ describe("поиск человека по фразе", () => {
     expect(who("Маше", "из ивента")).toBe("gusarovame");
     expect(who("Маше-дизайнеру")).toBe("mouserdyuk");
     expect(who("Маше", "дизайнеру")).toBe("mouserdyuk");
-    expect(who("Маше")).toEqual(["Маша · Главный дизайнер", "Маша · Ивент-отдел"]);
+    expect(who("Маше")).toEqual(["Маша (Главный дизайнер) @mouserdyuk", "Маша (Ивент-отдел) @gusarovame"]);
   });
 
   it("Настя: глава смм однозначно, просто Насте — выбор", () => {
     expect(who("Насте", "главе смм")).toBe("zuzya_zyzya");
-    expect(who("Насте")).toEqual(["Настя · Глава SMM", "Настя · SMM"]);
+    expect(who("Насте")).toEqual(["Настя (Глава SMM) @zuzya_zyzya", "Настя (SMM) @ananas_2711"]);
   });
 
   it("Вика-разработчик", () => {
@@ -62,7 +62,29 @@ describe("поиск человека по фразе", () => {
   });
 
   it("уточнение, не подходящее никому, не выбирает первого попавшегося", () => {
-    expect(who("Маше", "из бухгалтерии")).toEqual(["Маша · Главный дизайнер", "Маша · Ивент-отдел"]);
+    expect(who("Маше", "из бухгалтерии")).toEqual(["Маша (Главный дизайнер) @mouserdyuk", "Маша (Ивент-отдел) @gusarovame"]);
+  });
+});
+
+describe("форматтер человека", () => {
+  it("с должностью, без должности, отправитель; внутри отдела — без должности", () => {
+    const masha = team.find((m) => m.username === "gusarovame")!;
+    const ali = { ...team.find((m) => m.username === "Hulu404")!, title: null };
+    expect(personLabel(masha)).toBe("Маша (Ивент-отдел) @gusarovame");
+    expect(personLabel(team[0])).toBe("Настя (Глава SMM) @zuzya_zyzya");
+    expect(personLabel(ali)).toBe("Али @Hulu404");
+    expect(personLabel(masha, masha.chat_id)).toBe("ты");
+    expect(personShort(masha)).toBe("Маша @gusarovame");
+  });
+
+  it("творительный — готовая форма из roster.ts, не склонение на лету", () => {
+    expect(team.map(nameInstr)).toEqual(["Настей", "Настей", "Викой", "Викой", "Машей", "Машей", "Сальмой", "Али", "Дмитрием"]);
+    expect(nameInstr({ ...team[0], first_name: "Ксюша", username: "new_one" })).toBeNull();
+  });
+
+  it("кривое распознавание имени: одна буква разницы", () => {
+    expect(who("сальва")).toBe("salmasxsx");
+    expect(who("Сальве")).toBe("salmasxsx");
   });
 });
 

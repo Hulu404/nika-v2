@@ -130,7 +130,7 @@ describe("голос и свободный текст", () => {
       expect(preview().text).toBe([
         "Проверь, пожалуйста:", "",
         "📋 Задача", "Найти пейсеров на кофе-ран",
-        "👤 Исполнитель: Маша · Ивент-отдел (@gusarovame)",
+        "👤 Исполнитель: Маша (Ивент-отдел) @gusarovame",
         "⏰ Срок: чт 15.10, 20:00", "✍️ Автор: ты",
       ].join("\n"));
       expect(preview().buttons.map((b) => b.text)).toEqual(["✅ Создать", "✏️ Изменить", "✖️ Отмена"]);
@@ -143,7 +143,7 @@ describe("голос и свободный текст", () => {
       expect(all).toHaveLength(1);
       expect(all[0]).toMatchObject({ username: "gusarovame", assignee_id: MASHA_EVENTS, assigned_by: ALI, what: "Найти пейсеров на кофе-ран",
         due_at: msk("2026-10-15T20:00").toISOString(), delivery_state: "sent" });
-      expect(sent.some((s) => s.method === "editMessageText" && s.text === "✅ Задача поставлена Маше, срок чт 15.10, 20:00")).toBe(true);
+      expect(sent.some((s) => s.method === "editMessageText" && s.text === "✅ Задача поставлена: Маша, срок чт 15.10, 20:00")).toBe(true);
       expect(sent.some((s) => s.chat === MASHA_EVENTS && s.text.includes("Найти пейсеров"))).toBe(true);
     });
 
@@ -153,7 +153,7 @@ describe("голос и свободный текст", () => {
       const [mine] = await tasks.importAssignedTasks(9, 1, [{ line: 1, username: "hulu404", what: "Заполнить форму по хакатону", due_at: null }]);
       answers.push({ intent: "create_reminder", text: "заполнить форму по хакатону", remind_at: "2026-10-13T14:00", task_hint: "форма по хакатону" });
       await say("Напомни мне в 14:00 заполнить форму по хакатону");
-      expect(preview().text).toContain("⏰ Напоминание\nзаполнить форму по хакатону\n🕑 Когда: вт 13.10, 14:00\n🔗 К задаче: Заполнить форму по хакатону\nВидишь только ты.");
+      expect(preview().text).toContain("⏰ Напоминание\nзаполнить форму по хакатону\n🕘 Когда: вт 13.10, 14:00\n🔗 К задаче: Заполнить форму по хакатону\nВидишь только ты.");
       await press(button("✅ Создать")!);
       expect([...reminders.reminders.values()]).toMatchObject([{ chat_id: ALI, task_id: mine.id, remind_at: msk("2026-10-13T14:00").toISOString() }]);
 
@@ -170,7 +170,7 @@ describe("голос и свободный текст", () => {
       answers.push({ intent: "create_event", title: "Сбивка по кофе-рану", starts_at: "2026-10-13T16:00", place: "малая переговорная",
         participants: [{ name: "Сальме", qualifier: null }, { name: "со мной", qualifier: null }], kind: "meeting" });
       await say("Поставь встречу Сальме на 16:00 в малой переговорной со мной, сбивка по кофе-рану");
-      expect(preview().text).toContain("🗓 Встреча\nСбивка по кофе-рану\n🕑 Когда: вт 13.10, 16:00\n📍 Где: малая переговорная\n👥 Участники: ты, Сальма · Ивент-отдел (@salmasxsx)\n✍️ Автор: ты");
+      expect(preview().text).toContain("🗓 Сбивка по кофе-рану\n🕘 Когда: вт 13.10, 16:00\n📍 Где: малая переговорная\n👥 Участники: ты, Сальма (Ивент-отдел) @salmasxsx\n✍️ Автор: ты");
       expect(events.events.size).toBe(0);
       await press(button("✅ Создать")!);
       const ev = [...events.events.values()][0];
@@ -257,9 +257,9 @@ describe("голос и свободный текст", () => {
       answers.push({ ...pacers, assignees: [{ name: "Маше", qualifier: null }] } as Intent);
       await say("поставь Маше найти пейсеров в четверг 20:00");
       expect(preview().text).toContain("«Маше» — кто именно? Выбери ниже");
-      expect(preview().buttons.map((b) => b.text)).toEqual(["Маша · Главный дизайнер", "Маша · Ивент-отдел", "✏️ Изменить", "✖️ Отмена"]);
+      expect(preview().buttons.map((b) => b.text)).toEqual(["Маша (Главный дизайнер) @mouserdyuk", "Маша (Ивент-отдел) @gusarovame", "✏️ Изменить", "✖️ Отмена"]);
       await press(preview().buttons[1].data!);
-      expect(preview().text).toContain("👤 Исполнитель: Маша · Ивент-отдел (@gusarovame)");
+      expect(preview().text).toContain("👤 Исполнитель: Маша (Ивент-отдел) @gusarovame");
       const messageId = drafts.drafts.get(1)!.message_id;
 
       await press(button("✏️ Изменить")!);
@@ -272,7 +272,7 @@ describe("голос и свободный текст", () => {
       await say("не в четверг, а в среду");
       const updated = sent.at(-1)!;
       expect(updated).toMatchObject({ method: "editMessageText", message_id: messageId });
-      expect(updated.text).toContain("Найти пейсеров на кофе-ран\n👤 Исполнитель: Маша · Ивент-отдел (@gusarovame)\n⏰ Срок: ср 14.10, 20:00");
+      expect(updated.text).toContain("Найти пейсеров на кофе-ран\n👤 Исполнитель: Маша (Ивент-отдел) @gusarovame\n⏰ Срок: ср 14.10, 20:00");
       await press(button("✅ Создать")!);
       expect([...tasks.assignedTasks.values()][0]).toMatchObject({ username: "gusarovame", due_at: msk("2026-10-14T20:00").toISOString() });
     });
@@ -316,11 +316,10 @@ describe("голос и свободный текст", () => {
     const model = (raw: Record<string, unknown>) => validateIntent({ ...blank, ...raw });
     const onlineMeeting = (mention: string) => model({ intent: "create_event", title: "Онлайн-встреча", starts_at: "2026-10-13",
       participants: [{ name: mention, qualifier: "" }] });
-    const question = (mention: string) =>
-      `Поняла: встреча сегодня, вт 13.10 · онлайн · с ${mention} (Маша, Сальма)\nВо сколько?`;
+    const question = "Поняла: встреча с ивент-отделом сегодня, вт 13.10, онлайн.\nВо сколько?\nНапиши или надиктуй время, например «в 18:30».";
     const meetingPreview = [
-      "🗓 Встреча", "Встреча с ивент-отделом", "🕑 Когда: вт 13.10, 18:00", "📍 Где: Онлайн", "👥 Участники: ты",
-      "👥 Ивент-отдел: Маша (@gusarovame), Сальма (@salmasxsx)", "✍️ Автор: ты",
+      "🗓 Встреча с ивент-отделом", "🕘 Когда: вт 13.10, 18:00", "📍 Где: Онлайн",
+      "👥 Участники: ты, Ивент-отдел: Маша @gusarovame, Сальма @salmasxsx", "✍️ Автор: ты",
     ].join("\n");
 
     it("«Поставь сегодня онлайн-встречу с ивент-отделом» → один вопрос «Во сколько?» с «Поняла» → «в 18» без модели → предпросмотр", async () => {
@@ -328,7 +327,7 @@ describe("голос и свободный текст", () => {
       answers.push(onlineMeeting("ивент-отделом"));
       await say("Поставь сегодня онлайн-встречу с ивент-отделом");
       const q = sent.at(-1)!;
-      expect(q.text).toBe(question("ивент-отделом"));
+      expect(q.text).toBe(question);
       expect(q.buttons.map((b) => b.text)).toEqual(["15:00", "18:00", "19:00", "✖️ Отмена"]);
       expect(warn).toHaveBeenCalledWith("[team-ai] clarify: create_event awaiting=starts_at attempt=1");
       expect(warn.mock.calls.flat().join(" ")).not.toContain("Поставь");
@@ -350,11 +349,11 @@ describe("голос и свободный текст", () => {
       answers.push(onlineMeeting("ивента дел"));
       await say("составь сегодня онлайн встречу с ивента дел");
       const q = sent.at(-1)!;
-      expect(q.text).toBe(question("ивента дел"));
+      expect(q.text).toBe(question);
       await press(q.buttons.find((b) => b.text === "18:00")!.data!);
       expect(sent.at(-1)!.method).toBe("editMessageText");
-      expect(sent.at(-1)!.text).toContain("🕑 Когда: вт 13.10, 18:00\n📍 Где: Онлайн");
-      expect(sent.at(-1)!.text).toContain("👥 Ивент-отдел: Маша (@gusarovame), Сальма (@salmasxsx)");
+      expect(sent.at(-1)!.text).toContain("🕘 Когда: вт 13.10, 18:00\n📍 Где: Онлайн");
+      expect(sent.at(-1)!.text).toContain("👥 Участники: ты, Ивент-отдел: Маша @gusarovame, Сальма @salmasxsx");
       expect(sent.at(-1)!.buttons.map((b) => b.text)).toContain("✅ Создать");
     });
 
@@ -390,20 +389,20 @@ describe("голос и свободный текст", () => {
       expect(transcribe).toHaveBeenCalledTimes(1); // короче секунды в SpeechKit не уходит
       expect(drafts.drafts.get(1)!.intent).toMatchObject({ awaiting: "starts_at", asked: 1, failures: 0 });
       await say("в 18");
-      expect(preview().text).toContain("🕑 Когда: вт 13.10, 18:00");
+      expect(preview().text).toContain("🕘 Когда: вт 13.10, 18:00");
     });
 
     it("«Встреча завтра в 16 с Сальмой» — сразу предпросмотр, название «Встреча с Сальмой»", async () => {
       answers.push(model({ intent: "create_event", title: "Встреча", starts_at: "2026-10-14T16:00", participants: [{ name: "Сальмой", qualifier: "" }] }));
       await say("Встреча завтра в 16 с Сальмой");
-      expect(preview().text).toContain("🗓 Встреча\nВстреча с Сальмой\n🕑 Когда: ср 14.10, 16:00\n👥 Участники: ты, Сальма · Ивент-отдел (@salmasxsx)");
+      expect(preview().text).toContain("🗓 Встреча с Сальмой\n🕘 Когда: ср 14.10, 16:00\n👥 Участники: ты, Сальма (Ивент-отдел) @salmasxsx");
       expect(sent.some((x) => /Во сколько|Как назвать/.test(x.text))).toBe(false);
     });
 
     it("«Встреча завтра в 16 с Машей из ивента» — один человек, не отдел", async () => {
       answers.push(model({ intent: "create_event", title: "Встреча", starts_at: "2026-10-14T16:00", participants: [{ name: "Машей", qualifier: "из ивента" }] }));
       await say("Встреча завтра в 16 с Машей из ивента");
-      expect(preview().text).toContain("👥 Участники: ты, Маша · Ивент-отдел (@gusarovame)");
+      expect(preview().text).toContain("👥 Участники: ты, Маша (Ивент-отдел) @gusarovame");
       expect(preview().text).not.toContain("👥 Ивент-отдел:");
     });
 
@@ -411,11 +410,11 @@ describe("голос и свободный текст", () => {
       answers.push(model({ intent: "create_task", what: "Выложить сторис", due: "2026-10-14T23:59" }));
       await say("Поставь задачу выложить сторис до завтра");
       const q = sent.at(-1)!;
-      expect(q.text).toBe("Поняла: задача «Выложить сторис» · срок ср 14.10, 23:59\nКому поставить задачу?");
-      expect(q.buttons.slice(0, 4).map((b) => b.text)).toEqual(["👥 СММ", "👥 Ивент-отдел", "👥 Дизайн", "👥 Разработка"]);
-      expect(q.buttons.map((b) => b.text)).toContain("Сальма · Ивент-отдел");
-      await press(q.buttons.find((b) => b.text === "👥 СММ")!.data!);
-      expect(sent.at(-1)!.text).toContain("👥 СММ: Настя (@zuzya_zyzya), Настя (@ananas_2711), Вика (@tora_co)");
+      expect(q.text).toBe("Поняла: задача «Выложить сторис», срок ср 14.10, 23:59.\nКому поставить задачу?\nНапиши или надиктуй имя или отдел, или выбери кнопкой.");
+      expect(q.buttons.slice(0, 4).map((b) => b.text)).toEqual(["👥 SMM", "👥 Ивент-отдел", "👥 Дизайн", "👥 Разработка"]);
+      expect(q.buttons.map((b) => b.text)).toContain("Сальма (Ивент-отдел) @salmasxsx");
+      await press(q.buttons.find((b) => b.text === "👥 SMM")!.data!);
+      expect(sent.at(-1)!.text).toContain("👥 SMM: Настя @zuzya_zyzya, Настя @ananas_2711, Вика @tora_co");
     });
 
     it("ответ «Сальме» на «Кому?» разбирает код, без модели", async () => {
@@ -423,36 +422,36 @@ describe("голос и свободный текст", () => {
       await say("Поставь задачу выложить сторис");
       await say("Сальме");
       expect(inputs).toHaveLength(1);
-      expect(preview().text).toContain("👤 Исполнитель: Сальма · Ивент-отдел (@salmasxsx)");
+      expect(preview().text).toContain("👤 Исполнитель: Сальма (Ивент-отдел) @salmasxsx");
     });
 
     it("«Напомни мне позвонить в Surf» → «Когда напомнить?» → «через час» → предпросмотр", async () => {
       answers.push(model({ intent: "create_reminder", text: "позвонить в Surf" }));
       await say("Напомни мне позвонить в Surf");
       const q = sent.at(-1)!;
-      expect(q.text).toBe("Поняла: напоминание «позвонить в Surf»\nКогда напомнить?");
+      expect(q.text).toBe("Поняла: напоминание «позвонить в Surf».\nКогда напомнить?\nНапиши или надиктуй, например «в 18:30» или «через час».");
       expect(q.buttons.map((b) => b.text)).toEqual(["через 30 мин", "через час", "сегодня 18:00", "завтра 10:00", "✖️ Отмена"]);
       await say("через час");
       expect(inputs).toHaveLength(1);
-      expect(preview().text).toContain("⏰ Напоминание\nпозвонить в Surf\n🕑 Когда: вт 13.10, 15:05");
+      expect(preview().text).toContain("⏰ Напоминание\nпозвонить в Surf\n🕘 Когда: вт 13.10, 15:05");
     });
 
     it("«Поставь задачу СММ выложить сторис до завтра 12:00» — три исполнителя из СММ", async () => {
       answers.push(model({ intent: "create_task", what: "Выложить сторис", due: "2026-10-14T12:00", assignees: [{ name: "СММ", qualifier: "" }] }));
       await say("Поставь задачу СММ выложить сторис до завтра 12:00");
-      expect(preview().text).toContain("📋 Задача\nВыложить сторис\n👥 СММ: Настя (@zuzya_zyzya), Настя (@ananas_2711), Вика (@tora_co)\n⏰ Срок: ср 14.10, 12:00");
+      expect(preview().text).toContain("📋 Задача\nВыложить сторис\n👥 SMM: Настя @zuzya_zyzya, Настя @ananas_2711, Вика @tora_co\n⏰ Срок: ср 14.10, 12:00");
       await press(button("✅ Создать")!);
       expect([...tasks.assignedTasks.values()].map((t) => t.username).sort()).toEqual(["ananas_2711", "tora_co", "zuzya_zyzya"]);
-      expect(sent.some((x) => x.text === "✅ Задача поставлена отделу СММ, срок ср 14.10, 12:00")).toBe(true);
+      expect(sent.some((x) => x.text === "✅ Задача поставлена: SMM, срок ср 14.10, 12:00")).toBe(true);
     });
 
     it("отправитель из отдела в задачу отделу не попадает, пока не скажет «и мне»", async () => {
       answers.push(model({ intent: "create_task", what: "Пост", assignees: [{ name: "смм-щикам", qualifier: "" }] }));
       await say("поставь смм-щикам сделать пост", NASTYA);
-      expect(preview().text).toContain("👥 СММ: Настя (@zuzya_zyzya), Вика (@tora_co)");
+      expect(preview().text).toContain("👥 SMM: Настя @zuzya_zyzya, Вика @tora_co");
       answers.push(model({ intent: "create_task", what: "Пост", assignees: [{ name: "смм-щикам", qualifier: "" }, { name: "мне", qualifier: "" }] }));
       await say("поставь смм-щикам и мне сделать пост", NASTYA);
-      expect(preview().text).toContain("👤 Исполнитель: ты\n👥 СММ: Настя (@zuzya_zyzya), Вика (@tora_co)");
+      expect(preview().text).toContain("👤 Исполнитель: ты\n👥 SMM: Настя @zuzya_zyzya, Вика @tora_co");
     });
 
     it("пустой отдел — сообщение и выбор людей кнопками", async () => {
@@ -466,7 +465,7 @@ describe("голос и свободный текст", () => {
     it("встреча без названия и участников — «Встреча», про название не спрашиваем", async () => {
       answers.push(model({ intent: "create_event", starts_at: "2026-10-14T11:00" }));
       await say("поставь встречу завтра в 11");
-      expect(preview().text).toContain("🗓 Встреча\nВстреча\n🕑 Когда: ср 14.10, 11:00");
+      expect(preview().text).toContain("🗓 Встреча\n🕘 Когда: ср 14.10, 11:00");
     });
 
     it("задача без текста и бессмысленный текст — «Не поняла»", async () => {
@@ -490,13 +489,35 @@ describe("голос и свободный текст", () => {
       expect(download).not.toHaveBeenCalled();
     });
 
-    it("распознанный текст — сверху предпросмотра", async () => {
-      answers.push(pacers);
+    it("расшифровки «🗣» нет ни в одном сообщении: вопрос, предпросмотр, итог; текст лежит в черновике", async () => {
+      transcribe.mockResolvedValueOnce("поставь на сегодня созвон с ивент отделом с машей и сальва");
+      answers.push(validateIntent({ intent: "create_event", title: "Созвон с Маше и Сальме", starts_at: "2026-10-13",
+        participants: [{ name: "ивент отделом", qualifier: "" }, { name: "машей", qualifier: "" }, { name: "сальва", qualifier: "" }] }));
       await voice(6);
-      expect(transcribe).toHaveBeenCalledWith(ALI, new Uint8Array([1, 2, 3]), 6);
-      expect(inputs[0].text).toBe("поставь маше из ивента найти пейсеров до четверга 20:00");
-      expect(preview().text.startsWith("🗣 «поставь маше из ивента найти пейсеров до четверга 20:00»\n\nПроверь, пожалуйста:")).toBe(true);
-      expect(drafts.drafts.get(1)!.source_text).toBe("поставь маше из ивента найти пейсеров до четверга 20:00");
+      expect(drafts.drafts.get(1)!.source_text).toBe("поставь на сегодня созвон с ивент отделом с машей и сальва");
+      expect(sent.at(-1)!.text).toBe("Поняла: созвон с ивент-отделом сегодня, вт 13.10, онлайн.\nВо сколько?\nНапиши или надиктуй время, например «в 18:30».");
+      transcribe.mockResolvedValueOnce("в 21 30");
+      await voice(2);
+      expect(preview().text).toBe([
+        "Проверь, пожалуйста:", "",
+        "🗓 Созвон с ивент-отделом",
+        "🕘 Когда: вт 13.10, 21:30",
+        "📍 Где: Онлайн",
+        "👥 Участники: ты, Ивент-отдел: Маша @gusarovame, Сальма @salmasxsx",
+        "✍️ Автор: ты",
+      ].join("\n"));
+      await press(button("✅ Создать")!);
+      expect(sent.length).toBeGreaterThan(2);
+      expect(sent.some((x) => x.text.includes("🗣"))).toBe(false);
+    });
+
+    it("в «Поняла» и списках нет «с <имя в именительном>»", async () => {
+      answers.push(validateIntent({ intent: "create_event", title: "Сбивка по кофе-рану", starts_at: "2026-10-14",
+        participants: [{ name: "Сальмой", qualifier: "" }, { name: "Викой", qualifier: "из смм" }] }));
+      await say("сбивка по кофе-рану завтра с Сальмой и Викой из смм");
+      const q = sent.at(-1)!.text;
+      expect(q).toContain("Поняла: сбивка по кофе-рану завтра, ср 14.10, участники: Сальма, Вика.");
+      expect(q).not.toMatch(/\sс (Маша|Сальма|Вика|Настя|Али|Дмитрий)\b/);
     });
   });
 });

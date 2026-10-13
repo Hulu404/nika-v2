@@ -273,8 +273,8 @@ async function visibleTasks(deps: TeamTaskDeps, uid: number): Promise<AssignedTa
 }
 
 async function showList(ctx: Context, deps: TeamTaskDeps, uid: number, tab: TaskTab, page: number, edit: boolean, now: Date): Promise<boolean> {
-  const [tasks, names] = await Promise.all([visibleTasks(deps, uid), namesOf(deps)]);
-  await show(ctx, tasksScreen(tab, tasks, uid, names, now, page, isFounder(uid)), edit);
+  const [tasks, names, members] = await Promise.all([visibleTasks(deps, uid), namesOf(deps), deps.listTeam()]);
+  await show(ctx, tasksScreen(tab, tasks, uid, names, now, page, isFounder(uid), members), edit);
   return true;
 }
 
@@ -423,7 +423,7 @@ async function doCancel(ctx: Context, deps: TeamTaskDeps, uid: number, id: numbe
   const founder = isFounder(uid);
   const [tasks, names] = await Promise.all([visibleTasks(deps, uid), namesOf(deps)]);
   const tab: TaskTab = group[0].assigned_by === uid ? "by" : "all";
-  await show(ctx, tasksScreen(tab, tasks, uid, names, now, 0, founder), true);
+  await show(ctx, tasksScreen(tab, tasks, uid, names, now, 0, founder, await deps.listTeam()), true);
   return true;
 }
 

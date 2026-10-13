@@ -13,21 +13,23 @@ import { departmentName, matchDepartment, type Department } from "./departments"
 export interface RosterEntry {
   username: string;
   firstName: string;
+  /** Творительный падеж имени — для «встреча с …». Склонения код не собирает. */
+  nameInstr: string;
   title: string;
   departments: string[];
   aliases: string[];
 }
 
 export const ROSTER: readonly RosterEntry[] = [
-  { username: "zuzya_zyzya", firstName: "Настя", title: "Глава SMM", departments: ["smm"], aliases: [] },
-  { username: "ananas_2711", firstName: "Настя", title: "SMM", departments: ["smm"], aliases: [] },
-  { username: "tora_co", firstName: "Вика", title: "SMM", departments: ["smm"], aliases: [] },
-  { username: "dissidenceandtea", firstName: "Вика", title: "Разработчик", departments: ["dev"], aliases: [] },
-  { username: "mouserdyuk", firstName: "Маша", title: "Главный дизайнер", departments: ["design"], aliases: [] },
-  { username: "gusarovame", firstName: "Маша", title: "Ивент-отдел", departments: ["events"], aliases: [] },
-  { username: "salmasxsx", firstName: "Сальма", title: "Ивент-отдел", departments: ["events"], aliases: [] },
-  { username: "Hulu404", firstName: "Али", title: "COO, фаундер", departments: [], aliases: [] },
-  { username: "srbrkvss", firstName: "Дмитрий", title: "CEO, фаундер", departments: [], aliases: ["Дима"] },
+  { username: "zuzya_zyzya", firstName: "Настя", nameInstr: "Настей", title: "Глава SMM", departments: ["smm"], aliases: [] },
+  { username: "ananas_2711", firstName: "Настя", nameInstr: "Настей", title: "SMM", departments: ["smm"], aliases: [] },
+  { username: "tora_co", firstName: "Вика", nameInstr: "Викой", title: "SMM", departments: ["smm"], aliases: [] },
+  { username: "dissidenceandtea", firstName: "Вика", nameInstr: "Викой", title: "Разработчик", departments: ["dev"], aliases: [] },
+  { username: "mouserdyuk", firstName: "Маша", nameInstr: "Машей", title: "Главный дизайнер", departments: ["design"], aliases: [] },
+  { username: "gusarovame", firstName: "Маша", nameInstr: "Машей", title: "Ивент-отдел", departments: ["events"], aliases: [] },
+  { username: "salmasxsx", firstName: "Сальма", nameInstr: "Сальмой", title: "Ивент-отдел", departments: ["events"], aliases: [] },
+  { username: "Hulu404", firstName: "Али", nameInstr: "Али", title: "COO, фаундер", departments: [], aliases: [] },
+  { username: "srbrkvss", firstName: "Дмитрий", nameInstr: "Дмитрием", title: "CEO, фаундер", departments: [], aliases: ["Дима"] },
 ];
 
 /** Ник без «@» и регистра. */
@@ -52,6 +54,19 @@ export function rosterPatch(m: TeamMember): ProfilePatch | null {
   return Object.keys(patch).length ? patch : null;
 }
 
+/** Творительный по имени, если имя поменяли в боте, а ник не из ROSTER. */
+const INSTR_BY_NAME: Record<string, string> = {
+  Настя: "Настей", Вика: "Викой", Маша: "Машей", Сальма: "Сальмой", Али: "Али", Дмитрий: "Дмитрием", Дима: "Димой",
+};
+
+/** «Машей» — для «встреча с …»; null — готовой формы нет, тогда список без предлога. */
+export function nameInstr(m: Pick<TeamMember, "first_name" | "display_name" | "username" | "chat_id">): string | null {
+  const name = personName(m);
+  const r = rosterFor(m.username);
+  if (r && r.firstName === name) return r.nameInstr;
+  return INSTR_BY_NAME[name] ?? null;
+}
+
 // ── Подписи ──────────────────────────────────────────────────────────────────
 
 /** «Маша»; без имени — имя из Telegram или ник. */
@@ -59,14 +74,18 @@ export function personName(m: Pick<TeamMember, "first_name" | "display_name" | "
   return m.first_name || m.display_name || (m.username ? `@${m.username}` : String(m.chat_id));
 }
 
-/** «Маша · Ивент-отдел» — для кнопок выбора. */
-export function personWithTitle(m: TeamMember): string {
-  return m.title ? `${personName(m)} · ${m.title}` : personName(m);
+/**
+ * Человек на всех экранах: «Маша (Ивент-отдел) @gusarovame», без должности —
+ * «Али @Hulu404», отправитель — «ты». Имя всегда в именительном.
+ */
+export function personLabel(m: TeamMember, senderId?: number): string {
+  if (senderId !== undefined && m.chat_id === senderId) return "ты";
+  return `${personName(m)}${m.title ? ` (${m.title})` : ""}${m.username ? ` @${m.username}` : ""}`;
 }
 
-/** «Маша · Ивент-отдел (@gusarovame)». */
-export function personFull(m: TeamMember): string {
-  return `${personWithTitle(m)}${m.username ? ` (@${m.username})` : ""}`;
+/** Внутри отдела должность не повторяем: «Ивент-отдел: Маша @gusarovame, Сальма @salmasxsx». */
+export function personShort(m: TeamMember): string {
+  return `${personName(m)}${m.username ? ` @${m.username}` : ""}`;
 }
 
 // ── Поиск человека по фразе ──────────────────────────────────────────────────
@@ -95,6 +114,15 @@ function profileText(m: TeamMember): string {
 function qualifierScore(m: TeamMember, words: readonly string[]): number {
   const text = profileText(m);
   return words.filter((w) => text.includes(w)).length;
+}
+
+/** Строки отличаются не больше чем на одну правку (замена, вставка, удаление). */
+function oneEditApart(a: string, b: string): boolean {
+  if (a === b) return true;
+  if (Math.abs(a.length - b.length) > 1) return false;
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  return a.slice(i + 1) === b.slice(i + 1) || a.slice(i) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i);
 }
 
 export type MentionMatch =
@@ -133,7 +161,11 @@ export function resolveMention(team: readonly TeamMember[], mention: { name: str
     if (department) {
       return { kind: "department", department, members: team.filter((m) => m.chat_id !== senderId && (m.departments ?? []).includes(department.key)) };
     }
-    return { kind: "none", name: mention.name };
+    // Кривое распознавание голоса («сальва» вместо «Сальма»): одна буква разницы в основе имени.
+    if (key.length >= 4) {
+      found = team.filter((m) => [m.first_name, ...(m.name_aliases ?? [])].some((n) => n && stem(n).length >= 4 && oneEditApart(stem(n), key)));
+    }
+    if (!found.length) return { kind: "none", name: mention.name };
   }
   if (found.length > 1) {
     const words = [...tail, ...(mention.qualifier ?? "").toLowerCase().split(/[\s\-—,]+/)]

@@ -10,7 +10,7 @@ import { isFounder } from "./config";
 import type { AssignedTask } from "../databot/task-list";
 import { CLUBS, clubByKey } from "./clubs";
 import { DEPARTMENTS, departmentName } from "./departments";
-import { personName } from "./roster";
+import { personLabel as teamPersonLabel } from "./roster";
 import { coffeeRunStart, coffeeRunTitle, groupByDay, itemClub, type ScheduleItem, type TeamEvent, type TeamEventKind } from "./events";
 
 /**
@@ -204,9 +204,8 @@ export function remindersText(
 export function teamText(members: TeamMember[], meChatId: number): string {
   if (members.length === 0) return "В команде пока никого — странно, ведь ты как-то сюда попал.";
   const line = (m: TeamMember) => {
-    // «Маша · Главный дизайнер · @mouserdyuk»; без имени и должности — как раньше, ник.
-    const who = [m.first_name, m.title, m.username ? `@${m.username}` : null].filter(Boolean).join(" · ")
-      || (m.display_name ?? String(m.chat_id));
+    // «Маша (Главный дизайнер) @mouserdyuk» — общий формат человека (roster.ts).
+    const who = teamPersonLabel(m);
     const role = isFounder(m.chat_id) && !/фаундер/i.test(m.title ?? "") ? " · фаундер" : "";
     const me = m.chat_id === meChatId ? " · это ты" : "";
     const seen = m.last_seen_at ? ` · был ${mskDateTime(m.last_seen_at)}` : " · ещё не заходил";
@@ -226,7 +225,7 @@ export function teamText(members: TeamMember[], meChatId: number): string {
 export function teamScreen(members: TeamMember[], meChatId: number, founder: boolean): TaskScreen {
   const kb = new InlineKeyboard();
   if (founder) {
-    for (const m of members) kb.text(personName(m) + (m.username ? ` · @${m.username}` : ""), `dp:m:${m.chat_id}`).row();
+    for (const m of members) kb.text(teamPersonLabel(m), `dp:m:${m.chat_id}`).row();
   } else if (members.some((m) => m.chat_id === meChatId)) {
     kb.text("Мои варианты имени", `dp:m:${meChatId}`).row();
   }
@@ -584,6 +583,7 @@ export function teamTasksScreen(
   names: ReadonlyMap<number, string>,
   now: Date,
   page = 0,
+  members: readonly TeamMember[] = [],
 ): TaskScreen {
   const active = tasks.filter(TASK_ACTIVE);
   const kb = new InlineKeyboard();
@@ -603,7 +603,8 @@ export function teamTasksScreen(
   for (const [username, list] of people) {
     const visible = list.filter((t) => shown.has(t.id));
     if (!visible.length) continue;
-    lines.push("", `<b>@${escapeHtmlTeam(username)}</b>`);
+    const person = members.find((m) => (m.username ?? "").toLowerCase() === username.toLowerCase());
+    lines.push("", `<b>${escapeHtmlTeam(person ? teamPersonLabel(person) : `@${username}`)}</b>`);
     for (const t of visible) {
       n++;
       const due = t.due_at ? ` · до ${shortDue(t.due_at, now)}${TASK_OVERDUE(t, now) ? " ⏰" : ""}` : "";
@@ -628,8 +629,9 @@ export function tasksScreen(
   now: Date,
   page = 0,
   founder = false,
+  members: readonly TeamMember[] = [],
 ): TaskScreen {
-  if (tab === "all" && founder) return teamTasksScreen(tasks, names, now, page);
+  if (tab === "all" && founder) return teamTasksScreen(tasks, names, now, page, members);
   if (tab === "by") return authoredScreen(tasks, me, now, page, founder);
   if (tab === "done") return doneScreen(tasks, me, page, founder);
   return myTasksScreen(tasks, me, names, now, page, founder);

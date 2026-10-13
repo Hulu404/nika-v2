@@ -253,7 +253,7 @@ describe("Пятница: фаундеры видят и меняют все з�
     await press("tk:l:all:0", 9, "owner");
     const all = String(lastScreen(9).payload.text);
     expect(all).toContain("<b>Задачи · Вся команда</b> · 1");
-    expect(all).toContain("<b>@bob</b>\n1. Макет · до пт 18:00 · от @alice · 🆕");
+    expect(all).toContain("<b>bob @bob</b>\n1. Макет · до пт 18:00 · от @alice · 🆕");
     expect(all).not.toContain("Своё дело"); // уже сделано
     await press("tk:l:done:0", 9, "owner");
     expect(String(lastScreen(9).payload.text)).toContain("✅ Своё дело · @carol");

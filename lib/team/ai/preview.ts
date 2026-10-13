@@ -2,7 +2,7 @@ import type { InlineKeyboardMarkup } from "grammy/types";
 import type { TeamMember } from "../access";
 import { escapeHtmlTeam, eventWhen } from "../copy";
 import type { Department } from "../departments";
-import { personFull, personName, personWithTitle, resolveMention, type MentionMatch } from "../roster";
+import { personLabel, personName, personShort, resolveMention, type MentionMatch } from "../roster";
 import { checkWhen, missingOf, mskLocalToDate, type Mention } from "./intent";
 import type { DraftBody } from "./stores";
 
@@ -57,12 +57,11 @@ export function slotsOf(body: DraftBody, team: readonly TeamMember[], senderId: 
   });
 }
 
-/** Как назвать человека в итоге: «Маше» (как сказали), себя — «тебе», отдел — «отделу СММ». */
-export function spokenName(slot: Slot, senderId: number): string {
-  if (slot.department) return `отделу ${slot.department.group}`;
-  if (slot.member?.chat_id === senderId) return "тебе";
-  const head = slot.mention.name.trim();
-  return head.charAt(0).toUpperCase() + head.slice(1);
+/** Кто в итоге — в именительном, без предлогов: «Маша», «ты», «SMM». */
+export function listName(slot: Slot, senderId: number): string {
+  if (slot.department) return slot.department.group;
+  if (slot.member) return slot.member.chat_id === senderId ? "ты" : personName(slot.member);
+  return slot.mention.name;
 }
 
 export interface Preview {
@@ -73,22 +72,24 @@ export interface Preview {
 
 type Row = InlineKeyboardMarkup["inline_keyboard"][number];
 
+/**
+ * Предпросмотр. Расшифровку голосового не показываем: Telegram показывает её у
+ * самого голосового. Люди — «Маша (Ивент-отдел) @gusarovame», отдел —
+ * «Ивент-отдел: Маша @gusarovame, Сальма @salmasxsx».
+ */
 export function renderPreview(
   draftId: number,
   body: DraftBody,
-  sourceText: string | null,
   team: readonly TeamMember[],
   senderId: number,
   now: Date,
   linkedTask?: string | null,
 ): Preview {
   const p = body.parsed;
-  const lines: string[] = [];
+  const lines: string[] = ["Проверь, пожалуйста:", ""];
   const rows: Row[] = [];
-  // Пока чего-то не хватает, создавать нечего: на это есть вопрос (questionFor).
+  // Пока чего-то не хватает, создавать нечего: на это есть вопрос (clarify.ts).
   let ready = missingOf(p).length === 0;
-  if (body.voice && sourceText) lines.push(`🗣 «${escapeHtmlTeam(sourceText.length > 300 ? `${sourceText.slice(0, 299)}…` : sourceText)}»`, "");
-  lines.push("Проверь, пожалуйста:", "");
 
   const when = (label: string, local: string | null, empty: string) => {
     if (!local) return `${label}: ${empty}`;
@@ -101,55 +102,59 @@ export function renderPreview(
     }
     return `${label}: ${whenText(check.at.toISOString())}`;
   };
+  const choose = (s: Slot, options: readonly TeamMember[]) => {
+    ready = false;
+    for (const m of options) rows.push([{ text: personLabel(m), callback_data: aiCb.pick(draftId, s.key, m.chat_id) }]);
+  };
+  const notes: string[] = [];
 
-  const short = (m: TeamMember) => escapeHtmlTeam(`${personName(m)}${m.username ? ` (@${m.username})` : ""}`);
-  /** Отдел отдельной строкой: «👥 Ивент-отдел: Маша (@gusarovame), Сальма (@salmasxsx)». */
-  const departmentLines = (slots: Slot[], needUsername: boolean): string[] => slots.filter((s) => s.department).map((s) => {
-    if (!s.people.length) {
-      ready = false;
-      for (const m of team) rows.push([{ text: personWithTitle(m), callback_data: aiCb.pick(draftId, s.key, m.chat_id) }]);
-      return `В отделе «${escapeHtmlTeam(s.department!.group)}» никого нет. Выбери людей ниже`;
+  /** Слот одной записью списка; проблемы — отдельной строкой ниже с кнопками выбора. */
+  const entry = (s: Slot, needUsername: boolean): string | null => {
+    if (s.department) {
+      if (!s.people.length) {
+        choose(s, team);
+        notes.push(`В отделе «${escapeHtmlTeam(s.department.group)}» никого нет. Выбери людей ниже`);
+        return null;
+      }
+      const noNick = needUsername ? s.people.filter((m) => !m.username) : [];
+      if (noNick.length) {
+        ready = false;
+        notes.push(`${escapeHtmlTeam(s.department.group)}: у ${noNick.map((m) => escapeHtmlTeam(personName(m))).join(", ")} нет ника в Telegram, задачу не поставить`);
+      }
+      return `${escapeHtmlTeam(s.department.group)}: ${s.people.map((m) => escapeHtmlTeam(personShort(m))).join(", ")}`;
     }
-    const noNick = needUsername ? s.people.filter((m) => !m.username) : [];
-    if (noNick.length) {
-      ready = false;
-      return `👥 ${escapeHtmlTeam(s.department!.group)}: у ${noNick.map((m) => escapeHtmlTeam(personName(m))).join(", ")} нет ника в Telegram, задачу не поставить`;
-    }
-    return `👥 ${escapeHtmlTeam(s.department!.group)}: ${s.people.map(short).join(", ")}`;
-  });
-
-  const people = (slots: Slot[], needUsername: boolean): string[] => slots.filter((s) => !s.department).map((s) => {
     if (s.member) {
       if (needUsername && !s.member.username) {
         ready = false;
-        return `${personName(s.member)}: нет ника в Telegram, задачу не поставить`;
+        notes.push(`${escapeHtmlTeam(personName(s.member))}: нет ника в Telegram, задачу не поставить`);
       }
-      return s.member.chat_id === senderId ? "ты" : escapeHtmlTeam(personFull(s.member));
+      return escapeHtmlTeam(personLabel(s.member, senderId));
     }
-    ready = false;
-    const options = s.match.kind === "many" ? s.match.options : team;
-    for (const m of options) rows.push([{ text: personWithTitle(m), callback_data: aiCb.pick(draftId, s.key, m.chat_id) }]);
-    return s.match.kind === "many"
+    choose(s, s.match.kind === "many" ? s.match.options : team);
+    notes.push(s.match.kind === "many"
       ? `«${escapeHtmlTeam(s.mention.name)}» — кто именно? Выбери ниже`
-      : `Не нашла в команде «${escapeHtmlTeam(s.mention.name)}». Выбери ниже`;
-  });
+      : `Не нашла в команде «${escapeHtmlTeam(s.mention.name)}». Выбери ниже`);
+    return null;
+  };
 
   if (p.intent === "create_task") {
     const slots = slotsOf(body, team, senderId);
-    const who = people(slots, true);
+    const people = slots.filter((s) => !s.department).map((s) => entry(s, true)).filter((x): x is string => !!x);
+    const groups = slots.filter((s) => s.department).map((s) => entry(s, true)).filter((x): x is string => !!x);
     lines.push("📋 Задача", escapeHtmlTeam(p.what));
-    if (who.length) lines.push(`👤 ${who.length > 1 ? "Исполнители" : "Исполнитель"}: ${who.join(", ")}`);
-    lines.push(...departmentLines(slots, true), when("⏰ Срок", p.due, "без срока"), "✍️ Автор: ты");
+    if (people.length) lines.push(`👤 ${people.length > 1 ? "Исполнители" : "Исполнитель"}: ${people.join(", ")}`);
+    for (const g of groups) lines.push(`👥 ${g}`);
+    lines.push(...notes, when("⏰ Срок", p.due, "без срока"), "✍️ Автор: ты");
   } else if (p.intent === "create_reminder") {
-    lines.push("⏰ Напоминание", escapeHtmlTeam(p.text), when("🕑 Когда", p.remind_at, "—"));
+    lines.push("⏰ Напоминание", escapeHtmlTeam(p.text), when("🕘 Когда", p.remind_at, "—"));
     if (linkedTask) lines.push(`🔗 К задаче: ${escapeHtmlTeam(linkedTask)}`);
     lines.push("Видишь только ты.");
   } else if (p.intent === "create_event") {
-    const slots = slotsOf(body, team, senderId);
-    const others = people(slots, false).filter((x) => x !== "ты");
-    lines.push(p.kind === "meeting" ? "🗓 Встреча" : "🗓 Событие", escapeHtmlTeam(p.title), when("🕑 Когда", p.starts_at, "—"));
+    const slots = slotsOf(body, team, senderId).filter((s) => s.member?.chat_id !== senderId);
+    const who = slots.map((s) => entry(s, false)).filter((x): x is string => !!x);
+    lines.push(`🗓 ${escapeHtmlTeam(p.title)}`, when("🕘 Когда", p.starts_at, "—"));
     if (p.place) lines.push(`📍 Где: ${escapeHtmlTeam(p.place)}`);
-    lines.push(`👥 Участники: ${["ты", ...others].join(", ")}`, ...departmentLines(slots, false), "✍️ Автор: ты");
+    lines.push(`👥 Участники: ${["ты", ...who].join(", ")}`, ...notes, "✍️ Автор: ты");
   }
 
   rows.push([

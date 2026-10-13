@@ -14,7 +14,7 @@ import { personName, stem } from "../roster";
 import { deliverAssigned, syncTeamTaskMembers } from "../tasks";
 import { missingOf, mskLocalToDate, type Intent } from "./intent";
 import { DEPARTMENTS } from "../departments";
-import { renderPreview, slotsOf, spokenName, whenText } from "./preview";
+import { listName, renderPreview, slotsOf, whenText } from "./preview";
 import { GIVE_UP_TEXT, MAX_CLARIFY_MESSAGES, NOT_HEARD_TEXT, applyAnswer, clarifyMessage, expandCompact, fillDefaults, parseAssigneeAnswer, parseTimeAnswer } from "./clarify";
 import {
   DRAFT_TTL_MS,
@@ -155,7 +155,7 @@ async function linkedTaskText(deps: AssistantDeps, body: DraftBody): Promise<str
 }
 
 async function renderDraft(deps: AssistantDeps, draft: Draft, uid: number, now: Date) {
-  return renderPreview(draft.id, draft.intent, draft.source_text, await deps.listTeam(), uid, now, await linkedTaskText(deps, draft.intent));
+  return renderPreview(draft.id, draft.intent, await deps.listTeam(), uid, now, await linkedTaskText(deps, draft.intent));
 }
 
 /** Понял, но не хватает поля: в лог без текста сообщения. */
@@ -182,7 +182,7 @@ async function present(ctx: Context, deps: AssistantDeps, draft: Draft, body: Dr
     await deps.drafts.setBody(draft.id, next);
     await deps.forms.set(uid, openTeamForm("ai.edit", { draft: String(draft.id) }, now), now);
     console.warn(`[team-ai] clarify: ${body.parsed.intent} awaiting=${field} attempt=${asked}`);
-    const q = clarifyMessage(draft.id, next, field, team, uid, now, sourceText, false);
+    const q = clarifyMessage(draft.id, next, field, team, uid, now, false);
     const msg = await ctx.reply(q.text, { ...HTML, reply_markup: q.keyboard });
     await deps.drafts.setMessage(draft.id, msg.message_id);
     return;
@@ -190,7 +190,7 @@ async function present(ctx: Context, deps: AssistantDeps, draft: Draft, body: Dr
   const next: DraftBody = { ...body, awaiting: undefined, failures: 0 };
   await deps.drafts.setBody(draft.id, next);
   await deps.forms.clear(uid);
-  const view = renderPreview(draft.id, next, sourceText, team, uid, now, await linkedTaskText(deps, next));
+  const view = renderPreview(draft.id, next, team, uid, now, await linkedTaskText(deps, next));
   const opts = { ...HTML, reply_markup: view.keyboard };
   if (where === "edit-callback") {
     // Кнопка на вопросе или предпросмотре: итог — в том же сообщении.
@@ -220,7 +220,7 @@ async function route(ctx: Context, deps: AssistantDeps, member: TeamMember, pars
       await ctx.reply(AI_UNKNOWN_TEXT, { reply_markup: menuKeyboard() });
       return;
   }
-  const body: DraftBody = { parsed: fillDefaults(parsed, said.text), picks: {}, voice: said.voice };
+  const body: DraftBody = { parsed: fillDefaults(parsed, said.text, await deps.listTeam(), uid), picks: {}, voice: said.voice };
   if (parsed.intent === "create_reminder") body.taskId = (await linkTask(deps, uid, parsed.task_hint))?.id ?? null;
   const draft = await deps.drafts.create({ chat_id: uid, intent: body, source_text: said.text }, now);
   await present(ctx, deps, draft, body, said.text, await deps.listTeam(), uid, now, "reply");
@@ -292,7 +292,7 @@ async function answerQuestion(ctx: Context, deps: AssistantDeps, draft: Draft, s
     await deps.drafts.setBody(draft.id, next);
     await deps.forms.set(uid, openTeamForm("ai.edit", { draft: String(draft.id) }, now), now);
     console.warn(`[team-ai] clarify: ${p.intent} awaiting=${field} attempt=${asked}`);
-    const retry = clarifyMessage(draft.id, next, field, team, uid, now, draft.source_text, true);
+    const retry = clarifyMessage(draft.id, next, field, team, uid, now, true);
     await ctx.reply(retry.text, { ...HTML, reply_markup: retry.keyboard });
     return;
   }
@@ -319,7 +319,7 @@ async function applyEdit(ctx: Context, deps: AssistantDeps, member: TeamMember, 
   await deps.forms.clear(uid);
   const raw = await deps.ai!.parseIntent({ chatId: uid, text: said.text, now, team: aiTeam(team), previous: draft.intent.parsed });
   logIncomplete(raw);
-  const parsed = fillDefaults(raw, `${draft.source_text ?? ""} ${said.text}`);
+  const parsed = fillDefaults(raw, `${draft.source_text ?? ""} ${said.text}`, team, uid);
   if (!parsed.intent.startsWith("create_")) {
     await deps.forms.set(uid, openTeamForm("ai.edit", form.params, now), now);
     await ctx.reply("Не поняла уточнение. Попробуй сказать иначе или нажми «✖️ Отмена».");
@@ -358,9 +358,8 @@ async function create(ctx: Context, deps: AssistantDeps, draft: Draft, uid: numb
     const drafts: AssignedTaskDraft[] = usernames.map((username) => ({ line: 1, username, what: p.what, due_at: due }));
     const tasks = await deps.tasks.importAssignedTasks(uid, draft.message_id ?? draft.id, drafts);
     await deliverAssigned(ctx.api, deps.tasks, tasks.filter((t) => t.delivery_state === "pending"), author?.username ?? undefined, now);
-    const names = slots.map((s) => spokenName(s, uid));
-    const list = names.length > 1 ? `${names.slice(0, -1).join(", ")} и ${names.at(-1)}` : names[0];
-    return `✅ Задача поставлена ${list}, ${due ? `срок ${whenText(due)}` : "без срока"}`;
+    // Кто — в именительном, без собранных кодом склонений: «Маша», «SMM», «ты».
+    return `✅ Задача поставлена: ${slots.map((s) => listName(s, uid)).join(", ")}, ${due ? `срок ${whenText(due)}` : "без срока"}`;
   }
 
   if (p.intent === "create_reminder") {
@@ -474,7 +473,7 @@ export async function handleAiUpdate(ctx: Context, providedDeps?: AssistantDeps 
     if (!team.some((x) => x.chat_id === Number(chat))) return true;
     const body: DraftBody = { ...draft.intent, picks: { ...draft.intent.picks, [slot!]: Number(chat) } };
     await deps.drafts.setBody(draft.id, body);
-    const preview = renderPreview(draft.id, body, draft.source_text, team, uid, now, await linkedTaskText(deps, body));
+    const preview = renderPreview(draft.id, body, team, uid, now, await linkedTaskText(deps, body));
     await edit(preview.text, preview.keyboard);
     return true;
   }

@@ -3,22 +3,24 @@
  * Новый отдел — строка здесь; задачи кофе-рана ставятся по этим ключам
  * (lib/team/coffee-run-template.ts).
  *
- * group — как отдел называют группой людей («с ивент-отделом»); roots — корни,
- * по которым код узнаёт отдел во фразе, в том числе в кривом распознавании
- * голоса («ивента дел», «смм-щикам»).
+ * group — отдел как группа людей в списках («Ивент-отдел: Маша, Сальма»),
+ * groupInstr — готовая форма для «встреча с …» (склонения код не собирает);
+ * roots — корни, по которым код узнаёт отдел во фразе, в том числе в кривом
+ * распознавании голоса («ивента дел», «смм-щикам»).
  */
 export interface Department {
   key: string;
   name: string;
   group: string;
+  groupInstr: string;
   roots: RegExp;
 }
 
 export const DEPARTMENTS: readonly Department[] = [
-  { key: "smm", name: "СММ", group: "СММ", roots: /смм|smm|эсэмэм/ },
-  { key: "events", name: "Ивенты", group: "Ивент-отдел", roots: /ивент|event/ },
-  { key: "design", name: "Дизайн", group: "Дизайн", roots: /дизайн|design/ },
-  { key: "dev", name: "Разработка", group: "Разработка", roots: /разраб|\bdev|программист/ },
+  { key: "smm", name: "СММ", group: "SMM", groupInstr: "SMM-отделом", roots: /смм|smm|эсэмэм/ },
+  { key: "events", name: "Ивенты", group: "Ивент-отдел", groupInstr: "ивент-отделом", roots: /ивент|event/ },
+  { key: "design", name: "Дизайн", group: "Дизайн", groupInstr: "отделом дизайна", roots: /дизайн|design/ },
+  { key: "dev", name: "Разработка", group: "Разработка", groupInstr: "отделом разработки", roots: /разраб|\bdev|программист/ },
 ];
 
 export function departmentName(key: string): string {

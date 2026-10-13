@@ -68,13 +68,13 @@ describe("«👥 Команда»: отделы", () => {
     expect(screens.at(-1)!.text).toContain("@vika · СММ");
     expect(screens.at(-1)!.buttons).toEqual(["Мои варианты имени"]);
     await open(9);
-    expect(screens.at(-1)!.buttons).toEqual(["founder · @founder", "vika · @vika", "danya · @danya"]);
+    expect(screens.at(-1)!.buttons).toEqual(["founder @founder", "vika @vika", "danya @danya"]);
   });
 
-  it("строка участника: имя · должность · ник", async () => {
+  it("строка участника: имя (должность) @ник", async () => {
     Object.assign(team[1], { first_name: "Вика", title: "SMM" });
     await open(6);
-    expect(screens.at(-1)!.text).toContain("• Вика · SMM · @vika · СММ");
+    expect(screens.at(-1)!.text).toContain("• Вика (SMM) @vika · СММ");
   });
 
   it("фаундер меняет имя, должность и варианты имени любого участника", async () => {
