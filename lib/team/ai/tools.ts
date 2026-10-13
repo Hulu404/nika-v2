@@ -186,7 +186,7 @@ async function sendList(tc: ToolContext, title: string, lines: string[], choose:
 /** Напоминание «про задачу»: одна моя открытая задача, в тексте которой есть все слова подсказки. */
 export async function linkTask(store: DatabotStore, uid: number, hint: string | null): Promise<number | null> {
   if (!hint) return null;
-  const words = hint.split(/\s+/).map((w) => stem(w).slice(0, 5)).filter((w) => w.length >= 4);
+  const words = hint.split(/[\s\-—]+/).map((w) => stem(w).slice(0, 5)).filter((w) => w.length >= 4);
   if (!words.length) return null;
   const mine = (await store.listMyAssigned(uid)).filter((t) => t.assignee_id === uid && isActiveAssigned(t));
   const hits = mine.filter((t) => words.every((w) => t.what.toLowerCase().replace(/ё/g, "е").includes(w)));
@@ -234,7 +234,8 @@ async function listTasks(tc: ToolContext, a: Record<string, unknown>): Promise<s
     : status === "overdue" ? overdue(t, tc.now) : isActiveAssigned(t));
   const query = str(a.query);
   if (query) {
-    const words = query.split(/\s+/).map((w) => stem(w).slice(0, 5)).filter((w) => w.length >= 3);
+    // «кофе-рана» — два слова: дефис в тексте задачи стоит так же, как в запросе.
+    const words = query.split(/[\s\-—]+/).map((w) => stem(w).slice(0, 5)).filter((w) => w.length >= 3);
     tasks = tasks.filter((t) => words.every((w) => t.what.toLowerCase().replace(/ё/g, "е").includes(w)));
     title += ` · «${query}»`;
   }
