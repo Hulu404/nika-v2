@@ -19,7 +19,8 @@ import { INTENT_JSON_SCHEMA, validateIntent, type Intent } from "./intent";
 
 export const STT_URL = "https://stt.api.cloud.yandex.net/speech/v1/stt:recognize";
 export const LLM_URL = "https://ai.api.cloud.yandex.net/foundationModels/v1/completion";
-export const DEFAULT_LLM_MODEL = "yandexgpt-lite/latest";
+/** YandexGPT 5 Pro: Lite с вызовом инструментов не справляется. */
+export const DEFAULT_LLM_MODEL = "yandexgpt/latest";
 export const TIMEOUT_MS = 15_000;
 export const LLM_LIMIT_PER_HOUR = 40;
 /** Лимиты синхронного распознавания SpeechKit v1. */
@@ -106,12 +107,14 @@ export type FetchLike = (url: string, init: { method: string; headers: Record<st
 const retriable = (status: number) => status === 429 || status >= 500;
 
 /** Таймаут 15 секунд, один повтор при сетевой ошибке, 429 или 5xx. */
-async function request(fetchImpl: FetchLike, url: string, init: { headers: Record<string, string>; body: string | Uint8Array }): Promise<unknown> {
+async function request(fetchImpl: FetchLike, url: string, init: { headers: Record<string, string>; body: string | Uint8Array }, deadline?: number): Promise<unknown> {
   let lastError = "";
   for (let attempt = 0; attempt < 2; attempt++) {
     let res: Awaited<ReturnType<FetchLike>>;
     try {
-      res = await fetchImpl(url, { method: "POST", ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+      const left = deadline === undefined ? TIMEOUT_MS : Math.min(TIMEOUT_MS, deadline - Date.now());
+      if (left <= 0) throw new TeamAiError("api", "deadline");
+      res = await fetchImpl(url, { method: "POST", ...init, signal: AbortSignal.timeout(left) });
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
       continue;
@@ -144,7 +147,42 @@ export interface ParseInput {
   focus?: "assignees" | "starts_at" | "remind_at";
 }
 
+// ── Вызов инструментов (нативный API генерации текста: tools, toolCallList, toolResultList) ──
+
+export interface ToolCall {
+  name: string;
+  arguments: Record<string, unknown>;
+}
+
+export type ChatMessage =
+  | { role: "system" | "user" | "assistant"; text: string }
+  | { role: "assistant"; toolCallList: { toolCalls: Array<{ functionCall: ToolCall }> } }
+  | { role: "user"; toolResultList: { toolResults: Array<{ functionResult: { name: string; content: string } }> } };
+
+export interface ToolSpec {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+}
+
+export type StepResult =
+  | { type: "text"; text: string; tokensIn: number; tokensOut: number }
+  | { type: "tools"; calls: ToolCall[]; tokensIn: number; tokensOut: number };
+
+export interface StepInput {
+  messages: ChatMessage[];
+  tools: readonly ToolSpec[];
+  /** Момент (Date.now()), после которого запрос не начинать и не ждать. */
+  deadline?: number;
+}
+
 export interface TeamAi {
+  /** Один шаг модели: текстовый ответ или вызовы инструментов. Расход не пишет — это делает вызывающий раз на сообщение. */
+  step?(input: StepInput): Promise<StepResult>;
+  /** Не больше 40 сообщений к модели в час на человека: бросает TeamAiError("rate_limit"). */
+  checkLimit?(chatId: number): Promise<void>;
+  /** Расход одного сообщения (все шаги вместе) — одна строка team_ai_usage. */
+  recordLlm?(chatId: number, tokensIn: number, tokensOut: number): Promise<void>;
   transcribe(chatId: number, ogg: Uint8Array, seconds: number): Promise<string>;
   parseIntent(input: ParseInput): Promise<Intent>;
 }
@@ -224,6 +262,39 @@ export function createTeamAi(deps: TeamAiDeps): TeamAi {
       const text = (body as { result?: unknown })?.result;
       if (typeof text !== "string") throw new TeamAiError("api", "stt: no result");
       return text.trim();
+    },
+
+    checkLimit,
+
+    async recordLlm(chatId, tokensIn, tokensOut) {
+      await deps.usage.record({ chat_id: chatId, kind: "llm", tokens_in: tokensIn || null, tokens_out: tokensOut || null }, clock());
+    },
+
+    async step(input) {
+      const cfg = config();
+      const body = await request(fetchImpl, LLM_URL, {
+        headers: { Authorization: `Api-Key ${cfg.apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          modelUri: cfg.modelUri,
+          completionOptions: { stream: false, temperature: 0.2, maxTokens: "1500" },
+          messages: input.messages,
+          tools: input.tools.map((t) => ({ function: t })),
+        }),
+      }, input.deadline);
+      const res = ((body as { result?: unknown })?.result ?? body) as {
+        alternatives?: Array<{ message?: { text?: unknown; toolCallList?: { toolCalls?: Array<{ functionCall?: { name?: unknown; arguments?: unknown } }> } }; status?: string }>;
+        usage?: { inputTextTokens?: unknown; completionTokens?: unknown };
+      };
+      const tokensIn = Number(res?.usage?.inputTextTokens) || 0;
+      const tokensOut = Number(res?.usage?.completionTokens) || 0;
+      const message = res?.alternatives?.[0]?.message;
+      const calls = (message?.toolCallList?.toolCalls ?? [])
+        .map((c) => c.functionCall)
+        .filter((f): f is { name: string; arguments: unknown } => typeof f?.name === "string")
+        .map((f) => ({ name: f.name, arguments: (f.arguments && typeof f.arguments === "object" ? f.arguments : {}) as Record<string, unknown> }));
+      if (calls.length) return { type: "tools", calls, tokensIn, tokensOut };
+      if (typeof message?.text === "string") return { type: "text", text: message.text.trim(), tokensIn, tokensOut };
+      throw new TeamAiError("api", "llm: empty answer");
     },
 
     async parseIntent(input) {

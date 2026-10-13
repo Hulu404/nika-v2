@@ -138,11 +138,11 @@ describe("полностью заполненный ответ с пустыми
 });
 
 describe("конфигурация", () => {
-  it("выключено без флага или ключей; модель по умолчанию — YandexGPT Lite", () => {
+  it("выключено без флага или ключей; модель по умолчанию — YandexGPT 5 Pro", () => {
     expect(teamAiConfig({ YANDEX_API_KEY: "k", YANDEX_FOLDER_ID: "f" })).toBeNull();
     expect(teamAiConfig({ TEAM_AI_ENABLED: "true", YANDEX_FOLDER_ID: "f" })).toBeNull();
     expect(teamAiConfig({ TEAM_AI_ENABLED: "true", YANDEX_API_KEY: "k", YANDEX_FOLDER_ID: "f" }))
-      .toEqual({ apiKey: "k", folderId: "f", modelUri: "gpt://f/yandexgpt-lite/latest" });
+      .toEqual({ apiKey: "k", folderId: "f", modelUri: "gpt://f/yandexgpt/latest" });
     expect(teamAiConfig({ TEAM_AI_ENABLED: "true", YANDEX_API_KEY: "k", YANDEX_FOLDER_ID: "f", YANDEX_LLM_MODEL: "yandexgpt/rc" })!.modelUri)
       .toBe("gpt://f/yandexgpt/rc");
   });
