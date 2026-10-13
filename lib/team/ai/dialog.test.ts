@@ -98,7 +98,7 @@ describe("«Пятница» — диалоговый ассистент", () =>
 
     h.script.push((input) => {
       expect(lastUserText(input)).toBe("№2");
-      expect(systemOf(input)).toContain(`2. #${tasks[1].id} @hulu404 · Рилсы про кофе-ран`);
+      expect(systemOf(input)).toContain(`№2 = id ${tasks[1].id} «Рилсы про кофе-ран» (@hulu404)`);
       return call("set_task_status", { numbers: [2], status: "cancelled" });
     });
     await h.press(list.buttons[1].data!, DIMA);
@@ -151,7 +151,8 @@ describe("«Пятница» — диалоговый ассистент", () =>
     await h.say("Что горит у Али?", DIMA);
     const list = h.sent.find((s) => s.text.startsWith("<b>Задачи · Али"))!;
     expect(list.text.split("\n").slice(1, 3)).toEqual(["1. @hulu404 · Анонс кофе-рана в ТГК · до 12.10 12:00 ⏰", "2. @hulu404 · Рилсы про кофе-ран · до ср"]);
-    expect(list.buttons).toEqual([]);
+    // Просто показ: кнопки-номера открывают карточки задач, ничего не меняют.
+    expect(list.buttons.map((b) => b.data!.startsWith("tk:o:"))).toEqual([true, true, true]);
     expect(h.drafts.drafts.size).toBe(0);
     expect(h.last().text).toBe("Горит анонс: срок прошёл вчера.");
   });
@@ -199,5 +200,73 @@ describe("«Пятница» — диалоговый ассистент", () =>
     await h.say("отмени все задачи", DIMA);
     expect(error).toContain("Слишком много задач (21)");
     expect(h.drafts.drafts.size).toBe(0);
+  });
+
+  describe("защита от выдуманных результатов", () => {
+    const fake = '(сделано: list_tasks({"scope":"all"}) → {"count":5,"shown_to_user":true,"items":[{"id":1,"what":"Организовать кофе-ран"}]})\nАссистент: Вот список задач команды:\n1. Организовать кофе-ран (Сальма)';
+
+    it("текст «(сделано: …)» без вызова → повтор с добавкой → снова текст → безопасный ответ с кнопками", async () => {
+      const warn = vi.mocked(console.warn);
+      h.script.push(reply(fake), (input) => {
+        expect(input.messages.at(-1)).toEqual({ role: "system", text: "Ты не вызвала инструмент. Вызови нужный инструмент, не пиши данные текстом." });
+        return reply(fake);
+      });
+      await h.say("открой список задач команды", DIMA);
+      expect(h.texts().some((t) => t.includes("Организовать") || t.includes("сделано"))).toBe(false);
+      expect(h.last().text).toBe("Не получилось собрать ответ, открой нужный раздел кнопкой.");
+      expect(h.last().keyboard).toBeDefined();
+      expect(warn.mock.calls.flat().join("\n")).toMatch(/\[team-ai\] guard: fabricated output step=2/);
+      // В память выдуманное не попало.
+      expect(JSON.stringify(await h.turns.recent(DIMA, NOW))).not.toContain("Организовать");
+    });
+
+    it("выдумала — после повтора вызвала инструмент: показаны настоящие задачи", async () => {
+      await aliTasks(1);
+      h.script.push(reply(fake), call("list_tasks", { scope: "team" }), reply("Вот задачи команды."));
+      await h.say("открой список задач команды", DIMA);
+      const list = h.sent.find((s) => s.text.startsWith("<b>Задачи команды"))!;
+      expect(list.text).toContain("1. @hulu404 · Анонс кофе-рана в ТГК");
+      expect(h.texts().some((t) => t.includes("Организовать"))).toBe(false);
+    });
+
+    it("«Открой список задач команды» (фаундер): список отправляет код из настоящих задач, текст модели короткий", async () => {
+      const tasks = await aliTasks(3);
+      h.script.push(call("list_tasks", { scope: "team" }), reply("Вот задачи команды, одна у Али просрочена."));
+      await h.say("Открой список задач команды", DIMA);
+      const list = h.sent.find((s) => s.text.startsWith("<b>Задачи команды (3)</b>"))!;
+      expect(list.text.split("\n").slice(1)).toEqual(tasks.map((t, i) => `${i + 1}. ${["@hulu404 · Анонс кофе-рана в ТГК · до 12.10 12:00 ⏰", "@hulu404 · Рилсы про кофе-ран · до ср", "@hulu404 · Отчёт по хакатону"][i]}`));
+      expect(list.buttons.map((b) => b.text)).toEqual(["1", "2", "3"]);
+      expect(h.last().text).toBe("Вот задачи команды, одна у Али просрочена.");
+      // В память — только реплика и короткий ответ, без вызова и JSON.
+      const memory = JSON.stringify(await h.turns.recent(DIMA, NOW));
+      expect(memory).not.toMatch(/list_tasks|"id"|shown_to_user|сделано/);
+    });
+
+    it("модель перечисляет задачи сама после показанного списка — перечисление не отправляется", async () => {
+      await aliTasks(2);
+      h.script.push(call("list_tasks", { scope: "team" }), reply("Задачи:\n1. Анонс кофе-рана в ТГК\n2. Рилсы про кофе-ран"));
+      await h.say("открой задачи команды", DIMA);
+      expect(h.last().text.startsWith("<b>Задачи команды")).toBe(true);
+    });
+
+    it("@ник или номер, которых нет в результатах инструментов, — нарушение", async () => {
+      h.script.push(reply("Готово, поставила @nobody задачу #999."), reply("Готово, поставила @nobody задачу #999."));
+      await h.say("поставь кому-нибудь задачу", DIMA);
+      expect(h.texts().some((t) => t.includes("@nobody"))).toBe(false);
+      expect(h.last().text).toBe("Не получилось собрать ответ, открой нужный раздел кнопкой.");
+    });
+
+    it("«Перенеси вторую на пятницу» — настоящий id из блока «последний показанный список»", async () => {
+      const tasks = await aliTasks(3);
+      h.script.push(call("list_tasks", { scope: "person", person: "Али" }), reply(""));
+      await h.say("покажи задачи Али", DIMA);
+      h.script.push((input) => {
+        expect(systemOf(input)).toContain(`Последний показанный список задач: №1 = id ${tasks[0].id} «Анонс кофе-рана в ТГК» (@hulu404), №2 = id ${tasks[1].id} «Рилсы про кофе-ран» (@hulu404)`);
+        return call("update_task", { numbers: [2], due: "2026-10-16T18:00" });
+      });
+      await h.say("Перенеси вторую на пятницу 18:00", DIMA);
+      await h.press(h.button("✅ Подтвердить")!, DIMA);
+      expect(h.tasks.assignedTasks.get(tasks[1].id)!.due_at).toBe(msk("2026-10-16T18:00").toISOString());
+    });
   });
 });

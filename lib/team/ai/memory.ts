@@ -124,23 +124,30 @@ export class MemoryStateStore implements StateStore {
   }
 }
 
+/** След вызова инструмента текстом — модель копирует такой формат и выдумывает результаты. */
+export const FABRICATION_MARKERS = /сделано:|ассистент:|shown_to_user|"id"\s*:|\{"/i;
+
 /**
  * Сообщения для модели: системная инструкция (с контекстом), прошлые реплики,
- * новое сообщение. Записи инструментов идут как заметки ассистента — модель
- * помнит, что уже сделала, но не путает их с ответами человеку.
+ * новое сообщение. В истории — только реплики человека и финальные ответы
+ * ассистента: вызовы инструментов и их результаты текстом сюда не попадают
+ * никогда (по ним модель училась «вызывать» инструменты строкой). Внутри
+ * сообщения инструменты идут только в нативном формате API (agent.ts).
  */
 export function dialogMessages(system: string, turns: readonly Turn[], userText: string): ChatMessage[] {
   return [
     { role: "system", text: system },
-    ...turns.map((t): ChatMessage => t.role === "user" ? { role: "user", text: t.content }
-      : t.role === "assistant" ? { role: "assistant", text: t.content } : { role: "assistant", text: `(сделано: ${t.content})` }),
+    ...turns
+      .filter((t) => t.role === "user" || (t.role === "assistant" && !FABRICATION_MARKERS.test(t.content)))
+      .map((t): ChatMessage => ({ role: t.role as "user" | "assistant", text: t.content })),
     { role: "user", text: userText },
   ];
 }
 
-/** Список для модели: «1. #42 Анонс кофе-рана · @ananas_2711 · до пт 12:00». */
+const LIST_NAMES = { tasks: "задач", events: "событий", reminders: "напоминаний", people: "людей" } as const;
+
+/** «Последний показанный список задач: №1 = id 37 «Анонс…» (@ananas_2711), №2 = …» — из реальных данных, без JSON. */
 export function shownListText(list: ShownList | null): string | null {
   if (!list?.items.length) return null;
-  const kind = { tasks: "задачи", events: "события", reminders: "напоминания", people: "люди" }[list.kind];
-  return [`Последний показанный список (${kind}):`, ...list.items.map((i) => `${i.n}. #${i.id} ${i.label}`)].join("\n");
+  return `Последний показанный список ${LIST_NAMES[list.kind]}: ${list.items.map((i) => `№${i.n} = id ${i.id} ${i.label}`).join(", ")}`;
 }

@@ -47,19 +47,21 @@ describe("память диалога", () => {
     expect(await state.get(2)).toEqual({ draft_id: null, last_list: null });
   });
 
-  it("сообщения для модели: система, прошлые реплики, заметки инструментов, новое сообщение", () => {
+  it("история для модели — только реплики человека и ответы; следов инструментов нет", () => {
     const msgs = dialogMessages("SYS", [
-      { role: "user", content: "поставь Маше задачу", created_at: "" },
-      { role: "tool", content: "create_task → предпросмотр", created_at: "" },
-      { role: "assistant", content: "Проверь черновик.", created_at: "" },
-    ], "ой, не Маше, а Сальме");
+      { role: "user", content: "открой список задач команды", created_at: "" },
+      // Старые записи до фикса: вызовы текстом и выдуманный «результат».
+      { role: "tool", content: 'list_tasks({"scope":"team"}) → {"count":5}', created_at: "" },
+      { role: "assistant", content: '(сделано: list_tasks({"scope":"all"}) → {"count":5,"shown_to_user":true,"items":[{"id":1}]}) Ассистент: Вот список', created_at: "" },
+      { role: "assistant", content: "Вот задачи команды.", created_at: "" },
+    ], "перенеси вторую на пятницу");
     expect(msgs).toEqual([
       { role: "system", text: "SYS" },
-      { role: "user", text: "поставь Маше задачу" },
-      { role: "assistant", text: "(сделано: create_task → предпросмотр)" },
-      { role: "assistant", text: "Проверь черновик." },
-      { role: "user", text: "ой, не Маше, а Сальме" },
+      { role: "user", text: "открой список задач команды" },
+      { role: "assistant", text: "Вот задачи команды." },
+      { role: "user", text: "перенеси вторую на пятницу" },
     ]);
+    expect(JSON.stringify(msgs)).not.toMatch(/сделано:|list_tasks|shown_to_user|"id"/);
   });
 });
 
@@ -70,13 +72,13 @@ describe("контекст в системной инструкции", () => {
   it("время по Москве, команда, отделы, черновик и список с номерами", () => {
     const text = assistantPrompt({ now: NOW, team, senderId: 8,
       draft: "Открытый черновик: задача «Найти пейсеров», исполнитель Маша",
-      list: shownListText({ kind: "tasks", items: [{ n: 1, id: 42, label: "Анонс · @ananas_2711" }, { n: 2, id: 43, label: "Рилсы · @tora_co" }] }) });
+      list: shownListText({ kind: "tasks", items: [{ n: 1, id: 37, label: "«Анонс кофе-рана: пост в ТГК и Instagram» (@ananas_2711)" }, { n: 2, id: 43, label: "«Рилсы» (@tora_co)" }] }) });
     expect(text).toContain("Сейчас вторник 2026-10-13, 14:05 по Москве");
     expect(text).toContain("Тебе пишет Али (фаундер");
     expect(text).toContain("- Маша, Ивент-отдел, @gusarovame");
     expect(text).toContain("- Ивент-отдел: Маша, Сальма");
     expect(text).toContain("Открытый черновик: задача «Найти пейсеров»");
-    expect(text).toContain("Последний показанный список (задачи):\n1. #42 Анонс · @ananas_2711\n2. #43 Рилсы · @tora_co");
+    expect(text).toContain("Последний показанный список задач: №1 = id 37 «Анонс кофе-рана: пост в ТГК и Instagram» (@ananas_2711), №2 = id 43 «Рилсы» (@tora_co)");
     expect(text).not.toMatch(/\+7|телефон/i);
   });
 

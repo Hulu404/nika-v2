@@ -6,7 +6,7 @@ import { normalizeTaskUsername } from "../../databot/tasks";
 import { isActiveAssigned, type AssignedTask, type AssignedTaskDraft } from "../../databot/task-list";
 import { findMember, listTeam, type TeamMember } from "../access";
 import { isFounder, teamBotConfigured, teamToken } from "../config";
-import { assigneeChangeText, escapeHtmlTeam, openMyTasksKeyboard, taskCb } from "../copy";
+import { assigneeChangeText, escapeHtmlTeam, menuKeyboard, taskCb } from "../copy";
 import { DEPARTMENTS } from "../departments";
 import { supabaseEventStore, type TeamEventStore } from "../events";
 import { openTeamForm, supabaseTeamForms, type TeamForm, type TeamFormStore } from "../form";
@@ -30,6 +30,7 @@ import {
   type ReminderStore,
 } from "./stores";
 import { executeTool, TOOL_SPECS, type ToolContext } from "./tools";
+import { GUARD_FAIL_TEXT, GUARD_RETRY_NOTE, fabricated, looksLikeListing } from "./guard";
 import { AI_FAIL_TEXT, TeamAiError, VOICE_MAX_BYTES, VOICE_MAX_SECONDS, aiErrorText, defaultTeamAi, teamAiConfig, type TeamAi } from "./yandex";
 
 /**
@@ -210,9 +211,6 @@ function codeAnswer(draft: Draft, text: string, team: TeamMember[], uid: number,
   return at ? applyAnswer(draft.intent, field, at) : null;
 }
 
-const callSummary = (c: { name: string; arguments: Record<string, unknown>; result: string }) =>
-  `${c.name}(${JSON.stringify(c.arguments).slice(0, 160)}) → ${c.result.slice(0, 200)}`;
-
 /**
  * Свободный текст или голосовое участника: диалог с моделью и инструментами.
  * false — голос и текст выключены, ответит старый путь.
@@ -240,7 +238,6 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
     if (draft && answered) {
       await present(ctx, deps, draft, answered, team, uid, now, "edit-message");
       await deps.turns.add(uid, "user", said.text, now);
-      await deps.turns.add(uid, "tool", "ответ на вопрос принят, черновик показан", now);
       return true;
     }
 
@@ -265,21 +262,40 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
     };
     const system = assistantPrompt({ now, team, senderId: uid, draft: draft ? draftContext(draft, team, uid) : null, list: shownListText(state.last_list) });
     const turns = trimHistory(await deps.turns.recent(uid, now));
+    const listNumbers = (state.last_list?.items ?? []).map((i) => i.n);
     const run = await runAgent({
       ai: deps.ai, messages: dialogMessages(system, turns, said.text), tools: TOOL_SPECS, progress,
+      validate: (text, calls) => !fabricated(text, { results: calls.map((c) => c.result), listNumbers }),
+      retryNote: GUARD_RETRY_NOTE,
       execute: (call) => executeTool(tctx, call),
       onStep: () => ctx.replyWithChatAction("typing").then(() => {}, () => {}),
     });
     await deps.ai.recordLlm(uid, run.tokensIn, run.tokensOut);
 
     // Предпросмотр говорит сам за себя; вопрос модели после него — показываем.
-    const text = run.text.trim();
-    if (text && (!shown.preview || /\?\s*$/.test(text))) await ctx.reply(text);
-    else if (!text && !shown.preview && !shown.list) await ctx.reply(AI_FAIL_TEXT);
+    let text = run.text.trim();
+    let sentText = "";
+    if (run.fabricated) {
+      // Выдуманные данные человеку не уходят: безопасный ответ и кнопки разделов.
+      console.warn(`[team-ai] guard: fabricated output step=${run.steps}`);
+      if (!shown.list && !shown.preview) {
+        await ctx.reply(GUARD_FAIL_TEXT, { reply_markup: menuKeyboard() });
+        sentText = GUARD_FAIL_TEXT;
+      }
+      text = "";
+    } else if (text && shown.list && looksLikeListing(text)) {
+      // Данные уже показал бот: перечисление моделью не дублируем.
+      console.warn(`[team-ai] guard: listing suppressed step=${run.steps}`);
+      text = "";
+    }
+    if (text && (!shown.preview || /\?\s*$/.test(text))) {
+      await ctx.reply(text);
+      sentText = text;
+    } else if (!text && !sentText && !shown.preview && !shown.list) await ctx.reply(AI_FAIL_TEXT);
 
+    // В память — только реплика человека и отправленный ответ; инструменты сюда не пишутся.
     await deps.turns.add(uid, "user", said.text, now);
-    if (run.calls.length) await deps.turns.add(uid, "tool", run.calls.map(callSummary).join("; "), now);
-    if (text) await deps.turns.add(uid, "assistant", text, now);
+    if (sentText) await deps.turns.add(uid, "assistant", sentText, now);
   } catch (err) {
     // Итоговая ошибка — одной строкой, без текста сообщения человека.
     const message = err instanceof Error ? err.message : String(err);
@@ -517,7 +533,7 @@ export async function handleAiUpdate(ctx: Context, providedDeps?: AssistantDeps 
   if (op === "x") {
     await deps.drafts.remove(draft.id);
     await close();
-    await deps.turns.add(uid, "tool", "человек отменил черновик", now);
+    await deps.turns.add(uid, "assistant", "Отменила.", now);
     await edit("Отменила.");
     return true;
   }
@@ -554,7 +570,7 @@ export async function handleAiUpdate(ctx: Context, providedDeps?: AssistantDeps 
   await close();
   try {
     const result = await confirm(ctx, deps, draft, uid, now);
-    await deps.turns.add(uid, "tool", `подтверждено: ${result}`, now);
+    await deps.turns.add(uid, "assistant", result, now);
     await edit(escapeHtmlTeam(result));
   } catch (err) {
     console.error("[team-ai] confirm:", err instanceof Error ? err.message : String(err));

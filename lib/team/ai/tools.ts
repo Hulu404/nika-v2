@@ -6,7 +6,7 @@ import { addDays, mskToday } from "../../databot/time";
 import { mskMidnight } from "../../databot/dates";
 import type { TeamMember } from "../access";
 import { isFounder } from "../config";
-import { escapeHtmlTeam, shortDue } from "../copy";
+import { escapeHtmlTeam, shortDue, taskCb } from "../copy";
 import { DEPARTMENTS, matchDepartment } from "../departments";
 import { canManageEvent, type TeamEvent, type TeamEventStore } from "../events";
 import { faqAnswerText, findFaq } from "../faq";
@@ -187,19 +187,20 @@ function excluded(tc: ToolContext, v: unknown): { ids: Set<number>; labels: stri
   return { ids, labels };
 }
 
-/** Строки с кнопками-номерами: выбор из списка нажатием. */
-function numberButtons(count: number): InlineKeyboardMarkup {
+/** Кнопки-номера: выбор из списка (ai:sel) или открыть карточку задачи. */
+function numberButtons(data: readonly string[]): InlineKeyboardMarkup {
   const rows: InlineKeyboardMarkup["inline_keyboard"] = [];
-  for (let i = 1; i <= count; i++) {
-    if ((i - 1) % 5 === 0) rows.push([]);
-    rows[rows.length - 1].push({ text: String(i), callback_data: `ai:sel:${i}` });
-  }
+  data.forEach((d, i) => {
+    if (i % 5 === 0) rows.push([]);
+    rows[rows.length - 1].push({ text: String(i + 1), callback_data: d });
+  });
   return { inline_keyboard: rows };
 }
 
-async function sendList(tc: ToolContext, title: string, lines: string[], choose: boolean): Promise<void> {
+/** Данные человеку показывает код, а не модель: заголовок, строки с номерами, кнопки. */
+async function sendList(tc: ToolContext, title: string, lines: string[], buttons?: readonly string[]): Promise<void> {
   const text = [`<b>${escapeHtmlTeam(title)}</b>`, ...lines.map((l, i) => `${i + 1}. ${escapeHtmlTeam(l)}`)].join("\n");
-  await tc.ctx.reply(text, { parse_mode: "HTML", ...(choose ? { reply_markup: numberButtons(lines.length) } : {}) });
+  await tc.ctx.reply(text, { parse_mode: "HTML", ...(buttons?.length ? { reply_markup: numberButtons(buttons) } : {}) });
   tc.shown.list = true;
 }
 
@@ -325,8 +326,12 @@ async function listTasks(tc: ToolContext, a: Record<string, unknown>): Promise<s
   const total = tasks.length;
   const shown = tasks.slice(0, MAX_BULK);
   if (shown.length) {
-    await tc.setList({ kind: "tasks", items: shown.map((t, i) => ({ n: i + 1, id: t.id, label: taskLine(t, tc.now) })) });
-    await sendList(tc, `${title} (${total})`, shown.map((t) => taskLine(t, tc.now)), str(a.purpose) === "choose" && shown.length > 1);
+    await tc.setList({ kind: "tasks", items: shown.map((t, i) => ({ n: i + 1, id: t.id, label: `«${cut(t.what, 80)}» (@${t.username})` })) });
+    // Выбор — кнопка шлёт номер в диалог; просто показ — кнопка открывает карточку задачи.
+    const choose = str(a.purpose) === "choose" && shown.length > 1;
+    const tab = founder ? "all" : "me";
+    await sendList(tc, `${title} (${total})`, shown.map((t) => taskLine(t, tc.now)),
+      shown.map((t, i) => (choose ? `ai:sel:${i + 1}` : taskCb.open(t.id, tab, 0))));
   }
   return json({
     count: total,
@@ -348,21 +353,30 @@ async function getSchedule(tc: ToolContext, a: Record<string, unknown>): Promise
   const events = await tc.events.listBetween(mskMidnight(from), mskMidnight(to));
   await tc.showSchedule(tc.ctx, range);
   tc.shown.list = true;
-  if (events.length) await tc.setList({ kind: "events", items: events.map((e, i) => ({ n: i + 1, id: e.id, label: `${e.title} · ${whenText(e.starts_at)}` })) });
+  if (events.length) await tc.setList({ kind: "events", items: events.map((e, i) => ({ n: i + 1, id: e.id, label: `«${e.title}» (${whenText(e.starts_at)})` })) });
   return json({ shown_to_user: true, items: events.map((e, i) => ({ n: i + 1, id: e.id, title: e.title, when: whenText(e.starts_at), place: e.place })) });
 }
 
 async function listReminders(tc: ToolContext): Promise<string> {
   const mine = await tc.reminders.listMine(tc.uid);
   if (mine.length) {
-    await tc.setList({ kind: "reminders", items: mine.map((r, i) => ({ n: i + 1, id: r.id, label: `${whenText(r.remind_at)} — ${r.text}` })) });
-    await sendList(tc, "Твои напоминания", mine.map((r) => `${whenText(r.remind_at)} — ${r.text}`), false);
+    await tc.setList({ kind: "reminders", items: mine.map((r, i) => ({ n: i + 1, id: r.id, label: `«${cut(r.text, 80)}» (${whenText(r.remind_at)})` })) });
+    await sendList(tc, "Твои напоминания", mine.map((r) => `${whenText(r.remind_at)} — ${r.text}`));
   }
   return json({ count: mine.length, items: mine.map((r, i) => ({ n: i + 1, id: r.id, text: r.text, when: whenText(r.remind_at) })) });
 }
 
-function getTeam(tc: ToolContext): string {
+async function getTeam(tc: ToolContext): Promise<string> {
+  const lines = [
+    "<b>Команда</b>",
+    ...tc.team.map((m) => `• ${escapeHtmlTeam(personLabel(m))}`),
+    "",
+    ...DEPARTMENTS.map((d) => `${escapeHtmlTeam(d.group)}: ${escapeHtmlTeam(tc.team.filter((m) => (m.departments ?? []).includes(d.key)).map(personName).join(", ") || "никого")}`),
+  ];
+  await tc.ctx.reply(lines.join("\n"), { parse_mode: "HTML" });
+  tc.shown.list = true;
   return json({
+    shown_to_user: true,
     people: tc.team.map((m) => ({ name: personName(m), title: m.title ?? null, username: m.username, founder: isFounder(m.chat_id) })),
     departments: DEPARTMENTS.map((d) => ({ name: d.group, people: tc.team.filter((m) => (m.departments ?? []).includes(d.key)).map(personName) })),
   });
@@ -440,7 +454,7 @@ export async function executeTool(tc: ToolContext, call: ToolCall): Promise<stri
       tc.shown.list = true;
       return json({ shown_to_user: true });
     case "get_team":
-      return getTeam(tc);
+      return await getTeam(tc);
     case "list_reminders":
       return listReminders(tc);
     case "answer_faq": {

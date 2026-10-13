@@ -25,8 +25,10 @@ export interface AgentRun {
   steps: number;
   tokensIn: number;
   tokensOut: number;
-  /** Что вызывалось — для памяти диалога и тестов. */
+  /** Что вызывалось — для тестов и защиты на выходе. */
   calls: Array<ToolCall & { result: string }>;
+  /** Модель дважды выдала текст вместо вызова инструмента. */
+  fabricated?: boolean;
 }
 
 export interface AgentInput {
@@ -41,6 +43,13 @@ export interface AgentInput {
   deadlineMs?: number;
   /** Сколько шагов пройдено и какие инструменты вызваны — для лога, если цикл упадёт. */
   progress?: { steps: number; tools: string[] };
+  /**
+   * Проверка финального текста: false — модель выдумала данные или написала
+   * вызов инструмента текстом. Тогда один повтор шага с retryNote; второе
+   * нарушение — run.fabricated, текст не отдаётся.
+   */
+  validate?: (text: string, calls: AgentRun["calls"]) => boolean;
+  retryNote?: string;
   clock?: () => number;
 }
 
@@ -49,6 +58,7 @@ export async function runAgent(input: AgentInput): Promise<AgentRun> {
   const deadline = clock() + (input.deadlineMs ?? AGENT_DEADLINE_MS);
   const messages = [...input.messages];
   const run: AgentRun = { text: "", steps: 0, tokensIn: 0, tokensOut: 0, calls: [] };
+  let retried = false;
   for (let i = 0; i < (input.maxSteps ?? MAX_STEPS); i++) {
     if (clock() >= deadline) throw new TeamAiError("api", "agent deadline");
     await input.onStep?.();
@@ -58,6 +68,15 @@ export async function runAgent(input: AgentInput): Promise<AgentRun> {
     run.tokensIn += res.tokensIn;
     run.tokensOut += res.tokensOut;
     if (res.type === "text") {
+      if (input.validate && !input.validate(res.text, run.calls)) {
+        if (!retried && i + 1 < (input.maxSteps ?? MAX_STEPS)) {
+          retried = true;
+          messages.push({ role: "system", text: input.retryNote ?? "Вызови нужный инструмент, не пиши данные текстом." });
+          continue;
+        }
+        run.fabricated = true;
+        return run;
+      }
       run.text = res.text;
       return run;
     }

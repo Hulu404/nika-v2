@@ -210,11 +210,11 @@ describe("ассистент: черновики через инструмент
 
     it("падение API — «Что-то пошло не так…» и строка fail в логе без текста человека; лимит — своё сообщение", async () => {
       const log = vi.spyOn(console, "error").mockImplementation(() => {});
-      h.script.push(call("get_team"), new TeamAiError("api", "ECONNRESET: read ECONNRESET"));
+      h.script.push(call("answer_faq", { query: "дождь" }), new TeamAiError("api", "ECONNRESET: read ECONNRESET"));
       await h.say("поставь Маше задачу");
       expect(h.last().text).toBe(AI_FAIL_TEXT);
       const line = log.mock.calls.map((c) => String(c[0])).find((l) => l.startsWith("[team-ai] fail"))!;
-      expect(line).toMatch(/^\[team-ai\] fail step=1 tools=get_team elapsed=\d+ err=ECONNRESET: read ECONNRESET$/);
+      expect(line).toMatch(/^\[team-ai\] fail step=1 tools=answer_faq elapsed=\d+ err=ECONNRESET: read ECONNRESET$/);
       expect(line).not.toContain("Маше");
       h.limited = true;
       await h.say("ещё");
