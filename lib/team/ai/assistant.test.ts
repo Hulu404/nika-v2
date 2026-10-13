@@ -200,6 +200,14 @@ describe("ассистент: черновики через инструмент
       expect(h.sent.some((s) => s.text.includes("🗣"))).toBe(false);
     });
 
+    it("дедлайн после показанного списка — список и есть ответ, без «Что-то пошло не так»", async () => {
+      vi.spyOn(console, "error").mockImplementation(() => {});
+      h.script.push(call("get_my_day"), new TeamAiError("api", "agent deadline"));
+      await h.say("что у меня сегодня");
+      expect(h.last().text).toBe("☀️ План для Али");
+      expect(h.texts()).not.toContain(AI_FAIL_TEXT);
+    });
+
     it("падение API — «Что-то пошло не так…» и строка fail в логе без текста человека; лимит — своё сообщение", async () => {
       const log = vi.spyOn(console, "error").mockImplementation(() => {});
       h.script.push(call("get_team"), new TeamAiError("api", "ECONNRESET: read ECONNRESET"));

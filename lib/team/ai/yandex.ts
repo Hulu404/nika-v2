@@ -18,7 +18,9 @@ export const STT_URL = "https://stt.api.cloud.yandex.net/speech/v1/stt:recognize
 export const LLM_URL = "https://ai.api.cloud.yandex.net/foundationModels/v1/completion";
 /** YandexGPT 5 Pro: Lite с вызовом инструментов не справляется. */
 export const DEFAULT_LLM_MODEL = "yandexgpt/latest";
-export const TIMEOUT_MS = 15_000;
+/** Таймаут одного HTTP-запроса: к модели и к распознаванию. */
+export const LLM_TIMEOUT_MS = 20_000;
+export const STT_TIMEOUT_MS = 10_000;
 export const LLM_LIMIT_PER_HOUR = 40;
 /** Лимиты синхронного распознавания SpeechKit v1. */
 export const VOICE_MAX_SECONDS = 30;
@@ -230,7 +232,7 @@ export function createTeamAi(deps: TeamAiDeps): TeamAi {
       const body = await request(fetchImpl, `${STT_URL}?lang=ru-RU&format=oggopus`, {
         headers: { Authorization: `Api-Key ${cfg.apiKey}`, "Content-Type": "application/octet-stream" },
         body: ogg,
-      }, { timeoutMs: TIMEOUT_MS, sleep });
+      }, { timeoutMs: STT_TIMEOUT_MS, sleep });
       await deps.usage.record({ chat_id: chatId, kind: "stt", audio_seconds: Math.ceil(seconds) }, clock());
       const text = (body as { result?: unknown })?.result;
       if (typeof text !== "string") throw new TeamAiError("api", "stt: no result");
@@ -253,7 +255,7 @@ export function createTeamAi(deps: TeamAiDeps): TeamAi {
           messages: input.messages,
           tools: input.tools.map((t) => ({ function: t })),
         }),
-      }, { deadline: input.deadline, timeoutMs: TIMEOUT_MS, sleep });
+      }, { deadline: input.deadline, timeoutMs: LLM_TIMEOUT_MS, sleep });
       const res = ((body as { result?: unknown })?.result ?? body) as {
         alternatives?: Array<{ message?: { text?: unknown; toolCallList?: { toolCalls?: Array<{ functionCall?: { name?: unknown; arguments?: unknown } }> } }; status?: string }>;
         usage?: { inputTextTokens?: unknown; completionTokens?: unknown };

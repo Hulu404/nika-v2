@@ -15,7 +15,7 @@ import { deliverAssigned, syncTeamTaskMembers } from "../tasks";
 import { runAgent } from "./agent";
 import { applyAnswer, clarifyMessage, expandCompact, NOT_HEARD_TEXT, parseAssigneeAnswer, parseTimeAnswer } from "./clarify";
 import { missingOf, mskLocalToDate, type Intent, type Mention } from "./intent";
-import { dialogMessages, shownListText, supabaseStateStore, supabaseTurnStore, type StateStore, type TurnStore } from "./memory";
+import { dialogMessages, shownListText, supabaseStateStore, supabaseTurnStore, trimHistory, type StateStore, type TurnStore } from "./memory";
 import { listName, renderOpPreview, renderPreview, slotsOf, whenText, type OpData } from "./preview";
 import { assistantPrompt } from "./prompt";
 import {
@@ -222,6 +222,10 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
   const uid = member.chat_id;
   const started = Date.now();
   const progress = { steps: 0, tools: [] as string[] };
+  const shown = { preview: false, list: false };
+  // «Печатает» гаснет через 5 секунд — повторяем, пока идёт обработка.
+  const typing = setInterval(() => void ctx.replyWithChatAction("typing").catch(() => {}), 5_000);
+  typing.unref?.();
   try {
     const said = preset ?? (await utterance(ctx, deps, uid));
     if (!said) return true;
@@ -240,7 +244,6 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
       return true;
     }
 
-    const shown = { preview: false, list: false };
     const tctx: ToolContext = {
       ctx, uid, team, now, saidText: said.text, voice: said.voice, state,
       tasks: deps.tasks, events: deps.events, reminders: deps.reminders, shown,
@@ -261,7 +264,7 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
       },
     };
     const system = assistantPrompt({ now, team, senderId: uid, draft: draft ? draftContext(draft, team, uid) : null, list: shownListText(state.last_list) });
-    const turns = await deps.turns.recent(uid, now);
+    const turns = trimHistory(await deps.turns.recent(uid, now));
     const run = await runAgent({
       ai: deps.ai, messages: dialogMessages(system, turns, said.text), tools: TOOL_SPECS, progress,
       execute: (call) => executeTool(tctx, call),
@@ -282,7 +285,10 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
     const message = err instanceof Error ? err.message : String(err);
     if (err instanceof TeamAiError && err.code === "rate_limit") console.warn("[team-ai] rate_limit");
     else console.error(`[team-ai] fail step=${progress.steps} tools=${progress.tools.join(",") || "-"} elapsed=${Date.now() - started} err=${message.slice(0, 300)}`);
-    await ctx.reply(aiErrorText(err)).catch(() => {});
+    // Данные уже показаны (список задач, расписание, черновик) — они и есть ответ.
+    if (!shown.list && !shown.preview) await ctx.reply(aiErrorText(err)).catch(() => {});
+  } finally {
+    clearInterval(typing);
   }
   return true;
 }

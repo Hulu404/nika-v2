@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { TeamMember } from "../access";
 import { ROSTER } from "../roster";
-import { MemoryStateStore, MemoryTurnStore, TURNS_KEPT, dialogMessages, shownListText } from "./memory";
+import { HISTORY_MAX_CHARS, MemoryStateStore, MemoryTurnStore, TURNS_KEPT, dialogMessages, shownListText, trimHistory } from "./memory";
 import { assistantPrompt } from "./prompt";
 
 const msk = (local: string) => new Date(`${local}+03:00`);
@@ -23,6 +23,14 @@ describe("память диалога", () => {
     expect(recent.some((t) => t.content === "давно")).toBe(false);
     expect(await turns.recent(1, msk("2026-10-13T21:00"))).toEqual([]);
     expect(await turns.recent(2, NOW)).toEqual([]);
+  });
+
+  it("история для модели — не больше ~8000 символов, старые отбрасываются первыми", () => {
+    // 12 реплик по 700 символов = 8400: самая старая не влезает.
+    const turns = Array.from({ length: 12 }, (_, i) => ({ role: "user" as const, content: `#${i}`.padEnd(700, "я"), created_at: "" }));
+    const kept = trimHistory(turns);
+    expect(kept.reduce((n, t) => n + t.content.length, 0)).toBeLessThanOrEqual(HISTORY_MAX_CHARS);
+    expect(kept.map((t) => t.content.split("я")[0])).toEqual(["#1", "#2", "#3", "#4", "#5", "#6", "#7", "#8", "#9", "#10", "#11"]);
   });
 
   it("длинная реплика усекается", async () => {

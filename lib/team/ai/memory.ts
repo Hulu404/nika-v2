@@ -10,6 +10,19 @@ import type { ChatMessage } from "./yandex";
 export const TURNS_KEPT = 12;
 export const TURNS_TTL_MS = 6 * 3_600_000;
 export const TURN_MAX_CHARS = 600;
+/** История в запросе к модели — не больше этого суммарно; старые реплики отбрасываются первыми. */
+export const HISTORY_MAX_CHARS = 8_000;
+
+export function trimHistory(turns: readonly Turn[], max = HISTORY_MAX_CHARS): Turn[] {
+  const out: Turn[] = [];
+  let total = 0;
+  for (const t of [...turns].reverse()) {
+    if (total + t.content.length > max) break;
+    total += t.content.length;
+    out.unshift(t);
+  }
+  return out;
+}
 
 export type TurnRole = "user" | "assistant" | "tool";
 
