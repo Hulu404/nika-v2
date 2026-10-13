@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateIntent, checkWhen, normalizeLocal } from "./intent";
+import { INTENT_JSON_SCHEMA, validateIntent, checkWhen, normalizeLocal } from "./intent";
 import {
   AI_FAIL_TEXT,
   AI_LIMIT_TEXT,
@@ -72,6 +72,55 @@ describe("проверка ответа модели", () => {
   });
 });
 
+describe("схема для Яндекса", () => {
+  type Node = { type?: string; properties?: Record<string, Node>; required?: readonly string[]; additionalProperties?: boolean; items?: Node };
+  const objects = (node: Node, path = "$"): Array<[string, Node]> => [
+    ...(node.type === "object" ? [[path, node] as [string, Node]] : []),
+    ...Object.entries(node.properties ?? {}).flatMap(([k, v]) => objects(v, `${path}.${k}`)),
+    ...(node.items ? objects(node.items, `${path}[]`) : []),
+  ];
+
+  it("в каждом объекте (и в items массивов) required — все ключи properties, additionalProperties: false", () => {
+    const all = objects(INTENT_JSON_SCHEMA as unknown as Node);
+    expect(all.map(([p]) => p)).toEqual(["$", "$.assignees[]", "$.participants[]"]);
+    for (const [path, node] of all) {
+      expect([...(node.required ?? [])].sort(), path).toEqual(Object.keys(node.properties ?? {}).sort());
+      expect(node.additionalProperties, path).toBe(false);
+    }
+  });
+
+  it("без nullable-типов", () => {
+    expect(JSON.stringify(INTENT_JSON_SCHEMA)).not.toContain("null");
+  });
+});
+
+describe("полностью заполненный ответ с пустыми значениями", () => {
+  const empty = { intent: "unknown", what: "", due: "", assignees: [], text: "", remind_at: "", task_hint: "", title: "",
+    starts_at: "", place: "", participants: [], kind: "meeting", range: "week", reason: "" };
+
+  it("create_task без срока; пустое уточнение — null", () => {
+    expect(validateIntent({ ...empty, intent: "create_task", what: "Найти пейсеров", assignees: [{ name: "Маше", qualifier: "" }] }))
+      .toEqual({ intent: "create_task", what: "Найти пейсеров", due: null, assignees: [{ name: "Маше", qualifier: null }] });
+  });
+
+  it("create_reminder без task_hint", () => {
+    expect(validateIntent({ ...empty, intent: "create_reminder", text: "заполнить форму", remind_at: "2026-10-13T14:00" }))
+      .toEqual({ intent: "create_reminder", text: "заполнить форму", remind_at: "2026-10-13T14:00", task_hint: null });
+  });
+
+  it("create_event без места и участников", () => {
+    expect(validateIntent({ ...empty, intent: "create_event", title: "Планёрка", starts_at: "2026-10-14T19:00", kind: "meeting" }))
+      .toEqual({ intent: "create_event", title: "Планёрка", starts_at: "2026-10-14T19:00", place: null, participants: [], kind: "meeting" });
+  });
+
+  it("show_my_day и unknown игнорируют лишние поля", () => {
+    expect(validateIntent({ ...empty, intent: "show_my_day" })).toEqual({ intent: "show_my_day" });
+    expect(validateIntent({ ...empty, intent: "show_schedule", range: "tomorrow" })).toEqual({ intent: "show_schedule", range: "tomorrow" });
+    expect(validateIntent({ ...empty, intent: "unknown", reason: "" })).toEqual({ intent: "unknown", reason: "не поняла" });
+    expect(validateIntent({ ...empty, intent: "unknown", reason: "болтовня" })).toEqual({ intent: "unknown", reason: "болтовня" });
+  });
+});
+
 describe("конфигурация", () => {
   it("выключено без флага или ключей; модель по умолчанию — YandexGPT Lite", () => {
     expect(teamAiConfig({ YANDEX_API_KEY: "k", YANDEX_FOLDER_ID: "f" })).toBeNull();
@@ -101,7 +150,7 @@ describe("запросы к Яндексу", () => {
     expect(calls[0].headers.Authorization).toBe("Api-Key k");
     const body = JSON.parse(String(calls[0].body));
     expect(body.modelUri).toBe("gpt://f1/yandexgpt-lite/latest");
-    expect(body.jsonSchema.schema.required).toEqual(["intent"]);
+    expect(body.jsonSchema.schema).toEqual(JSON.parse(JSON.stringify(INTENT_JSON_SCHEMA)));
     expect(body.messages[0].text).toContain("Сейчас вторник 2026-10-13, 14:05 по Москве");
     expect(body.messages[0].text).toContain("пятница 2026-10-16");
     expect(body.messages[0].text).toContain("- Маша, Ивент-отдел, отделы: Ивенты, @gusarovame");

@@ -33,13 +33,18 @@ const INTENTS: readonly IntentName[] = [
   "create_task", "create_reminder", "create_event", "show_my_day", "show_my_tasks", "show_schedule", "unknown",
 ];
 
+// Яндекс в structured output требует: в каждом объекте схемы все ключи
+// properties перечислены в required, без nullable-типов. Поэтому «нет значения» —
+// пустая строка или пустой массив, а kind и range у намерений, которым они не
+// нужны, модель заполняет любым значением из enum: validateIntent их игнорирует.
 const mentionSchema = {
   type: "object",
   properties: {
     name: { type: "string", description: "Имя или обращение как в тексте: «Маше», «мне», «со мной», «@nick»" },
-    qualifier: { type: "string", description: "Уточнение рядом с именем: «из ивента», «дизайнеру», «главе смм»; пусто, если нет" },
+    qualifier: { type: "string", description: "Уточнение рядом с именем: «из ивента», «дизайнеру», «главе смм»; пустая строка, если нет" },
   },
-  required: ["name"],
+  required: ["name", "qualifier"],
+  additionalProperties: false,
 } as const;
 
 /** JSON-схема ответа модели (jsonSchema.schema в запросе к AI Studio). */
@@ -47,21 +52,22 @@ export const INTENT_JSON_SCHEMA = {
   type: "object",
   properties: {
     intent: { type: "string", enum: INTENTS },
-    what: { type: "string", description: "create_task: что сделать" },
-    due: { type: "string", description: "create_task: срок YYYY-MM-DDTHH:mm по Москве; пусто — без срока" },
-    assignees: { type: "array", items: mentionSchema, description: "create_task: кому" },
-    text: { type: "string", description: "create_reminder: о чём напомнить" },
-    remind_at: { type: "string", description: "create_reminder: когда, YYYY-MM-DDTHH:mm по Москве" },
-    task_hint: { type: "string", description: "create_reminder: если напоминание про задачу — её суть; иначе пусто" },
-    title: { type: "string", description: "create_event: название" },
-    starts_at: { type: "string", description: "create_event: начало YYYY-MM-DDTHH:mm по Москве" },
-    place: { type: "string", description: "create_event: место; пусто, если не сказано" },
-    participants: { type: "array", items: mentionSchema, description: "create_event: участники, кроме автора" },
-    kind: { type: "string", enum: ["meeting", "club_event", "other"] },
-    range: { type: "string", enum: ["today", "tomorrow", "week"] },
-    reason: { type: "string", description: "unknown: почему не получилось" },
+    what: { type: "string", description: "create_task: что сделать; пустая строка, если не применимо" },
+    due: { type: "string", description: "create_task: срок YYYY-MM-DDTHH:mm по Москве; пустая строка — без срока или не применимо" },
+    assignees: { type: "array", items: mentionSchema, description: "create_task: кому; пустой массив, если не применимо" },
+    text: { type: "string", description: "create_reminder: о чём напомнить; пустая строка, если не применимо" },
+    remind_at: { type: "string", description: "create_reminder: когда, YYYY-MM-DDTHH:mm по Москве; пустая строка, если не применимо" },
+    task_hint: { type: "string", description: "create_reminder: если напоминание про задачу — её суть; пустая строка, если не применимо" },
+    title: { type: "string", description: "create_event: название; пустая строка, если не применимо" },
+    starts_at: { type: "string", description: "create_event: начало YYYY-MM-DDTHH:mm по Москве; пустая строка, если не применимо" },
+    place: { type: "string", description: "create_event: место; пустая строка, если не сказано или не применимо" },
+    participants: { type: "array", items: mentionSchema, description: "create_event: участники, кроме автора; пустой массив, если не применимо" },
+    kind: { type: "string", enum: ["meeting", "club_event", "other"], description: "create_event: тип; meeting, если не применимо" },
+    range: { type: "string", enum: ["today", "tomorrow", "week"], description: "show_schedule: период; week, если не применимо" },
+    reason: { type: "string", description: "unknown: почему не получилось; пустая строка, если не применимо" },
   },
-  required: ["intent"],
+  required: ["intent", "what", "due", "assignees", "text", "remind_at", "task_hint", "title", "starts_at", "place", "participants", "kind", "range", "reason"],
+  additionalProperties: false,
 } as const;
 
 const str = (v: unknown, max = 500): string | null => {
