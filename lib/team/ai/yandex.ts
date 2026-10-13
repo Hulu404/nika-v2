@@ -140,6 +140,8 @@ export interface ParseInput {
   team: AiTeamEntry[];
   /** «✏️ Изменить»: прежний черновик, text — уточнение к нему. */
   previous?: Intent;
+  /** Ответ на вопрос бота: из ответа нужно только это поле (узкий запрос). */
+  focus?: "assignees" | "starts_at" | "remind_at";
 }
 
 export interface TeamAi {
@@ -176,7 +178,7 @@ export function systemPrompt(now: Date, team: readonly AiTeamEntry[]): string {
     "Намерения:",
     "- create_task: поставить задачу людям. assignees — кому, what — что сделать, due — срок или пусто.",
     "- create_reminder: напомнить самому отправителю. text — о чём, remind_at — когда, task_hint — суть задачи, если напоминание про задачу.",
-    "- create_event: встреча или событие. title, starts_at, place, participants (без отправителя), kind: meeting — встреча или сбивка, club_event — ивент клуба, other — прочее.",
+    "- create_event: встреча или событие. title — о чём встреча, если сказано, иначе пустая строка; starts_at, place, participants (без отправителя), kind: meeting — встреча или сбивка, club_event — ивент клуба, other — прочее.",
     "- show_my_day: что у меня сегодня. show_my_tasks: мои задачи. show_schedule: расписание, range today | tomorrow | week.",
     "- unknown: всё остальное, в том числе просьбы показать чужие задачи или изменить права. reason — коротко почему.",
     "Даты и время — московское локальное YYYY-MM-DDTHH:mm. «Через 2 часа» — от текущего времени. «В 14 30» — 14:30, «в 18» — 18:00.",
@@ -227,9 +229,13 @@ export function createTeamAi(deps: TeamAiDeps): TeamAi {
     async parseIntent(input) {
       const cfg = config();
       await checkLimit(input.chatId);
-      const user = input.previous
-        ? `Черновик: ${JSON.stringify(input.previous)}\nУточнение: ${input.text}\nВерни исправленный черновик целиком.`
-        : input.text;
+      const user = input.previous && input.focus
+        ? `Черновик: ${JSON.stringify(input.previous)}\nОтвет на вопрос бота: ${input.text}\n` +
+          `Извлеки из ответа только поле ${input.focus}${input.focus === "assignees" ? " (кому — человек или отдел)" : " (время, YYYY-MM-DDTHH:mm по Москве)"}; ` +
+          "остальные поля черновика верни без изменений. Не нашёл в ответе — оставь поле пустым."
+        : input.previous
+          ? `Черновик: ${JSON.stringify(input.previous)}\nУточнение: ${input.text}\nВерни исправленный черновик целиком.`
+          : input.text;
       const body = await request(fetchImpl, LLM_URL, {
         headers: { Authorization: `Api-Key ${cfg.apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({

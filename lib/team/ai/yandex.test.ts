@@ -61,14 +61,17 @@ describe("проверка ответа модели", () => {
 
   it("понятое намерение без нужного поля — не unknown, а missing", () => {
     expect(validateIntent({ intent: "create_task", what: "x", assignees: [] })).toEqual({ intent: "create_task", what: "x", assignees: [], due: null, missing: ["assignees"] });
-    expect(validateIntent({ intent: "create_task", what: "", assignees: [{ name: "мне", qualifier: "" }] })).toMatchObject({ missing: ["what"] });
+    // Без текста задачи — не вопрос, а «не поняла».
+    expect(validateIntent({ intent: "create_task", what: "", assignees: [{ name: "мне", qualifier: "" }] })).toEqual({ intent: "unknown", reason: "no_task_text" });
     expect(validateIntent({ intent: "create_reminder", text: "про отчёт", remind_at: "" })).toMatchObject({ intent: "create_reminder", missing: ["remind_at"] });
     expect(validateIntent({ intent: "create_reminder", text: "x", remind_at: "2026-02-30T10:00" })).toMatchObject({ missing: ["remind_at"] });
     expect(validateIntent({ intent: "create_event", title: "x", starts_at: "2026-10-13T25:00", participants: [] })).toMatchObject({ missing: ["starts_at"] });
     // Только день: дата сохраняется, спрашивается время, 23:59 встрече не подставляется.
     expect(validateIntent({ intent: "create_event", title: "Онлайн-встреча", starts_at: "2026-10-13", participants: [], place: "" }))
       .toEqual({ intent: "create_event", title: "Онлайн-встреча", starts_at: "", place: null, participants: [], kind: "meeting", date: "2026-10-13", missing: ["starts_at"] });
-    expect(validateIntent({ intent: "create_event", title: "", starts_at: "", participants: [] })).toMatchObject({ missing: ["title", "starts_at"] });
+    // Название не обязательно: спрашивается только время.
+    expect(validateIntent({ intent: "create_event", title: "", starts_at: "", participants: [] })).toMatchObject({ title: "", missing: ["starts_at"] });
+    expect(validateIntent({ intent: "create_reminder", text: "", remind_at: "2026-10-13T18:00" })).not.toHaveProperty("missing");
     // У задачи день без времени — по-прежнему конец дня.
     expect(validateIntent({ intent: "create_task", what: "x", assignees: [{ name: "мне" }], due: "2026-10-14" })).toMatchObject({ due: "2026-10-14T23:59" });
   });

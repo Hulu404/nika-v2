@@ -23,11 +23,13 @@ export type EventKind = "meeting" | "club_event" | "other";
 export type ScheduleRange = "today" | "tomorrow" | "week";
 
 /**
- * Чего не хватает: what / title / text — сути, assignees — исполнителя,
- * starts_at / remind_at — времени. Если сказана только дата, она лежит в date,
- * а спрашивается только время (23:59 встречам и напоминаниям не подставляем).
+ * Чего не хватает — только то, без чего действие невозможно: у задачи —
+ * исполнителя, у встречи и напоминания — времени. Название встречи, место и
+ * текст напоминания подставляются (clarify.ts → fillDefaults). Если сказана
+ * только дата, она лежит в date, а спрашивается только время (23:59 встречам
+ * и напоминаниям не подставляем).
  */
-export type MissingField = "what" | "assignees" | "text" | "remind_at" | "title" | "starts_at";
+export type MissingField = "assignees" | "remind_at" | "starts_at";
 
 export type Intent =
   | { intent: "create_task"; assignees: Mention[]; what: string; due: string | null; missing?: MissingField[] }
@@ -147,8 +149,9 @@ export function validateIntent(raw: unknown): Intent {
       // У задачи «сегодня» без времени — конец дня: срок, а не встреча.
       const due = str(r.due) === null ? null : normalizeLocal(r.due);
       if (!assignees || (str(r.due) !== null && !due)) return unknown("invalid");
+      // Без текста задачи ставить нечего: это не вопрос, а «не поняла».
+      if (!what) return unknown("no_task_text");
       const missing: MissingField[] = [];
-      if (!what) missing.push("what");
       if (!assignees.length) missing.push("assignees");
       return extra({ intent: "create_task", what: what ?? "", assignees, due }, missing, null);
     }
@@ -156,7 +159,6 @@ export function validateIntent(raw: unknown): Intent {
       const text = str(r.text, 1000);
       const at = moment(r.remind_at);
       const missing: MissingField[] = [];
-      if (!text) missing.push("text");
       if (!at.local) missing.push("remind_at");
       return extra({ intent: "create_reminder", text: text ?? "", remind_at: at.local ?? "", task_hint: str(r.task_hint, 300) }, missing, at.date);
     }
@@ -167,7 +169,6 @@ export function validateIntent(raw: unknown): Intent {
       const kind = r.kind === "club_event" || r.kind === "other" ? r.kind : "meeting";
       if (!participants) return unknown("invalid");
       const missing: MissingField[] = [];
-      if (!title) missing.push("title");
       if (!at.local) missing.push("starts_at");
       return extra({ intent: "create_event", title: title ?? "", starts_at: at.local ?? "", place: str(r.place, 200), participants, kind }, missing, at.date);
     }

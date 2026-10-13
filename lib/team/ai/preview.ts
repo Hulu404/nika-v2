@@ -1,7 +1,7 @@
 import type { InlineKeyboardMarkup } from "grammy/types";
 import type { TeamMember } from "../access";
 import { escapeHtmlTeam, eventWhen } from "../copy";
-import { DEPARTMENTS, type Department } from "../departments";
+import type { Department } from "../departments";
 import { personFull, personName, personWithTitle, resolveMention, type MentionMatch } from "../roster";
 import { checkWhen, missingOf, mskLocalToDate, type Mention } from "./intent";
 import type { DraftBody } from "./stores";
@@ -20,6 +20,8 @@ export const aiCb = {
   /** Ответ на «Кому поставить задачу?» кнопкой: человек или отдел. */
   assignPerson: (id: number, chat: number) => `ai:as:${id}:${chat}`,
   assignDept: (id: number, key: string) => `ai:ad:${id}:${key}`,
+  /** Ответ кнопкой на «Во сколько?» / «Когда напомнить?»: YYYYMMDDHHmm по Москве. */
+  time: (id: number, compact: string) => `ai:tm:${id}:${compact}`,
 };
 
 /** «чт 15.10, 20:00». */
@@ -156,27 +158,4 @@ export function renderPreview(
     { text: "✖️ Отмена", callback_data: aiCb.cancel(draftId) },
   ]);
   return { text: lines.join("\n"), keyboard: { inline_keyboard: rows }, ready };
-}
-
-// ── Уточняющий вопрос ────────────────────────────────────────────────────────
-
-/** Один вопрос за раз: сначала суть, потом кому, потом время. */
-export function questionFor(draftId: number, body: DraftBody, team: readonly TeamMember[]): { text: string; keyboard: InlineKeyboardMarkup } | null {
-  const p = body.parsed;
-  const missing = missingOf(p);
-  if (!missing.length) return null;
-  const cancel = [{ text: "✖️ Отмена", callback_data: aiCb.cancel(draftId) }];
-  const ask = (text: string, rows: Row[] = []) => ({ text, keyboard: { inline_keyboard: [...rows, cancel] } });
-  if (missing.includes("what")) return ask("Что именно сделать?");
-  if (missing.includes("title")) return ask("Как назвать встречу?");
-  if (missing.includes("text")) return ask("О чём напомнить?");
-  if (missing.includes("assignees")) {
-    return ask("Кому поставить задачу? Напиши или выбери:", [
-      ...DEPARTMENTS.map((d) => [{ text: `👥 ${d.group}`, callback_data: aiCb.assignDept(draftId, d.key) }]),
-      ...team.map((m) => [{ text: personWithTitle(m), callback_data: aiCb.assignPerson(draftId, m.chat_id) }]),
-    ]);
-  }
-  if (missing.includes("starts_at")) return ask("Во сколько встреча?");
-  if (missing.includes("remind_at")) return ask("Когда напомнить?");
-  return null;
 }

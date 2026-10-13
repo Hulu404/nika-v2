@@ -1,5 +1,5 @@
 import { tgAdmin } from "../../telegram/supabase";
-import type { Intent } from "./intent";
+import type { Intent, MissingField } from "./intent";
 
 /** Черновик живёт час: потом «Создать» не сработает, а очистка его удалит. */
 export const DRAFT_TTL_MS = 3_600_000;
@@ -12,8 +12,12 @@ export interface DraftBody {
   /** Задача, к которой привязано напоминание (по task_hint). */
   taskId?: number | null;
   voice?: boolean;
-  /** Черновику не хватает данных: сейчас висит вопрос, предпросмотра ещё не было. */
-  asking?: boolean;
+  /** Какое поле сейчас спрашиваем (у черновика висит вопрос, предпросмотра ещё не было). */
+  awaiting?: MissingField;
+  /** Сколько сообщений-вопросов бот уже задал по черновику (не больше 3). */
+  asked?: number;
+  /** Неудачных ответов на текущий вопрос подряд. */
+  failures?: number;
 }
 
 export interface Draft {
