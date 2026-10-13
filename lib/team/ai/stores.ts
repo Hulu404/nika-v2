@@ -12,6 +12,8 @@ export interface DraftBody {
   /** Задача, к которой привязано напоминание (по task_hint). */
   taskId?: number | null;
   voice?: boolean;
+  /** Черновику не хватает данных: сейчас висит вопрос, предпросмотра ещё не было. */
+  asking?: boolean;
 }
 
 export interface Draft {
@@ -29,6 +31,7 @@ export interface DraftStore {
   get(id: number): Promise<Draft | null>;
   setMessage(id: number, messageId: number): Promise<void>;
   setBody(id: number, body: DraftBody): Promise<void>;
+  setSource(id: number, sourceText: string | null): Promise<void>;
   /** Атомарно: true только у первого нажатия «Создать». */
   confirm(id: number, now: Date): Promise<boolean>;
   remove(id: number): Promise<void>;
@@ -80,6 +83,10 @@ export function supabaseDraftStore(): DraftStore {
     },
     async setBody(id, body) {
       const { error } = await t().update({ intent: body }).eq("id", id).is("confirmed_at", null);
+      if (error) throw fail(error);
+    },
+    async setSource(id, sourceText) {
+      const { error } = await t().update({ source_text: sourceText }).eq("id", id).is("confirmed_at", null);
       if (error) throw fail(error);
     },
     async confirm(id, now) {
@@ -161,6 +168,10 @@ export class MemoryDraftStore implements DraftStore {
   async setBody(id: number, body: DraftBody) {
     const d = this.drafts.get(id);
     if (d && !d.confirmed_at) d.intent = structuredClone(body);
+  }
+  async setSource(id: number, sourceText: string | null) {
+    const d = this.drafts.get(id);
+    if (d && !d.confirmed_at) d.source_text = sourceText;
   }
   async confirm(id: number, now: Date) {
     const d = this.drafts.get(id);

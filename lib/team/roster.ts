@@ -1,5 +1,5 @@
 import type { TeamMember } from "./access";
-import { departmentName } from "./departments";
+import { departmentName, matchDepartment, type Department } from "./departments";
 
 /**
  * Состав команды в коде: имя, должность, отделы и варианты имени по нику.
@@ -100,12 +100,18 @@ function qualifierScore(m: TeamMember, words: readonly string[]): number {
 export type MentionMatch =
   | { kind: "one"; member: TeamMember }
   | { kind: "many"; options: TeamMember[] }
-  | { kind: "none"; name: string };
+  | { kind: "none"; name: string }
+  /** Отдел, названный сам по себе: все его участники, кроме отправителя (может быть пусто). */
+  | { kind: "department"; department: Department; members: TeamMember[] };
 
 /**
  * Упоминание → человек. Совпадение по имени, вариантам имени и нику; если
  * совпало несколько — сужение по уточнению (должность, отдел); не сузилось —
  * выбор кнопками, первого попавшегося не берём никогда.
+ *
+ * Отдел — только когда назван сам по себе («с ивент-отделом», «СММ»): «Маше
+ * из ивента» — это человек с уточнением. Отправитель в раскрытие отдела не
+ * входит: себя он добавляет сам («и мне»).
  */
 export function resolveMention(team: readonly TeamMember[], mention: { name: string; qualifier: string | null }, senderId: number): MentionMatch {
   // «Маше-дизайнеру», «Маше из ивента» в одном поле — имя первое слово, остальное к уточнению.
@@ -122,7 +128,13 @@ export function resolveMention(team: readonly TeamMember[], mention: { name: str
   let found = team.filter((m) =>
     normUsername(m.username) === user ||
     [m.first_name, ...(m.name_aliases ?? [])].some((n) => n && stem(n) === key));
-  if (!found.length) return { kind: "none", name: mention.name };
+  if (!found.length) {
+    const department = matchDepartment(`${mention.name} ${mention.qualifier ?? ""}`);
+    if (department) {
+      return { kind: "department", department, members: team.filter((m) => m.chat_id !== senderId && (m.departments ?? []).includes(department.key)) };
+    }
+    return { kind: "none", name: mention.name };
+  }
   if (found.length > 1) {
     const words = [...tail, ...(mention.qualifier ?? "").toLowerCase().split(/[\s\-—,]+/)]
       .filter((w) => w && !STOP.has(w)).map((w) => stem(w).slice(0, 5)).filter((w) => w.length >= 3);

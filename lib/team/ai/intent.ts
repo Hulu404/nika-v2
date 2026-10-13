@@ -7,7 +7,11 @@ import { addDays, mskToday } from "../../databot/time";
  *
  * Схема для structured output — один плоский объект с полем intent: союзы
  * (oneOf) поддерживаются моделями хуже, а проверка всё равно здесь, в коде.
- * Любой ответ, не прошедший проверку, становится unknown.
+ *
+ * Намерение понято, но не хватает поля (встреча без времени, задача без
+ * исполнителя) — это не unknown: возвращается намерение с missing, бот
+ * сохраняет черновик и задаёт один вопрос. unknown — только когда намерение
+ * не распознано или ответ модели сломан.
  */
 
 export interface Mention {
@@ -18,10 +22,17 @@ export interface Mention {
 export type EventKind = "meeting" | "club_event" | "other";
 export type ScheduleRange = "today" | "tomorrow" | "week";
 
+/**
+ * Чего не хватает: what / title / text — сути, assignees — исполнителя,
+ * starts_at / remind_at — времени. Если сказана только дата, она лежит в date,
+ * а спрашивается только время (23:59 встречам и напоминаниям не подставляем).
+ */
+export type MissingField = "what" | "assignees" | "text" | "remind_at" | "title" | "starts_at";
+
 export type Intent =
-  | { intent: "create_task"; assignees: Mention[]; what: string; due: string | null }
-  | { intent: "create_reminder"; text: string; remind_at: string; task_hint: string | null }
-  | { intent: "create_event"; title: string; starts_at: string; place: string | null; participants: Mention[]; kind: EventKind }
+  | { intent: "create_task"; assignees: Mention[]; what: string; due: string | null; missing?: MissingField[] }
+  | { intent: "create_reminder"; text: string; remind_at: string; task_hint: string | null; date?: string | null; missing?: MissingField[] }
+  | { intent: "create_event"; title: string; starts_at: string; place: string | null; participants: Mention[]; kind: EventKind; date?: string | null; missing?: MissingField[] }
   | { intent: "show_my_day" }
   | { intent: "show_my_tasks" }
   | { intent: "show_schedule"; range: ScheduleRange }
@@ -108,6 +119,24 @@ const unknown = (reason: string): Intent => ({ intent: "unknown", reason });
  * Ответ модели → Intent. Лишние поля (например «автор») отбрасываются: их в
  * Intent просто нет. Невалидное — unknown, без исключений.
  */
+/** «2026-10-15T20:00» → полная дата; «2026-10-15» → только день (время не сказано). */
+function moment(v: unknown): { local: string | null; date: string | null } {
+  const s = str(v, 32);
+  const m = s ? LOCAL_RE.exec(s) : null;
+  if (!m) return { local: null, date: null };
+  const local = normalizeLocal(s);
+  if (!local) return { local: null, date: null };
+  return m[2] === undefined ? { local: null, date: local.slice(0, 10) } : { local, date: null };
+}
+
+/** missing и date — только когда есть: полный ответ выглядит как раньше. */
+function extra<T extends Intent>(intent: T, missing: MissingField[], date: string | null): T {
+  return { ...intent, ...(missing.length ? { missing } : {}), ...(date ? { date } : {}) };
+}
+
+/** Есть ли что спрашивать у намерения. */
+export const missingOf = (i: Intent): MissingField[] => ("missing" in i && i.missing) || [];
+
 export function validateIntent(raw: unknown): Intent {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return unknown("invalid");
   const r = raw as Record<string, unknown>;
@@ -115,23 +144,32 @@ export function validateIntent(raw: unknown): Intent {
     case "create_task": {
       const what = str(r.what, 3000);
       const assignees = mentions(r.assignees);
+      // У задачи «сегодня» без времени — конец дня: срок, а не встреча.
       const due = str(r.due) === null ? null : normalizeLocal(r.due);
-      if (!what || !assignees?.length || (str(r.due) !== null && !due)) return unknown("invalid");
-      return { intent: "create_task", what, assignees, due };
+      if (!assignees || (str(r.due) !== null && !due)) return unknown("invalid");
+      const missing: MissingField[] = [];
+      if (!what) missing.push("what");
+      if (!assignees.length) missing.push("assignees");
+      return extra({ intent: "create_task", what: what ?? "", assignees, due }, missing, null);
     }
     case "create_reminder": {
       const text = str(r.text, 1000);
-      const remind_at = normalizeLocal(r.remind_at);
-      if (!text || !remind_at) return unknown("invalid");
-      return { intent: "create_reminder", text, remind_at, task_hint: str(r.task_hint, 300) };
+      const at = moment(r.remind_at);
+      const missing: MissingField[] = [];
+      if (!text) missing.push("text");
+      if (!at.local) missing.push("remind_at");
+      return extra({ intent: "create_reminder", text: text ?? "", remind_at: at.local ?? "", task_hint: str(r.task_hint, 300) }, missing, at.date);
     }
     case "create_event": {
       const title = str(r.title, 200);
-      const starts_at = normalizeLocal(r.starts_at);
+      const at = moment(r.starts_at);
       const participants = mentions(r.participants);
       const kind = r.kind === "club_event" || r.kind === "other" ? r.kind : "meeting";
-      if (!title || !starts_at || !participants) return unknown("invalid");
-      return { intent: "create_event", title, starts_at, place: str(r.place, 200), participants, kind };
+      if (!participants) return unknown("invalid");
+      const missing: MissingField[] = [];
+      if (!title) missing.push("title");
+      if (!at.local) missing.push("starts_at");
+      return extra({ intent: "create_event", title: title ?? "", starts_at: at.local ?? "", place: str(r.place, 200), participants, kind }, missing, at.date);
     }
     case "show_my_day":
       return { intent: "show_my_day" };

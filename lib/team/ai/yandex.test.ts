@@ -53,11 +53,24 @@ describe("проверка ответа модели", () => {
   it("невалидное — unknown, без исключений", () => {
     expect(validateIntent(null).intent).toBe("unknown");
     expect(validateIntent({ intent: "drop_table" }).intent).toBe("unknown");
-    expect(validateIntent({ intent: "create_task", what: "x", assignees: [] }).intent).toBe("unknown");
+    expect(validateIntent({ intent: "create_task", what: "x", assignees: "Маше" }).intent).toBe("unknown");
     expect(validateIntent({ intent: "create_task", what: "x", assignees: [{ name: "мне" }], due: "в четверг" }).intent).toBe("unknown");
-    expect(validateIntent({ intent: "create_reminder", text: "x", remind_at: "2026-02-30T10:00" }).intent).toBe("unknown");
-    expect(validateIntent({ intent: "create_event", title: "x", starts_at: "2026-10-13T25:00" }).intent).toBe("unknown");
+    expect(validateIntent({ intent: "create_event", title: "x", starts_at: "2026-10-14T10:00", participants: [{ qualifier: "x" }] }).intent).toBe("unknown");
     expect(validateIntent([1, 2]).intent).toBe("unknown");
+  });
+
+  it("понятое намерение без нужного поля — не unknown, а missing", () => {
+    expect(validateIntent({ intent: "create_task", what: "x", assignees: [] })).toEqual({ intent: "create_task", what: "x", assignees: [], due: null, missing: ["assignees"] });
+    expect(validateIntent({ intent: "create_task", what: "", assignees: [{ name: "мне", qualifier: "" }] })).toMatchObject({ missing: ["what"] });
+    expect(validateIntent({ intent: "create_reminder", text: "про отчёт", remind_at: "" })).toMatchObject({ intent: "create_reminder", missing: ["remind_at"] });
+    expect(validateIntent({ intent: "create_reminder", text: "x", remind_at: "2026-02-30T10:00" })).toMatchObject({ missing: ["remind_at"] });
+    expect(validateIntent({ intent: "create_event", title: "x", starts_at: "2026-10-13T25:00", participants: [] })).toMatchObject({ missing: ["starts_at"] });
+    // Только день: дата сохраняется, спрашивается время, 23:59 встрече не подставляется.
+    expect(validateIntent({ intent: "create_event", title: "Онлайн-встреча", starts_at: "2026-10-13", participants: [], place: "" }))
+      .toEqual({ intent: "create_event", title: "Онлайн-встреча", starts_at: "", place: null, participants: [], kind: "meeting", date: "2026-10-13", missing: ["starts_at"] });
+    expect(validateIntent({ intent: "create_event", title: "", starts_at: "", participants: [] })).toMatchObject({ missing: ["title", "starts_at"] });
+    // У задачи день без времени — по-прежнему конец дня.
+    expect(validateIntent({ intent: "create_task", what: "x", assignees: [{ name: "мне" }], due: "2026-10-14" })).toMatchObject({ due: "2026-10-14T23:59" });
   });
 
   it("чтение: show_schedule по умолчанию неделя", () => {
@@ -158,7 +171,7 @@ describe("запросы к Яндексу", () => {
   });
 
   it("ответ не JSON или не по схеме — unknown", async () => {
-    const { fetch } = fakeFetch([llmAnswer("Конечно! Вот задача: ..."), llmAnswer({ intent: "create_task" }), { status: 200, body: {} }]);
+    const { fetch } = fakeFetch([llmAnswer("Конечно! Вот задача: ..."), llmAnswer({ intent: "create_task", assignees: "Маше" }), { status: 200, body: {} }]);
     const ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch, now: () => NOW });
     for (let i = 0; i < 3; i++) expect((await ai.parseIntent({ chatId: 1, text: "x", now: NOW, team: [] })).intent).toBe("unknown");
   });

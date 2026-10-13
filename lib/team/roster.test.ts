@@ -66,6 +66,29 @@ describe("поиск человека по фразе", () => {
   });
 });
 
+describe("отдел во фразе", () => {
+  const dept = (name: string, qualifier: string | null = null, sender = 999) => {
+    const res = resolveMention(team, { name, qualifier }, sender);
+    return res.kind === "department" ? [res.department.key, res.members.map((m) => m.username)] : res.kind;
+  };
+
+  it("отдел, названный сам по себе, — все его участники; кривой STT тоже", () => {
+    for (const n of ["ивент-отделом", "ивента дел", "ивент отдел", "ивентам", "отделу ивентов"]) {
+      expect(dept(n), n).toEqual(["events", ["gusarovame", "salmasxsx"]]);
+    }
+    expect(dept("СММ")).toEqual(["smm", ["zuzya_zyzya", "ananas_2711", "tora_co"]]);
+    expect(dept("смм-щикам")).toEqual(["smm", ["zuzya_zyzya", "ananas_2711", "tora_co"]]);
+    expect(dept("дизайну")).toEqual(["design", ["mouserdyuk"]]);
+    expect(dept("разработчикам")).toEqual(["dev", ["dissidenceandtea"]]);
+  });
+
+  it("имя с отделом — человек, не отдел; отправитель в раскрытие отдела не входит", () => {
+    expect(who("Маше", "из ивента")).toBe("gusarovame");
+    expect(who("Машей из ивента")).toBe("gusarovame");
+    expect(dept("ивент-отделу", null, 7)).toEqual(["events", ["gusarovame"]]);
+  });
+});
+
 describe("начальные данные из roster.ts", () => {
   it("заполняются только пустые поля; ник без регистра и @", () => {
     expect(rosterPatch(base(1, "hulu404"))).toEqual({ first_name: "Али", title: "COO, фаундер" });

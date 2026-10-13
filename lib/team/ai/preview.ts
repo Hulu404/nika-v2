@@ -1,8 +1,9 @@
 import type { InlineKeyboardMarkup } from "grammy/types";
 import type { TeamMember } from "../access";
 import { escapeHtmlTeam, eventWhen } from "../copy";
+import { DEPARTMENTS, type Department } from "../departments";
 import { personFull, personName, personWithTitle, resolveMention, type MentionMatch } from "../roster";
-import { checkWhen, mskLocalToDate, type Mention } from "./intent";
+import { checkWhen, missingOf, mskLocalToDate, type Mention } from "./intent";
 import type { DraftBody } from "./stores";
 
 /**
@@ -16,6 +17,9 @@ export const aiCb = {
   edit: (id: number) => `ai:ed:${id}`,
   cancel: (id: number) => `ai:x:${id}`,
   pick: (id: number, slot: string, chat: number) => `ai:pk:${id}:${slot}:${chat}`,
+  /** Ответ на «Кому поставить задачу?» кнопкой: человек или отдел. */
+  assignPerson: (id: number, chat: number) => `ai:as:${id}:${chat}`,
+  assignDept: (id: number, key: string) => `ai:ad:${id}:${key}`,
 };
 
 /** «чт 15.10, 20:00». */
@@ -30,6 +34,10 @@ export interface Slot {
   match: MentionMatch;
   /** Итог: выбран кнопкой или найден однозначно. */
   member: TeamMember | null;
+  /** Отдел, названный сам по себе (если человека не выбрали кнопкой вместо него). */
+  department: Department | null;
+  /** Кого слот означает: человека или всех участников отдела. */
+  people: TeamMember[];
 }
 
 /** Упоминания черновика по слотам: a0, a1… — исполнители, p0, p1… — участники встречи. */
@@ -40,12 +48,16 @@ export function slotsOf(body: DraftBody, team: readonly TeamMember[], senderId: 
   return list.map(([key, mention]) => {
     const match = resolveMention(team, mention, senderId);
     const picked = body.picks[key] !== undefined ? team.find((m) => m.chat_id === body.picks[key]) ?? null : null;
-    return { key, mention, match, member: picked ?? (match.kind === "one" ? match.member : null) };
+    const member = picked ?? (match.kind === "one" ? match.member : null);
+    const department = !picked && match.kind === "department" ? match.department : null;
+    const people = member ? [member] : match.kind === "department" && !picked ? match.members : [];
+    return { key, mention, match, member, department, people };
   });
 }
 
-/** Как назвать человека в итоге: «Маше» (как сказали), себя — «тебе». */
+/** Как назвать человека в итоге: «Маше» (как сказали), себя — «тебе», отдел — «отделу СММ». */
 export function spokenName(slot: Slot, senderId: number): string {
+  if (slot.department) return `отделу ${slot.department.group}`;
   if (slot.member?.chat_id === senderId) return "тебе";
   const head = slot.mention.name.trim();
   return head.charAt(0).toUpperCase() + head.slice(1);
@@ -71,7 +83,8 @@ export function renderPreview(
   const p = body.parsed;
   const lines: string[] = [];
   const rows: Row[] = [];
-  let ready = true;
+  // Пока чего-то не хватает, создавать нечего: на это есть вопрос (questionFor).
+  let ready = missingOf(p).length === 0;
   if (body.voice && sourceText) lines.push(`🗣 «${escapeHtmlTeam(sourceText.length > 300 ? `${sourceText.slice(0, 299)}…` : sourceText)}»`, "");
   lines.push("Проверь, пожалуйста:", "");
 
@@ -87,7 +100,23 @@ export function renderPreview(
     return `${label}: ${whenText(check.at.toISOString())}`;
   };
 
-  const people = (slots: Slot[], needUsername: boolean): string[] => slots.map((s) => {
+  const short = (m: TeamMember) => escapeHtmlTeam(`${personName(m)}${m.username ? ` (@${m.username})` : ""}`);
+  /** Отдел отдельной строкой: «👥 Ивент-отдел: Маша (@gusarovame), Сальма (@salmasxsx)». */
+  const departmentLines = (slots: Slot[], needUsername: boolean): string[] => slots.filter((s) => s.department).map((s) => {
+    if (!s.people.length) {
+      ready = false;
+      for (const m of team) rows.push([{ text: personWithTitle(m), callback_data: aiCb.pick(draftId, s.key, m.chat_id) }]);
+      return `В отделе «${escapeHtmlTeam(s.department!.group)}» никого нет. Выбери людей ниже`;
+    }
+    const noNick = needUsername ? s.people.filter((m) => !m.username) : [];
+    if (noNick.length) {
+      ready = false;
+      return `👥 ${escapeHtmlTeam(s.department!.group)}: у ${noNick.map((m) => escapeHtmlTeam(personName(m))).join(", ")} нет ника в Telegram, задачу не поставить`;
+    }
+    return `👥 ${escapeHtmlTeam(s.department!.group)}: ${s.people.map(short).join(", ")}`;
+  });
+
+  const people = (slots: Slot[], needUsername: boolean): string[] => slots.filter((s) => !s.department).map((s) => {
     if (s.member) {
       if (needUsername && !s.member.username) {
         ready = false;
@@ -104,18 +133,21 @@ export function renderPreview(
   });
 
   if (p.intent === "create_task") {
-    const who = people(slotsOf(body, team, senderId), true);
-    lines.push("📋 Задача", escapeHtmlTeam(p.what), `👤 ${who.length > 1 ? "Исполнители" : "Исполнитель"}: ${who.join(", ")}`,
-      when("⏰ Срок", p.due, "без срока"), "✍️ Автор: ты");
+    const slots = slotsOf(body, team, senderId);
+    const who = people(slots, true);
+    lines.push("📋 Задача", escapeHtmlTeam(p.what));
+    if (who.length) lines.push(`👤 ${who.length > 1 ? "Исполнители" : "Исполнитель"}: ${who.join(", ")}`);
+    lines.push(...departmentLines(slots, true), when("⏰ Срок", p.due, "без срока"), "✍️ Автор: ты");
   } else if (p.intent === "create_reminder") {
     lines.push("⏰ Напоминание", escapeHtmlTeam(p.text), when("🕑 Когда", p.remind_at, "—"));
     if (linkedTask) lines.push(`🔗 К задаче: ${escapeHtmlTeam(linkedTask)}`);
     lines.push("Видишь только ты.");
   } else if (p.intent === "create_event") {
-    const others = people(slotsOf(body, team, senderId), false).filter((x) => x !== "ты");
+    const slots = slotsOf(body, team, senderId);
+    const others = people(slots, false).filter((x) => x !== "ты");
     lines.push(p.kind === "meeting" ? "🗓 Встреча" : "🗓 Событие", escapeHtmlTeam(p.title), when("🕑 Когда", p.starts_at, "—"));
     if (p.place) lines.push(`📍 Где: ${escapeHtmlTeam(p.place)}`);
-    lines.push(`👥 Участники: ${["ты", ...others].join(", ")}`, "✍️ Автор: ты");
+    lines.push(`👥 Участники: ${["ты", ...others].join(", ")}`, ...departmentLines(slots, false), "✍️ Автор: ты");
   }
 
   rows.push([
@@ -124,4 +156,27 @@ export function renderPreview(
     { text: "✖️ Отмена", callback_data: aiCb.cancel(draftId) },
   ]);
   return { text: lines.join("\n"), keyboard: { inline_keyboard: rows }, ready };
+}
+
+// ── Уточняющий вопрос ────────────────────────────────────────────────────────
+
+/** Один вопрос за раз: сначала суть, потом кому, потом время. */
+export function questionFor(draftId: number, body: DraftBody, team: readonly TeamMember[]): { text: string; keyboard: InlineKeyboardMarkup } | null {
+  const p = body.parsed;
+  const missing = missingOf(p);
+  if (!missing.length) return null;
+  const cancel = [{ text: "✖️ Отмена", callback_data: aiCb.cancel(draftId) }];
+  const ask = (text: string, rows: Row[] = []) => ({ text, keyboard: { inline_keyboard: [...rows, cancel] } });
+  if (missing.includes("what")) return ask("Что именно сделать?");
+  if (missing.includes("title")) return ask("Как назвать встречу?");
+  if (missing.includes("text")) return ask("О чём напомнить?");
+  if (missing.includes("assignees")) {
+    return ask("Кому поставить задачу? Напиши или выбери:", [
+      ...DEPARTMENTS.map((d) => [{ text: `👥 ${d.group}`, callback_data: aiCb.assignDept(draftId, d.key) }]),
+      ...team.map((m) => [{ text: personWithTitle(m), callback_data: aiCb.assignPerson(draftId, m.chat_id) }]),
+    ]);
+  }
+  if (missing.includes("starts_at")) return ask("Во сколько встреча?");
+  if (missing.includes("remind_at")) return ask("Когда напомнить?");
+  return null;
 }
