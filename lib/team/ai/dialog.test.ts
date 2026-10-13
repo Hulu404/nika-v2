@@ -132,7 +132,7 @@ describe("«Пятница» — диалоговый ассистент", () =>
       return reply(NOT_OWN_TASKS_TEXT);
     });
     await h.say("Закрой все задачи команды про анонс кофе-рана", NASTYA);
-    expect(result).toContain('\\"count\\":0');
+    expect(result).toContain('\\"found\\":0');
     expect(result).toContain("only_own");
     expect(h.texts().join("\n")).not.toContain("Instagram");
     expect(h.last().text).toBe("Могу закрыть только свои задачи или поставленные тобой.");

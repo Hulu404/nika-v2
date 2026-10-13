@@ -202,6 +202,51 @@ async function draft(tc: ToolContext, parsed: Intent, extra: Partial<DraftBody> 
     : { ok: true, shown: "черновик показан человеку, он нажмёт «✅ Подтвердить»; повторять его содержание не нужно" });
 }
 
+// ── Поиск задач по тексту ────────────────────────────────────────────────────
+
+export const FALLBACK_TASKS = 30;
+
+/** Синонимы: и в запросе, и в тексте задачи слово приводится к одному виду. */
+const SYNONYMS: Array<[RegExp, string]> = [
+  [/^(инст(а|у|е|ой|ы)?|инстаграм[a-zа-я]*|insta[a-zа-я]*|instagram|ig)$/, "instagram"],
+  [/^(тгк|тг|tg|телег(а|и|е|у|ой)|телеграм[a-zа-я]*|telegram)$/, "тгк"],
+  [/^(рилс[a-zа-я]*|reels?)$/, "reels"],
+  [/^(сторис|сториз|stories)$/, "stories"],
+  [/^(шортс[a-zа-я]*|шорт|шорты|shorts?)$/, "шорт"],
+  [/^(пост|посты|постом|постов|поста|посту|посте|постах)$/, "пост"],
+];
+const SEARCH_STOP = new Set(["в", "во", "и", "на", "по", "для", "у", "с", "со", "к", "о", "об", "от", "до", "про", "за", "из", "все", "всех", "эти", "этих", "надо", "нужно"]);
+
+/** Значимые слова: синонимы сведены, остальное — основа из 5 букв. */
+export function searchTokens(text: string): Set<string> {
+  const t = text.toLowerCase().replace(/ё/g, "е")
+    .replace(/кофе[\s\-—]*ран[а-я]*|кофран[а-я]*|coffee[\s\-]*run[a-z]*/g, " коферан ");
+  const out = new Set<string>();
+  for (const w of t.split(/[^a-zа-я0-9]+/)) {
+    if (!w || SEARCH_STOP.has(w)) continue;
+    const syn = SYNONYMS.find(([re]) => re.test(w))?.[1];
+    if (syn) out.add(syn);
+    else if (w === "коферан") out.add(w);
+    else if (w.length >= 3) out.add(stem(w).slice(0, 5));
+  }
+  return out;
+}
+
+/**
+ * Задачи по запросу: подходит, где совпало не меньше половины значимых слов
+ * (минимум одно); сначала — с большим числом совпадений.
+ */
+export function searchTasks(tasks: readonly AssignedTask[], query: string): AssignedTask[] {
+  const q = [...searchTokens(query)];
+  if (!q.length) return [...tasks];
+  const need = Math.max(1, Math.ceil(q.length / 2));
+  return tasks
+    .map((t, i) => ({ t, i, score: (() => { const tt = searchTokens(t.what); return q.filter((w) => tt.has(w)).length; })() }))
+    .filter((x) => x.score >= need)
+    .sort((a, b) => b.score - a.score || a.i - b.i)
+    .map((x) => x.t);
+}
+
 // ── Чтение ───────────────────────────────────────────────────────────────────
 
 async function listTasks(tc: ToolContext, a: Record<string, unknown>): Promise<string> {
@@ -232,15 +277,24 @@ async function listTasks(tc: ToolContext, a: Record<string, unknown>): Promise<s
 
   tasks = tasks.filter((t) => status === "all" ? true : status === "done" ? t.status === "done"
     : status === "overdue" ? overdue(t, tc.now) : isActiveAssigned(t));
-  const query = str(a.query);
-  if (query) {
-    // «кофе-рана» — два слова: дефис в тексте задачи стоит так же, как в запросе.
-    const words = query.split(/[\s\-—]+/).map((w) => stem(w).slice(0, 5)).filter((w) => w.length >= 3);
-    tasks = tasks.filter((t) => words.every((w) => t.what.toLowerCase().replace(/ё/g, "е").includes(w)));
-    title += ` · «${query}»`;
-  }
   tasks.sort((x, y) => (overdue(x, tc.now) ? 0 : 1) - (overdue(y, tc.now) ? 0 : 1)
     || (x.due_at ? Date.parse(x.due_at) : Infinity) - (y.due_at ? Date.parse(y.due_at) : Infinity) || x.id - y.id);
+  const query = str(a.query);
+  if (query) {
+    const area = tasks;
+    tasks = searchTasks(area, query);
+    title += ` · «${query}»`;
+    if (!tasks.length) {
+      // По запросу пусто — модели все открытые задачи этой области, пусть выберет сама.
+      return json({
+        found: 0, hint: "по запросу ничего, вот все открытые задачи в этой области",
+        ...(onlyOwn ? { only_own: true, note: `Не фаундер: чужие задачи не видны. Если подходящих нет — ответь «${NOT_OWN_TASKS_TEXT}»` } : {}),
+        tasks: area.filter(isActiveAssigned).slice(0, FALLBACK_TASKS).map((t) => ({
+          id: t.id, what: t.what, assignee: `@${t.username}`, due: t.due_at ? whenText(t.due_at) : null, overdue: overdue(t, tc.now),
+        })),
+      });
+    }
+  }
 
   const total = tasks.length;
   const shown = tasks.slice(0, MAX_BULK);
