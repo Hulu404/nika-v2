@@ -24,6 +24,7 @@ import { defaultCoffeeWeekDeps, handleCoffeeWeekUpdate } from "./coffee-run-week
 import { closeAiDraft, defaultAssistantDeps, handleAiMessage, handleAiUpdate, type AssistantDeps } from "./ai/assistant";
 import { supabaseDraftStore, supabaseParticipantStore } from "./ai/stores";
 import { teamAiConfig } from "./ai/yandex";
+import { aiCheckText, defaultCheckDeps } from "./ai/check";
 import { buildMyDay } from "./my-day";
 import { buildCoffeeBlock } from "./digest-build";
 import { fetchRunSignups } from "./stats";
@@ -333,6 +334,18 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     } else {
       await ctx.reply(`Не нашла «${target}» в команде. Полный список — /team.`);
     }
+  });
+
+  // Скрытая команда фаундеров: жива ли связь с Yandex AI Studio (без логов Railway).
+  bot.command("ai_check", async (ctx) => {
+    const member = await requireMember(ctx);
+    if (!member) return;
+    if (!isFounder(member.chat_id)) {
+      await ctx.reply("Это команда фаундеров.");
+      return;
+    }
+    await ctx.replyWithChatAction("typing").catch(() => {});
+    await ctx.reply(await aiCheckText(defaultCheckDeps()));
   });
 
   bot.command("leave", async (ctx) => {

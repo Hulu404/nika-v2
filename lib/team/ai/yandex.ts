@@ -253,7 +253,7 @@ export function createTeamAi(deps: TeamAiDeps): TeamAi {
           modelUri: cfg.modelUri,
           completionOptions: { stream: false, temperature: 0.2, maxTokens: "1500" },
           messages: input.messages,
-          tools: input.tools.map((t) => ({ function: t })),
+          ...(input.tools.length ? { tools: input.tools.map((t) => ({ function: t })) } : {}),
         }),
       }, { deadline: input.deadline, timeoutMs: LLM_TIMEOUT_MS, sleep });
       const res = ((body as { result?: unknown })?.result ?? body) as {

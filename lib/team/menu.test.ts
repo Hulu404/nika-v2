@@ -42,6 +42,7 @@ vi.mock("./events", async (importOriginal) => {
   shared.events = new real.MemoryEventStore();
   return { ...real, supabaseEventStore: () => shared.events };
 });
+vi.mock("./ai/check", () => ({ defaultCheckDeps: () => ({}), aiCheckText: async () => "🔌 Проверка ИИ" }));
 vi.mock("./history", async (importOriginal) => ({ ...(await importOriginal<typeof import("./history")>()), fetchArchive: async () => [] }));
 vi.mock("./stats", async (importOriginal) => ({ ...(await importOriginal<typeof import("./stats")>()), fetchRunSignups: async () => [] }));
 
@@ -138,6 +139,17 @@ describe("постоянное меню «Пятницы»", () => {
     expect(drafts.drafts.size).toBe(0);
     expect(sent.find((s) => s.method === "editMessageText")?.text).toBe("Черновик закрыт.");
     expect(sent.map((s) => s.text).join("\n")).toMatch(/Расписание/);
+  });
+
+  it("/ai_check — только фаундерам и не в меню команд", async () => {
+    vi.stubEnv("TEAM_FOUNDER_IDS", "9");
+    roster.set(9, member(9, "dima"));
+    await send("/ai_check", 1);
+    expect(sent.at(-1)!.text).toBe("Это команда фаундеров.");
+    await send("/ai_check", 9);
+    expect(sent.at(-1)!.text).toBe("🔌 Проверка ИИ");
+    expect(TEAM_COMMANDS.map((c) => c.command)).not.toContain("ai_check");
+    vi.unstubAllEnvs();
   });
 
   it("меню слэш-команд — только /start и /help", () => {
