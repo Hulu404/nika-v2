@@ -75,8 +75,15 @@ export const forceIPv4 = (env: Record<string, string | undefined> = process.env)
 
 export const CONNECT_TIMEOUT_MS = 10_000;
 
+/**
+ * undici — только в Node-рантайме. webpackIgnore: Next собирает instrumentation
+ * ещё и для edge, где node:-модулей нет; так импорт остаётся обычным import()
+ * и берётся из node_modules при выполнении.
+ */
+const loadUndici = () => import(/* webpackIgnore: true */ "undici") as Promise<typeof import("undici")>;
+
 async function makeAgent(): Promise<UndiciAgent> {
-  const { Agent } = await import("undici");
+  const { Agent } = await loadUndici();
   return new Agent({
     keepAliveTimeout: 4_000,
     keepAliveMaxTimeout: 10_000,
@@ -105,7 +112,7 @@ export async function yandexFetch(url: string, init: YandexFetchInit) {
     shared = makeAgent();
     void old?.then((a) => a.close()).catch(() => {});
   }
-  const { fetch } = await import("undici");
+  const { fetch } = await loadUndici();
   const res = await fetch(url, { method: init.method, headers: init.headers, body: init.body, signal: init.signal, dispatcher: await shared });
   return { ok: res.ok, status: res.status, json: () => res.json(), text: () => res.text() };
 }

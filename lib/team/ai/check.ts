@@ -1,5 +1,3 @@
-import { promises as dns } from "node:dns";
-import { connect as tcpConnect } from "node:net";
 import { describeNetError, forceIPv4, hostOf, recentNetErrors } from "./net";
 import { LLM_URL, STT_URL, createTeamAi, supabaseAiUsage, teamAiConfig } from "./yandex";
 
@@ -25,19 +23,25 @@ const TCP_TIMEOUT_MS = 5_000;
 export function defaultCheckDeps(): CheckDeps {
   const cfg = teamAiConfig();
   const ai = cfg ? createTeamAi({ config: cfg, usage: supabaseAiUsage() }) : null;
+  // node:dns и node:net — только в Node-рантайме (см. loadUndici в net.ts).
+  const nodeDns = () => import(/* webpackIgnore: true */ "node:dns") as Promise<typeof import("node:dns")>;
+  const nodeNet = () => import(/* webpackIgnore: true */ "node:net") as Promise<typeof import("node:net")>;
   return {
-    lookup: (host) => dns.lookup(host, { all: true }),
-    connect: (host, port) => new Promise<void>((resolve, reject) => {
-      const socket = tcpConnect({ host, port, ...(forceIPv4() ? { family: 4 } : {}) });
-      const done = (err?: Error) => {
-        socket.destroy();
-        if (err) reject(err);
-        else resolve();
-      };
-      socket.setTimeout(TCP_TIMEOUT_MS, () => done(Object.assign(new Error("connect timeout"), { code: "ETIMEDOUT" })));
-      socket.once("connect", () => done());
-      socket.once("error", (err) => done(err));
-    }),
+    lookup: async (host) => (await nodeDns()).promises.lookup(host, { all: true }),
+    connect: async (host, port) => {
+      const { connect: tcpConnect } = await nodeNet();
+      return new Promise<void>((resolve, reject) => {
+        const socket = tcpConnect({ host, port, ...(forceIPv4() ? { family: 4 } : {}) });
+        const done = (err?: Error) => {
+          socket.destroy();
+          if (err) reject(err);
+          else resolve();
+        };
+        socket.setTimeout(TCP_TIMEOUT_MS, () => done(Object.assign(new Error("connect timeout"), { code: "ETIMEDOUT" })));
+        socket.once("connect", () => done());
+        socket.once("error", (err) => done(err));
+      });
+    },
     llm: ai ? async () => {
       await ai.step({ messages: [{ role: "user", text: "Ответь одним словом: ок" }], tools: [] });
     } : null,
