@@ -1,0 +1,133 @@
+import { tgAdmin } from "../../telegram/supabase";
+import type { ChatMessage } from "./yandex";
+
+/**
+ * Память диалога ассистента: последние реплики, открытый черновик и последний
+ * показанный список с номерами. Хранится только в team_ai_turns и
+ * team_ai_state (миграция 055); в логи и другие таблицы тексты не попадают.
+ */
+
+export const TURNS_KEPT = 12;
+export const TURNS_TTL_MS = 6 * 3_600_000;
+export const TURN_MAX_CHARS = 600;
+
+export type TurnRole = "user" | "assistant" | "tool";
+
+export interface Turn {
+  role: TurnRole;
+  content: string;
+  created_at: string;
+}
+
+/** Последний показанный список: «вторая» — это items[1]. */
+export interface ShownList {
+  kind: "tasks" | "events" | "reminders" | "people";
+  items: Array<{ n: number; id: number; label: string }>;
+}
+
+export interface AiState {
+  draft_id: number | null;
+  last_list: ShownList | null;
+}
+
+export interface TurnStore {
+  add(chatId: number, role: TurnRole, content: string, now: Date): Promise<void>;
+  /** Последние реплики (не больше 12, не старше 6 часов) по порядку. */
+  recent(chatId: number, now: Date): Promise<Turn[]>;
+}
+
+export interface StateStore {
+  get(chatId: number): Promise<AiState>;
+  setDraft(chatId: number, draftId: number | null, now: Date): Promise<void>;
+  setList(chatId: number, list: ShownList | null, now: Date): Promise<void>;
+}
+
+const cut = (s: string) => (s.length > TURN_MAX_CHARS ? `${s.slice(0, TURN_MAX_CHARS - 1)}…` : s);
+
+export function supabaseTurnStore(): TurnStore {
+  const t = () => tgAdmin().from("team_ai_turns");
+  return {
+    async add(chatId, role, content, now) {
+      const { error } = await t().insert({ chat_id: chatId, role, content: cut(content), created_at: now.toISOString() });
+      if (error) throw new Error(`team_ai_turns: ${error.message}`);
+      // Старше 6 часов — удалить; сверх 12 последних — тоже.
+      await t().delete().eq("chat_id", chatId).lt("created_at", new Date(now.getTime() - TURNS_TTL_MS).toISOString());
+      const { data } = await t().select("id").eq("chat_id", chatId).order("created_at", { ascending: false }).range(TURNS_KEPT, TURNS_KEPT + 100);
+      const old = ((data ?? []) as Array<{ id: number }>).map((r) => r.id);
+      if (old.length) await t().delete().in("id", old);
+    },
+    async recent(chatId, now) {
+      const { data, error } = await t().select("role, content, created_at").eq("chat_id", chatId)
+        .gte("created_at", new Date(now.getTime() - TURNS_TTL_MS).toISOString())
+        .order("created_at", { ascending: false }).limit(TURNS_KEPT);
+      if (error) throw new Error(`team_ai_turns: ${error.message}`);
+      return ((data ?? []) as Turn[]).reverse();
+    },
+  };
+}
+
+export function supabaseStateStore(): StateStore {
+  const t = () => tgAdmin().from("team_ai_state");
+  return {
+    async get(chatId) {
+      const { data, error } = await t().select("draft_id, last_list").eq("chat_id", chatId).maybeSingle();
+      if (error) throw new Error(`team_ai_state: ${error.message}`);
+      const row = data as AiState | null;
+      return { draft_id: row?.draft_id ?? null, last_list: row?.last_list ?? null };
+    },
+    async setDraft(chatId, draftId, now) {
+      const { error } = await t().upsert({ chat_id: chatId, draft_id: draftId, updated_at: now.toISOString() }, { onConflict: "chat_id" });
+      if (error) throw new Error(`team_ai_state: ${error.message}`);
+    },
+    async setList(chatId, list, now) {
+      const { error } = await t().upsert({ chat_id: chatId, last_list: list, updated_at: now.toISOString() }, { onConflict: "chat_id" });
+      if (error) throw new Error(`team_ai_state: ${error.message}`);
+    },
+  };
+}
+
+export class MemoryTurnStore implements TurnStore {
+  turns = new Map<number, Turn[]>();
+  async add(chatId: number, role: TurnRole, content: string, now: Date) {
+    const fresh = (this.turns.get(chatId) ?? []).filter((x) => Date.parse(x.created_at) >= now.getTime() - TURNS_TTL_MS);
+    fresh.push({ role, content: cut(content), created_at: now.toISOString() });
+    this.turns.set(chatId, fresh.slice(-TURNS_KEPT));
+  }
+  async recent(chatId: number, now: Date) {
+    return (this.turns.get(chatId) ?? []).filter((x) => Date.parse(x.created_at) >= now.getTime() - TURNS_TTL_MS).slice(-TURNS_KEPT);
+  }
+}
+
+export class MemoryStateStore implements StateStore {
+  states = new Map<number, AiState>();
+  async get(chatId: number) {
+    return structuredClone(this.states.get(chatId) ?? { draft_id: null, last_list: null });
+  }
+  async setDraft(chatId: number, draftId: number | null, _now?: Date) {
+    this.states.set(chatId, { ...(await this.get(chatId)), draft_id: draftId });
+  }
+  async setList(chatId: number, list: ShownList | null, _now?: Date) {
+    this.states.set(chatId, { ...(await this.get(chatId)), last_list: list ? structuredClone(list) : null });
+  }
+}
+
+/**
+ * Сообщения для модели: системная инструкция (с контекстом), прошлые реплики,
+ * новое сообщение. Записи инструментов идут как заметки ассистента — модель
+ * помнит, что уже сделала, но не путает их с ответами человеку.
+ */
+export function dialogMessages(system: string, turns: readonly Turn[], userText: string): ChatMessage[] {
+  return [
+    { role: "system", text: system },
+    ...turns.map((t): ChatMessage => t.role === "user" ? { role: "user", text: t.content }
+      : t.role === "assistant" ? { role: "assistant", text: t.content } : { role: "assistant", text: `(сделано: ${t.content})` }),
+    { role: "user", text: userText },
+  ];
+}
+
+/** Список для модели: «1. #42 Анонс кофе-рана · @ananas_2711 · до пт 12:00». */
+export function shownListText(list: ShownList | null): string | null {
+  if (!list?.items.length) return null;
+  const kind = { tasks: "задачи", events: "события", reminders: "напоминания", people: "люди" }[list.kind];
+  return [`Последний показанный список (${kind}):`, ...list.items.map((i) => `${i.n}. #${i.id} ${i.label}`)].join("\n");
+}
