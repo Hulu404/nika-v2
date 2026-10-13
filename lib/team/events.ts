@@ -50,6 +50,8 @@ export interface TeamEventStore {
   /** Назначить ответственного, даже если он уже есть (фаундер выбирает после решения «Да»). */
   assignResponsible(id: number, chatId: number, now: Date): Promise<TeamEvent | null>;
   cancel(id: number, now: Date): Promise<TeamEvent | null>;
+  /** Новое название или место (ассистент «Пятницы»). null — события нет или оно отменено. */
+  update(id: number, patch: { title?: string; place?: string | null }, now: Date): Promise<TeamEvent | null>;
   /** Поставить отметку подтверждения кофе-рана (confirm_asked_at, confirmed_at, confirm_nag_at). Только если её ещё нет. */
   mark(id: number, field: "confirm_asked_at" | "confirmed_at" | "confirm_nag_at", now: Date): Promise<boolean>;
   /** Последний неотменённый кофе-ран недели, начавшийся до before. */
@@ -109,6 +111,12 @@ export function supabaseEventStore(): TeamEventStore {
     },
     async cancel(id, now) {
       const { data, error } = await t().update({ cancelled_at: now.toISOString(), updated_at: now.toISOString() })
+        .eq("id", id).is("cancelled_at", null).select(COLUMNS).maybeSingle();
+      if (error) throw new Error(`team_events: ${error.message}`);
+      return one(data);
+    },
+    async update(id, patch, now) {
+      const { data, error } = await t().update({ ...patch, updated_at: now.toISOString() })
         .eq("id", id).is("cancelled_at", null).select(COLUMNS).maybeSingle();
       if (error) throw new Error(`team_events: ${error.message}`);
       return one(data);
@@ -185,6 +193,12 @@ export class MemoryEventStore implements TeamEventStore {
     const ev = this.events.get(id);
     if (!ev || ev.cancelled_at) return null;
     Object.assign(ev, { cancelled_at: now.toISOString(), updated_at: now.toISOString() });
+    return { ...ev };
+  }
+  async update(id: number, patch: { title?: string; place?: string | null }, now: Date) {
+    const ev = this.events.get(id);
+    if (!ev || ev.cancelled_at) return null;
+    Object.assign(ev, patch, { updated_at: now.toISOString() });
     return { ...ev };
   }
 }

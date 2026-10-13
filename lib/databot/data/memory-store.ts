@@ -117,6 +117,11 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
     return { task: structuredClone(task), previous };
   }
 
+  async markAssignedStatusBy(id: number, chatId: number): Promise<void> {
+    const task = this.assignedTasks.get(id);
+    if (task) task.status_by = chatId;
+  }
+
   async editAssignedTask(id: number, ownerId: number, patch: { what?: string; due?: string | null }): Promise<AssignedTask> {
     this.maybeFail("editAssignedTask");
     const owner = this.members.get(ownerId);

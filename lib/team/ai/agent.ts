@@ -34,7 +34,6 @@ export interface AgentInput {
 }
 
 export async function runAgent(input: AgentInput): Promise<AgentRun> {
-  if (!input.ai.step) throw new TeamAiError("api", "step is not supported");
   const clock = input.clock ?? (() => Date.now());
   const deadline = clock() + (input.deadlineMs ?? AGENT_DEADLINE_MS);
   const messages = [...input.messages];

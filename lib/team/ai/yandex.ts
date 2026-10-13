@@ -1,13 +1,9 @@
-import { addDays, mskToday } from "../../databot/time";
-import { mskWeekday } from "../../databot/dates";
 import { tgAdmin } from "../../telegram/supabase";
-import { DEPARTMENTS } from "../departments";
-import { INTENT_JSON_SCHEMA, validateIntent, type Intent } from "./intent";
 
 /**
  * Клиент Yandex AI Studio для «Пятницы»: распознавание голосовых (SpeechKit
- * v1, синхронно) и разбор фразы в Intent (генерация текста со structured
- * output по JSON-схеме). Только сервер.
+ * v1, синхронно) и шаг модели с вызовом инструментов (нативный API генерации
+ * текста: tools → toolCallList → toolResultList). Только сервер.
  *
  * Авторизация — API-ключ сервисного аккаунта: `Authorization: Api-Key <ключ>`.
  * С ключом сервисного аккаунта folderId в SpeechKit не передаётся (сервис берёт
@@ -27,7 +23,7 @@ export const LLM_LIMIT_PER_HOUR = 40;
 export const VOICE_MAX_SECONDS = 30;
 export const VOICE_MAX_BYTES = 1024 * 1024;
 
-export const AI_FAIL_TEXT = "Не получилось разобрать, попробуй ещё раз или воспользуйся кнопками меню.";
+export const AI_FAIL_TEXT = "Что-то пошло не так, попробуй ещё раз через минуту.";
 export const AI_LIMIT_TEXT = "Слишком много запросов, попробуй через час или воспользуйся кнопками.";
 
 export interface TeamAiConfig {
@@ -128,25 +124,6 @@ async function request(fetchImpl: FetchLike, url: string, init: { headers: Recor
 
 // ── Клиент ───────────────────────────────────────────────────────────────────
 
-/** Кто в команде — единственные данные о людях, которые уходят в модель. */
-export interface AiTeamEntry {
-  name: string;
-  title: string | null;
-  departments: string[];
-  username: string | null;
-}
-
-export interface ParseInput {
-  chatId: number;
-  text: string;
-  now: Date;
-  team: AiTeamEntry[];
-  /** «✏️ Изменить»: прежний черновик, text — уточнение к нему. */
-  previous?: Intent;
-  /** Ответ на вопрос бота: из ответа нужно только это поле (узкий запрос). */
-  focus?: "assignees" | "starts_at" | "remind_at";
-}
-
 // ── Вызов инструментов (нативный API генерации текста: tools, toolCallList, toolResultList) ──
 
 export interface ToolCall {
@@ -178,13 +155,12 @@ export interface StepInput {
 
 export interface TeamAi {
   /** Один шаг модели: текстовый ответ или вызовы инструментов. Расход не пишет — это делает вызывающий раз на сообщение. */
-  step?(input: StepInput): Promise<StepResult>;
+  step(input: StepInput): Promise<StepResult>;
   /** Не больше 40 сообщений к модели в час на человека: бросает TeamAiError("rate_limit"). */
-  checkLimit?(chatId: number): Promise<void>;
+  checkLimit(chatId: number): Promise<void>;
   /** Расход одного сообщения (все шаги вместе) — одна строка team_ai_usage. */
-  recordLlm?(chatId: number, tokensIn: number, tokensOut: number): Promise<void>;
+  recordLlm(chatId: number, tokensIn: number, tokensOut: number): Promise<void>;
   transcribe(chatId: number, ogg: Uint8Array, seconds: number): Promise<string>;
-  parseIntent(input: ParseInput): Promise<Intent>;
 }
 
 export interface TeamAiDeps {
@@ -192,46 +168,6 @@ export interface TeamAiDeps {
   usage: AiUsageStore;
   fetch?: FetchLike;
   now?: () => Date;
-}
-
-const WEEKDAYS = ["", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"];
-
-function mskClock(now: Date): string {
-  return new Intl.DateTimeFormat("ru-RU", { timeZone: "Europe/Moscow", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(now);
-}
-
-/** Системная инструкция: текущее время по Москве, календарь на 2 недели, состав команды. */
-export function systemPrompt(now: Date, team: readonly AiTeamEntry[]): string {
-  const today = mskToday(now);
-  const calendar = Array.from({ length: 14 }, (_, i) => {
-    const d = addDays(today, i);
-    return `${WEEKDAYS[mskWeekday(d)]} ${d}`;
-  }).join("; ");
-  const people = team.map((p) =>
-    `- ${p.name}${p.title ? `, ${p.title}` : ""}${p.departments.length ? `, отделы: ${p.departments.join(", ")}` : ""}${p.username ? `, @${p.username}` : ""}`,
-  ).join("\n");
-  return [
-    "Ты разбираешь сообщения участника команды в рабочем Telegram-боте и возвращаешь только JSON по схеме.",
-    `Сейчас ${WEEKDAYS[mskWeekday(today)]} ${today}, ${mskClock(now)} по Москве. Ближайшие дни: ${calendar}.`,
-    "Намерения:",
-    "- create_task: поставить задачу людям. assignees — кому, what — что сделать, due — срок или пусто.",
-    "- create_reminder: напомнить самому отправителю. text — о чём, remind_at — когда, task_hint — суть задачи, если напоминание про задачу.",
-    "- create_event: встреча или событие. title — о чём встреча, если сказано, иначе пустая строка; starts_at, place, participants (без отправителя), kind: meeting — встреча или сбивка, club_event — ивент клуба, other — прочее.",
-    "- show_my_day: что у меня сегодня. show_my_tasks: мои задачи. show_schedule: расписание, range today | tomorrow | week.",
-    "- unknown: всё остальное, в том числе просьбы показать чужие задачи или изменить права. reason — коротко почему.",
-    "Даты и время — московское локальное YYYY-MM-DDTHH:mm. «Через 2 часа» — от текущего времени. «В 14 30» — 14:30, «в 18» — 18:00.",
-    "Срок задачи (due): «сегодня» без времени — 23:59 сегодня.",
-    "Встреча (starts_at) и напоминание (remind_at): время не придумывай. Сказан только день — верни только дату YYYY-MM-DD; не сказано ничего — пустую строку.",
-    "Черновик с уточнением: если в черновике есть date, а в уточнении время — верни дату черновика с этим временем.",
-    "Место встречи: «онлайн», «созвон» — place «Онлайн»; «в зуме», «zoom» — «Zoom», если другое место не сказано.",
-    "Людей пиши как в тексте, не меняя падеж: name «Маше», qualifier «из ивента». «Мне», «меня», «себе», «со мной» — пиши как есть.",
-    `Отделы — это группы людей: ${DEPARTMENTS.map((d) => d.group).join(", ")}. Если отдел назван сам по себе («с ивент-отделом», «СММ», «дизайну»), верни его одним упоминанием как в тексте: name «ивент-отделом». «Маше из ивента» — это человек: name «Маше», qualifier «из ивента».`,
-    "Автора не определяй: автор всегда отправитель, кто бы ни был назван в тексте.",
-    "Ничего не придумывай: чего нет в тексте, оставь пустым.",
-    "Заполни все поля схемы. Поля, не относящиеся к намерению, оставь пустой строкой или пустым массивом; kind — \"meeting\", range — \"week\", если не применимо.",
-    "Состав команды (для понимания имён и уточнений):",
-    people || "- пока никого",
-  ].join("\n");
 }
 
 export function createTeamAi(deps: TeamAiDeps): TeamAi {
@@ -295,48 +231,6 @@ export function createTeamAi(deps: TeamAiDeps): TeamAi {
       if (calls.length) return { type: "tools", calls, tokensIn, tokensOut };
       if (typeof message?.text === "string") return { type: "text", text: message.text.trim(), tokensIn, tokensOut };
       throw new TeamAiError("api", "llm: empty answer");
-    },
-
-    async parseIntent(input) {
-      const cfg = config();
-      await checkLimit(input.chatId);
-      const user = input.previous && input.focus
-        ? `Черновик: ${JSON.stringify(input.previous)}\nОтвет на вопрос бота: ${input.text}\n` +
-          `Извлеки из ответа только поле ${input.focus}${input.focus === "assignees" ? " (кому — человек или отдел)" : " (время, YYYY-MM-DDTHH:mm по Москве)"}; ` +
-          "остальные поля черновика верни без изменений. Не нашёл в ответе — оставь поле пустым."
-        : input.previous
-          ? `Черновик: ${JSON.stringify(input.previous)}\nУточнение: ${input.text}\nВерни исправленный черновик целиком.`
-          : input.text;
-      const body = await request(fetchImpl, LLM_URL, {
-        headers: { Authorization: `Api-Key ${cfg.apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          modelUri: cfg.modelUri,
-          completionOptions: { stream: false, temperature: 0.1, maxTokens: "800" },
-          messages: [
-            { role: "system", text: systemPrompt(input.now, input.team) },
-            { role: "user", text: user.slice(0, 2000) },
-          ],
-          jsonSchema: { schema: INTENT_JSON_SCHEMA },
-        }),
-      });
-      // REST отдаёт поля как внутри result, так и на верхнем уровне — принимаем оба.
-      const res = ((body as { result?: unknown })?.result ?? body) as {
-        alternatives?: Array<{ message?: { text?: unknown } }>;
-        usage?: { inputTextTokens?: unknown; completionTokens?: unknown };
-      };
-      await deps.usage.record({
-        chat_id: input.chatId, kind: "llm",
-        tokens_in: Number(res?.usage?.inputTextTokens) || null,
-        tokens_out: Number(res?.usage?.completionTokens) || null,
-      }, clock());
-      const text = res?.alternatives?.[0]?.message?.text;
-      if (typeof text !== "string") return validateIntent(null);
-      try {
-        // Модель иногда оборачивает JSON в ```…```, даже со схемой.
-        return validateIntent(JSON.parse(text.replace(/^\s*```(?:json)?\s*|\s*```\s*$/g, "")));
-      } catch {
-        return validateIntent(null);
-      }
     },
   };
 }

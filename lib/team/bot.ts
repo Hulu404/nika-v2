@@ -13,7 +13,7 @@ import { mergeRuns, pickRun, type TeamRun } from "./runs";
 import { fetchArchive, runKeysFrom, type ArchiveRow } from "./history";
 import { NOT_A_MEMBER_TEXT, helpText, menuCommand, menuKeyboard, menuSection } from "./copy";
 import { faqAnswerText, faqIndexText, findFaq } from "./faq";
-import { handleTeamTaskUpdate, showMyTasks } from "./tasks";
+import { handleTeamTaskUpdate } from "./tasks";
 import { handleScheduleUpdate, showSchedule, defaultScheduleDeps, type ScheduleDeps } from "./schedule";
 import { defaultEventsDeps, handleEventsUpdate, openClubEventScreen, openCoffeeRunScreen } from "./ivents";
 import { supabaseTeamForms } from "./form";
@@ -116,8 +116,7 @@ function scheduleDeps(): ScheduleDeps {
 /** Голос и свободный текст: экраны — те же, что у кнопок. */
 function assistantDeps(): AssistantDeps {
   return defaultAssistantDeps({
-    showMyTasks: (ctx, uid) => showMyTasks(ctx, uid),
-    showSchedule: (ctx) => showSchedule(ctx, scheduleDeps(), 0, false, new Date()),
+    showSchedule: (ctx, range) => showSchedule(ctx, scheduleDeps(), range === "next_week" ? 1 : 0, false, new Date()),
     // То же, что утренняя сводка: фаундерам — с блоками про кофе-ран.
     myDay: async (member, now) => buildMyDay(
       { events: supabaseEventStore(), participants: supabaseParticipantStore(), tasks: createSupabaseStore() },
@@ -356,13 +355,9 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     if (!member) return;
 
     const text = ctx.message.text.trim();
-    // С голосом и текстом короткое («лужники 13.09», «дождь») по-прежнему ищем
-    // среди забегов и в FAQ, всё длиннее — сразу в разбор фразы.
-    const ai = teamAiConfig() ? assistantDeps() : null;
-    if (ai && text.split(/\s+/).length > 3) {
-      await handleAiMessage(ctx, member, ai);
-      return;
-    }
+    // С ассистентом любое сообщение — ему: «нет, Насте» из двух слов — тоже
+    // разговор, а не поиск забега. Быстрые ответы у него есть инструментом.
+    if (teamAiConfig() && (await handleAiMessage(ctx, member, assistantDeps()))) return;
 
     await withData(ctx, async () => {
       const snap = await snapshot();
@@ -372,7 +367,6 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
         return;
       }
       if (await replyFaq(ctx, text, { quiet: true })) return;
-      if (ai && (await handleAiMessage(ctx, member, ai))) return;
       await ctx.reply(
         `Свободно говорить не умею.\n\n${helpText(isFounder(member.chat_id), !!teamAiConfig())}`,
       );

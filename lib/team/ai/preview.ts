@@ -3,8 +3,11 @@ import type { TeamMember } from "../access";
 import { escapeHtmlTeam, eventWhen } from "../copy";
 import type { Department } from "../departments";
 import { personLabel, personName, personShort, resolveMention, type MentionMatch } from "../roster";
-import { checkWhen, missingOf, mskLocalToDate, type Mention } from "./intent";
-import type { DraftBody } from "./stores";
+import { checkWhen, missingOf, mskLocalToDate, type Intent, type Mention } from "./intent";
+import type { AssignedTask } from "../../databot/task-list";
+import type { TeamEvent } from "../events";
+import { taskLine } from "./tools";
+import type { DraftBody, Reminder } from "./stores";
 
 /**
  * Предпросмотр черновика: одно сообщение, дата всегда явно с днём недели.
@@ -14,7 +17,6 @@ import type { DraftBody } from "./stores";
 
 export const aiCb = {
   create: (id: number) => `ai:ok:${id}`,
-  edit: (id: number) => `ai:ed:${id}`,
   cancel: (id: number) => `ai:x:${id}`,
   pick: (id: number, slot: string, chat: number) => `ai:pk:${id}:${slot}:${chat}`,
   /** Ответ на «Кому поставить задачу?» кнопкой: человек или отдел. */
@@ -157,10 +159,95 @@ export function renderPreview(
     lines.push(`👥 Участники: ${["ты", ...who].join(", ")}`, ...notes, "✍️ Автор: ты");
   }
 
-  rows.push([
-    ...(ready ? [{ text: "✅ Создать", callback_data: aiCb.create(draftId) }] : []),
-    { text: "✏️ Изменить", callback_data: aiCb.edit(draftId) },
-    { text: "✖️ Отмена", callback_data: aiCb.cancel(draftId) },
-  ]);
+  rows.push(confirmRow(draftId, ready));
   return { text: lines.join("\n"), keyboard: { inline_keyboard: rows }, ready };
+}
+
+/** «✅ Подтвердить» (если всё однозначно) и «✖️ Отмена». Правки — словами в чат. */
+export function confirmRow(draftId: number, ready: boolean): Row {
+  return [
+    ...(ready ? [{ text: "✅ Подтвердить", callback_data: aiCb.create(draftId) }] : []),
+    { text: "✖️ Отмена", callback_data: aiCb.cancel(draftId) },
+  ];
+}
+
+const plural = (n: number, one: string, few: string, many: string) => {
+  const m10 = n % 10, m100 = n % 100;
+  return m10 === 1 && m100 !== 11 ? one : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? few : many;
+};
+const tasksWord = (n: number) => `${n} ${plural(n, "задачу", "задачи", "задач")}`;
+
+export interface OpData {
+  tasks: AssignedTask[];
+  event?: TeamEvent | null;
+  reminder?: Reminder | null;
+}
+
+/**
+ * Предпросмотр изменения существующего: что именно поменяется, каждая задача
+ * строкой («Отменю 6 задач: 1. @ananas_2711 · Анонс кофе-рана…»).
+ */
+export function renderOpPreview(draftId: number, p: Intent, data: OpData, team: readonly TeamMember[], senderId: number, now: Date): Preview {
+  const lines: string[] = ["Проверь, пожалуйста:", ""];
+  const rows: Row[] = [];
+  let ready = true;
+  const list = (tasks: AssignedTask[]) => tasks.map((t, i) => `${i + 1}. ${escapeHtmlTeam(taskLine(t, now))}`);
+  const missing = (what: string) => {
+    ready = false;
+    lines.push(`Не нашла: ${what}. Напиши, что поменять, или нажми «✖️ Отмена».`);
+  };
+
+  if (p.intent === "set_task_status") {
+    const n = data.tasks.length;
+    if (!n) missing("задачи");
+    const head = p.status === "cancelled" ? (n === 1 ? "❌ Отменю задачу:" : `❌ Отменю ${tasksWord(n)}:`)
+      : p.status === "done" ? (n === 1 ? "✅ Отмечу выполненной:" : `✅ Отмечу выполненными ${tasksWord(n)}:`)
+        : (n === 1 ? "🔄 Возьму в работу:" : `🔄 Возьму в работу ${tasksWord(n)}:`);
+    lines.push(head, ...list(data.tasks));
+    if (p.status === "done" && data.tasks.some((t) => t.assignee_id !== senderId)) lines.push("", "За исполнителя: в задаче останется, что отметил ты.");
+  } else if (p.intent === "update_task") {
+    const n = data.tasks.length;
+    if (!n) missing("задачи");
+    lines.push(n === 1 ? "✏️ Изменю задачу:" : `✏️ Изменю ${tasksWord(n)}:`, ...list(data.tasks), "");
+    if (p.what) lines.push(`Текст: ${escapeHtmlTeam(p.what)}`);
+    if (p.due) {
+      const check = checkWhen(p.due, now);
+      if (!check.ok) ready = false;
+      lines.push(check.ok ? `⏰ Новый срок: ${whenText(check.at.toISOString())}` : `⚠️ Срок ${whenText(mskLocalToDate(p.due).toISOString())} — ${check.error === "past" ? "уже прошло" : "дальше года"}. Напиши другой.`);
+    }
+    if (p.clear_due) lines.push("⏰ Срок: убрать");
+    const people = (ms: Mention[] | undefined) => (ms ?? []).map((m) => {
+      const r = resolveMention(team, m, senderId);
+      if (r.kind === "one") return escapeHtmlTeam(personLabel(r.member, senderId));
+      if (r.kind === "department" && r.members.length) return `${escapeHtmlTeam(r.department.group)}: ${r.members.map((x) => escapeHtmlTeam(personShort(x))).join(", ")}`;
+      ready = false;
+      return `«${escapeHtmlTeam(m.name)}» — не поняла, кто именно; назови точнее`;
+    });
+    const add = people(p.add_assignees);
+    const remove = people(p.remove_assignees);
+    if (add.length) lines.push(`👤 Добавлю: ${add.join(", ")}`);
+    if (remove.length) lines.push(`👤 Уберу: ${remove.join(", ")}`);
+  } else if (p.intent === "update_event" || p.intent === "cancel_event") {
+    const ev = data.event;
+    if (!ev || ev.cancelled_at) missing("событие");
+    else {
+      const head = `${escapeHtmlTeam(ev.title)}, ${whenText(ev.starts_at)}`;
+      if (p.intent === "cancel_event") lines.push(`❌ Отменю событие: ${head}`);
+      else {
+        lines.push(`✏️ Изменю событие: ${head}`);
+        if (p.starts_at) {
+          const check = checkWhen(p.starts_at, now);
+          if (!check.ok) ready = false;
+          lines.push(check.ok ? `🕘 Новое время: ${whenText(check.at.toISOString())}` : `⚠️ Время ${whenText(mskLocalToDate(p.starts_at).toISOString())} — ${check.error === "past" ? "уже прошло" : "дальше года"}. Напиши другое.`);
+        }
+        if (p.title) lines.push(`Название: ${escapeHtmlTeam(p.title)}`);
+        if (p.place) lines.push(`📍 Место: ${escapeHtmlTeam(p.place)}`);
+      }
+    }
+  } else if (p.intent === "cancel_reminder") {
+    if (!data.reminder) missing("напоминание");
+    else lines.push(`❌ Удалю напоминание: ${whenText(data.reminder.remind_at)} — ${escapeHtmlTeam(data.reminder.text)}`);
+  }
+  rows.push(confirmRow(draftId, ready));
+  return { text: lines.join("\n").replace(/\n\n$/, ""), keyboard: { inline_keyboard: rows }, ready };
 }

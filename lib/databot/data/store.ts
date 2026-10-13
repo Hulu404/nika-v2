@@ -26,6 +26,8 @@ export interface DatabotStore extends TaskStore {
    * изменений, previous равен текущему статусу.
    */
   setAssignedStatus(id: number, actorId: number, action: AssignedAction): Promise<{ task: AssignedTask; previous: AssignedStatus }>;
+  /** Кто сменил статус за исполнителя (фаундер через ассистента «Пятницы»). Не бросает. */
+  markAssignedStatusBy(id: number, chatId: number): Promise<void>;
   /** Правка автором задачи; due: undefined — срок не трогать, null — снять. */
   editAssignedTask(id: number, ownerId: number, patch: { what?: string; due?: string | null }): Promise<AssignedTask>;
   /** Всё незакрытое и закрытое начиная с since — для обзора владельца. */

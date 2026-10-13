@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { INTENT_JSON_SCHEMA, validateIntent, checkWhen, normalizeLocal } from "./intent";
+import { validateIntent, checkWhen, normalizeLocal } from "./intent";
 import {
   AI_FAIL_TEXT,
   AI_LIMIT_TEXT,
@@ -10,7 +10,6 @@ import {
   TeamAiError,
   aiErrorText,
   createTeamAi,
-  systemPrompt,
   teamAiConfig,
   type FetchLike,
 } from "./yandex";
@@ -88,29 +87,7 @@ describe("проверка ответа модели", () => {
   });
 });
 
-describe("схема для Яндекса", () => {
-  type Node = { type?: string; properties?: Record<string, Node>; required?: readonly string[]; additionalProperties?: boolean; items?: Node };
-  const objects = (node: Node, path = "$"): Array<[string, Node]> => [
-    ...(node.type === "object" ? [[path, node] as [string, Node]] : []),
-    ...Object.entries(node.properties ?? {}).flatMap(([k, v]) => objects(v, `${path}.${k}`)),
-    ...(node.items ? objects(node.items, `${path}[]`) : []),
-  ];
-
-  it("в каждом объекте (и в items массивов) required — все ключи properties, additionalProperties: false", () => {
-    const all = objects(INTENT_JSON_SCHEMA as unknown as Node);
-    expect(all.map(([p]) => p)).toEqual(["$", "$.assignees[]", "$.participants[]"]);
-    for (const [path, node] of all) {
-      expect([...(node.required ?? [])].sort(), path).toEqual(Object.keys(node.properties ?? {}).sort());
-      expect(node.additionalProperties, path).toBe(false);
-    }
-  });
-
-  it("без nullable-типов", () => {
-    expect(JSON.stringify(INTENT_JSON_SCHEMA)).not.toContain("null");
-  });
-});
-
-describe("полностью заполненный ответ с пустыми значениями", () => {
+describe("аргументы инструментов с пустыми значениями", () => {
   const empty = { intent: "unknown", what: "", due: "", assignees: [], text: "", remind_at: "", task_hint: "", title: "",
     starts_at: "", place: "", participants: [], kind: "meeting", range: "week", reason: "" };
 
@@ -150,71 +127,53 @@ describe("конфигурация", () => {
   it("выключенный флаг: клиент не ходит в сеть", async () => {
     const { fetch, calls } = fakeFetch([]);
     const ai = createTeamAi({ config: null, usage: new MemoryAiUsage(), fetch, now: () => NOW });
-    await expect(ai.parseIntent({ chatId: 1, text: "привет", now: NOW, team: [] })).rejects.toMatchObject({ code: "disabled" });
+    await expect(ai.step({ messages: [{ role: "user", text: "привет" }], tools: [] })).rejects.toMatchObject({ code: "disabled" });
     expect(calls).toHaveLength(0);
   });
 });
 
 describe("запросы к Яндексу", () => {
-  it("разбор: схема, ключ, контекст даты и команды; расход записан без текста", async () => {
-    const usage = new MemoryAiUsage();
-    const { fetch, calls } = fakeFetch([llmAnswer({ intent: "show_my_day" })]);
-    const ai = createTeamAi({ config: CONFIG, usage, fetch, now: () => NOW });
-    const team = [{ name: "Маша", title: "Ивент-отдел", departments: ["Ивенты"], username: "gusarovame" }];
-    expect(await ai.parseIntent({ chatId: 7, text: "что у меня сегодня?", now: NOW, team })).toEqual({ intent: "show_my_day" });
+  const step = (ai: ReturnType<typeof createTeamAi>) => ai.step({ messages: [{ role: "user", text: "x" }], tools: [] });
+
+  it("ключ в заголовке, модель в modelUri, без structured output", async () => {
+    const { fetch, calls } = fakeFetch([llmAnswer("Привет!")]);
+    const ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch, now: () => NOW });
+    expect(await step(ai)).toEqual({ type: "text", text: "Привет!", tokensIn: 120, tokensOut: 30 });
     expect(calls[0].url).toBe(LLM_URL);
     expect(calls[0].headers.Authorization).toBe("Api-Key k");
     const body = JSON.parse(String(calls[0].body));
     expect(body.modelUri).toBe("gpt://f1/yandexgpt-lite/latest");
-    expect(body.jsonSchema.schema).toEqual(JSON.parse(JSON.stringify(INTENT_JSON_SCHEMA)));
-    expect(body.messages[0].text).toContain("Сейчас вторник 2026-10-13, 14:05 по Москве");
-    expect(body.messages[0].text).toContain("пятница 2026-10-16");
-    expect(body.messages[0].text).toContain("- Маша, Ивент-отдел, отделы: Ивенты, @gusarovame");
-    expect(usage.rows).toEqual([{ chat_id: 7, kind: "llm", tokens_in: 120, tokens_out: 30, created_at: NOW.toISOString() }]);
-  });
-
-  it("ответ не JSON или не по схеме — unknown", async () => {
-    const { fetch } = fakeFetch([llmAnswer("Конечно! Вот задача: ..."), llmAnswer({ intent: "create_task", assignees: "Маше" }), { status: 200, body: {} }]);
-    const ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch, now: () => NOW });
-    for (let i = 0; i < 3; i++) expect((await ai.parseIntent({ chatId: 1, text: "x", now: NOW, team: [] })).intent).toBe("unknown");
-  });
-
-  it("JSON в ```-обёртке принимается", async () => {
-    const { fetch } = fakeFetch([llmAnswer("```json\n{\"intent\":\"show_my_tasks\"}\n```")]);
-    const ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch, now: () => NOW });
-    expect(await ai.parseIntent({ chatId: 1, text: "x", now: NOW, team: [] })).toEqual({ intent: "show_my_tasks" });
+    expect(body).not.toHaveProperty("jsonSchema");
   });
 
   it("один повтор при 429, 5xx и сетевой ошибке; 400 не повторяется", async () => {
-    let f = fakeFetch([{ status: 503 }, llmAnswer({ intent: "show_my_day" })]);
+    let f = fakeFetch([{ status: 503 }, llmAnswer("ок")]);
     let ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch: f.fetch, now: () => NOW });
-    expect((await ai.parseIntent({ chatId: 1, text: "x", now: NOW, team: [] })).intent).toBe("show_my_day");
+    expect((await step(ai)).type).toBe("text");
     expect(f.calls).toHaveLength(2);
 
     f = fakeFetch([new Error("ECONNRESET"), { status: 429 }]);
     ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch: f.fetch, now: () => NOW });
-    const err = await ai.parseIntent({ chatId: 1, text: "x", now: NOW, team: [] }).catch((e) => e);
+    const err = await step(ai).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(TeamAiError);
     expect(aiErrorText(err)).toBe(AI_FAIL_TEXT);
+    expect(AI_FAIL_TEXT).toBe("Что-то пошло не так, попробуй ещё раз через минуту.");
     expect(f.calls).toHaveLength(2);
 
     f = fakeFetch([{ status: 400, body: { error: "bad" } }]);
     ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch: f.fetch, now: () => NOW });
-    await expect(ai.parseIntent({ chatId: 1, text: "x", now: NOW, team: [] })).rejects.toMatchObject({ code: "api" });
+    await expect(step(ai)).rejects.toMatchObject({ code: "api" });
     expect(f.calls).toHaveLength(1);
   });
 
-  it("лимит: 40 запросов к LLM в час на человека, дальше — без запроса", async () => {
+  it("лимит: 40 сообщений к модели в час на человека", async () => {
     const usage = new MemoryAiUsage();
     for (let i = 0; i < LLM_LIMIT_PER_HOUR; i++) await usage.record({ chat_id: 5, kind: "llm" }, new Date(NOW.getTime() - 30 * 60_000));
     await usage.record({ chat_id: 5, kind: "llm" }, new Date(NOW.getTime() - 2 * 3_600_000));
-    const { fetch, calls } = fakeFetch([llmAnswer({ intent: "show_my_day" })]);
-    const ai = createTeamAi({ config: CONFIG, usage, fetch, now: () => NOW });
-    const err = await ai.parseIntent({ chatId: 5, text: "x", now: NOW, team: [] }).catch((e) => e);
+    const ai = createTeamAi({ config: CONFIG, usage, fetch: fakeFetch([]).fetch, now: () => NOW });
+    const err = await ai.checkLimit(5).catch((e: unknown) => e);
     expect(aiErrorText(err)).toBe(AI_LIMIT_TEXT);
-    expect(calls).toHaveLength(0);
-    // У другого человека свой лимит.
-    expect((await ai.parseIntent({ chatId: 6, text: "x", now: NOW, team: [] })).intent).toBe("show_my_day");
+    await expect(ai.checkLimit(6)).resolves.toBeUndefined();
   });
 
   it("распознавание: oggopus, ru-RU, без folderId; секунды в учёте", async () => {
@@ -235,9 +194,4 @@ describe("запросы к Яндексу", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("в инструкции нет ничего, кроме имени, должности, отделов и ника", () => {
-    const text = systemPrompt(NOW, [{ name: "Сальма", title: "Ивент-отдел", departments: ["Ивенты"], username: "salmasxsx" }]);
-    expect(text).toContain("- Сальма, Ивент-отдел, отделы: Ивенты, @salmasxsx");
-    expect(text).not.toMatch(/\+7|телефон/i);
-  });
 });

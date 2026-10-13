@@ -57,6 +57,10 @@ export interface ReminderStore {
   listDue(now: Date): Promise<Reminder[]>;
   /** Атомарно: true только у первого прохода. */
   markSent(id: number, now: Date): Promise<boolean>;
+  /** Мои неотправленные напоминания по времени. */
+  listMine(chatId: number): Promise<Reminder[]>;
+  /** Удалить своё неотправленное напоминание. false — чужое, нет или уже ушло. */
+  cancel(id: number, chatId: number): Promise<boolean>;
 }
 
 export interface ParticipantStore {
@@ -126,6 +130,16 @@ export function supabaseReminderStore(): ReminderStore {
     },
     async markSent(id, now) {
       const { data, error } = await t().update({ sent_at: now.toISOString() }).eq("id", id).is("sent_at", null).select("id");
+      if (error) throw fail(error);
+      return (data ?? []).length === 1;
+    },
+    async listMine(chatId) {
+      const { data, error } = await t().select("*").eq("chat_id", chatId).is("sent_at", null).order("remind_at").limit(50);
+      if (error) throw fail(error);
+      return (data ?? []) as Reminder[];
+    },
+    async cancel(id, chatId) {
+      const { data, error } = await t().delete().eq("id", id).eq("chat_id", chatId).is("sent_at", null).select("id");
       if (error) throw fail(error);
       return (data ?? []).length === 1;
     },
@@ -210,6 +224,16 @@ export class MemoryReminderStore implements ReminderStore {
     const r = this.reminders.get(id);
     if (!r || r.sent_at) return false;
     r.sent_at = now.toISOString();
+    return true;
+  }
+  async listMine(chatId: number) {
+    return [...this.reminders.values()].filter((r) => r.chat_id === chatId && !r.sent_at)
+      .sort((a, b) => a.remind_at.localeCompare(b.remind_at)).map((r) => ({ ...r }));
+  }
+  async cancel(id: number, chatId: number) {
+    const r = this.reminders.get(id);
+    if (!r || r.chat_id !== chatId || r.sent_at) return false;
+    this.reminders.delete(id);
     return true;
   }
 }

@@ -30,6 +30,8 @@ export interface AssignedTask extends AssignedTaskDraft {
   reminded_12_at?: string | null;
   reminded_3_at?: string | null;
   overdue_notified_at: string | null;
+  /** Кто сменил статус, если не сам исполнитель (миграция 056). */
+  status_by?: number | null;
 }
 
 /** Какую отметку ставит напоминание: порог до срока, просрочка или старая единая. */

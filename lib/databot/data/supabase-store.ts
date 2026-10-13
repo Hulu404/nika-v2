@@ -121,6 +121,11 @@ class SupabaseStore extends TaskStoreBase implements DatabotStore {
     return data as { task: AssignedTask; previous: AssignedStatus };
   }
 
+  async markAssignedStatusBy(id: number, chatId: number): Promise<void> {
+    const { error } = await this.db.from("databot_assigned_tasks").update({ status_by: chatId }).eq("id", id).abortSignal(timeout());
+    if (error) console.error("[databot] markAssignedStatusBy:", error.message);
+  }
+
   async editAssignedTask(id: number, ownerId: number, patch: { what?: string; due?: string | null }): Promise<AssignedTask> {
     const { data, error } = await this.db.rpc("databot_assigned_edit", {
       p_id: id, p_owner: ownerId, p_what: patch.what ?? null,
