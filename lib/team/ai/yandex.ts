@@ -1,4 +1,5 @@
 import { tgAdmin } from "../../telegram/supabase";
+import { describeNetError, hostOf, rememberNetError } from "./net";
 
 /**
  * Клиент Yandex AI Studio для «Пятницы»: распознавание голосовых (SpeechKit
@@ -105,14 +106,22 @@ const retriable = (status: number) => status === 429 || status >= 500;
 /** Таймаут 15 секунд, один повтор при сетевой ошибке, 429 или 5xx. */
 async function request(fetchImpl: FetchLike, url: string, init: { headers: Record<string, string>; body: string | Uint8Array }, deadline?: number): Promise<unknown> {
   let lastError = "";
-  for (let attempt = 0; attempt < 2; attempt++) {
+  const host = hostOf(url);
+  const max = 2;
+  for (let attempt = 1; attempt <= max; attempt++) {
     let res: Awaited<ReturnType<FetchLike>>;
+    const started = Date.now();
     try {
       const left = deadline === undefined ? TIMEOUT_MS : Math.min(TIMEOUT_MS, deadline - Date.now());
       if (left <= 0) throw new TeamAiError("api", "deadline");
       res = await fetchImpl(url, { method: "POST", ...init, signal: AbortSignal.timeout(left) });
     } catch (err) {
-      lastError = err instanceof Error ? err.message : String(err);
+      if (err instanceof TeamAiError) throw err;
+      // Настоящая причина «fetch failed» — в err.cause; без неё чинить вслепую.
+      const info = describeNetError(err);
+      console.error(`[team-ai] net host=${host} attempt=${attempt}/${max} after=${Date.now() - started} name=${info.name} code=${info.code ?? "-"} msg=${info.message}`);
+      rememberNetError({ at: Date.now(), host, code: info.code ?? info.name });
+      lastError = `${info.code ?? info.name}: ${info.message}`;
       continue;
     }
     if (res.ok) return res.json();

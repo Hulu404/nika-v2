@@ -220,6 +220,8 @@ const callSummary = (c: { name: string; arguments: Record<string, unknown>; resu
 export async function handleAiMessage(ctx: Context, member: TeamMember, deps: AssistantDeps, now = new Date(), preset?: { text: string; voice: boolean }): Promise<boolean> {
   if (!deps.ai) return false;
   const uid = member.chat_id;
+  const started = Date.now();
+  const progress = { steps: 0, tools: [] as string[] };
   try {
     const said = preset ?? (await utterance(ctx, deps, uid));
     if (!said) return true;
@@ -261,7 +263,7 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
     const system = assistantPrompt({ now, team, senderId: uid, draft: draft ? draftContext(draft, team, uid) : null, list: shownListText(state.last_list) });
     const turns = await deps.turns.recent(uid, now);
     const run = await runAgent({
-      ai: deps.ai, messages: dialogMessages(system, turns, said.text), tools: TOOL_SPECS,
+      ai: deps.ai, messages: dialogMessages(system, turns, said.text), tools: TOOL_SPECS, progress,
       execute: (call) => executeTool(tctx, call),
       onStep: () => ctx.replyWithChatAction("typing").then(() => {}, () => {}),
     });
@@ -276,7 +278,10 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
     if (run.calls.length) await deps.turns.add(uid, "tool", run.calls.map(callSummary).join("; "), now);
     if (text) await deps.turns.add(uid, "assistant", text, now);
   } catch (err) {
-    console.error("[team-ai]", err instanceof Error ? err.message : String(err));
+    // Итоговая ошибка — одной строкой, без текста сообщения человека.
+    const message = err instanceof Error ? err.message : String(err);
+    if (err instanceof TeamAiError && err.code === "rate_limit") console.warn("[team-ai] rate_limit");
+    else console.error(`[team-ai] fail step=${progress.steps} tools=${progress.tools.join(",") || "-"} elapsed=${Date.now() - started} err=${message.slice(0, 300)}`);
     await ctx.reply(aiErrorText(err)).catch(() => {});
   }
   return true;

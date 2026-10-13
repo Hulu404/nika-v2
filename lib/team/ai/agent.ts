@@ -30,6 +30,8 @@ export interface AgentInput {
   onStep?: () => Promise<void> | void;
   maxSteps?: number;
   deadlineMs?: number;
+  /** Сколько шагов пройдено и какие инструменты вызваны — для лога, если цикл упадёт. */
+  progress?: { steps: number; tools: string[] };
   clock?: () => number;
 }
 
@@ -43,6 +45,7 @@ export async function runAgent(input: AgentInput): Promise<AgentRun> {
     await input.onStep?.();
     const res = await input.ai.step({ messages, tools: input.tools, deadline });
     run.steps++;
+    if (input.progress) input.progress.steps = run.steps;
     run.tokensIn += res.tokensIn;
     run.tokensOut += res.tokensOut;
     if (res.type === "text") {
@@ -52,6 +55,7 @@ export async function runAgent(input: AgentInput): Promise<AgentRun> {
     messages.push({ role: "assistant", toolCallList: { toolCalls: res.calls.map((c) => ({ functionCall: c })) } });
     const results: Array<{ functionResult: { name: string; content: string } }> = [];
     for (const call of res.calls) {
+      input.progress?.tools.push(call.name);
       let content: string;
       try {
         content = await input.execute(call);
