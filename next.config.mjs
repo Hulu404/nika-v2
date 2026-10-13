@@ -24,6 +24,8 @@ const nextConfig = {
     // флагом. Там регистрируется вебхук Telegram и тикер напоминаний кофе-рана:
     // приложение запущено — бот на связи, отдельных процессов не нужно.
     instrumentationHook: true,
+    // undici (соединение «Пятницы» с Yandex AI Studio) — как есть из node_modules, без сборки webpack.
+    serverComponentsExternalPackages: ["undici"],
   },
   typescript: {
     ignoreBuildErrors: true,

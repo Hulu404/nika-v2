@@ -1,5 +1,5 @@
 import { tgAdmin } from "../../telegram/supabase";
-import { describeNetError, hostOf, rememberNetError } from "./net";
+import { describeNetError, hostOf, isStaleSocket, rememberNetError, yandexFetch } from "./net";
 
 /**
  * Клиент Yandex AI Studio для «Пятницы»: распознавание голосовых (SpeechKit
@@ -98,35 +98,60 @@ export class MemoryAiUsage implements AiUsageStore {
 
 // ── HTTP ─────────────────────────────────────────────────────────────────────
 
-export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body: string | Uint8Array; signal: AbortSignal }) =>
+export type FetchLike = (url: string, init: { method: string; headers: Record<string, string>; body: string | Uint8Array; signal: AbortSignal; fresh?: boolean }) =>
   Promise<{ ok: boolean; status: number; json: () => Promise<unknown>; text: () => Promise<string> }>;
 
 const retriable = (status: number) => status === 429 || status >= 500;
 
 /** Таймаут 15 секунд, один повтор при сетевой ошибке, 429 или 5xx. */
-async function request(fetchImpl: FetchLike, url: string, init: { headers: Record<string, string>; body: string | Uint8Array }, deadline?: number): Promise<unknown> {
+export const MAX_ATTEMPTS = 3;
+/** Пауза перед 2-й и 3-й попыткой. */
+export const RETRY_PAUSES_MS = [300, 1200];
+/** Меньше этого до дедлайна сообщения — новую попытку не начинаем. */
+export const MIN_LEFT_FOR_RETRY_MS = 3_000;
+
+interface RequestOptions {
+  /** Момент (Date.now()), после которого не начинать и не ждать. */
+  deadline?: number;
+  /** Таймаут одного HTTP-запроса. */
+  timeoutMs: number;
+  sleep: (ms: number) => Promise<void>;
+}
+
+/**
+ * До 3 попыток: сетевая ошибка, 429 и 5xx — повтор через 300 мс и 1200 мс;
+ * оборванное соединение (ECONNRESET, UND_ERR_SOCKET) — первый повтор сразу и
+ * на новом соединении. 4xx не повторяется. Повторы — внутри дедлайна сообщения.
+ */
+async function request(fetchImpl: FetchLike, url: string, init: { headers: Record<string, string>; body: string | Uint8Array }, opts: RequestOptions): Promise<unknown> {
   let lastError = "";
   const host = hostOf(url);
-  const max = 2;
-  for (let attempt = 1; attempt <= max; attempt++) {
+  let fresh = false;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const left = opts.deadline === undefined ? opts.timeoutMs : Math.min(opts.timeoutMs, opts.deadline - Date.now());
+    if (attempt > 1 && opts.deadline !== undefined && opts.deadline - Date.now() < MIN_LEFT_FOR_RETRY_MS) break;
+    if (left <= 0) throw new TeamAiError("api", lastError || "deadline");
     let res: Awaited<ReturnType<FetchLike>>;
     const started = Date.now();
+    let pause = RETRY_PAUSES_MS[attempt - 1] ?? 0;
     try {
-      const left = deadline === undefined ? TIMEOUT_MS : Math.min(TIMEOUT_MS, deadline - Date.now());
-      if (left <= 0) throw new TeamAiError("api", "deadline");
-      res = await fetchImpl(url, { method: "POST", ...init, signal: AbortSignal.timeout(left) });
+      res = await fetchImpl(url, { method: "POST", ...init, signal: AbortSignal.timeout(left), ...(fresh ? { fresh } : {}) });
     } catch (err) {
-      if (err instanceof TeamAiError) throw err;
       // Настоящая причина «fetch failed» — в err.cause; без неё чинить вслепую.
       const info = describeNetError(err);
-      console.error(`[team-ai] net host=${host} attempt=${attempt}/${max} after=${Date.now() - started} name=${info.name} code=${info.code ?? "-"} msg=${info.message}`);
+      console.error(`[team-ai] net host=${host} attempt=${attempt}/${MAX_ATTEMPTS} after=${Date.now() - started} name=${info.name} code=${info.code ?? "-"} msg=${info.message}`);
       rememberNetError({ at: Date.now(), host, code: info.code ?? info.name });
       lastError = `${info.code ?? info.name}: ${info.message}`;
+      fresh = isStaleSocket(info.code);
+      if (fresh && attempt === 1) pause = 0;
+      if (attempt < MAX_ATTEMPTS && pause) await opts.sleep(pause);
       continue;
     }
+    fresh = false;
     if (res.ok) return res.json();
     lastError = `HTTP ${res.status}: ${(await res.text().catch(() => "")).slice(0, 300)}`;
     if (!retriable(res.status)) break;
+    if (attempt < MAX_ATTEMPTS) await opts.sleep(pause);
   }
   throw new TeamAiError("api", lastError);
 }
@@ -177,10 +202,13 @@ export interface TeamAiDeps {
   usage: AiUsageStore;
   fetch?: FetchLike;
   now?: () => Date;
+  /** Пауза между попытками (в тестах — мгновенная). */
+  sleep?: (ms: number) => Promise<void>;
 }
 
 export function createTeamAi(deps: TeamAiDeps): TeamAi {
-  const fetchImpl = deps.fetch ?? (globalThis.fetch as unknown as FetchLike);
+  const fetchImpl = deps.fetch ?? (yandexFetch as FetchLike);
+  const sleep = deps.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)));
   const clock = deps.now ?? (() => new Date());
   const config = () => {
     if (!deps.config) throw new TeamAiError("disabled", "TEAM_AI выключен");
@@ -202,7 +230,7 @@ export function createTeamAi(deps: TeamAiDeps): TeamAi {
       const body = await request(fetchImpl, `${STT_URL}?lang=ru-RU&format=oggopus`, {
         headers: { Authorization: `Api-Key ${cfg.apiKey}`, "Content-Type": "application/octet-stream" },
         body: ogg,
-      });
+      }, { timeoutMs: TIMEOUT_MS, sleep });
       await deps.usage.record({ chat_id: chatId, kind: "stt", audio_seconds: Math.ceil(seconds) }, clock());
       const text = (body as { result?: unknown })?.result;
       if (typeof text !== "string") throw new TeamAiError("api", "stt: no result");
@@ -225,7 +253,7 @@ export function createTeamAi(deps: TeamAiDeps): TeamAi {
           messages: input.messages,
           tools: input.tools.map((t) => ({ function: t })),
         }),
-      }, input.deadline);
+      }, { deadline: input.deadline, timeoutMs: TIMEOUT_MS, sleep });
       const res = ((body as { result?: unknown })?.result ?? body) as {
         alternatives?: Array<{ message?: { text?: unknown; toolCallList?: { toolCalls?: Array<{ functionCall?: { name?: unknown; arguments?: unknown } }> } }; status?: string }>;
         usage?: { inputTextTokens?: unknown; completionTokens?: unknown };

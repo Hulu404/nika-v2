@@ -1,3 +1,5 @@
+import type { Agent as UndiciAgent } from "undici";
+
 /**
  * Сеть до Yandex AI Studio: разбор сетевых ошибок и их память в процессе.
  *
@@ -60,3 +62,50 @@ export const hostOf = (url: string) => {
     return url;
   }
 };
+
+// ── Соединение с Яндексом ────────────────────────────────────────────────────
+// Прерывистый «fetch failed» из-за рубежа: (а) сервер закрывает простаивающее
+// keep-alive-соединение, а Node берёт его снова; (б) DNS отдаёт IPv6 без
+// маршрута; (в) медленное установление соединения. Свой Agent закрывает все три:
+// короткий keep-alive, IPv4 (YANDEX_FORCE_IPV4, по умолчанию да), таймаут connect.
+
+
+export const forceIPv4 = (env: Record<string, string | undefined> = process.env) =>
+  (env.YANDEX_FORCE_IPV4 ?? "true").trim().toLowerCase() !== "false";
+
+export const CONNECT_TIMEOUT_MS = 10_000;
+
+async function makeAgent(): Promise<UndiciAgent> {
+  const { Agent } = await import("undici");
+  return new Agent({
+    keepAliveTimeout: 4_000,
+    keepAliveMaxTimeout: 10_000,
+    // Заголовки и тело — в пределах таймаута самого запроса (LLM — 20 с).
+    headersTimeout: 20_000,
+    bodyTimeout: 20_000,
+    connect: { timeout: CONNECT_TIMEOUT_MS, ...(forceIPv4() ? { family: 4 } : {}) },
+  });
+}
+
+let shared: Promise<UndiciAgent> | null = null;
+
+export interface YandexFetchInit {
+  method: string;
+  headers: Record<string, string>;
+  body: string | Uint8Array;
+  signal: AbortSignal;
+  /** Прошлое соединение оборвалось: открыть новое, старые сокеты не брать. */
+  fresh?: boolean;
+}
+
+/** fetch из undici со своим Agent для stt.api / ai.api.cloud.yandex.net. */
+export async function yandexFetch(url: string, init: YandexFetchInit) {
+  if (init.fresh || !shared) {
+    const old = shared;
+    shared = makeAgent();
+    void old?.then((a) => a.close()).catch(() => {});
+  }
+  const { fetch } = await import("undici");
+  const res = await fetch(url, { method: init.method, headers: init.headers, body: init.body, signal: init.signal, dispatcher: await shared });
+  return { ok: res.ok, status: res.status, json: () => res.json(), text: () => res.text() };
+}

@@ -146,22 +146,22 @@ describe("запросы к Яндексу", () => {
     expect(body).not.toHaveProperty("jsonSchema");
   });
 
-  it("один повтор при 429, 5xx и сетевой ошибке; 400 не повторяется", async () => {
+  it("до 3 попыток при 429, 5xx и сетевой ошибке; 400 не повторяется", async () => {
     let f = fakeFetch([{ status: 503 }, llmAnswer("ок")]);
-    let ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch: f.fetch, now: () => NOW });
+    let ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch: f.fetch, now: () => NOW, sleep: async () => {} });
     expect((await step(ai)).type).toBe("text");
     expect(f.calls).toHaveLength(2);
 
-    f = fakeFetch([new Error("ECONNRESET"), { status: 429 }]);
-    ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch: f.fetch, now: () => NOW });
+    f = fakeFetch([new Error("ECONNRESET"), { status: 429 }, { status: 503 }]);
+    ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch: f.fetch, now: () => NOW, sleep: async () => {} });
     const err = await step(ai).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(TeamAiError);
     expect(aiErrorText(err)).toBe(AI_FAIL_TEXT);
     expect(AI_FAIL_TEXT).toBe("Что-то пошло не так, попробуй ещё раз через минуту.");
-    expect(f.calls).toHaveLength(2);
+    expect(f.calls).toHaveLength(3);
 
     f = fakeFetch([{ status: 400, body: { error: "bad" } }]);
-    ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch: f.fetch, now: () => NOW });
+    ai = createTeamAi({ config: CONFIG, usage: new MemoryAiUsage(), fetch: f.fetch, now: () => NOW, sleep: async () => {} });
     await expect(step(ai)).rejects.toMatchObject({ code: "api" });
     expect(f.calls).toHaveLength(1);
   });
