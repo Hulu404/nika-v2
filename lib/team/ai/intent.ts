@@ -37,7 +37,7 @@ export type Intent =
   | { intent: "create_event"; title: string; starts_at: string; place: string | null; participants: Mention[]; kind: EventKind; date?: string | null; missing?: MissingField[] }
   // Изменения существующего — только через черновик и «✅ Подтвердить» (tools.ts → assistant.ts).
   | { intent: "update_task"; task_ids: number[]; what?: string; due?: string; clear_due?: boolean; add_assignees?: Mention[]; remove_assignees?: Mention[] }
-  | { intent: "set_task_status"; task_ids: number[]; status: TaskStatusChange }
+  | { intent: "set_task_status"; task_ids: number[]; status: TaskStatusChange; /** «Кроме: Настя (Глава SMM)» — кого исключили. */ except?: string[] }
   | { intent: "update_event"; event_id: number; title?: string; starts_at?: string; place?: string }
   | { intent: "cancel_event"; event_id: number }
   | { intent: "cancel_reminder"; reminder_id: number }

@@ -204,6 +204,7 @@ export function renderOpPreview(draftId: number, p: Intent, data: OpData, team: 
       : p.status === "done" ? (n === 1 ? "✅ Отмечу выполненной:" : `✅ Отмечу выполненными ${tasksWord(n)}:`)
         : (n === 1 ? "🔄 Возьму в работу:" : `🔄 Возьму в работу ${tasksWord(n)}:`);
     lines.push(head, ...list(data.tasks));
+    if (p.except?.length) lines.push(`Кроме: ${escapeHtmlTeam(p.except.join(", "))}`);
     if (p.status === "done" && data.tasks.some((t) => t.assignee_id !== senderId)) lines.push("", "За исполнителя: в задаче останется, что отметил ты.");
   } else if (p.intent === "update_task") {
     const n = data.tasks.length;

@@ -66,4 +66,39 @@ describe("list_tasks с запросом", () => {
     expect(parsed.tasks.map((t: { assignee: string }) => t.assignee)).toEqual(["@zuzya_zyzya", "@ananas_2711", "@tora_co", "@tora_co"]);
     expect(h.sent.some((s) => s.text.startsWith("<b>Задачи"))).toBe(false);
   });
+
+  it("сценарий с прода: удалить анонсы у всех в СММ, кроме Насти главы СММ", async () => {
+    const before = [...h.tasks.assignedTasks.values()];
+    const id = (u: string) => before.find((t) => t.username === u && t.what.startsWith("Анонс кофе-рана"))!.id;
+    const nastya = [{ name: "Насти", qualifier: "главы СММ" }];
+    h.script.push(
+      call("list_tasks", { scope: "department", department: "smm", query: "пост анонс в тгк и в инсте", exclude_people: nastya }),
+      // Модель по ошибке передаёт и задачу Насти — исключение её всё равно уберёт.
+      call("set_task_status", { task_ids: [id("zuzya_zyzya"), id("ananas_2711"), id("tora_co")], status: "cancelled", exclude_people: nastya }),
+    );
+    await h.say("посмотри задачи смм отдела, на сегодня у них стоят задачи выпустить пост анонс в тгк и в инсте, эти задачи надо удалить у всех, кроме Насти главы СММ", DIMA);
+    const list = h.sent.find((s) => s.text.startsWith("<b>Задачи · SMM"))!;
+    expect(list.text).toContain("кроме Настя (Глава SMM)");
+    expect(list.text).not.toContain("@zuzya_zyzya");
+    expect(h.preview().text).toBe([
+      "Проверь, пожалуйста:", "",
+      "❌ Отменю 2 задачи:",
+      "1. @ananas_2711 · Анонс кофе-рана: пост в ТГК и Instagram",
+      "2. @tora_co · Анонс кофе-рана: пост в ТГК и Instagram",
+      "Кроме: Настя (Глава SMM)",
+    ].join("\n"));
+    await h.press(h.button("✅ Подтвердить")!, DIMA);
+    expect(["zuzya_zyzya", "ananas_2711", "tora_co"].map((u) => h.tasks.assignedTasks.get(id(u))!.status)).toEqual(["open", "cancelled", "cancelled"]);
+  });
+
+  it("«кроме Насти» без уточнения — вопрос, кого именно, без черновика", async () => {
+    let result = "";
+    h.script.push(call("list_tasks", { scope: "department", department: "smm", exclude_people: [{ name: "Насти" }] }), (input) => {
+      result = JSON.stringify(input.messages.at(-1));
+      return reply("Какую Настю исключить?");
+    });
+    await h.say("задачи смм у всех кроме насти", DIMA);
+    expect(result).toContain("Кого именно исключить");
+    expect(h.drafts.drafts.size).toBe(0);
+  });
 });

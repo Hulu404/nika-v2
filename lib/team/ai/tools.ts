@@ -82,6 +82,7 @@ export const TOOL_SPECS: readonly ToolSpec[] = [
         status: { type: "string", enum: ["open", "overdue", "done", "all"], description: "По умолчанию open" },
         query: { type: "string", description: "Поиск по тексту задачи: «анонс кофе-рана»" },
         purpose: { type: "string", enum: ["show", "choose"], description: "choose — человек выберет задачу кнопкой с номером" },
+        exclude_people: { type: "array", items: mention, description: "«у всех, кроме Насти» — чьи задачи не брать" },
       },
       required: ["scope"],
     },
@@ -105,7 +106,8 @@ export const TOOL_SPECS: readonly ToolSpec[] = [
   {
     name: "set_task_status",
     description: `Черновик смены статуса до ${MAX_BULK} задач: done — выполнена, taken — в работе, cancelled — отменить (так же «удалить»).`,
-    parameters: { type: "object", properties: { ...refs, status: { type: "string", enum: ["done", "taken", "cancelled"] } }, required: ["status"] },
+    parameters: { type: "object", properties: { ...refs, status: { type: "string", enum: ["done", "taken", "cancelled"] },
+      exclude_people: { type: "array", items: mention, description: "«для всех, кроме Насти» — чьи задачи не трогать" } }, required: ["status"] },
   },
   {
     name: "create_event",
@@ -165,6 +167,24 @@ async function resolveTasks(tc: ToolContext, args: Record<string, unknown>): Pro
   const found = ids.map((id) => visible.get(id)).filter((t): t is AssignedTask => !!t);
   if (!found.length) return isFounder(tc.uid) ? "Таких задач нет." : NOT_OWN_TASKS_TEXT;
   return found;
+}
+
+/** «Настя (Глава SMM)» — кого исключили, без ника. */
+const exceptLabel = (m: TeamMember) => `${personName(m)}${m.title ? ` (${m.title})` : ""}`;
+
+/** Кого исключить («кроме Насти главы СММ»): люди или отдел; тёзки без уточнения — вопрос. */
+function excluded(tc: ToolContext, v: unknown): { ids: Set<number>; labels: string[] } | string {
+  const ids = new Set<number>();
+  const labels: string[] = [];
+  for (const m of mentions(v)) {
+    const r = resolveMention(tc.team, m, tc.uid);
+    if (r.kind === "many") return `Кого именно исключить: ${r.options.map((x) => personLabel(x)).join(" или ")}?`;
+    if (r.kind === "none") return `В команде нет «${m.name}».`;
+    const people = r.kind === "one" ? [r.member] : r.members;
+    for (const p of people) ids.add(p.chat_id);
+    labels.push(r.kind === "one" ? exceptLabel(r.member) : r.department.group);
+  }
+  return { ids, labels };
 }
 
 /** Строки с кнопками-номерами: выбор из списка нажатием. */
@@ -277,6 +297,12 @@ async function listTasks(tc: ToolContext, a: Record<string, unknown>): Promise<s
 
   tasks = tasks.filter((t) => status === "all" ? true : status === "done" ? t.status === "done"
     : status === "overdue" ? overdue(t, tc.now) : isActiveAssigned(t));
+  const except = excluded(tc, a.exclude_people);
+  if (typeof except === "string") return err(except);
+  if (except.ids.size) {
+    tasks = tasks.filter((t) => !except.ids.has(t.assignee_id));
+    title += ` · кроме ${except.labels.join(", ")}`;
+  }
   tasks.sort((x, y) => (overdue(x, tc.now) ? 0 : 1) - (overdue(y, tc.now) ? 0 : 1)
     || (x.due_at ? Date.parse(x.due_at) : Infinity) - (y.due_at ? Date.parse(y.due_at) : Infinity) || x.id - y.id);
   const query = str(a.query);
@@ -347,8 +373,12 @@ function getTeam(tc: ToolContext): string {
 async function setTaskStatus(tc: ToolContext, a: Record<string, unknown>): Promise<string> {
   const status = (["done", "taken", "cancelled"] as const).find((s) => s === a.status) as TaskStatusChange | undefined;
   if (!status) return err("Статус: done, taken или cancelled.");
-  const tasks = await resolveTasks(tc, a);
-  if (typeof tasks === "string") return err(tasks);
+  const found = await resolveTasks(tc, a);
+  if (typeof found === "string") return err(found);
+  const except = excluded(tc, a.exclude_people);
+  if (typeof except === "string") return err(except);
+  const tasks = found.filter((t) => !except.ids.has(t.assignee_id));
+  if (!tasks.length) return err("После исключений задач не осталось.");
   const founder = isFounder(tc.uid);
   const allowed = tasks.filter((t) => isActiveAssigned(t) || (status !== "cancelled" && t.status === "declined"))
     .filter((t) => status === "cancelled" ? t.assigned_by === tc.uid || founder
@@ -357,7 +387,7 @@ async function setTaskStatus(tc: ToolContext, a: Record<string, unknown>): Promi
     return err(status === "taken" ? "В работу берёт только сам исполнитель."
       : founder ? "Эти задачи уже закрыты." : NOT_OWN_TASKS_TEXT);
   }
-  return draft(tc, { intent: "set_task_status", task_ids: allowed.map((t) => t.id), status });
+  return draft(tc, { intent: "set_task_status", task_ids: allowed.map((t) => t.id), status, ...(except.labels.length ? { except: except.labels } : {}) });
 }
 
 async function updateTask(tc: ToolContext, a: Record<string, unknown>): Promise<string> {
