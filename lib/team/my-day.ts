@@ -64,26 +64,47 @@ export function myTasksToday(tasks: readonly AssignedTask[], chatId: number, ymd
   };
 }
 
-export function myDayText(ymd: string, events: readonly TeamEvent[], tasks: { today: AssignedTask[]; overdue: AssignedTask[] }, now: Date, opts: MyDayOptions = {}): string {
-  const lines = [`☀️ План на ${dayHeader(ymd).toLowerCase()}`];
+/** Содержание дня одного проекта без шапки: события, задачи, доп. строки. Пусто — []. */
+export function myDayBlock(ymd: string, events: readonly TeamEvent[], tasks: { today: AssignedTask[]; overdue: AssignedTask[] }, extra: readonly string[] = []): string[] {
+  const lines: string[] = [];
   if (events.length) {
-    lines.push("", "🗓 События");
+    lines.push("🗓 События");
     for (const e of [...events].sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at))) {
       lines.push(`- ${timeOf(e.starts_at)} ${escapeHtmlTeam(e.title)}${e.place ? ` · ${escapeHtmlTeam(e.place)}` : ""}`);
     }
   }
   if (tasks.today.length || tasks.overdue.length) {
-    lines.push("", "📋 Твои задачи на сегодня");
+    if (lines.length) lines.push("");
+    lines.push("📋 Твои задачи на сегодня");
     tasks.today.forEach((t, i) => {
       const until = timeOf(t.due_at!) === "23:59" ? "до конца дня" : `до ${timeOf(t.due_at!)}`;
       lines.push(`${i + 1}. ${escapeHtmlTeam(t.what)} (${until})`);
     });
     for (const t of tasks.overdue) lines.push(`⏰ Просрочено: ${escapeHtmlTeam(t.what)} (срок ${overdueWhen(t.due_at!, ymd)})`);
   }
-  if (!events.length && !tasks.today.length && !tasks.overdue.length) lines.push("", MY_DAY_EMPTY);
-  if (opts.extra?.length) lines.push("", ...opts.extra);
+  if (extra.length) {
+    if (lines.length) lines.push("");
+    lines.push(...extra);
+  }
+  return lines;
+}
+
+const header = (ymd: string) => `☀️ План на ${dayHeader(ymd).toLowerCase()}`;
+
+/** «Мой день» одного проекта: пустой день — «На сегодня ничего не запланировано». */
+export function myDayText(ymd: string, events: readonly TeamEvent[], tasks: { today: AssignedTask[]; overdue: AssignedTask[] }, _now: Date, opts: MyDayOptions = {}): string {
+  const block = myDayBlock(ymd, events, tasks, opts.extra);
+  const lines = [header(ymd), "", ...(block.length ? block : [MY_DAY_EMPTY])];
   if (opts.footer) lines.push("", MY_DAY_FOOTER);
   return lines.join("\n");
+}
+
+/** Блок проекта одного человека. */
+export async function myDayProjectBlock(deps: MyDayDeps, chatId: number, now: Date, extra: readonly string[] = []): Promise<string[]> {
+  const ymd = mskToday(now);
+  const [events, all] = await Promise.all([myEvents(deps, chatId, ymd), deps.tasks.listMyAssigned(chatId)]);
+  const tasks = all.filter((t) => (t.project_id ?? "nika") === (deps.projectId ?? "nika"));
+  return myDayBlock(ymd, events, myTasksToday(tasks, chatId, ymd, now), extra);
 }
 
 export async function buildMyDay(deps: MyDayDeps, member: Pick<TeamMember, "chat_id">, now: Date, opts: MyDayOptions = {}): Promise<string> {
@@ -91,4 +112,18 @@ export async function buildMyDay(deps: MyDayDeps, member: Pick<TeamMember, "chat
   const [events, all] = await Promise.all([myEvents(deps, member.chat_id, ymd), deps.tasks.listMyAssigned(member.chat_id)]);
   const tasks = all.filter((t) => (t.project_id ?? "nika") === (deps.projectId ?? "nika"));
   return myDayText(ymd, events, myTasksToday(tasks, member.chat_id, ymd, now), now, opts);
+}
+
+/**
+ * Утренний план: одно сообщение на человека. Человеку в одном проекте — как
+ * раньше, без названий проектов; в нескольких — блоки «🏃 NIKA», «🔬 RESCAN».
+ * Пустые блоки не показываются, пустой день — null (не отправлять).
+ */
+export function morningPlanText(ymd: string, blocks: ReadonlyArray<{ label: string; lines: string[] }>, footer: boolean): string | null {
+  const filled = blocks.filter((b) => b.lines.length);
+  if (!filled.length) return null;
+  const body = blocks.length > 1
+    ? filled.flatMap((b, i) => [...(i ? [""] : []), `<b>${escapeHtmlTeam(b.label)}</b>`, ...b.lines])
+    : filled[0].lines;
+  return [header(ymd), "", ...body, ...(footer ? ["", MY_DAY_FOOTER] : [])].join("\n");
 }

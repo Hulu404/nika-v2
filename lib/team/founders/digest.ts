@@ -3,6 +3,7 @@ import type { AssignedTask } from "../../databot/task-list";
 import { mskMidnight } from "../../databot/dates";
 import { addDays, mskToday } from "../../databot/time";
 import type { TeamMember } from "../access";
+import { NIKA, hasModule, projectLabel, type Project } from "../projects/projects";
 import { AWAY_DAYS, DIGEST_LIST_LIMIT, FOUNDER_DIGEST_SLOTS } from "./constants";
 import { formatNumber, takenToday, telegramChannel } from "./social";
 import type { Platform, Snapshot, SocialStore } from "./social-store";
@@ -107,9 +108,34 @@ export interface FounderDigestInput {
   team: readonly TeamMember[];
   founders: readonly number[];
   social: readonly SocialLine[];
+  /** Проекты (больше одного) — сводка блоками по проектам. */
+  blocks?: readonly ProjectDigestBlock[];
+}
+
+/** Блок проекта: задачи и команда проекта; extra — строки модулей (план развития). */
+export interface ProjectDigestBlock {
+  project: Project;
+  tasks: readonly AssignedTask[];
+  team: readonly TeamMember[];
+  extra: readonly string[];
 }
 
 export function founderDigestText(input: FounderDigestInput): string {
+  if (input.blocks && input.blocks.length > 1) return multiProjectText(input, input.blocks);
+  return sectionsText(input, true, true).join("\n");
+}
+
+/** Сводка по проектам: блок каждого проекта; команда — у проектов со сводкой фаундерам, соцсети — у проектов с соцсетями. */
+function multiProjectText(input: FounderDigestInput, blocks: readonly ProjectDigestBlock[]): string {
+  const out = [`Сводка ${input.slot.key} · ${dayMonth(input.slot.ymd)}`];
+  for (const b of blocks) {
+    const body = sectionsText({ ...input, tasks: b.tasks, team: b.team }, hasModule(b.project, "founders_digest"), hasModule(b.project, "social")).slice(2);
+    out.push("", projectLabel(b.project), ...b.extra, ...(b.extra.length ? [""] : []), ...body);
+  }
+  return out.join("\n");
+}
+
+function sectionsText(input: FounderDigestInput, withTeam: boolean, withSocial: boolean): string[] {
   const { slot, now, tasks, team, founders, social } = input;
   const names = new Map(team.filter((m) => m.username).map((m) => [m.chat_id, m.username!] as const));
   const inWindow = (iso: string) => {
@@ -141,24 +167,51 @@ export function founderDigestText(input: FounderDigestInput): string {
     ...capped(declined.map((t) => `  · @${t.username} · ${t.what}`)),
     `⏰ Просрочено сейчас: ${overdue.length}`,
     ...capped(overdue.map((t) => `  · @${t.username} · ${t.what} · срок ${relativeDue(t.due_at!, now)}`)),
-    "",
-    "Команда",
-    `Заходили: ${visited.length ? visited.map(who).join(", ") : "никто"}`,
-    `Давно не было (${AWAY_DAYS}+ дня): ${away.length ? away.map(({ m, days }) => `${who(m)} · ${days === null ? "ни разу" : `${days} дн.`}`).join(", ") : "нет"}`,
-    "",
-    "Соцсети",
-    ...social.map((s) => socialText(s, now)),
-  ].join("\n");
+    ...(withTeam ? [
+      "",
+      "Команда",
+      `Заходили: ${visited.length ? visited.map(who).join(", ") : "никто"}`,
+      `Давно не было (${AWAY_DAYS}+ дня): ${away.length ? away.map(({ m, days }) => `${who(m)} · ${days === null ? "ни разу" : `${days} дн.`}`).join(", ") : "нет"}`,
+    ] : []),
+    ...(withSocial ? ["", "Соцсети", ...social.map((s) => socialText(s, now))] : []),
+  ];
 }
 
 export interface FounderDigestDeps {
   /** Все задачи команды: незакрытые и сменившие статус после since. */
   tasks: (since: Date) => Promise<AssignedTask[]>;
   team: () => Promise<TeamMember[]>;
+  /** Проекты компании; больше одного — сводка блоками по проектам. */
+  projects?: () => Promise<Project[]>;
+  /** Команда проекта. */
+  teamOf?: (projectId: string) => Promise<TeamMember[]>;
+  /** Строки модулей проекта в сводке (план развития: ближайшая точка, просрочки). */
+  projectExtra?: (project: Project, now: Date) => Promise<string[]>;
   founders: () => number[];
   social: SocialStore;
   memberCount: (channel: string) => Promise<number>;
   send: (chatId: number, text: string, keyboard?: InlineKeyboardMarkup) => Promise<unknown>;
+}
+
+/** Задачи по проектам (без project_id — nika), команда и строки модулей каждого проекта. */
+async function projectBlocks(
+  deps: Pick<FounderDigestDeps, "projects" | "teamOf" | "projectExtra">,
+  tasks: readonly AssignedTask[],
+  team: readonly TeamMember[],
+  now: Date,
+): Promise<ProjectDigestBlock[] | undefined> {
+  const projects = deps.projects ? await deps.projects().catch(() => []) : [];
+  if (projects.length < 2) return undefined;
+  const blocks: ProjectDigestBlock[] = [];
+  for (const p of projects) {
+    blocks.push({
+      project: p,
+      tasks: tasks.filter((t) => (t.project_id ?? NIKA) === p.id),
+      team: deps.teamOf ? await deps.teamOf(p.id).catch(() => []) : p.id === NIKA ? team : [],
+      extra: deps.projectExtra ? await deps.projectExtra(p, now).catch(() => []) : [],
+    });
+  }
+  return blocks;
 }
 
 async function socialLine(store: SocialStore, platform: Platform, now: Date, extra: Partial<SocialLine> = {}): Promise<SocialLine> {
@@ -196,7 +249,7 @@ export async function dispatchFounderDigest(deps: FounderDigestDeps, now: Date):
     await socialLine(deps.social, "telegram", now, { failed: tgFailed, notConfigured: !channel }),
     await socialLine(deps.social, "instagram", now),
   ];
-  const text = founderDigestText({ slot, now, tasks, team, founders: deps.founders(), social });
+  const text = founderDigestText({ slot, now, tasks, team, founders: deps.founders(), social, blocks: await projectBlocks(deps, tasks, team, now) });
   for (const chatId of deps.founders()) await Promise.resolve(deps.send(chatId, text)).catch(() => {});
   return `${slot.key} ${slot.ymd}`;
 }
@@ -207,7 +260,7 @@ export async function dispatchFounderDigest(deps: FounderDigestDeps, now: Date):
  * плановые сводки она не трогает.
  */
 export async function buildFounderDigestNow(
-  deps: Pick<FounderDigestDeps, "tasks" | "team" | "founders" | "social">,
+  deps: Pick<FounderDigestDeps, "tasks" | "team" | "founders" | "social" | "projects" | "teamOf" | "projectExtra">,
   now: Date,
 ): Promise<string> {
   const last = currentSlot(now);
@@ -218,5 +271,5 @@ export async function buildFounderDigestNow(
     await socialLine(deps.social, "telegram", now, { notConfigured: !channel }),
     await socialLine(deps.social, "instagram", now),
   ];
-  return founderDigestText({ slot, now, tasks, team, founders: deps.founders(), social });
+  return founderDigestText({ slot, now, tasks, team, founders: deps.founders(), social, blocks: await projectBlocks(deps, tasks, team, now) });
 }

@@ -1,5 +1,7 @@
 import { createSupabaseStore } from "../../databot/data/supabase-store";
-import { listTeam } from "../access";
+import { listProjectTeam } from "../access";
+import { NIKA } from "../projects/projects";
+import { founderProjectDeps } from "./projects";
 import { founderIds, teamBotConfigured } from "../config";
 import { supabaseTeamForms } from "../form";
 import { dispatchFounderDigest } from "./digest";
@@ -28,7 +30,8 @@ export async function dispatchFounderReports(now = new Date()): Promise<{ status
     const store = createSupabaseStore();
     const sent = await dispatchFounderDigest({
       tasks: (since) => store.listAssignedOverview(since),
-      team: listTeam,
+      team: () => listProjectTeam(NIKA),
+      ...founderProjectDeps(),
       founders: social.founders,
       social: social.store,
       memberCount: social.memberCount,

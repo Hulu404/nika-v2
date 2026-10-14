@@ -8,6 +8,7 @@ import { isActiveAssigned, parseTaskList, TaskListError, type AssignedTask } fro
 import type { Zone } from "../databot/types";
 import { findMember, listProjectTeam, type TeamMember } from "./access";
 import { DEFAULT_SCOPE, recordProject, scopeForRecord, scopeOf, type Scope } from "./projects/scope";
+import { withProjectLabel } from "./projects/labels";
 import { NIKA } from "./projects/projects";
 import { isFounder } from "./config";
 import {
@@ -166,7 +167,7 @@ export async function deliverAssigned(
     const mates = new Map<number, string[]>();
     for (const t of locked) mates.set(t.id, await store.listAssignedTeammates(t));
     try {
-      const sent = await api.sendMessage(assignee, newTasksText(locked, authorName, mates, now, late),
+      const sent = await api.sendMessage(assignee, await withProjectLabel(assignee, locked[0].project_id, newTasksText(locked, authorName, mates, now, late)),
         { ...HTML, reply_markup: openMyTasksKeyboard() });
       for (const t of locked) await store.assignedTaskDelivery(t.id, "sent", sent.message_id);
     } catch (err) {
@@ -424,7 +425,7 @@ async function applyDue(ctx: Context, deps: TeamTaskDeps, uid: number, id: numbe
   for (const t of group.filter(isActiveAssigned)) {
     const updated = await deps.store.editAssignedTask(t.id, uid, { due });
     if (updated.assignee_id !== uid)
-      await ctx.api.sendMessage(updated.assignee_id, assigneeChangeText(updated, "due", now),
+      await ctx.api.sendMessage(updated.assignee_id, await withProjectLabel(updated.assignee_id, updated.project_id, assigneeChangeText(updated, "due", now)),
         { ...HTML, reply_markup: openMyTasksKeyboard() }).catch(() => {});
     await tellAuthor(ctx, deps, uid, updated, "due", now);
   }
@@ -454,7 +455,7 @@ async function doCancel(ctx: Context, deps: TeamTaskDeps, uid: number, id: numbe
   for (const t of group.filter((x) => x.status !== "done" && x.status !== "cancelled")) {
     const { task, previous } = await deps.store.setAssignedStatus(t.id, uid, "cancel");
     if (previous !== "cancelled" && task.assignee_id !== uid)
-      await ctx.api.sendMessage(task.assignee_id, assigneeChangeText(task, "cancel", now), HTML).catch(() => {});
+      await ctx.api.sendMessage(task.assignee_id, await withProjectLabel(task.assignee_id, task.project_id, assigneeChangeText(task, "cancel", now)), HTML).catch(() => {});
     if (previous !== "cancelled") await tellAuthor(ctx, deps, uid, task, "cancel", now);
   }
   const founder = adminOf(deps, uid);
@@ -532,7 +533,7 @@ async function hiddenCommand(ctx: Context, deps: TeamTaskDeps, uid: number, cmd:
     if (cmd === "assign_cancel") {
       const { task, previous } = await deps.store.setAssignedStatus(id, uid, "cancel");
       if (previous !== "cancelled" && task.assignee_id !== uid)
-        await ctx.api.sendMessage(task.assignee_id, assigneeChangeText(task, "cancel", now), HTML).catch(() => {});
+        await ctx.api.sendMessage(task.assignee_id, await withProjectLabel(task.assignee_id, task.project_id, assigneeChangeText(task, "cancel", now)), HTML).catch(() => {});
       await ctx.reply(previous !== "cancelled" ? "Задача отменена, исполнитель предупреждён." : "Задача уже была отменена.");
     } else if (cmd === "assign_edit") {
       const found = extractDue(rest, now);

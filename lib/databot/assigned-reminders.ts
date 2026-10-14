@@ -60,6 +60,10 @@ export function noticeDue(t: AssignedTask, now: Date): NoticePlan | null {
 export interface ReminderDeps {
   store: DatabotStore;
   api: Pick<Api, "sendMessage">;
+  /** Метка проекта для человека в нескольких проектах («🔬 RESCAN · »). */
+  label?: (chatId: number, projectId: string | null | undefined) => Promise<string>;
+  /** Кнопка карточки задачи в её проекте. */
+  cardButton?: (task: AssignedTask) => { text: string; callback_data: string };
 }
 
 export async function sendAssignedReminders(deps: ReminderDeps, now = new Date()): Promise<{ reminders: number; overdue: number }> {
@@ -69,20 +73,22 @@ export async function sendAssignedReminders(deps: ReminderDeps, now = new Date()
     const plan = noticeDue(task, now);
     if (!plan) continue;
     const teammates = await store.listAssignedTeammates(task);
+    const card = deps.cardButton ? [[deps.cardButton(task)]] : [];
     const options = { parse_mode: "HTML" as const, link_preview_options: { is_disabled: true },
-      reply_markup: { inline_keyboard: taskButtons(task) ?? [] } };
+      reply_markup: { inline_keyboard: [...(taskButtons(task) ?? []), ...card] } };
+    const label = async (chatId: number) => (deps.label ? await deps.label(chatId, task.project_id).catch(() => "") : "");
     // Сбой одной отправки не останавливает остальные: отметка уже стоит, повтора не будет.
     if (plan.kind === "reminder") {
       // Проспанные ранние пороги помечаем молча: уходит только самый поздний.
       for (const mark of plan.silent) await store.markAssignedNotice(task.id, mark);
       if (!(await store.markAssignedNotice(task.id, plan.mark))) continue;
-      await api.sendMessage(task.assignee_id, reminderText(task, now, teammates, plan.hours), options).catch(() => {});
+      await api.sendMessage(task.assignee_id, `${await label(task.assignee_id)}${reminderText(task, now, teammates, plan.hours)}`, options).catch(() => {});
       out.reminders += 1;
     } else {
       if (!(await store.markAssignedNotice(task.id, "overdue"))) continue;
-      await api.sendMessage(task.assignee_id, overdueText(task, now, teammates), options).catch(() => {});
+      await api.sendMessage(task.assignee_id, `${await label(task.assignee_id)}${overdueText(task, now, teammates)}`, options).catch(() => {});
       if (task.assigned_by !== task.assignee_id)
-        await api.sendMessage(task.assigned_by, overdueOwnerText(task), { parse_mode: "HTML" }).catch(() => {});
+        await api.sendMessage(task.assigned_by, `${await label(task.assigned_by)}${overdueOwnerText(task)}`, { parse_mode: "HTML" }).catch(() => {});
       out.overdue += 1;
     }
   }
@@ -92,10 +98,16 @@ export async function sendAssignedReminders(deps: ReminderDeps, now = new Date()
 /** Точка входа тикера. Задачи живут в «Пятнице»: без TEAM_BOT_TOKEN — absent. */
 export async function dispatchAssignedReminders(now = new Date()): Promise<{ status: "absent" | "done"; reminders?: number; overdue?: number }> {
   if (!teamBotConfigured()) return { status: "absent" };
-  const [{ createSupabaseStore }, { getTeamBot }] = await Promise.all([
+  const [{ createSupabaseStore }, { getTeamBot }, { projectPrefix }, { taskCb }] = await Promise.all([
     import("./data/supabase-store"),
     import("../team/bot"),
+    import("../team/projects/labels"),
+    import("../team/copy"),
   ]);
-  const res = await sendAssignedReminders({ store: createSupabaseStore(), api: getTeamBot().api }, now);
+  const res = await sendAssignedReminders({
+    store: createSupabaseStore(), api: getTeamBot().api, label: projectPrefix,
+    // Карточка открывается в проекте задачи (кнопки старых сообщений работают в проекте записи).
+    cardButton: (task) => ({ text: "Открыть задачу", callback_data: taskCb.open(task.id, "me", 0) }),
+  }, now);
   return { status: "done", ...res };
 }

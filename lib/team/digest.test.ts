@@ -5,7 +5,8 @@ import { MemoryParticipantStore } from "./ai/stores";
 import { MemoryFactStore } from "./attendance";
 import { dispatchTeamDigests, type DigestDispatchDeps } from "./digest";
 import { founderCoffeeLines } from "./digest-copy";
-import { MemoryEventStore } from "./events";
+import { MemoryEventStore, scopedEvents } from "./events";
+import { DEFAULT_PROJECTS } from "./projects/projects";
 import { MemoryTeamForms } from "./form";
 import { MY_DAY_EMPTY, MY_DAY_FOOTER } from "./my-day";
 import type { SignupRow } from "./stats";
@@ -66,14 +67,28 @@ describe("утренняя сводка — «Мой день»", () => {
     expect(textOf(1)).toBe(["☀️ План на вт 13.10", "", "🗓 События", "- 19:00 Планёрка · Zoom", "", MY_DAY_FOOTER].join("\n"));
   });
 
-  it("участник без задач и событий — «На сегодня ничего не запланировано», без мотивации", async () => {
+  it("пустой день не отправляется", async () => {
     await dispatchTeamDigests({ now: msk("2026-10-13T08:00"), deps: deps() });
-    expect(textOf(1)).toBe(["☀️ План на вт 13.10", "", MY_DAY_EMPTY, "", MY_DAY_FOOTER].join("\n"));
-    aiEnabled = false;
-    claimed.clear();
-    sent = [];
-    await dispatchTeamDigests({ now: msk("2026-10-13T08:00"), deps: deps() });
-    expect(textOf(1)).toBe(["☀️ План на вт 13.10", "", MY_DAY_EMPTY].join("\n"));
+    expect(sent).toEqual([]);
+    expect(MY_DAY_EMPTY).toBe("На сегодня ничего не запланировано.");
+  });
+
+  it("человек в двух проектах — одно сообщение, блоки 🏃 NIKA и 🔬 RESCAN; в одном проекте — без меток", async () => {
+    await create("Планёрка", "2026-10-13T19:00", { place: "Zoom" });
+    await scopedEvents(events, "rescan").create({ kind: "meeting", club: null, title: "Созвон RESCAN", starts_at: msk("2026-10-13T12:00").toISOString(), place: null, responsible_chat_id: null, created_by: 9 }, msk("2026-10-10T12:00"));
+    await tasks.importAssignedTasks(9, 50, [{ line: 1, username: "vika", what: "Макет пациента", due_at: msk("2026-10-13T18:00").toISOString() }], { projectId: "rescan" });
+    await dispatchTeamDigests({ now: msk("2026-10-13T08:00"), deps: { ...deps(),
+      projectsOf: async (chat) => (chat === 1 ? DEFAULT_PROJECTS.slice() : DEFAULT_PROJECTS.slice(0, 1)),
+      eventsFor: (id) => scopedEvents(events, id),
+    } });
+    expect(sent.filter((s) => s.chat === 1)).toHaveLength(1);
+    expect(textOf(1)).toBe([
+      "☀️ План на вт 13.10", "",
+      "<b>🏃 NIKA</b>", "🗓 События", "- 19:00 Планёрка · Zoom", "",
+      "<b>🔬 RESCAN</b>", "🗓 События", "- 12:00 Созвон RESCAN", "", "📋 Твои задачи на сегодня", "1. Макет пациента (до 18:00)",
+      "", MY_DAY_FOOTER,
+    ].join("\n"));
+    expect(textOf(2)).toBe(["☀️ План на вт 13.10", "", "🗓 События", "- 19:00 Планёрка · Zoom", "", MY_DAY_FOOTER].join("\n"));
   });
 
   it("встреча с участниками — только им; общее событие — всем", async () => {
@@ -102,7 +117,8 @@ describe("утренняя сводка — «Мой день»", () => {
       "⏰ Просрочено: Анонс кофе-рана в ТГК (срок вчера 12:00)",
       "", MY_DAY_FOOTER,
     ].join("\n"));
-    expect(textOf(9)).not.toContain("Найти пейсеров");
+    // У Али задач на сегодня нет — пустой день ему не отправляется.
+    expect(sent.some((s) => s.chat === 9)).toBe(false);
   });
 
   it("кофе-ран: фаундеру — ожидаемая явка и тревога рассылки, участнику — только строка события", async () => {

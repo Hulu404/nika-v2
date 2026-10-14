@@ -7,6 +7,7 @@ import { escapeHtmlTeam, type TaskScreen } from "../copy";
 import { supabaseTeamForms, type TeamFormStore } from "../form";
 import { INSTAGRAM_OWNER_SETTING } from "./constants";
 import { buildFounderDigestNow, type FounderDigestDeps } from "./digest";
+import { founderProjectDeps } from "./projects";
 import { formatNumber, handleInstagramInput, telegramChannel } from "./social";
 import { supabaseSocialStore, type Platform, type Snapshot, type SocialStore } from "./social-store";
 
@@ -241,7 +242,7 @@ export async function handleSocialSectionUpdate(ctx: Context, providedDeps?: Soc
     }
     // op === "dig": сводка фаундерам прямо сейчас, без отметки дедупа.
     const digest = await buildFounderDigestNow({
-      tasks: deps.tasks, team: deps.listTeam, founders: () => [...founderIds()], social: deps.store,
+      tasks: deps.tasks, team: deps.listTeam, founders: () => [...founderIds()], social: deps.store, ...founderProjectDeps(),
     }, now);
     await show(ctx, { text: escapeHtmlTeam(digest), keyboard: back() }, true);
     return true;

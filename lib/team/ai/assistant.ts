@@ -6,6 +6,7 @@ import { normalizeTaskUsername } from "../../databot/tasks";
 import { isActiveAssigned, type AssignedTask, type AssignedTaskDraft } from "../../databot/task-list";
 import { findMember, listProjectTeam, type TeamMember } from "../access";
 import { DEFAULT_SCOPE, isMulti, scopeOf, type Scope } from "../projects/scope";
+import { withProjectLabel } from "../projects/labels";
 import { NIKA } from "../projects/projects";
 import { isFounder, teamBotConfigured, teamToken } from "../config";
 import { assigneeChangeText, escapeHtmlTeam, menuKeyboard, taskCb } from "../copy";
@@ -351,7 +352,11 @@ async function confirm(ctx: Context, deps: AssistantDeps, draft: Draft, uid: num
   const authorTag = author?.username ? `@${author.username}` : (author ? personName(author) : "участник команды");
   const founder = (deps.isAdmin ?? isFounder)(uid);
   if (p.intent === "create_task" || p.intent === "set_task_status" || p.intent === "update_task") await syncTeamTaskMembers({ store: deps.tasks, isAdmin: deps.isAdmin }, now, team);
-  const tell = (chat: number, text: string) => (chat === uid ? Promise.resolve() : ctx.api.sendMessage(chat, text, HTML).then(() => {}, () => {}));
+  // Человеку в нескольких проектах — с меткой проекта.
+  const tell = async (chat: number, text: string) => {
+    if (chat === uid) return;
+    await ctx.api.sendMessage(chat, await withProjectLabel(chat, deps.projectId ?? NIKA, text), HTML).then(() => {}, () => {});
+  };
 
   if (p.intent === "create_task") {
     const slots = slotsOf(draft.intent, team, uid);

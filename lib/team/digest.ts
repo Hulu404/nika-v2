@@ -4,13 +4,13 @@ import { dailyDigestDue } from "./digest-schedule";
 import { buildCoffeeBlock, type DigestDeps } from "./digest-build";
 import { sendTeamMessage, type TeamSendResult } from "./send";
 import { isFounder, teamBotConfigured } from "./config";
-import { supabaseMembershipStore } from "./projects/members";
-import { NIKA } from "./projects/projects";
-import { buildMyDay, type MyDayDeps } from "./my-day";
+import { morningPlanText, myDayProjectBlock, type MyDayDeps } from "./my-day";
+import { DEFAULT_PROJECTS, hasModule, projectLabel, supabaseProjectStore, type Project } from "./projects/projects";
+import { projectIdsOf } from "./projects/labels";
 import { supabaseParticipantStore } from "./ai/stores";
 import { teamAiConfig } from "./ai/yandex";
 import { createSupabaseStore } from "../databot/data/supabase-store";
-import { supabaseEventStore, type TeamEventStore } from "./events";
+import { scopedEvents, supabaseEventStore, type TeamEventStore } from "./events";
 import { fetchRunSignups } from "./stats";
 import { dispatchAttendanceAsks, supabaseFactStore, type FactStore } from "./attendance";
 import { supabaseTeamForms, type TeamFormStore } from "./form";
@@ -57,17 +57,26 @@ export interface DigestDispatchDeps extends DigestDeps, Pick<MyDayDeps, "partici
   markDailySent: (ymd: string, count: number) => Promise<void>;
   send: (chatId: number, text: string, keyboard?: InlineKeyboardMarkup) => Promise<TeamSendResult>;
   throttleMs?: number;
+  /** Проекты человека (по умолчанию — только nika). */
+  projectsOf?: (chatId: number) => Promise<Project[]>;
+  /** События проекта (по умолчанию — events, это nika). */
+  eventsFor?: (projectId: string) => Pick<TeamEventStore, "listBetween">;
 }
 
-/** Кому план на день по nika: участники nika (и фаундеры) без /mute. */
+/** Кому план на день: все без /mute; блоки — по их проектам. */
 async function recipients(): Promise<number[]> {
   const { data, error } = await tgAdmin().from("team_members").select("chat_id").eq("digest_opt_in", true);
   if (error) {
     console.error("[team-digest] recipients:", error.message);
     return [];
   }
-  const nika = new Set((await supabaseMembershipStore().ofProject(NIKA).catch(() => [])).map((m) => m.chat_id));
-  return ((data ?? []) as Array<{ chat_id: number }>).map((r) => r.chat_id).filter((id) => nika.has(id) || isFounder(id));
+  return ((data ?? []) as Array<{ chat_id: number }>).map((r) => r.chat_id);
+}
+
+/** Проекты человека из базы (фаундер — все). */
+async function projectsOfPerson(chatId: number): Promise<Project[]> {
+  const [all, ids] = await Promise.all([supabaseProjectStore().list(), projectIdsOf(chatId)]);
+  return all.filter((p) => ids.includes(p.id));
 }
 
 /**
@@ -98,6 +107,8 @@ function defaultDeps(): DigestDispatchDeps {
     participants: supabaseParticipantStore(),
     tasks: createSupabaseStore(),
     aiEnabled: !!teamAiConfig(),
+    projectsOf: projectsOfPerson,
+    eventsFor: (projectId) => scopedEvents(supabaseEventStore(), projectId),
     recipients,
     claimDaily,
     markDailySent,
@@ -135,7 +146,16 @@ export async function dispatchTeamDigests(opts: DispatchOptions = {}): Promise<T
     let delivered = 0;
     for (const chatId of to) {
       try {
-        const text = await buildMyDay(deps, { chat_id: chatId }, now, { footer: deps.aiEnabled, extra: isFounder(chatId) ? coffee : [] });
+        // Одно сообщение на человека: блоки его проектов, пустой день — не отправляем.
+        const projects = deps.projectsOf ? await deps.projectsOf(chatId) : DEFAULT_PROJECTS.slice(0, 1);
+        const blocks = [];
+        for (const p of projects) {
+          const events = deps.eventsFor ? deps.eventsFor(p.id) : deps.events;
+          const extra = isFounder(chatId) && hasModule(p, "coffee_run") ? coffee : [];
+          blocks.push({ label: projectLabel(p), lines: await myDayProjectBlock({ events, participants: deps.participants, tasks: deps.tasks, projectId: p.id }, chatId, now, extra) });
+        }
+        const text = morningPlanText(day, blocks, !!deps.aiEnabled);
+        if (!text) continue;
         if ((await deps.send(chatId, text)).ok) delivered++;
       } catch (err) {
         console.error("[team-digest] my day:", chatId, err instanceof Error ? err.message : String(err));
