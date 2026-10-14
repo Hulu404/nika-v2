@@ -2,7 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { tgAdmin } from "../../telegram/supabase";
 import { asFormState, type FormState } from "../form";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
-import type { DatabotStore } from "./store";
+import type { ImportOptions, DatabotStore } from "./store";
 import { TaskStoreBase, TaskError, type TaskRow } from "../tasks";
 import type { AssignedAction, AssignedNoticeMark, AssignedStatus, AssignedTask, AssignedTaskDraft } from "../task-list";
 
@@ -70,12 +70,21 @@ function fail(op: string, message: string): never {
 }
 
 class SupabaseStore extends TaskStoreBase implements DatabotStore {
-  async importAssignedTasks(ownerId: number, messageId: number, tasks: AssignedTaskDraft[]): Promise<AssignedTask[]> {
+  async importAssignedTasks(ownerId: number, messageId: number, tasks: AssignedTaskDraft[], opts: ImportOptions = {}): Promise<AssignedTask[]> {
     const { data, error } = await this.db.rpc("databot_assigned_import", {
       p_owner: ownerId, p_message: messageId, p_tasks: tasks,
     }).abortSignal(timeout());
     if (error) fail("importAssignedTasks", error.message);
-    return (data ?? []) as AssignedTask[];
+    const rows = (data ?? []) as AssignedTask[];
+    // RPC о проектах не знает: проект «Пятницы» и пункт плана — отдельным обновлением (nika — значение по умолчанию).
+    const patch = { ...(opts.projectId && opts.projectId !== "nika" ? { project_id: opts.projectId } : {}),
+      ...(opts.roadmapItemId ? { roadmap_item_id: opts.roadmapItemId } : {}) };
+    if (rows.length && Object.keys(patch).length) {
+      const { error: e2 } = await this.db.from("databot_assigned_tasks").update(patch).in("id", rows.map((r) => r.id)).abortSignal(timeout());
+      if (e2) fail("importAssignedTasks", e2.message);
+      return rows.map((r) => ({ ...r, ...patch }));
+    }
+    return rows;
   }
 
   async listAssignedTasks(userId: number): Promise<AssignedTask[]> {

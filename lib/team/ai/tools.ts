@@ -6,6 +6,7 @@ import { addDays, mskToday } from "../../databot/time";
 import { mskMidnight } from "../../databot/dates";
 import type { TeamMember } from "../access";
 import { isFounder } from "../config";
+import { NIKA } from "../projects/projects";
 import { escapeHtmlTeam, shortDue, taskCb } from "../copy";
 import { DEPARTMENTS, matchDepartment } from "../departments";
 import { canManageEvent, type TeamEvent, type TeamEventStore } from "../events";
@@ -22,7 +23,7 @@ import type { ToolCall, ToolSpec } from "./yandex";
  * Инструменты ассистента. Каждый выполняется от имени отправителя, права —
  * внутри, теми же правилами, что у кнопок:
  *   • чтение выполняется сразу и показывает только видимое отправителю
- *     (фаундер — всё, остальные — задачи, где они автор или исполнитель);
+ *     (админ проекта — всё в проекте, остальные — задачи, где они автор или исполнитель);
  *   • запись только готовит черновик с предпросмотром; меняет данные
  *     «✅ Подтвердить» (assistant.ts), ещё раз проверяя права.
  * Людей и отделы находит код (roster.ts), модель передаёт упоминание как в тексте.
@@ -34,6 +35,10 @@ export const NOT_OWN_TASKS_TEXT = "Могу закрыть только свои
 export interface ToolContext {
   ctx: Context;
   uid: number;
+  /** Проект запроса: задачи и события — только его. */
+  projectId: string;
+  /** Админ проекта: видит и меняет все задачи проекта. */
+  isAdmin: (chatId: number) => boolean;
   team: TeamMember[];
   now: Date;
   /** Исходная фраза — для подстановок (название встречи, «онлайн»). */
@@ -72,7 +77,7 @@ const local = "YYYY-MM-DDTHH:mm по Москве";
 export const TOOL_SPECS: readonly ToolSpec[] = [
   {
     name: "list_tasks",
-    description: "Показать задачи. Чужие (scope person, department, team) — только фаундеру; остальным вернутся только их задачи. Список с номерами увидит и человек.",
+    description: "Показать задачи. Чужие (scope person, department, team) — только админу проекта; остальным вернутся только их задачи. Список с номерами увидит и человек.",
     parameters: {
       type: "object",
       properties: {
@@ -99,7 +104,7 @@ export const TOOL_SPECS: readonly ToolSpec[] = [
   },
   {
     name: "update_task",
-    description: "Черновик правки задач: текст, срок, исполнители. Менять может автор или фаундер.",
+    description: "Черновик правки задач: текст, срок, исполнители. Менять может автор или админ проекта.",
     parameters: { type: "object", properties: { ...refs, what: { type: "string" }, due: { type: "string", description: local }, clear_due: { type: "boolean" },
       add_assignees: { type: "array", items: mention }, remove_assignees: { type: "array", items: mention } } },
   },
@@ -117,7 +122,7 @@ export const TOOL_SPECS: readonly ToolSpec[] = [
   },
   {
     name: "update_event",
-    description: "Черновик правки события: время, название, место. Можно автору, ответственному, фаундеру.",
+    description: "Черновик правки события: время, название, место. Можно автору, ответственному, админу проекта.",
     parameters: { type: "object", properties: { event_id: { type: "integer" }, number: { type: "integer" }, title: { type: "string" }, starts_at: { type: "string", description: local }, place: { type: "string" } } },
   },
   { name: "cancel_event", description: "Черновик отмены события.", parameters: { type: "object", properties: { event_id: { type: "integer" }, number: { type: "integer" } } } },
@@ -142,9 +147,10 @@ const mentions = (v: unknown) => (Array.isArray(v) ? v : [])
 
 const cut = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-/** Задачи, которые видит человек: фаундер — все, остальные — где он автор или исполнитель. */
-export async function visibleTasks(store: DatabotStore, uid: number): Promise<AssignedTask[]> {
-  return isFounder(uid) ? store.listAssignedOverview(new Date(0)) : store.listMyAssigned(uid);
+/** Задачи, которые человек видит в проекте: админ — все, остальные — где он автор или исполнитель. */
+export async function visibleTasks(store: DatabotStore, uid: number, projectId = NIKA, isAdmin: (id: number) => boolean = isFounder): Promise<AssignedTask[]> {
+  const all = isAdmin(uid) ? await store.listAssignedOverview(new Date(0)) : await store.listMyAssigned(uid);
+  return all.filter((t) => (t.project_id ?? NIKA) === projectId);
 }
 
 const overdue = (t: AssignedTask, now: Date) => isActiveAssigned(t) && !!t.due_at && Date.parse(t.due_at) < now.getTime();
@@ -163,9 +169,9 @@ async function resolveTasks(tc: ToolContext, args: Record<string, unknown>): Pro
   const ids = [...new Set([...ints(args.task_ids), ...byNumber])];
   if (!ids.length) return "Не понятно, какие задачи: покажи список (list_tasks) или назови номер из списка.";
   if (ids.length > MAX_BULK) return `Слишком много задач (${ids.length}), за раз — не больше ${MAX_BULK}. Уточни.`;
-  const visible = new Map((await visibleTasks(tc.tasks, tc.uid)).map((t) => [t.id, t] as const));
+  const visible = new Map((await visibleTasks(tc.tasks, tc.uid, tc.projectId, tc.isAdmin)).map((t) => [t.id, t] as const));
   const found = ids.map((id) => visible.get(id)).filter((t): t is AssignedTask => !!t);
-  if (!found.length) return isFounder(tc.uid) ? "Таких задач нет." : NOT_OWN_TASKS_TEXT;
+  if (!found.length) return tc.isAdmin(tc.uid) ? "Таких задач нет." : NOT_OWN_TASKS_TEXT;
   return found;
 }
 
@@ -271,10 +277,10 @@ export function searchTasks(tasks: readonly AssignedTask[], query: string): Assi
 // ── Чтение ───────────────────────────────────────────────────────────────────
 
 async function listTasks(tc: ToolContext, a: Record<string, unknown>): Promise<string> {
-  const founder = isFounder(tc.uid);
+  const founder = tc.isAdmin(tc.uid);
   const scope = ["mine", "assigned_by_me", "person", "department", "team"].includes(str(a.scope)) ? str(a.scope) : "mine";
   const status = ["open", "overdue", "done", "all"].includes(str(a.status)) ? str(a.status) : "open";
-  let tasks = await visibleTasks(tc.tasks, tc.uid);
+  let tasks = await visibleTasks(tc.tasks, tc.uid, tc.projectId, tc.isAdmin);
   let title = "Твои задачи";
   const onlyOwn = !founder && (scope === "team" || scope === "person" || scope === "department");
 
@@ -315,7 +321,7 @@ async function listTasks(tc: ToolContext, a: Record<string, unknown>): Promise<s
       // По запросу пусто — модели все открытые задачи этой области, пусть выберет сама.
       return json({
         found: 0, hint: "по запросу ничего, вот все открытые задачи в этой области",
-        ...(onlyOwn ? { only_own: true, note: `Не фаундер: чужие задачи не видны. Если подходящих нет — ответь «${NOT_OWN_TASKS_TEXT}»` } : {}),
+        ...(onlyOwn ? { only_own: true, note: `Не админ: чужие задачи не видны. Если подходящих нет — ответь «${NOT_OWN_TASKS_TEXT}»` } : {}),
         tasks: area.filter(isActiveAssigned).slice(0, FALLBACK_TASKS).map((t) => ({
           id: t.id, what: t.what, assignee: `@${t.username}`, due: t.due_at ? whenText(t.due_at) : null, overdue: overdue(t, tc.now),
         })),
@@ -335,7 +341,7 @@ async function listTasks(tc: ToolContext, a: Record<string, unknown>): Promise<s
   }
   return json({
     count: total,
-    ...(onlyOwn ? { only_own: true, note: `Не фаундер: чужие задачи не видны. Если подходящих нет — ответь «${NOT_OWN_TASKS_TEXT}»` } : {}),
+    ...(onlyOwn ? { only_own: true, note: `Не админ: чужие задачи не видны. Если подходящих нет — ответь «${NOT_OWN_TASKS_TEXT}»` } : {}),
     ...(total > MAX_BULK ? { too_many: true, note: `Показаны первые ${MAX_BULK}; для действий уточни` } : {}),
     shown_to_user: shown.length > 0,
     items: shown.map((t, i) => ({
@@ -377,7 +383,7 @@ async function getTeam(tc: ToolContext): Promise<string> {
   tc.shown.list = true;
   return json({
     shown_to_user: true,
-    people: tc.team.map((m) => ({ name: personName(m), title: m.title ?? null, username: m.username, founder: isFounder(m.chat_id) })),
+    people: tc.team.map((m) => ({ name: personName(m), title: m.title ?? null, username: m.username, admin: tc.isAdmin(m.chat_id) })),
     departments: DEPARTMENTS.map((d) => ({ name: d.group, people: tc.team.filter((m) => (m.departments ?? []).includes(d.key)).map(personName) })),
   });
 }
@@ -393,7 +399,7 @@ async function setTaskStatus(tc: ToolContext, a: Record<string, unknown>): Promi
   if (typeof except === "string") return err(except);
   const tasks = found.filter((t) => !except.ids.has(t.assignee_id));
   if (!tasks.length) return err("После исключений задач не осталось.");
-  const founder = isFounder(tc.uid);
+  const founder = tc.isAdmin(tc.uid);
   const allowed = tasks.filter((t) => isActiveAssigned(t) || (status !== "cancelled" && t.status === "declined"))
     .filter((t) => status === "cancelled" ? t.assigned_by === tc.uid || founder
       : status === "done" ? t.assignee_id === tc.uid || founder : t.assignee_id === tc.uid);
@@ -407,9 +413,9 @@ async function setTaskStatus(tc: ToolContext, a: Record<string, unknown>): Promi
 async function updateTask(tc: ToolContext, a: Record<string, unknown>): Promise<string> {
   const tasks = await resolveTasks(tc, a);
   if (typeof tasks === "string") return err(tasks);
-  const founder = isFounder(tc.uid);
+  const founder = tc.isAdmin(tc.uid);
   const mine = tasks.filter((t) => (t.assigned_by === tc.uid || founder) && isActiveAssigned(t));
-  if (!mine.length) return err("Менять текст, срок и исполнителей может автор задачи или фаундер; закрытые задачи не меняются.");
+  if (!mine.length) return err("Менять текст, срок и исполнителей может автор задачи или админ проекта; закрытые задачи не меняются.");
   const what = str(a.what);
   const due = str(a.due) ? normalizeLocal(a.due) : null;
   if (str(a.due) && !due) return err(`Срок — ${local}.`);
@@ -428,7 +434,7 @@ async function resolveEvent(tc: ToolContext, a: Record<string, unknown>): Promis
   const id = Number.isInteger(a.event_id) ? Number(a.event_id) : fromList.find((i) => i.n === a.number)?.id;
   const ev = id ? await tc.events.get(id) : null;
   if (!ev || ev.cancelled_at) return "Не нашла такое событие: покажи расписание (get_schedule) и назови номер.";
-  if (!canManageEvent(ev, tc.uid)) return "Менять и отменять событие может автор, ответственный или фаундер.";
+  if (!canManageEvent(ev, tc.uid, tc.isAdmin)) return "Менять и отменять событие может автор, ответственный или админ проекта.";
   return ev;
 }
 

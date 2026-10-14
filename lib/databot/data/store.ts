@@ -3,6 +3,11 @@ import type { TaskStore } from "../tasks";
 import type { AssignedAction, AssignedNoticeMark, AssignedStatus, AssignedTask, AssignedTaskDraft } from "../task-list";
 import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
 
+export interface ImportOptions {
+  projectId?: string;
+  roadmapItemId?: number | null;
+}
+
 /**
  * Всё, что бот данных делает со своими таблицами, — через этот интерфейс.
  * Боевая реализация — supabase-store.ts, для тестов — memory-store.ts.
@@ -12,7 +17,8 @@ import type { AuditEntry, InviteRow, MemberRow, Zone } from "../types";
  * «никого нет». Запись журнала и отметки «был в боте» не бросают никогда.
  */
 export interface DatabotStore extends TaskStore {
-  importAssignedTasks(ownerId: number, messageId: number, tasks: AssignedTaskDraft[]): Promise<AssignedTask[]>;
+  /** opts.projectId — проект «Пятницы» (по умолчанию nika), opts.roadmapItemId — пункт плана развития. */
+  importAssignedTasks(ownerId: number, messageId: number, tasks: AssignedTaskDraft[], opts?: ImportOptions): Promise<AssignedTask[]>;
   getAssignedTask(id: number): Promise<AssignedTask | null>;
   listAssignedTasks(userId: number): Promise<AssignedTask[]>;
   /** Задачи, где человек исполнитель или автор. Других задач не видит никто. */

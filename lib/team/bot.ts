@@ -29,7 +29,12 @@ import { buildMyDay } from "./my-day";
 import { buildCoffeeBlock } from "./digest-build";
 import { fetchRunSignups } from "./stats";
 import { mskToday } from "../databot/time";
-import { supabaseEventStore } from "./events";
+import { scopedEvents, supabaseEventStore } from "./events";
+import { DEFAULT_SCOPE, resolveScope, scopeOf, setScope, type Scope } from "./projects/scope";
+import { hasModule, supabaseProjectStore, type ModuleKey } from "./projects/projects";
+import { supabaseMembershipStore } from "./projects/members";
+
+const scopeDeps = () => ({ projects: supabaseProjectStore(), memberships: supabaseMembershipStore() });
 import { createSupabaseStore } from "../databot/data/supabase-store";
 
 /**
@@ -105,31 +110,34 @@ async function withData(ctx: TeamContext, work: () => Promise<void>): Promise<vo
 }
 
 /** Расписание со ссылками на экраны ивентов: кофе-ран и ивент клуба открываются в «Ивентах». */
-function scheduleDeps(): ScheduleDeps {
+function scheduleDeps(scope: Scope = DEFAULT_SCOPE): ScheduleDeps {
   const events = defaultEventsDeps();
   return {
-    ...defaultScheduleDeps(),
+    ...defaultScheduleDeps(scope),
     openClubEvent: (ctx, ev) => openClubEventScreen(ctx, events, ev, ctx.from!.id, true, new Date()),
     openCoffeeRun: (ctx, spot, date) => openCoffeeRunScreen(ctx, events, spot, date, true, new Date()),
   };
 }
 
 /** Голос и свободный текст: экраны — те же, что у кнопок. */
-function assistantDeps(): AssistantDeps {
+function assistantDeps(scope: Scope = DEFAULT_SCOPE): AssistantDeps {
   return defaultAssistantDeps({
-    showSchedule: (ctx, range) => showSchedule(ctx, scheduleDeps(), range === "next_week" ? 1 : 0, false, new Date()),
-    // То же, что утренняя сводка: фаундерам — с блоками про кофе-ран.
+    showSchedule: (ctx, range) => showSchedule(ctx, scheduleDeps(scope), range === "next_week" ? 1 : 0, false, new Date()),
+    // То же, что утренняя сводка (в проекте запроса); фаундерам nika — с блоками про кофе-ран.
     myDay: async (member, now) => buildMyDay(
-      { events: supabaseEventStore(), participants: supabaseParticipantStore(), tasks: createSupabaseStore() },
+      { events: scopedEvents(supabaseEventStore(), scope.project.id), participants: supabaseParticipantStore(), tasks: createSupabaseStore(), projectId: scope.project.id },
       member, now, {
         footer: !!teamAiConfig(),
-        extra: isFounder(member.chat_id)
+        extra: isFounder(member.chat_id) && hasModule(scope.project, "coffee_run")
           ? await buildCoffeeBlock({ events: supabaseEventStore(), fetchSignups: fetchRunSignups }, mskToday(now), now).catch(() => [])
           : [],
       },
     ),
-  });
+  }, scope);
 }
+
+/** Команды разделов, которые есть не у всех проектов. */
+const MODULE_COMMANDS: Record<string, ModuleKey> = { events: "events", social: "social", coffee_weekly: "coffee_run" };
 
 /** Закрыть открытую форму; черновик с открытым «Изменить» закрывается вместе с ней. */
 async function closeForm(ctx: TeamContext, uid: number): Promise<void> {
@@ -149,6 +157,16 @@ export function resetMenuShown(): void {
 }
 
 export function registerHandlers(bot: Bot<TeamContext>): void {
+  // Область проекта на это обновление: текущий проект человека, его проекты, админы.
+  bot.use(async (ctx, next) => {
+    const id = ctx.chat?.type === "private" ? ctx.from?.id : undefined;
+    if (id !== undefined) {
+      const member = await findMember(id).catch(() => null);
+      const scope = member ? await resolveScope(scopeDeps(), id, member.current_project).catch(() => null) : null;
+      if (scope) setScope(ctx, scope);
+    }
+    await next();
+  });
   // Кнопка меню — это команда. Подменяем текст на команду раздела до всех
   // обработчиков: открытая форма (явка, Instagram, список задач) закрывается
   // так же, как от любой команды, и текст кнопки никогда не станет ответом.
@@ -192,15 +210,25 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     }
     await next();
   });
+  // Раздел, которого нет в проекте (ивенты, соцсети, кофе-ран), — не открываем.
+  bot.use(async (ctx, next) => {
+    const command = /^\/([a-z_]+)/.exec(ctx.message?.text ?? "")?.[1];
+    const module = command ? MODULE_COMMANDS[command] : undefined;
+    if (module && !hasModule(scopeOf(ctx).project, module)) {
+      await ctx.reply("В этом проекте такого раздела нет.");
+      return;
+    }
+    await next();
+  });
   bot.use(async (ctx, next) => {
     if (await handleTeamTaskUpdate(ctx)) return;
-    if (await handleScheduleUpdate(ctx, scheduleDeps())) return;
+    if (await handleScheduleUpdate(ctx, scheduleDeps(scopeOf(ctx)))) return;
     if (await handleEventsUpdate(ctx)) return;
     if (await handleSocialSectionUpdate(ctx)) return;
     if (await handleTeamScreenUpdate(ctx)) return;
     if (await handleCoffeeWeekUpdate(ctx, defaultCoffeeWeekDeps())) return;
     // Кнопки черновика и «✏️ Изменить» — после всех форм: уточнение ждём, только если открыто именно оно.
-    if (await handleAiUpdate(ctx, assistantDeps)) return;
+    if (await handleAiUpdate(ctx, () => assistantDeps(scopeOf(ctx)))) return;
     await next();
   });
 
@@ -273,7 +301,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     menuShown.add(member.chat_id);
     await ctx.reply(helpText(isFounder(member.chat_id), !!teamAiConfig()), { reply_markup: menuKeyboard() });
     if (ctx.message?.text?.startsWith("/start")) {
-      await withData(ctx, async () => showSchedule(ctx, defaultScheduleDeps(), 0, false, new Date()));
+      await withData(ctx, async () => showSchedule(ctx, defaultScheduleDeps(scopeOf(ctx)), 0, false, new Date()));
     }
   });
 
@@ -309,7 +337,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
   bot.command("team", async (ctx) => {
     const member = await requireMember(ctx);
     if (!member) return;
-    await showTeam(ctx, defaultTeamScreenDeps(), member.chat_id, false);
+    await showTeam(ctx, defaultTeamScreenDeps(scopeOf(ctx)), member.chat_id, false);
   });
 
   bot.command("kick", async (ctx) => {
@@ -370,7 +398,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     const text = ctx.message.text.trim();
     // С ассистентом любое сообщение — ему: «нет, Насте» из двух слов — тоже
     // разговор, а не поиск забега. Быстрые ответы у него есть инструментом.
-    if (teamAiConfig() && (await handleAiMessage(ctx, member, assistantDeps()))) return;
+    if (teamAiConfig() && (await handleAiMessage(ctx, member, assistantDeps(scopeOf(ctx))))) return;
 
     await withData(ctx, async () => {
       const snap = await snapshot();
@@ -389,7 +417,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
   bot.on("message:voice", async (ctx, next) => {
     const member = await requireMember(ctx);
     if (!member) return;
-    if (teamAiConfig() && (await handleAiMessage(ctx, member, assistantDeps()))) return;
+    if (teamAiConfig() && (await handleAiMessage(ctx, member, assistantDeps(scopeOf(ctx))))) return;
     await next();
   });
 

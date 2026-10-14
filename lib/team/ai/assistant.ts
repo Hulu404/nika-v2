@@ -4,11 +4,13 @@ import { createSupabaseStore } from "../../databot/data/supabase-store";
 import type { DatabotStore } from "../../databot/data/store";
 import { normalizeTaskUsername } from "../../databot/tasks";
 import { isActiveAssigned, type AssignedTask, type AssignedTaskDraft } from "../../databot/task-list";
-import { findMember, listTeam, type TeamMember } from "../access";
+import { findMember, listProjectTeam, type TeamMember } from "../access";
+import { DEFAULT_SCOPE, type Scope } from "../projects/scope";
+import { NIKA } from "../projects/projects";
 import { isFounder, teamBotConfigured, teamToken } from "../config";
 import { assigneeChangeText, escapeHtmlTeam, menuKeyboard, taskCb } from "../copy";
 import { DEPARTMENTS } from "../departments";
-import { supabaseEventStore, type TeamEventStore } from "../events";
+import { scopedEvents, supabaseEventStore, type TeamEventStore } from "../events";
 import { openTeamForm, supabaseTeamForms, type TeamForm, type TeamFormStore } from "../form";
 import { personLabel, personName, resolveMention } from "../roster";
 import { deliverAssigned, syncTeamTaskMembers } from "../tasks";
@@ -66,6 +68,10 @@ export interface AssistantDeps {
   downloadVoice: (ctx: Context, fileId: string) => Promise<Uint8Array>;
   showSchedule: (ctx: Context, range: "today" | "tomorrow" | "week" | "next_week") => Promise<void>;
   myDay: (member: TeamMember, now: Date) => Promise<string>;
+  /** Проект запроса (по умолчанию nika): задачи, события и команда — только его. */
+  projectId?: string;
+  /** Админ проекта (по умолчанию — фаундер). */
+  isAdmin?: (chatId: number) => boolean;
 }
 
 /** Голосовое из Telegram — в память, никуда не пишем. */
@@ -78,20 +84,22 @@ async function downloadVoice(ctx: Context, fileId: string): Promise<Uint8Array> 
 }
 
 /** Боевые зависимости; экраны «Расписание» и «Мой день» подставляет bot.ts. */
-export function defaultAssistantDeps(screens: Pick<AssistantDeps, "showSchedule" | "myDay">): AssistantDeps {
+export function defaultAssistantDeps(screens: Pick<AssistantDeps, "showSchedule" | "myDay">, scope: Scope = DEFAULT_SCOPE): AssistantDeps {
   return {
     ai: teamAiConfig() ? defaultTeamAi() : null,
     drafts: supabaseDraftStore(),
     reminders: supabaseReminderStore(),
     participants: supabaseParticipantStore(),
-    events: supabaseEventStore(),
+    events: scopedEvents(supabaseEventStore(), scope.project.id),
     tasks: createSupabaseStore(),
     forms: supabaseTeamForms(),
     turns: supabaseTurnStore(),
     state: supabaseStateStore(),
-    listTeam,
+    listTeam: () => listProjectTeam(scope.project.id),
     findMember,
     downloadVoice,
+    projectId: scope.project.id,
+    isAdmin: scope.isAdmin,
     ...screens,
   };
 }
@@ -244,6 +252,7 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
     const tctx: ToolContext = {
       ctx, uid, team, now, saidText: said.text, voice: said.voice, state,
       tasks: deps.tasks, events: deps.events, reminders: deps.reminders, shown,
+      projectId: deps.projectId ?? NIKA, isAdmin: deps.isAdmin ?? isFounder,
       showSchedule: deps.showSchedule,
       myDay: (at) => deps.myDay(member, at),
       setList: async (list) => {
@@ -260,7 +269,7 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
         draft = (await deps.drafts.get(draft!.id)) ?? draft;
       },
     };
-    const system = assistantPrompt({ now, team, senderId: uid, draft: draft ? draftContext(draft, team, uid) : null, list: shownListText(state.last_list) });
+    const system = assistantPrompt({ now, team, senderId: uid, isAdmin: deps.isAdmin, draft: draft ? draftContext(draft, team, uid) : null, list: shownListText(state.last_list) });
     const turns = trimHistory(await deps.turns.recent(uid, now));
     const listNumbers = (state.last_list?.items ?? []).map((i) => i.n);
     const run = await runAgent({
@@ -340,8 +349,8 @@ async function confirm(ctx: Context, deps: AssistantDeps, draft: Draft, uid: num
   const team = await deps.listTeam();
   const author = team.find((m) => m.chat_id === uid);
   const authorTag = author?.username ? `@${author.username}` : (author ? personName(author) : "участник команды");
-  const founder = isFounder(uid);
-  if (p.intent === "create_task" || p.intent === "set_task_status" || p.intent === "update_task") await syncTeamTaskMembers({ store: deps.tasks }, now, team);
+  const founder = (deps.isAdmin ?? isFounder)(uid);
+  if (p.intent === "create_task" || p.intent === "set_task_status" || p.intent === "update_task") await syncTeamTaskMembers({ store: deps.tasks, isAdmin: deps.isAdmin }, now, team);
   const tell = (chat: number, text: string) => (chat === uid ? Promise.resolve() : ctx.api.sendMessage(chat, text, HTML).then(() => {}, () => {}));
 
   if (p.intent === "create_task") {
@@ -353,7 +362,7 @@ async function confirm(ctx: Context, deps: AssistantDeps, draft: Draft, uid: num
     }
     const due = p.due ? mskLocalToDate(p.due).toISOString() : null;
     const drafts: AssignedTaskDraft[] = usernames.map((username) => ({ line: 1, username, what: p.what, due_at: due }));
-    const tasks = await deps.tasks.importAssignedTasks(uid, draft.message_id ?? draft.id, drafts);
+    const tasks = await deps.tasks.importAssignedTasks(uid, draft.message_id ?? draft.id, drafts, { projectId: deps.projectId ?? NIKA });
     await deliverAssigned(ctx.api, deps.tasks, tasks.filter((t) => t.delivery_state === "pending"), author?.username ?? undefined, now);
     // Кто — в именительном, без собранных кодом склонений: «Маша», «SMM», «ты».
     return `✅ Задача поставлена: ${slots.map((s) => listName(s, uid)).join(", ")}, ${due ? `срок ${whenText(due)}` : "без срока"}`;
@@ -444,7 +453,7 @@ async function confirm(ctx: Context, deps: AssistantDeps, draft: Draft, uid: num
     if (template && add.length) {
       const created = await deps.tasks.importAssignedTasks(uid, 1_500_000_000 + draft.id, add.map((username) => ({
         line: 1, username, what: p.what ?? template.what, due_at: p.due ? mskLocalToDate(p.due).toISOString() : p.clear_due ? null : template.due_at,
-      })));
+      })), { projectId: deps.projectId ?? NIKA });
       await deliverAssigned(ctx.api, deps.tasks, created.filter((t) => t.delivery_state === "pending"), author?.username ?? undefined, now);
     }
     if (!n && !add.length && !removed.size) return "Ничего не поменялось: менять может автор задачи или фаундер.";

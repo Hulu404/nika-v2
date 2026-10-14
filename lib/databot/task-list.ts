@@ -32,6 +32,10 @@ export interface AssignedTask extends AssignedTaskDraft {
   overdue_notified_at: string | null;
   /** Кто сменил статус, если не сам исполнитель (миграция 056). */
   status_by?: number | null;
+  /** Проект «Пятницы» (миграция 058); нет — nika. */
+  project_id?: string | null;
+  /** Пункт плана развития, к которому привязана задача (модуль roadmap). */
+  roadmap_item_id?: number | null;
 }
 
 /** Какую отметку ставит напоминание: порог до срока, просрочка или старая единая. */

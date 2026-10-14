@@ -8,7 +8,8 @@ import { normalizeTaskUsername } from "../databot/tasks";
 import type { AssignedTask, AssignedTaskDraft } from "../databot/task-list";
 import { addDays, mskHour, mskToday } from "../databot/time";
 import { tgAdmin } from "../telegram/supabase";
-import { listTeam, type TeamMember } from "./access";
+import { listProjectTeam, type TeamMember } from "./access";
+import { NIKA } from "./projects/projects";
 import { COFFEE_RUN_TASKS } from "./coffee-run-template";
 import { founderIds, isFounder, teamBotConfigured, teamToken } from "./config";
 import { dayHeader, escapeHtmlTeam, eventWhen, shortDay } from "./copy";
@@ -733,7 +734,8 @@ export function defaultCoffeeWeekDeps(): CoffeeWeekDeps {
     rsvp: supabaseRsvpStore(),
     tasks: createSupabaseStore(),
     forms: supabaseTeamForms(),
-    listTeam,
+    // Кофе-ран — модуль nika: анонсы, опрос и задачи только её участникам.
+    listTeam: () => listProjectTeam(NIKA),
     // Пока кофе-раны проводим — вопрос идёт каждую неделю; выключает фаундер командой /coffee_weekly off.
     enabled: async () => (await readWeeklySetting()) !== "off",
   };

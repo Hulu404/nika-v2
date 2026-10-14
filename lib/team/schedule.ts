@@ -1,6 +1,6 @@
 import { InlineKeyboard, type Context } from "grammy";
 import { COFFEE_RUNS } from "../coffeerun/run";
-import { findMember, listTeam, type TeamMember } from "./access";
+import { findMember, listProjectTeam, type TeamMember } from "./access";
 import { clubByKey } from "./clubs";
 import {
   EVENT_ADD_HINT,
@@ -23,6 +23,7 @@ import {
 import {
   EventParseError,
   canManageEvent,
+  scopedEvents,
   coffeeRunStart,
   coffeeRunTitle,
   parseEventLine,
@@ -34,6 +35,7 @@ import {
   type TeamEventKind,
   type TeamEventStore,
 } from "./events";
+import { DEFAULT_SCOPE, scopeOf, type Scope } from "./projects/scope";
 import { openTeamForm, supabaseTeamForms, teamFormExpired, type TeamFormStore } from "./form";
 import { mskMidnight } from "../databot/dates";
 import { addDays } from "../databot/time";
@@ -51,10 +53,18 @@ export interface ScheduleDeps {
   /** Экран ивента клуба (этап «Ивенты»). Без него открывается простая карточка. */
   openClubEvent?: (ctx: Context, ev: TeamEvent) => Promise<void>;
   openCoffeeRun?: (ctx: Context, spot: string, date: string) => Promise<void>;
+  /** Админ проекта (по умолчанию — фаундер): меняет и отменяет любое событие проекта. */
+  isAdmin?: (chatId: number) => boolean;
+  /** Модули проекта: без events нет ивентов клубов (по умолчанию — как у nika). */
+  modules?: readonly string[];
 }
 
-export function defaultScheduleDeps(): ScheduleDeps {
-  return { events: supabaseEventStore(), forms: supabaseTeamForms(), findMember, listTeam };
+/** Расписание проекта: события и команда только этого проекта. */
+export function defaultScheduleDeps(scope: Scope = DEFAULT_SCOPE): ScheduleDeps {
+  return {
+    events: scopedEvents(supabaseEventStore(), scope.project.id), forms: supabaseTeamForms(), findMember,
+    listTeam: () => listProjectTeam(scope.project.id), isAdmin: scope.isAdmin, modules: scope.project.modules,
+  };
 }
 
 const HTML = { parse_mode: "HTML" as const, link_preview_options: { is_disabled: true } };
@@ -113,7 +123,7 @@ export async function handleScheduleUpdate(ctx: Context, providedDeps?: Schedule
   const isFreeText = !!text && !text.startsWith("/");
   if (!command && !cb && !isFreeText) return false;
 
-  const deps = providedDeps ?? defaultScheduleDeps();
+  const deps = providedDeps ?? defaultScheduleDeps(scopeOf(ctx));
   const uid = ctx.from.id;
   let form = isFreeText ? await deps.forms.get(uid) : null;
   if (isFreeText && form?.kind !== "event.new" && form?.kind !== "event.time") return false;
@@ -288,7 +298,7 @@ async function openEvent(ctx: Context, deps: ScheduleDeps, uid: number, id: numb
     await deps.openClubEvent(ctx, ev);
     return;
   }
-  await show(ctx, eventCard(ev, await namesOf(deps), canManageEvent(ev, uid), offset), true);
+  await show(ctx, eventCard(ev, await namesOf(deps), canManageEvent(ev, uid, deps.isAdmin), offset), true);
 }
 
 /** Карточка кофе-рана только для чтения. Экран с цифрами — в «Ивентах». */
@@ -311,7 +321,7 @@ async function managed(ctx: Context, deps: ScheduleDeps, uid: number, id: number
     await ctx.reply("Такого события больше нет.");
     return null;
   }
-  if (!canManageEvent(ev, uid)) {
+  if (!canManageEvent(ev, uid, deps.isAdmin)) {
     await ctx.reply("Менять время и отменять событие могут автор, ответственный и фаундеры.");
     return null;
   }

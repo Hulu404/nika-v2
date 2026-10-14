@@ -4,6 +4,8 @@ import { dailyDigestDue } from "./digest-schedule";
 import { buildCoffeeBlock, type DigestDeps } from "./digest-build";
 import { sendTeamMessage, type TeamSendResult } from "./send";
 import { isFounder, teamBotConfigured } from "./config";
+import { supabaseMembershipStore } from "./projects/members";
+import { NIKA } from "./projects/projects";
 import { buildMyDay, type MyDayDeps } from "./my-day";
 import { supabaseParticipantStore } from "./ai/stores";
 import { teamAiConfig } from "./ai/yandex";
@@ -57,13 +59,15 @@ export interface DigestDispatchDeps extends DigestDeps, Pick<MyDayDeps, "partici
   throttleMs?: number;
 }
 
+/** Кому план на день по nika: участники nika (и фаундеры) без /mute. */
 async function recipients(): Promise<number[]> {
   const { data, error } = await tgAdmin().from("team_members").select("chat_id").eq("digest_opt_in", true);
   if (error) {
     console.error("[team-digest] recipients:", error.message);
     return [];
   }
-  return ((data ?? []) as Array<{ chat_id: number }>).map((r) => r.chat_id);
+  const nika = new Set((await supabaseMembershipStore().ofProject(NIKA).catch(() => [])).map((m) => m.chat_id));
+  return ((data ?? []) as Array<{ chat_id: number }>).map((r) => r.chat_id).filter((id) => nika.has(id) || isFounder(id));
 }
 
 /**

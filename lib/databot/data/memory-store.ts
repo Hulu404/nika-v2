@@ -23,7 +23,7 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
   rateLimited = new Set<string>();
   private failing = new Set<keyof DatabotStore>();
 
-  async importAssignedTasks(ownerId: number, messageId: number, drafts: AssignedTaskDraft[]): Promise<AssignedTask[]> {
+  async importAssignedTasks(ownerId: number, messageId: number, drafts: AssignedTaskDraft[], opts: { projectId?: string; roadmapItemId?: number | null } = {}): Promise<AssignedTask[]> {
     this.maybeFail("importAssignedTasks");
     const owner = this.members.get(ownerId);
     if (!owner?.is_active) throw new Error("assigned:owner");
@@ -45,7 +45,8 @@ export class MemoryStore extends MemoryTasks implements DatabotStore {
           source_message_id: messageId, assignee_id: recipients[index], assigned_by: ownerId,
           created_at: this.clock().toISOString(), delivery_state: "pending", delivered_message_id: null,
           status: "open", status_at: this.clock().toISOString(), reminded_at: null,
-          reminded_24_at: null, reminded_12_at: null, reminded_3_at: null, overdue_notified_at: null };
+          reminded_24_at: null, reminded_12_at: null, reminded_3_at: null, overdue_notified_at: null,
+          project_id: opts.projectId ?? "nika", roadmap_item_id: opts.roadmapItemId ?? null };
         this.assignedTasks.set(task.id, task);
       }
       return structuredClone(task);

@@ -74,7 +74,7 @@ describe("контекст в системной инструкции", () => {
       draft: "Открытый черновик: задача «Найти пейсеров», исполнитель Маша",
       list: shownListText({ kind: "tasks", items: [{ n: 1, id: 37, label: "«Анонс кофе-рана: пост в ТГК и Instagram» (@ananas_2711)" }, { n: 2, id: 43, label: "«Рилсы» (@tora_co)" }] }) });
     expect(text).toContain("Сейчас вторник 2026-10-13, 14:05 по Москве");
-    expect(text).toContain("Тебе пишет Али (фаундер");
+    expect(text).toContain("Тебе пишет Али (админ проекта");
     expect(text).toContain("- Маша, Ивент-отдел, @gusarovame");
     expect(text).toContain("- Ивент-отдел: Маша, Сальма");
     expect(text).toContain("Открытый черновик: задача «Найти пейсеров»");
@@ -93,7 +93,7 @@ describe("контекст в системной инструкции", () => {
     expect(text).not.toContain("Не поняла. Я умею");
   });
 
-  it("не-фаундеру — пометка, что видит только свои задачи", () => {
-    expect(assistantPrompt({ now: NOW, team, senderId: 2 })).toContain("Тебе пишет Настя (не фаундер: видит только свои задачи и поставленные им)");
+  it("не-админу — пометка, что видит только свои задачи", () => {
+    expect(assistantPrompt({ now: NOW, team, senderId: 2 })).toContain("Тебе пишет Настя (не админ: видит только свои задачи и поставленные им)");
   });
 });

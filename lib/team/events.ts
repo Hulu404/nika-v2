@@ -33,10 +33,12 @@ export interface TeamEvent {
   confirm_asked_at?: string | null;
   confirmed_at?: string | null;
   confirm_nag_at?: string | null;
+  /** Проект «Пятницы» (миграция 058); нет — nika. */
+  project_id?: string | null;
 }
 
 export type NewTeamEvent = Pick<TeamEvent, "kind" | "club" | "title" | "starts_at" | "place" | "responsible_chat_id" | "created_by">
-  & Partial<Pick<TeamEvent, "format" | "spot">>;
+  & Partial<Pick<TeamEvent, "format" | "spot" | "project_id">>;
 
 export interface TeamEventStore {
   create(row: NewTeamEvent, now: Date): Promise<TeamEvent>;
@@ -261,8 +263,30 @@ export function parseEventTime(text: string, now: Date): string {
 // ── Права ────────────────────────────────────────────────────────────────────
 
 /** Менять время и отменять: автор, ответственный и фаундеры. */
-export function canManageEvent(ev: Pick<TeamEvent, "created_by" | "responsible_chat_id">, actorId: number): boolean {
-  return ev.created_by === actorId || ev.responsible_chat_id === actorId || isFounder(actorId);
+/** Менять и отменять событие: автор, ответственный или админ проекта (по умолчанию — фаундер). */
+export function canManageEvent(ev: Pick<TeamEvent, "created_by" | "responsible_chat_id">, actorId: number, isAdmin: (id: number) => boolean = isFounder): boolean {
+  return ev.created_by === actorId || ev.responsible_chat_id === actorId || isAdmin(actorId);
+}
+
+const eventProject = (e: Pick<TeamEvent, "project_id">) => e.project_id ?? "nika";
+
+/**
+ * События одного проекта: списки фильтруются по project_id, новые события
+ * получают проект. nika не пишет project_id явно — это значение по умолчанию
+ * (и до миграции 058 колонки нет).
+ */
+export function scopedEvents(store: TeamEventStore, projectId: string): TeamEventStore {
+  const mine = (list: TeamEvent[]) => list.filter((e) => eventProject(e) === projectId);
+  return {
+    ...store,
+    create: (row, now) => store.create(projectId === "nika" ? row : { ...row, project_id: projectId }, now),
+    listBetween: async (from, to) => mine(await store.listBetween(from, to)),
+    listPastClubEvents: async (before, limit) => mine(await store.listPastClubEvents(before, limit)),
+    lastCoffeeRun: async (before) => {
+      const ev = await store.lastCoffeeRun(before);
+      return ev && eventProject(ev) === projectId ? ev : null;
+    },
+  };
 }
 
 // ── Расписание ───────────────────────────────────────────────────────────────

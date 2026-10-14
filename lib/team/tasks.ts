@@ -6,7 +6,9 @@ import type { DatabotStore } from "../databot/data/store";
 import { normalizeTaskUsername } from "../databot/tasks";
 import { isActiveAssigned, parseTaskList, TaskListError, type AssignedTask } from "../databot/task-list";
 import type { Zone } from "../databot/types";
-import { findMember, listTeam, type TeamMember } from "./access";
+import { findMember, listProjectTeam, type TeamMember } from "./access";
+import { DEFAULT_SCOPE, recordProject, scopeOf, type Scope } from "./projects/scope";
+import { NIKA } from "./projects/projects";
 import { isFounder } from "./config";
 import {
   TASK_DUE_PROMPT,
@@ -48,13 +50,25 @@ const TASK_COMMAND = /^\/(tasks|assigned|assign|assign_edit|assign_due|assign_ca
 export interface TeamTaskDeps {
   store: DatabotStore;
   findMember: (chatId: number) => Promise<TeamMember | null>;
+  /** Команда проекта: люди с должностью и отделами из проекта. */
   listTeam: () => Promise<TeamMember[]>;
   forms: TeamFormStore;
+  /** Проект задач (по умолчанию nika). Чужие проекты не видны и не меняются. */
+  projectId?: string;
+  /** Админ проекта (по умолчанию — фаундер): видит все задачи проекта, правит и отменяет чужие. */
+  isAdmin?: (chatId: number) => boolean;
 }
 
-function defaultDeps(): TeamTaskDeps {
-  return { store: createSupabaseStore(), findMember, listTeam, forms: supabaseTeamForms() };
+export function defaultTaskDeps(scope: Scope = DEFAULT_SCOPE): TeamTaskDeps {
+  return {
+    store: createSupabaseStore(), findMember, forms: supabaseTeamForms(),
+    listTeam: () => listProjectTeam(scope.project.id),
+    projectId: scope.project.id, isAdmin: scope.isAdmin,
+  };
 }
+
+const adminOf = (deps: Pick<TeamTaskDeps, "isAdmin">, uid: number) => (deps.isAdmin ?? isFounder)(uid);
+const projectOf = (deps: Pick<TeamTaskDeps, "projectId">) => deps.projectId ?? NIKA;
 
 /**
  * RPC задач опираются на databot_members (стабильная привязка Telegram ID).
@@ -62,13 +76,14 @@ function defaultDeps(): TeamTaskDeps {
  * фаундера, а не роль в team_members.
  */
 export async function syncTeamTaskMembers(
-  deps: Pick<TeamTaskDeps, "store">,
+  deps: Pick<TeamTaskDeps, "store" | "isAdmin">,
   now: Date,
   members: TeamMember[],
 ): Promise<void> {
   if (!members.length) throw new Error("team task roster is empty");
   for (const member of members) {
-    const founder = isFounder(member.chat_id);
+    // is_owner в databot_members — права админа на отмену и срок чужих задач (048): админ этого проекта.
+    const founder = adminOf(deps, member.chat_id);
     const zone: Zone = founder ? "council" : "smm";
     await deps.store.upsertMember({
       chat_id: member.chat_id,
@@ -170,7 +185,7 @@ export async function handleTeamTaskUpdate(ctx: Context, providedDeps?: TeamTask
   const isFreeText = !!text && !text.startsWith("/");
   if (!command && !cb && !legacy && !isFreeText) return false;
 
-  const deps = providedDeps ?? defaultDeps();
+  const deps = providedDeps ?? defaultTaskDeps(scopeOf(ctx));
   const uid = ctx.from.id;
 
   // Свободный текст наш, только если открыта форма задач.
@@ -260,7 +275,7 @@ export async function handleTeamTaskUpdate(ctx: Context, providedDeps?: TeamTask
 
 /** «📋 Мои задачи» по запросу голосом или текстом: тот же экран, вкладка «Мне». */
 export async function showMyTasks(ctx: Context, uid: number, providedDeps?: TeamTaskDeps, now = new Date()): Promise<void> {
-  const deps = providedDeps ?? defaultDeps();
+  const deps = providedDeps ?? defaultTaskDeps(scopeOf(ctx));
   const member = await deps.findMember(uid);
   if (!member) return;
   await syncTeamTaskMembers(deps, now, [member]);
@@ -269,12 +284,13 @@ export async function showMyTasks(ctx: Context, uid: number, providedDeps?: Team
 
 /** Задачи, которые человек видит: свои, а у фаундера — все задачи команды. */
 async function visibleTasks(deps: TeamTaskDeps, uid: number): Promise<AssignedTask[]> {
-  return isFounder(uid) ? deps.store.listAssignedOverview(new Date(0)) : deps.store.listMyAssigned(uid);
+  const all = adminOf(deps, uid) ? await deps.store.listAssignedOverview(new Date(0)) : await deps.store.listMyAssigned(uid);
+  return all.filter((t) => recordProject(t) === projectOf(deps));
 }
 
 async function showList(ctx: Context, deps: TeamTaskDeps, uid: number, tab: TaskTab, page: number, edit: boolean, now: Date): Promise<boolean> {
   const [tasks, names, members] = await Promise.all([visibleTasks(deps, uid), namesOf(deps), deps.listTeam()]);
-  await show(ctx, tasksScreen(tab, tasks, uid, names, now, page, isFounder(uid), members), edit);
+  await show(ctx, tasksScreen(tab, tasks, uid, names, now, page, adminOf(deps, uid), members), edit);
   return true;
 }
 
@@ -291,7 +307,7 @@ async function openCard(ctx: Context, deps: TeamTaskDeps, uid: number, id: numbe
     return true;
   }
   const [names, mates] = await Promise.all([namesOf(deps), deps.store.listAssignedTeammates(found.task)]);
-  await show(ctx, myTaskCard(found.task, uid, names, mates, now, back, isFounder(uid)), true);
+  await show(ctx, myTaskCard(found.task, uid, names, mates, now, back, adminOf(deps, uid)), true);
   return true;
 }
 
@@ -317,7 +333,7 @@ async function pressStatus(ctx: Context, deps: TeamTaskDeps, uid: number, action
   }
   const { task, previous } = result;
   const [names, mates] = await Promise.all([namesOf(deps), deps.store.listAssignedTeammates(task)]);
-  await show(ctx, myTaskCard(task, uid, names, mates, now, { tab: "me", page: 0 }, isFounder(uid)), true);
+  await show(ctx, myTaskCard(task, uid, names, mates, now, { tab: "me", page: 0 }, adminOf(deps, uid)), true);
   const notice = authorNoticeText(task, previous);
   if (notice && task.assigned_by !== uid) {
     await ctx.api.sendMessage(task.assigned_by, notice, {
@@ -336,7 +352,7 @@ async function authoredGroup(deps: TeamTaskDeps, uid: number, id: number): Promi
   const found = await myTask(deps, uid, id);
   if (!found) return null;
   if (found.task.assigned_by === uid) return groupOf(found.all.filter((t) => t.assigned_by === uid), found.task);
-  return isFounder(uid) ? [found.task] : null;
+  return adminOf(deps, uid) ? [found.task] : null;
 }
 
 /** Автору: фаундер поменял срок или отменил его задачу. */
@@ -420,7 +436,7 @@ async function doCancel(ctx: Context, deps: TeamTaskDeps, uid: number, id: numbe
       await ctx.api.sendMessage(task.assignee_id, assigneeChangeText(task, "cancel", now), HTML).catch(() => {});
     if (previous !== "cancelled") await tellAuthor(ctx, deps, uid, task, "cancel", now);
   }
-  const founder = isFounder(uid);
+  const founder = adminOf(deps, uid);
   const [tasks, names] = await Promise.all([visibleTasks(deps, uid), namesOf(deps)]);
   const tab: TaskTab = group[0].assigned_by === uid ? "by" : "all";
   await show(ctx, tasksScreen(tab, tasks, uid, names, now, 0, founder, await deps.listTeam()), true);
@@ -437,7 +453,7 @@ async function importList(ctx: Context, deps: TeamTaskDeps, uid: number, text: s
         throw new TaskListError(draft.line, `Ник @${draft.username} не найден среди участников команды. Попроси человека открыть бота и набрать /start.`);
       }
     }
-    const tasks = await deps.store.importAssignedTasks(uid, ctx.message!.message_id, drafts);
+    const tasks = await deps.store.importAssignedTasks(uid, ctx.message!.message_id, drafts, { projectId: projectOf(deps) });
     await deps.forms.clear(uid);
     const names = await namesOf(deps);
     await deliverAssigned(ctx.api, deps.store, tasks.filter((t) => t.delivery_state === "pending"), names.get(uid), now);

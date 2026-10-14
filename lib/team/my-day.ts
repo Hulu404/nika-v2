@@ -18,9 +18,12 @@ import type { TeamEvent, TeamEventStore } from "./events";
  */
 
 export interface MyDayDeps {
+  /** События проекта (scopedEvents). */
   events: Pick<TeamEventStore, "listBetween">;
   participants: Pick<ParticipantStore, "forEvents">;
   tasks: Pick<DatabotStore, "listMyAssigned">;
+  /** Задачи только этого проекта (по умолчанию nika). */
+  projectId?: string;
 }
 
 export interface MyDayOptions {
@@ -85,6 +88,7 @@ export function myDayText(ymd: string, events: readonly TeamEvent[], tasks: { to
 
 export async function buildMyDay(deps: MyDayDeps, member: Pick<TeamMember, "chat_id">, now: Date, opts: MyDayOptions = {}): Promise<string> {
   const ymd = mskToday(now);
-  const [events, tasks] = await Promise.all([myEvents(deps, member.chat_id, ymd), deps.tasks.listMyAssigned(member.chat_id)]);
+  const [events, all] = await Promise.all([myEvents(deps, member.chat_id, ymd), deps.tasks.listMyAssigned(member.chat_id)]);
+  const tasks = all.filter((t) => (t.project_id ?? "nika") === (deps.projectId ?? "nika"));
   return myDayText(ymd, events, myTasksToday(tasks, member.chat_id, ymd, now), now, opts);
 }

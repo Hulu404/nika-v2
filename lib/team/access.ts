@@ -1,7 +1,9 @@
 import { tgAdmin } from "../telegram/supabase";
 import { normalizeTelegramUsername } from "../coffeerun/telegram-username";
 import { isFounder } from "./config";
-import { rosterPatch, type ProfilePatch } from "./roster";
+import { PROJECT_ROSTER, normUsername, rosterPatch, type ProfilePatch } from "./roster";
+import { projectTeam, supabaseMembershipStore, type MembershipStore } from "./projects/members";
+import { NIKA, supabaseProjectStore, type Project } from "./projects/projects";
 
 /**
  * Кто допущен к внутреннему боту команды.
@@ -41,6 +43,8 @@ export interface TeamMember {
   name_aliases?: string[];
   /** Когда профиль меняли в боте: roster.ts его больше не трогает. */
   profile_edited_at?: string | null;
+  /** Какой проект человек сейчас смотрит (миграция 058). */
+  current_project?: string | null;
 }
 
 const TABLE = "team_members";
@@ -152,7 +156,18 @@ export async function joinTeam(
     console.error("[team-access] joinTeam:", error.message);
     return { status: "failed" };
   }
+  // Ключ /join — вход в nika (другие проекты — по приглашению).
+  await supabaseMembershipStore().add({ project_id: NIKA, chat_id: chatId }, new Date()).catch((e) => console.error("[team-access] join nika:", e instanceof Error ? e.message : e));
   return { status: "joined", member: data as TeamMember };
+}
+
+/**
+ * Команда проекта: люди из реестра с должностью и отделами из проекта; фаундеры
+ * видны везде. До миграции 058 — прежний состав (все — nika).
+ */
+export async function listProjectTeam(projectId: string, memberships: MembershipStore = supabaseMembershipStore()): Promise<TeamMember[]> {
+  const [people, members] = await Promise.all([listTeam(), memberships.ofProject(projectId).catch(() => [])]);
+  return projectTeam(people, members);
 }
 
 /** Состав команды по дате входа. Фаундеров /team отмечает сам (isFounder). */
@@ -247,27 +262,72 @@ export async function toggleDepartment(chatId: number, department: string): Prom
   return next;
 }
 
+/** Отметить, что профиль меняли в боте: roster.ts его больше не трогает. */
+export async function markProfileEdited(chatId: number, now: Date = new Date()): Promise<void> {
+  const { error } = await tgAdmin().from(TABLE).update({ profile_edited_at: now.toISOString() }).eq("chat_id", chatId);
+  if (error) console.error("[team-access] markProfileEdited:", error.message);
+}
+
 /** Правка профиля в боте (имя, должность, отделы, варианты имени). После неё roster.ts профиль не трогает. */
 export async function updateProfile(chatId: number, patch: ProfilePatch, now: Date = new Date()): Promise<void> {
   const { error } = await tgAdmin().from(TABLE).update({ ...patch, profile_edited_at: now.toISOString() }).eq("chat_id", chatId);
   if (error) throw new Error(`team_members: ${error.message}`);
 }
 
-/** Дописать человеку пустые поля из roster.ts (при /join и /start). До миграции 053 — молча ничего. */
-export async function applyRoster(member: TeamMember): Promise<void> {
+/**
+ * Дописать человеку пустые поля из roster.ts (при /join и /start): имя и
+ * варианты имени — в реестр, должность и отделы — в проекты из PROJECT_ROSTER.
+ * Фаундеры — админы во всех проектах. До миграций 053/058 — молча ничего.
+ * true — что-то дописали.
+ */
+export async function applyRoster(member: TeamMember, memberships: MembershipStore = supabaseMembershipStore(), projects?: Project[]): Promise<boolean> {
+  let changed = false;
   const patch = rosterPatch(member);
-  if (!patch) return;
-  const { error } = await tgAdmin().from(TABLE).update(patch).eq("chat_id", member.chat_id).is("profile_edited_at", null);
-  if (error) console.error("[team-access] applyRoster:", error.message);
+  if (patch) {
+    const { error } = await tgAdmin().from(TABLE).update(patch).eq("chat_id", member.chat_id).is("profile_edited_at", null);
+    if (error) console.error("[team-access] applyRoster:", error.message);
+    else changed = true;
+  }
+  try {
+    const mine = await memberships.ofPerson(member.chat_id);
+    const now = new Date();
+    if (isFounder(member.chat_id)) {
+      for (const p of projects ?? (await supabaseProjectStore().list())) {
+        const row = mine.find((m) => m.project_id === p.id);
+        if (!row) changed = (await memberships.add({ project_id: p.id, chat_id: member.chat_id, role: "admin" }, now)) || changed;
+        else if (row.role !== "admin") {
+          await memberships.update(p.id, member.chat_id, { role: "admin" });
+          changed = true;
+        }
+      }
+    }
+    for (const [projectId, entries] of Object.entries(PROJECT_ROSTER)) {
+      const r = entries.find((e) => normUsername(e.username) === normUsername(member.username));
+      if (!r) continue;
+      const row = mine.find((m) => m.project_id === projectId);
+      if (!row) changed = (await memberships.add({ project_id: projectId, chat_id: member.chat_id, title: r.title, departments: r.departments }, now)) || changed;
+      else if (!member.profile_edited_at && (!row.title || !row.departments.length)) {
+        await memberships.update(projectId, member.chat_id, { ...(!row.title ? { title: r.title } : {}), ...(!row.departments.length ? { departments: r.departments } : {}) });
+        changed = true;
+      }
+    }
+  } catch (err) {
+    console.error("[team-access] applyRoster projects:", err instanceof Error ? err.message : String(err));
+  }
+  return changed;
 }
 
 /** Один раз при старте приложения: всем, кто уже в команде. */
 export async function applyRosterAll(): Promise<number> {
   let n = 0;
-  for (const m of await listTeam()) {
-    if (!rosterPatch(m)) continue;
-    await applyRoster(m);
-    n++;
-  }
+  const memberships = supabaseMembershipStore();
+  const projects = await supabaseProjectStore().list();
+  for (const m of await listTeam()) if (await applyRoster(m, memberships, projects)) n++;
   return n;
+}
+
+/** Переключить текущий проект человека. */
+export async function setCurrentProject(chatId: number, projectId: string): Promise<void> {
+  const { error } = await tgAdmin().from(TABLE).update({ current_project: projectId }).eq("chat_id", chatId);
+  if (error) console.error("[team-access] setCurrentProject:", error.message);
 }

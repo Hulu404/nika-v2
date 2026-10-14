@@ -32,6 +32,25 @@ export const ROSTER: readonly RosterEntry[] = [
   { username: "srbrkvss", firstName: "Дмитрий", nameInstr: "Дмитрием", title: "CEO, фаундер", departments: [], aliases: ["Дима"] },
 ];
 
+/** Должность и отделы человека в проекте (project_members). */
+export interface ProjectRosterEntry {
+  username: string;
+  title: string;
+  departments: string[];
+}
+
+/**
+ * Состав по проектам. nika — как в ROSTER; rescan — Вика и Маша. Фаундеры
+ * (TEAM_FOUNDER_IDS) — админы во всех проектах сами, их здесь нет.
+ */
+export const PROJECT_ROSTER: Readonly<Record<string, readonly ProjectRosterEntry[]>> = {
+  nika: ROSTER.filter((r) => !/фаундер/i.test(r.title)).map((r) => ({ username: r.username, title: r.title, departments: r.departments })),
+  rescan: [
+    { username: "dissidenceandtea", title: "Разработчик", departments: ["dev"] },
+    { username: "mouserdyuk", title: "Дизайнер", departments: ["design"] },
+  ],
+};
+
 /** Ник без «@» и регистра. */
 export const normUsername = (u: string | null | undefined) => (u ?? "").trim().replace(/^@/, "").toLowerCase();
 

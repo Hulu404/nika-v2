@@ -14,8 +14,20 @@ vi.mock("./access", () => ({
   removeMember: async () => ({ status: "not_found" }),
   toggleDepartment: async () => [],
   applyRoster: async () => {},
+  listProjectTeam: async () => [...roster.values()],
+  markProfileEdited: async () => {},
+  setCurrentProject: async () => {},
   updateProfile: async () => {},
 }));
+vi.mock("./projects/members", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./projects/members")>();
+  const store = new real.MemoryMembershipStore();
+  return { ...real, supabaseMembershipStore: () => store };
+});
+vi.mock("./projects/projects", async (importOriginal) => {
+  const real = await importOriginal<typeof import("./projects/projects")>();
+  return { ...real, supabaseProjectStore: () => new real.MemoryProjectStore() };
+});
 vi.mock("../databot/data/supabase-store", async () => {
   const { MemoryStore } = await import("../databot/data/memory-store");
   const store = new MemoryStore();
