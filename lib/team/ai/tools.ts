@@ -6,7 +6,12 @@ import { addDays, mskToday } from "../../databot/time";
 import { mskMidnight } from "../../databot/dates";
 import type { TeamMember } from "../access";
 import { isFounder } from "../config";
-import { NIKA } from "../projects/projects";
+import { NIKA, type Project } from "../projects/projects";
+import { ROADMAP_GROUPS } from "../projects/rescan-seed";
+import { STATUS_NAME, conditionsOf, groupScreen, isOverdue, milestoneScreen, nearestMilestone, overdueScreen, roadmapHome } from "../roadmap/copy";
+import { isRoadmapStatus, type RoadmapItem, type RoadmapStore } from "../roadmap/store";
+import { questionDue, questionOwner, questionsScreen, sectionScreen } from "../about/screen";
+import type { AboutStore, InfoSection } from "../about/store";
 import { escapeHtmlTeam, shortDue, taskCb } from "../copy";
 import { DEPARTMENTS, matchDepartment } from "../departments";
 import { canManageEvent, type TeamEvent, type TeamEventStore } from "../events";
@@ -56,6 +61,16 @@ export interface ToolContext {
   myDay: (now: Date) => Promise<string>;
   /** Что уже показано человеку в этом сообщении. */
   shown: { preview: boolean; list: boolean };
+  /** «🔬 RESCAN» — заголовок экрана плана. */
+  projectLabel?: string;
+  /** Модули проекта: инструменты плана и «О проекте» — только там, где они есть. */
+  modules?: readonly string[];
+  roadmap?: RoadmapStore;
+  about?: AboutStore;
+  /** Команды других проектов отправителя: людей из проектов, где его нет, не ищем и не называем. */
+  otherTeams?: () => Promise<Array<{ project: Project; team: TeamMember[] }>>;
+  /** «Сальма в проекте NIKA. Поставить задачу там?» — черновик ждёт ответа кнопкой. */
+  offerProject?: (project: Project, person: TeamMember, body: DraftBody) => Promise<void>;
 }
 
 // ── Описания для модели ──────────────────────────────────────────────────────
@@ -133,6 +148,50 @@ export const TOOL_SPECS: readonly ToolSpec[] = [
   },
   { name: "cancel_reminder", description: "Черновик удаления своего напоминания.", parameters: { type: "object", properties: { reminder_id: { type: "integer" }, number: { type: "integer" } } } },
 ];
+
+/** Инструменты модулей проекта: план развития и «О проекте». */
+export const PROJECT_TOOL_SPECS: readonly ToolSpec[] = [
+  {
+    name: "get_roadmap",
+    description: "Показать план развития проекта: без аргументов — главный экран; milestone — условия контрольной точки (КТ1); group — пункты группы; overdue — просроченные.",
+    parameters: { type: "object", properties: {
+      milestone: { type: "string", description: "Код контрольной точки: «КТ1», «КТ2»" },
+      group: { type: "string", enum: [...ROADMAP_GROUPS] },
+      overdue: { type: "boolean" },
+    } },
+  },
+  {
+    name: "update_roadmap_item",
+    description: "Черновик правки пункта плана: статус, ответственный, срок. Менять может админ проекта или ответственный пункта.",
+    parameters: { type: "object", properties: {
+      code: { type: "string", description: "Код пункта: «B4», «FE2», «CL1»" },
+      id: { type: "integer" },
+      status: { type: "string", enum: ["planned", "in_progress", "done", "blocked", "dropped"] },
+      owner: mention,
+      due: { type: "string", description: "YYYY-MM-DD" },
+      clear_due: { type: "boolean" },
+    } },
+  },
+  {
+    name: "get_project_info",
+    description: "Показать раздел «О проекте»: summary — суть, rules — правила продукта, links — материалы, facts — ключевые цифры.",
+    parameters: { type: "object", properties: { section: { type: "string", enum: ["summary", "rules", "links", "facts"] } }, required: ["section"] },
+  },
+  { name: "list_open_questions", description: "Открытые вопросы проекта: кто решает и к какому сроку.", parameters: { type: "object", properties: {} } },
+];
+
+/** Все инструменты — для проверки, что модель не написала вызов текстом. */
+export const ALL_TOOL_SPECS: readonly ToolSpec[] = [...TOOL_SPECS, ...PROJECT_TOOL_SPECS];
+
+const TOOL_MODULE: Record<string, string> = {
+  answer_faq: "coffee_run", get_roadmap: "roadmap", update_roadmap_item: "roadmap", get_project_info: "about", list_open_questions: "about",
+};
+
+/** Инструменты проекта по его модулям; без модулей — как в nika до проектов. */
+export function toolSpecsFor(modules?: readonly string[]): ToolSpec[] {
+  if (!modules) return [...TOOL_SPECS];
+  return ALL_TOOL_SPECS.filter((t) => !TOOL_MODULE[t.name] || modules.includes(TOOL_MODULE[t.name]));
+}
 
 // ── Помощники ────────────────────────────────────────────────────────────────
 
@@ -438,6 +497,134 @@ async function resolveEvent(tc: ToolContext, a: Record<string, unknown>): Promis
   return ev;
 }
 
+// ── План развития и «О проекте» ──────────────────────────────────────────────
+
+/** «b 4», «В4» (кириллица), «kt1» → вид кодов плана: B4, КТ1. */
+export function normCode(s: string): string {
+  const lookalike: Record<string, string> = { В: "B", Е: "E", С: "C", Д: "D", K: "К", T: "Т" };
+  return s.toUpperCase().replace(/[\s\-·.]/g, "").replace(/[ВЕСДKT]/g, (c) => lookalike[c] ?? c);
+}
+
+const roadmapNames = (tc: ToolContext) => new Map(tc.team.map((m) => [m.chat_id, personName(m)] as const));
+
+function roadmapRow(i: RoadmapItem, names: ReadonlyMap<number, string>, today: string) {
+  return {
+    code: i.code, title: i.title, status: STATUS_NAME[i.status], due: i.due_date,
+    owner: i.owner_chat_id ? names.get(i.owner_chat_id) ?? null : null, ...(isOverdue(i, today) ? { overdue: true } : {}),
+  };
+}
+
+const GROUP_ROOTS: Array<[RegExp, string]> = [
+  [/бэк|бек|back/i, "Бэкенд"], [/фронт|front/i, "Фронтенд"], [/дизайн|design/i, "Дизайн"], [/клиник|юрист/i, "Клиника и юрист"], [/решени/i, "Решения"],
+];
+
+async function getRoadmap(tc: ToolContext, a: Record<string, unknown>): Promise<string> {
+  const items = await tc.roadmap!.list(tc.projectId);
+  const names = roadmapNames(tc);
+  const today = mskToday(tc.now);
+  const reply = async (screen: { text: string; keyboard: unknown }) => {
+    await tc.ctx.reply(screen.text, { parse_mode: "HTML", reply_markup: screen.keyboard as InlineKeyboardMarkup });
+    tc.shown.list = true;
+  };
+  const rows = (list: RoadmapItem[]) => list.slice(0, 40).map((i) => roadmapRow(i, names, today));
+  const ms = str(a.milestone);
+  if (ms) {
+    const code = /^\d+$/.test(ms) ? `КТ${ms}` : normCode(ms);
+    const m = items.find((i) => i.kind === "milestone" && i.code && normCode(i.code) === code);
+    if (!m) return err(`В плане нет контрольной точки «${ms}».`);
+    await reply(milestoneScreen(m, items, names, today));
+    return json({ shown_to_user: true, milestone: roadmapRow(m, names, today), conditions: rows(conditionsOf(items, m.id)) });
+  }
+  const g = str(a.group);
+  if (g) {
+    const group = ROADMAP_GROUPS.find((x) => x.toLowerCase() === g.toLowerCase()) ?? GROUP_ROOTS.find(([re]) => re.test(g))?.[1];
+    if (!group) return err(`Группы: ${ROADMAP_GROUPS.join(", ")}.`);
+    await reply(groupScreen(group, items, names, today));
+    return json({ shown_to_user: true, group, items: rows(items.filter((i) => i.kind === "item" && i.group === group && i.status !== "dropped")) });
+  }
+  if (a.overdue === true) {
+    await reply(overdueScreen(items, names, today));
+    return json({ shown_to_user: true, overdue: rows(items.filter((i) => isOverdue(i, today))) });
+  }
+  await reply(roadmapHome(tc.projectLabel ?? "План развития", items, today));
+  const next = nearestMilestone(items, today);
+  return json({
+    shown_to_user: true,
+    nearest_milestone: next ? roadmapRow(next, names, today) : null,
+    milestones: rows(items.filter((i) => i.kind === "milestone")),
+    stages: rows(items.filter((i) => i.kind === "stage")),
+    overdue_count: items.filter((i) => isOverdue(i, today)).length,
+  });
+}
+
+async function updateRoadmapItem(tc: ToolContext, a: Record<string, unknown>): Promise<string> {
+  const items = await tc.roadmap!.list(tc.projectId);
+  const code = str(a.code);
+  const item = Number.isInteger(a.id) ? items.find((i) => i.id === a.id) : code ? items.find((i) => i.code && normCode(i.code) === normCode(code)) : undefined;
+  if (!item) return err(code ? `В плане нет пункта «${code}».` : "Какой пункт: назови код («B4»).");
+  if (!tc.isAdmin(tc.uid) && item.owner_chat_id !== tc.uid) return err("Менять пункт могут админы проекта и его ответственный.");
+  const status = isRoadmapStatus(a.status) ? a.status : undefined;
+  let owner: number | undefined;
+  const who = mentions(a.owner ? [a.owner] : [])[0];
+  if (who) {
+    const r = resolveMention(tc.team, who, tc.uid);
+    if (r.kind === "many") return err(`Кого именно: ${r.options.map((x) => personLabel(x)).join(" или ")}?`);
+    if (r.kind !== "one") return err(`В команде проекта нет «${who.name}».`);
+    owner = r.member.chat_id;
+  }
+  const due = str(a.due) ? normalizeLocal(str(a.due).slice(0, 10))?.slice(0, 10) ?? null : null;
+  if (str(a.due) && !due) return err("Срок — YYYY-MM-DD.");
+  if (!status && !owner && !due && a.clear_due !== true) return err("Что поменять: статус, ответственного или срок?");
+  return draft(tc, { intent: "update_roadmap_item", item_id: item.id, ...(status ? { status } : {}), ...(owner ? { owner_chat_id: owner } : {}),
+    ...(due ? { due } : {}), ...(a.clear_due === true && !due ? { clear_due: true } : {}) });
+}
+
+/** HTML раздела → текст для модели. */
+const plain = (html: string) => html.replace(/<[^>]+>/g, "").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, "\"").replace(/&amp;/g, "&");
+
+const aboutView = (tc: ToolContext) => ({ about: tc.about!, projectId: tc.projectId, isAdmin: tc.isAdmin, listTeam: async () => tc.team });
+
+async function getProjectInfo(tc: ToolContext, a: Record<string, unknown>): Promise<string> {
+  const section = (["summary", "rules", "links", "facts"] as const).find((x) => x === a.section);
+  if (!section) return err("Раздел: summary, rules, links или facts.");
+  const screen = await sectionScreen(aboutView(tc), tc.uid, section);
+  await tc.ctx.reply(screen.text, { parse_mode: "HTML", link_preview_options: { is_disabled: true }, reply_markup: screen.keyboard });
+  tc.shown.list = true;
+  const content = await tc.about!.getSection(tc.projectId, section as InfoSection);
+  return json({ shown_to_user: true, section, content: content ? plain(content) : null });
+}
+
+async function listOpenQuestions(tc: ToolContext): Promise<string> {
+  const screen = await questionsScreen(aboutView(tc), tc.now);
+  await tc.ctx.reply(screen.text, { parse_mode: "HTML", reply_markup: screen.keyboard });
+  tc.shown.list = true;
+  const names = roadmapNames(tc);
+  const today = mskToday(tc.now);
+  const open = (await tc.about!.questions(tc.projectId)).filter((q) => q.status === "open");
+  return json({ shown_to_user: true, questions: open.map((q, i) => ({ n: i + 1, question: q.question, owner: questionOwner(q, names), due: questionDue(q, today) })) });
+}
+
+/**
+ * Исполнителя нет в этом проекте, но он есть ровно в одном другом проекте
+ * отправителя — спросить, поставить ли задачу там. Иначе null: обычный путь
+ * («не нашла»), людей из чужих проектов не называем.
+ */
+async function elsewhere(tc: ToolContext, parsed: Intent): Promise<string | null> {
+  if (parsed.intent !== "create_task" || !tc.otherTeams || !tc.offerProject) return null;
+  const lost = parsed.assignees.filter((m) => resolveMention(tc.team, m, tc.uid).kind === "none");
+  if (!lost.length) return null;
+  const others = await tc.otherTeams();
+  for (const m of lost) {
+    const hits = others.map((o) => ({ o, r: resolveMention(o.team, m, tc.uid) })).filter((x) => x.r.kind === "one");
+    if (hits.length !== 1 || hits[0].r.kind !== "one") continue;
+    const { o, r } = { o: hits[0].o, r: hits[0].r };
+    await tc.offerProject(o.project, r.member, { parsed, picks: {}, voice: tc.voice, projectId: o.project.id });
+    tc.shown.preview = true;
+    return json({ ok: true, shown: `человеку задан вопрос: ${personName(r.member)} в проекте ${o.project.name}, поставить ли задачу там; ждём кнопку` });
+  }
+  return null;
+}
+
 async function cancelReminder(tc: ToolContext, a: Record<string, unknown>): Promise<string> {
   const fromList = tc.state.last_list?.kind === "reminders" ? tc.state.last_list.items : [];
   const id = Number.isInteger(a.reminder_id) ? Number(a.reminder_id) : fromList.find((i) => i.n === a.number)?.id;
@@ -470,7 +657,8 @@ export async function executeTool(tc: ToolContext, call: ToolCall): Promise<stri
     case "create_task": {
       const parsed = validateIntent({ intent: "create_task", what: str(a.what), due: str(a.due), assignees: mentions(a.assignees) });
       if (parsed.intent === "unknown") return err("Нужен текст задачи: что сделать.");
-      return draft(tc, fillDefaults(parsed, tc.saidText, tc.team, tc.uid));
+      const filled = fillDefaults(parsed, tc.saidText, tc.team, tc.uid);
+      return (await elsewhere(tc, filled)) ?? draft(tc, filled);
     }
     case "create_event": {
       const parsed = validateIntent({ intent: "create_event", title: str(a.title), starts_at: str(a.starts_at), place: str(a.place),
@@ -503,6 +691,14 @@ export async function executeTool(tc: ToolContext, call: ToolCall): Promise<stri
     }
     case "cancel_reminder":
       return cancelReminder(tc, a);
+    case "get_roadmap":
+    case "update_roadmap_item":
+      if (!tc.roadmap || !tc.modules?.includes("roadmap")) return err("В этом проекте нет плана развития.");
+      return call.name === "get_roadmap" ? getRoadmap(tc, a) : updateRoadmapItem(tc, a);
+    case "get_project_info":
+    case "list_open_questions":
+      if (!tc.about || !tc.modules?.includes("about")) return err("В этом проекте нет раздела «О проекте».");
+      return call.name === "get_project_info" ? getProjectInfo(tc, a) : listOpenQuestions(tc);
     default:
       return err(`Нет инструмента ${call.name}.`);
   }

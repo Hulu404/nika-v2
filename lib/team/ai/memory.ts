@@ -1,10 +1,14 @@
 import { tgAdmin } from "../../telegram/supabase";
+import { NIKA, isMissingTable } from "../projects/projects";
 import type { ChatMessage } from "./yandex";
 
 /**
  * Память диалога ассистента: последние реплики, открытый черновик и последний
  * показанный список с номерами. Хранится только в team_ai_turns и
  * team_ai_state (миграция 055); в логи и другие таблицы тексты не попадают.
+ * Реплики — отдельно по проекту (team_ai_turns.project_id, миграция 058):
+ * разговор в RESCAN не всплывает в NIKA. Черновик и список сбрасываются
+ * при переключении проекта (bot.ts).
  */
 
 export const TURNS_KEPT = 12;
@@ -44,9 +48,9 @@ export interface AiState {
 }
 
 export interface TurnStore {
-  add(chatId: number, role: TurnRole, content: string, now: Date): Promise<void>;
-  /** Последние реплики (не больше 12, не старше 6 часов) по порядку. */
-  recent(chatId: number, now: Date): Promise<Turn[]>;
+  add(chatId: number, role: TurnRole, content: string, now: Date, projectId?: string): Promise<void>;
+  /** Последние реплики в проекте (не больше 12, не старше 6 часов) по порядку. */
+  recent(chatId: number, now: Date, projectId?: string): Promise<Turn[]>;
 }
 
 export interface StateStore {
@@ -59,20 +63,37 @@ const cut = (s: string) => (s.length > TURN_MAX_CHARS ? `${s.slice(0, TURN_MAX_C
 
 export function supabaseTurnStore(): TurnStore {
   const t = () => tgAdmin().from("team_ai_turns");
+  // До миграции 058 колонки project_id нет — тогда одна общая память, как раньше.
+  let projects = true;
+  const off = (e: { message: string } | null) => {
+    if (e && projects && isMissingTable(e.message)) {
+      projects = false;
+      return true;
+    }
+    return false;
+  };
   return {
-    async add(chatId, role, content, now) {
-      const { error } = await t().insert({ chat_id: chatId, role, content: cut(content), created_at: now.toISOString() });
+    async add(chatId, role, content, now, projectId = NIKA) {
+      const row: Record<string, unknown> = { chat_id: chatId, role, content: cut(content), created_at: now.toISOString() };
+      let { error } = await t().insert(projects ? { ...row, project_id: projectId } : row);
+      if (off(error)) ({ error } = await t().insert(row));
       if (error) throw new Error(`team_ai_turns: ${error.message}`);
-      // Старше 6 часов — удалить; сверх 12 последних — тоже.
+      // Старше 6 часов — удалить; сверх 12 последних в проекте — тоже.
       await t().delete().eq("chat_id", chatId).lt("created_at", new Date(now.getTime() - TURNS_TTL_MS).toISOString());
-      const { data } = await t().select("id").eq("chat_id", chatId).order("created_at", { ascending: false }).range(TURNS_KEPT, TURNS_KEPT + 100);
+      const mine = () => (projects ? t().select("id").eq("chat_id", chatId).eq("project_id", projectId) : t().select("id").eq("chat_id", chatId));
+      const { data } = await mine().order("created_at", { ascending: false }).range(TURNS_KEPT, TURNS_KEPT + 100);
       const old = ((data ?? []) as Array<{ id: number }>).map((r) => r.id);
       if (old.length) await t().delete().in("id", old);
     },
-    async recent(chatId, now) {
-      const { data, error } = await t().select("role, content, created_at").eq("chat_id", chatId)
-        .gte("created_at", new Date(now.getTime() - TURNS_TTL_MS).toISOString())
-        .order("created_at", { ascending: false }).limit(TURNS_KEPT);
+    async recent(chatId, now, projectId = NIKA) {
+      const query = () => {
+        const q = t().select("role, content, created_at").eq("chat_id", chatId);
+        return (projects ? q.eq("project_id", projectId) : q)
+          .gte("created_at", new Date(now.getTime() - TURNS_TTL_MS).toISOString())
+          .order("created_at", { ascending: false }).limit(TURNS_KEPT);
+      };
+      let { data, error } = await query();
+      if (off(error)) ({ data, error } = await query());
       if (error) throw new Error(`team_ai_turns: ${error.message}`);
       return ((data ?? []) as Turn[]).reverse();
     },
@@ -100,14 +121,15 @@ export function supabaseStateStore(): StateStore {
 }
 
 export class MemoryTurnStore implements TurnStore {
-  turns = new Map<number, Turn[]>();
-  async add(chatId: number, role: TurnRole, content: string, now: Date) {
-    const fresh = (this.turns.get(chatId) ?? []).filter((x) => Date.parse(x.created_at) >= now.getTime() - TURNS_TTL_MS);
+  turns = new Map<string, Turn[]>();
+  async add(chatId: number, role: TurnRole, content: string, now: Date, projectId = NIKA) {
+    const key = `${chatId}:${projectId}`;
+    const fresh = (this.turns.get(key) ?? []).filter((x) => Date.parse(x.created_at) >= now.getTime() - TURNS_TTL_MS);
     fresh.push({ role, content: cut(content), created_at: now.toISOString() });
-    this.turns.set(chatId, fresh.slice(-TURNS_KEPT));
+    this.turns.set(key, fresh.slice(-TURNS_KEPT));
   }
-  async recent(chatId: number, now: Date) {
-    return (this.turns.get(chatId) ?? []).filter((x) => Date.parse(x.created_at) >= now.getTime() - TURNS_TTL_MS).slice(-TURNS_KEPT);
+  async recent(chatId: number, now: Date, projectId = NIKA) {
+    return (this.turns.get(`${chatId}:${projectId}`) ?? []).filter((x) => Date.parse(x.created_at) >= now.getTime() - TURNS_TTL_MS).slice(-TURNS_KEPT);
   }
 }
 

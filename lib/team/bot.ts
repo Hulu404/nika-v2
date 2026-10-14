@@ -30,6 +30,7 @@ import { handleAboutUpdate } from "./about/screen";
 import type { RoadmapItem } from "./roadmap/store";
 import { personName } from "./roster";
 import { supabaseDraftStore, supabaseParticipantStore } from "./ai/stores";
+import { supabaseStateStore } from "./ai/memory";
 import { teamAiConfig } from "./ai/yandex";
 import { aiCheckText, defaultCheckDeps } from "./ai/check";
 import { buildMyDay } from "./my-day";
@@ -129,7 +130,7 @@ function scheduleDeps(scope: Scope = DEFAULT_SCOPE): ScheduleDeps {
 
 /** Голос и свободный текст: экраны — те же, что у кнопок. */
 function assistantDeps(scope: Scope = DEFAULT_SCOPE): AssistantDeps {
-  return defaultAssistantDeps({
+  const deps = defaultAssistantDeps({
     showSchedule: (ctx, range) => showSchedule(ctx, scheduleDeps(scope), range === "next_week" ? 1 : 0, false, new Date()),
     // То же, что утренняя сводка (в проекте запроса); фаундерам nika — с блоками про кофе-ран.
     myDay: async (member, now) => buildMyDay(
@@ -142,6 +143,12 @@ function assistantDeps(scope: Scope = DEFAULT_SCOPE): AssistantDeps {
       },
     ),
   }, scope);
+  // Другой проект человека (назван в речи или черновик оттуда) — с его правами там.
+  deps.forProject = async (projectId) => {
+    const project = scope.projects.find((p) => p.id === projectId);
+    return project ? assistantDeps(await scopeFor(scopeDeps(), project, scope.projects)) : null;
+  };
+  return deps;
 }
 
 /** «📋 Сделать задачей» в плане развития: обычный предпросмотр, исполнитель — ответственный пункта. */
@@ -483,6 +490,11 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     }
     await setCurrentProject(ctx.from.id, target.id);
     setScope(ctx, await scopeFor(scopeDeps(), target, scope.projects));
+    // Открытый черновик и номера последнего списка — из прошлого проекта: сбрасываем.
+    await closeForm(ctx, ctx.from.id);
+    const state = supabaseStateStore();
+    await state.setDraft(ctx.from.id, null, new Date()).catch(() => {});
+    await state.setList(ctx.from.id, null, new Date()).catch(() => {});
     await ctx.editMessageText(`Проект: ${projectLabel(target)}`).catch(() => {});
     menuShown.add(ctx.from.id);
     await ctx.reply(`Переключила на ${projectLabel(target)}`, { reply_markup: keyboardFor(ctx) });

@@ -20,6 +20,8 @@ export interface DraftBody {
   failures?: number;
   /** Пункт плана развития, к которому привяжется задача («📋 Сделать задачей»). */
   roadmapItemId?: number | null;
+  /** Проект черновика, если он не текущий у человека («Сальма в проекте NIKA», «в рескане …»). */
+  projectId?: string;
 }
 
 export interface Draft {

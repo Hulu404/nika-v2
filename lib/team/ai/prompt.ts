@@ -10,6 +10,7 @@ import { personName } from "../roster";
  * Москве, состав команды и отделы, открытый черновик, последний показанный
  * список. Людей в контексте ровно столько, сколько нужно понять имена:
  * имя, должность, отделы, ник. Ни телефонов, ни участников забегов.
+ * Команда — только проекта запроса: людей из других проектов модель не видит.
  */
 
 const WEEKDAYS = ["", "понедельник", "вторник", "среда", "четверг", "пятница", "суббота", "воскресенье"];
@@ -30,6 +31,27 @@ export const ASSISTANT_RULES = [
   "Без эмодзи-перегруза и мотивационных фраз. Не отвечай шаблонными отказами со списком своих умений.",
 ];
 
+/** Правила проекта для ассистента (дополнительно к общим). */
+export const PROJECT_RULES: Record<string, readonly string[]> = {
+  rescan: [
+    "RESCAN — сервис навигации и записи пациента к врачу, а не медицина. Не обсуждай медицинскую интерпретацию: значения анализов, отклонения, диагнозы, срочность, какого врача выбрать по показателям. На такой вопрос ответь одной фразой, что это вне правил продукта, и покажи «🧭 Правила продукта» (get_project_info rules).",
+  ],
+};
+
+/** Подсказки по модулям проекта. */
+const MODULE_RULES: Record<string, string> = {
+  roadmap: "План развития: показать — get_roadmap (контрольная точка, группа, просрочки); статус, ответственный или срок пункта — update_roadmap_item черновиком.",
+  about: "«О проекте»: суть, правила продукта, материалы, цифры — get_project_info; открытые вопросы — list_open_questions.",
+};
+
+export interface PromptProject {
+  id: string;
+  /** «🔬 RESCAN». */
+  label: string;
+  name: string;
+  modules: readonly string[];
+}
+
 export interface PromptContext {
   now: Date;
   team: readonly TeamMember[];
@@ -40,6 +62,8 @@ export interface PromptContext {
   list?: string | null;
   /** Админ проекта (по умолчанию — фаундер). */
   isAdmin?: (chatId: number) => boolean;
+  /** Проект запроса; без него — nika, как до проектов. */
+  project?: PromptProject | null;
 }
 
 function clock(now: Date): string {
@@ -60,9 +84,18 @@ export function assistantPrompt(ctx: PromptContext): string {
     const names = ctx.team.filter((m) => (m.departments ?? []).includes(d.key)).map(personName);
     return `- ${d.group}: ${names.join(", ") || "никого"}`;
   });
+  const project = ctx.project;
+  // У nika (и без проекта) — правила как раньше; у других проектов — без забегов и кофе-ранов.
+  const rules = !project || project.modules.includes("coffee_run") ? ASSISTANT_RULES
+    : ASSISTANT_RULES
+      .map((r, i) => (i === 0 ? r.replace("команды НИКА", `проекта ${project.name}`) : r))
+      .filter((r) => !r.includes("участникам забегов"));
   return [
-    ...ASSISTANT_RULES,
+    ...rules,
+    ...(project ? project.modules.map((m) => MODULE_RULES[m]).filter((r): r is string => !!r) : []),
+    ...(project ? PROJECT_RULES[project.id] ?? [] : []),
     "",
+    ...(project ? [`Проект: ${project.label}. Задачи, события и команда — только этого проекта.`] : []),
     `Сейчас ${WEEKDAYS[mskWeekday(today)]} ${today}, ${clock(ctx.now)} по Москве. Ближайшие дни: ${calendar}.`,
     `Тебе пишет ${me ? personName(me) : "участник команды"}${admin(ctx.senderId) ? " (админ проекта: видит и меняет задачи всей команды)" : " (не админ: видит только свои задачи и поставленные им)"}.`,
     "Команда:",

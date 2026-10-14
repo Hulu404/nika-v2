@@ -1,5 +1,6 @@
 import { mskMidnight } from "../../databot/dates";
 import { addDays, mskToday } from "../../databot/time";
+import type { RoadmapStatus } from "../roadmap/store";
 
 /**
  * Действия ассистента: что создаётся или меняется по «✅ Подтвердить».
@@ -41,6 +42,8 @@ export type Intent =
   | { intent: "update_event"; event_id: number; title?: string; starts_at?: string; place?: string }
   | { intent: "cancel_event"; event_id: number }
   | { intent: "cancel_reminder"; reminder_id: number }
+  // Пункт плана развития: статус, ответственный, срок (YYYY-MM-DD).
+  | { intent: "update_roadmap_item"; item_id: number; status?: RoadmapStatus; owner_chat_id?: number; due?: string; clear_due?: boolean }
   | { intent: "show_my_day" }
   | { intent: "show_my_tasks" }
   | { intent: "show_schedule"; range: ScheduleRange }

@@ -64,3 +64,22 @@ export class MemoryProjectStore implements ProjectStore {
     return [...this.projects].sort((a, b) => a.sort - b.sort);
   }
 }
+
+/** Как проект называют по-русски, в том числе в распознанном голосе. */
+const SPOKEN: Record<string, RegExp> = {
+  // «Ника» бывает и именем — проект только со словом «проект»: «в проекте Ника».
+  nika: /проект\S*\s+«?ник(а|е|и|у|ой)(?![а-яё])/i,
+  rescan: /р[еи]скан/i,
+};
+
+/**
+ * Проект, явно названный во фразе («в рескане поставь Вике…», «в NIKA») —
+ * из проектов человека. Названо несколько или ни одного — null.
+ */
+export function projectInText(text: string, projects: readonly Project[]): Project | null {
+  const found = projects.filter((p) => {
+    const latin = p.name.replace(/[^a-z0-9]/gi, "");
+    return (latin && new RegExp(`(^|[^a-z0-9])${latin}([^a-z0-9]|$)`, "i").test(text)) || (SPOKEN[p.id]?.test(text) ?? false);
+  });
+  return found.length === 1 ? found[0] : null;
+}

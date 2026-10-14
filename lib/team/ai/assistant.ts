@@ -7,7 +7,7 @@ import { isActiveAssigned, type AssignedTask, type AssignedTaskDraft } from "../
 import { findMember, listProjectTeam, type TeamMember } from "../access";
 import { DEFAULT_SCOPE, isMulti, scopeOf, type Scope } from "../projects/scope";
 import { withProjectLabel } from "../projects/labels";
-import { NIKA } from "../projects/projects";
+import { NIKA, projectInText, projectLabel, type Project } from "../projects/projects";
 import { isFounder, teamBotConfigured, teamToken } from "../config";
 import { assigneeChangeText, escapeHtmlTeam, menuKeyboard, taskCb } from "../copy";
 import { DEPARTMENTS } from "../departments";
@@ -32,9 +32,10 @@ import {
   type ParticipantStore,
   type ReminderStore,
 } from "./stores";
-import { executeTool, TOOL_SPECS, type ToolContext } from "./tools";
+import { executeTool, toolSpecsFor, type ToolContext } from "./tools";
 import { checkRoadmapCompletion } from "../roadmap/complete";
-import { supabaseRoadmapStore } from "../roadmap/store";
+import { supabaseRoadmapStore, type RoadmapPatch, type RoadmapStore } from "../roadmap/store";
+import { supabaseAboutStore, type AboutStore } from "../about/store";
 import { GUARD_FAIL_TEXT, GUARD_RETRY_NOTE, fabricated, looksLikeListing } from "./guard";
 import { AI_FAIL_TEXT, TeamAiError, VOICE_MAX_BYTES, VOICE_MAX_SECONDS, aiErrorText, defaultTeamAi, teamAiConfig, type TeamAi } from "./yandex";
 
@@ -77,6 +78,16 @@ export interface AssistantDeps {
   isAdmin?: (chatId: number) => boolean;
   /** Задача стала выполненной (проверка плана развития: все задачи пункта закрыты?). */
   onTaskDone?: (api: Pick<Api, "sendMessage">, task: AssignedTask) => Promise<void>;
+  /** Проект запроса целиком: модули (инструменты), название. */
+  project?: Project;
+  /** Проекты человека: проект, названный в речи, и «Сальма в проекте NIKA». */
+  projects?: Project[];
+  /** Те же зависимости в другом проекте человека (с его правами там); null — его там нет. */
+  forProject?: (projectId: string) => Promise<AssistantDeps | null>;
+  /** Команда другого проекта. */
+  teamOf?: (projectId: string) => Promise<TeamMember[]>;
+  roadmap?: RoadmapStore;
+  about?: AboutStore;
 }
 
 /** Голосовое из Telegram — в память, никуда не пишем. */
@@ -105,6 +116,11 @@ export function defaultAssistantDeps(screens: Pick<AssistantDeps, "showSchedule"
     downloadVoice,
     projectId: scope.project.id,
     isAdmin: scope.isAdmin,
+    project: scope.project,
+    projects: scope.projects,
+    teamOf: listProjectTeam,
+    roadmap: supabaseRoadmapStore(),
+    about: supabaseAboutStore(),
     onTaskDone: async (api, task) => {
       await checkRoadmapCompletion(api, { roadmap: supabaseRoadmapStore(), tasks: createSupabaseStore() }, task).catch(() => {});
     },
@@ -151,7 +167,9 @@ async function opData(deps: AssistantDeps, p: Intent, uid: number): Promise<OpDa
   const tasks = (await Promise.all(ids.map((id) => deps.tasks.getAssignedTask(id)))).filter((t): t is AssignedTask => !!t);
   const event = p.intent === "update_event" || p.intent === "cancel_event" ? await deps.events.get(p.event_id) : null;
   const reminder = p.intent === "cancel_reminder" ? (await deps.reminders.listMine(uid)).find((r) => r.id === p.reminder_id) ?? null : null;
-  return { tasks, event, reminder };
+  const item = p.intent === "update_roadmap_item" && deps.roadmap ? await deps.roadmap.get(p.item_id) : null;
+  const roadmapItem = item && item.project_id === (deps.projectId ?? NIKA) ? item : null;
+  return { tasks, event, reminder, roadmapItem };
 }
 
 const isCreate = (p: Intent) => p.intent === "create_task" || p.intent === "create_event" || p.intent === "create_reminder";
@@ -187,6 +205,8 @@ async function present(ctx: Context, deps: AssistantDeps, draft: Draft, body: Dr
   const next: DraftBody = { ...body, awaiting: undefined, failures: 0 };
   await deps.drafts.setBody(draft.id, next);
   const view = await renderView(deps, draft.id, next, team, uid, now);
+  // Черновик не в текущем проекте человека — проект прямо в заголовке.
+  if (body.projectId && deps.project) view.text = view.text.replace(/^Проверь, пожалуйста:/, `Проверь, пожалуйста · ${escapeHtmlTeam(projectLabel(deps.project))}:`);
   const opts = { ...HTML, reply_markup: view.keyboard };
   if (where === "edit-callback") {
     await ctx.editMessageText(view.text, opts).catch(() => {});
@@ -231,8 +251,9 @@ function codeAnswer(draft: Draft, text: string, team: TeamMember[], uid: number,
  * Свободный текст или голосовое участника: диалог с моделью и инструментами.
  * false — голос и текст выключены, ответит старый путь.
  */
-export async function handleAiMessage(ctx: Context, member: TeamMember, deps: AssistantDeps, now = new Date(), preset?: { text: string; voice: boolean }): Promise<boolean> {
-  if (!deps.ai) return false;
+export async function handleAiMessage(ctx: Context, member: TeamMember, baseDeps: AssistantDeps, now = new Date(), preset?: { text: string; voice: boolean }): Promise<boolean> {
+  if (!baseDeps.ai) return false;
+  let deps = baseDeps;
   const uid = member.chat_id;
   const started = Date.now();
   const progress = { steps: 0, tools: [] as string[] };
@@ -243,31 +264,53 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
   try {
     const said = preset ?? (await utterance(ctx, deps, uid));
     if (!said) return true;
-    await deps.ai.checkLimit(uid);
-    const team = await deps.listTeam();
+    await deps.ai!.checkLimit(uid);
     const state = await deps.state.get(uid);
     let draft = state.draft_id ? await deps.drafts.get(state.draft_id) : null;
     if (draft && (draft.chat_id !== uid || draft.confirmed_at || expired(draft, now))) draft = null;
+
+    // Проект запроса: названный в речи важнее текущего; иначе — проект открытого черновика.
+    const current = baseDeps.projectId ?? NIKA;
+    const named = projectInText(said.text, baseDeps.projects ?? []);
+    const wanted = named?.id ?? draft?.intent.projectId ?? current;
+    if (wanted !== current && baseDeps.forProject) deps = (await baseDeps.forProject(wanted)) ?? baseDeps;
+    const projectId = deps.projectId ?? NIKA;
+    if (draft && (draft.intent.projectId ?? current) !== projectId) draft = null;
+    const team = await deps.listTeam();
 
     // Ответ на вопрос бота («в 18», «Сальме») разбирает код — модель не нужна.
     const answered = draft ? codeAnswer(draft, said.text, team, uid, now) : null;
     if (draft && answered) {
       await present(ctx, deps, draft, answered, team, uid, now, "edit-message");
-      await deps.turns.add(uid, "user", said.text, now);
+      await deps.turns.add(uid, "user", said.text, now, projectId);
       return true;
     }
 
     const tctx: ToolContext = {
       ctx, uid, team, now, saidText: said.text, voice: said.voice, state,
       tasks: deps.tasks, events: deps.events, reminders: deps.reminders, shown,
-      projectId: deps.projectId ?? NIKA, isAdmin: deps.isAdmin ?? isFounder,
+      projectId, isAdmin: deps.isAdmin ?? isFounder,
+      modules: deps.project?.modules, projectLabel: deps.project ? projectLabel(deps.project) : undefined,
+      roadmap: deps.roadmap, about: deps.about,
+      otherTeams: deps.projects && deps.projects.length > 1 && deps.teamOf
+        ? async () => Promise.all(deps.projects!.filter((p) => p.id !== projectId).map(async (p) => ({ project: p, team: await deps.teamOf!(p.id) })))
+        : undefined,
+      offerProject: async (project, person, body) => {
+        const created = await deps.drafts.create({ chat_id: uid, intent: body, source_text: said.text }, now);
+        const msg = await ctx.reply(`${escapeHtmlTeam(personName(person))} в проекте ${escapeHtmlTeam(project.name)}. Поставить задачу там?`, {
+          ...HTML, reply_markup: { inline_keyboard: [[{ text: `Да, в ${project.name}`, callback_data: `ai:pj:${created.id}` }, { text: "Отмена", callback_data: `ai:x:${created.id}` }]] },
+        });
+        await deps.drafts.setMessage(created.id, msg.message_id);
+      },
       showSchedule: deps.showSchedule,
       myDay: (at) => deps.myDay(member, at),
       setList: async (list) => {
         state.last_list = list;
         await deps.state.setList(uid, list, now);
       },
-      upsertDraft: async (body) => {
+      upsertDraft: async (raw) => {
+        // Проект не текущий (назван в речи) — запоминаем в черновике: подтверждение пойдёт туда же.
+        const body = projectId !== current ? { ...raw, projectId } : raw;
         if (draft) await present(ctx, deps, draft, body, team, uid, now, "edit-message");
         else {
           const created = await deps.drafts.create({ chat_id: uid, intent: body, source_text: said.text }, now);
@@ -277,17 +320,18 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
         draft = (await deps.drafts.get(draft!.id)) ?? draft;
       },
     };
-    const system = assistantPrompt({ now, team, senderId: uid, isAdmin: deps.isAdmin, draft: draft ? draftContext(draft, team, uid) : null, list: shownListText(state.last_list) });
-    const turns = trimHistory(await deps.turns.recent(uid, now));
+    const project = deps.project ? { id: deps.project.id, name: deps.project.name, label: projectLabel(deps.project), modules: deps.project.modules } : null;
+    const system = assistantPrompt({ now, team, senderId: uid, isAdmin: deps.isAdmin, project, draft: draft ? draftContext(draft, team, uid) : null, list: shownListText(state.last_list) });
+    const turns = trimHistory(await deps.turns.recent(uid, now, projectId));
     const listNumbers = (state.last_list?.items ?? []).map((i) => i.n);
     const run = await runAgent({
-      ai: deps.ai, messages: dialogMessages(system, turns, said.text), tools: TOOL_SPECS, progress,
+      ai: deps.ai!, messages: dialogMessages(system, turns, said.text), tools: toolSpecsFor(deps.project?.modules), progress,
       validate: (text, calls) => !fabricated(text, { results: calls.map((c) => c.result), listNumbers }),
       retryNote: GUARD_RETRY_NOTE,
       execute: (call) => executeTool(tctx, call),
       onStep: () => ctx.replyWithChatAction("typing").then(() => {}, () => {}),
     });
-    await deps.ai.recordLlm(uid, run.tokensIn, run.tokensOut);
+    await deps.ai!.recordLlm(uid, run.tokensIn, run.tokensOut);
 
     // Предпросмотр говорит сам за себя; вопрос модели после него — показываем.
     let text = run.text.trim();
@@ -311,8 +355,8 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
     } else if (!text && !sentText && !shown.preview && !shown.list) await ctx.reply(AI_FAIL_TEXT);
 
     // В память — только реплика человека и отправленный ответ; инструменты сюда не пишутся.
-    await deps.turns.add(uid, "user", said.text, now);
-    if (sentText) await deps.turns.add(uid, "assistant", sentText, now);
+    await deps.turns.add(uid, "user", said.text, now, projectId);
+    if (sentText) await deps.turns.add(uid, "assistant", sentText, now, projectId);
   } catch (err) {
     // Итоговая ошибка — одной строкой, без текста сообщения человека.
     const message = err instanceof Error ? err.message : String(err);
@@ -347,7 +391,7 @@ export async function closeAiDraft(api: Pick<Api, "editMessageText">, drafts: Dr
   if (draft.message_id) await api.editMessageText(uid, draft.message_id, "Черновик закрыт.").catch(() => {});
 }
 
-const CALLBACK_RE = /^ai:(ok|x|pk|as|ad|tm|sel):(\d+)(?::([ap]\d{1,2}|-?\d+|[a-z_]+)(?::(-?\d+))?)?$/;
+const CALLBACK_RE = /^ai:(ok|x|pk|as|ad|tm|sel|pj):(\d+)(?::([ap]\d{1,2}|-?\d+|[a-z_]+)(?::(-?\d+))?)?$/;
 
 const plural = (n: number, one: string, few: string, many: string) => {
   const m10 = n % 10, m100 = n % 100;
@@ -506,6 +550,21 @@ async function confirm(ctx: Context, deps: AssistantDeps, draft: Draft, uid: num
   if (p.intent === "cancel_reminder") {
     return (await deps.reminders.cancel(p.reminder_id, uid)) ? "✅ Удалила напоминание." : "Это напоминание уже ушло или удалено.";
   }
+
+  if (p.intent === "update_roadmap_item") {
+    // Те же права, что у кнопок плана: админ проекта или ответственный пункта.
+    const item = deps.roadmap ? await deps.roadmap.get(p.item_id) : null;
+    if (!item || item.project_id !== (deps.projectId ?? NIKA)) return "Этого пункта уже нет в плане.";
+    if (!founder && item.owner_chat_id !== uid) return "Менять пункт могут админы проекта и его ответственный.";
+    const patch: RoadmapPatch = {
+      ...(p.status ? { status: p.status } : {}), ...(p.owner_chat_id ? { owner_chat_id: p.owner_chat_id } : {}),
+      ...(p.due ? { due_date: p.due } : p.clear_due ? { due_date: null } : {}),
+    };
+    await deps.roadmap!.update(item.id, patch, uid, now);
+    const label = item.code ? `${item.code} · ${item.title}` : item.title;
+    if (p.owner_chat_id && p.owner_chat_id !== item.owner_chat_id) await tell(p.owner_chat_id, `🗺 Ты ответственный за пункт плана: ${escapeHtmlTeam(label)}`);
+    return `✅ Обновила пункт ${item.code ?? item.title}.`;
+  }
   return "Нечего делать.";
 }
 
@@ -517,7 +576,7 @@ export async function handleAiUpdate(ctx: Context, providedDeps?: AssistantDeps 
   const m = CALLBACK_RE.exec(data);
   const isUtterance = !!ctx.message?.voice || (!!ctx.message?.text && !ctx.message.text.startsWith("/"));
   if (!m && !isUtterance) return false;
-  const deps = typeof providedDeps === "function" ? providedDeps() : providedDeps!;
+  let deps = typeof providedDeps === "function" ? providedDeps() : providedDeps!;
 
   if (!m) {
     // Сообщение при открытом черновике — в диалог (правка черновика или новая просьба решит модель).
@@ -563,13 +622,26 @@ export async function handleAiUpdate(ctx: Context, providedDeps?: AssistantDeps 
     return true;
   }
   await ctx.answerCallbackQuery().catch(() => {});
-  const team = await deps.listTeam();
-
   if (op === "x") {
     await deps.drafts.remove(draft.id);
     await close();
-    await deps.turns.add(uid, "assistant", "Отменила.", now);
+    await deps.turns.add(uid, "assistant", "Отменила.", now, draft.intent.projectId ?? deps.projectId ?? NIKA);
     await edit("Отменила.");
+    return true;
+  }
+  // Черновик в другом проекте человека — всё дальше (команда, права, сохранение) в том проекте.
+  if (draft.intent.projectId && draft.intent.projectId !== (deps.projectId ?? NIKA)) {
+    const other = deps.forProject ? await deps.forProject(draft.intent.projectId) : null;
+    if (!other) {
+      await edit("Этого проекта нет в твоём списке.");
+      return true;
+    }
+    deps = other;
+  }
+  const team = await deps.listTeam();
+  if (op === "pj") {
+    // «Да, в NIKA» — обычный предпросмотр, уже в том проекте.
+    await present(ctx, deps, draft, draft.intent, team, uid, now, "edit-callback");
     return true;
   }
   if (op === "as" || op === "ad" || op === "tm") {
@@ -605,7 +677,7 @@ export async function handleAiUpdate(ctx: Context, providedDeps?: AssistantDeps 
   await close();
   try {
     const result = await confirm(ctx, deps, draft, uid, now);
-    await deps.turns.add(uid, "assistant", result, now);
+    await deps.turns.add(uid, "assistant", result, now, deps.projectId ?? NIKA);
     await edit(escapeHtmlTeam(result));
   } catch (err) {
     console.error("[team-ai] confirm:", err instanceof Error ? err.message : String(err));

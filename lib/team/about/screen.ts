@@ -33,7 +33,7 @@ export function defaultAboutDeps(scope: Scope = DEFAULT_SCOPE): AboutDeps {
 }
 
 const HTML = { parse_mode: "HTML" as const, link_preview_options: { is_disabled: true } };
-const SECTION_TITLE: Record<Exclude<InfoSection, "questions">, string> = {
+export const SECTION_TITLE: Record<Exclude<InfoSection, "questions">, string> = {
   summary: "О проекте", rules: "🧭 Правила продукта", links: "📎 Материалы", facts: "📊 Ключевые цифры",
 };
 const EDITABLE: readonly InfoSection[] = ["summary", "rules", "links", "facts"];
@@ -60,7 +60,10 @@ export async function aboutHome(deps: AboutDeps, uid: number): Promise<TaskScree
   return { text: [`<b>${escapeHtmlTeam(deps.projectLabel)}</b>`, "", summary ?? "Описание проекта пока не заполнено."].join("\n"), keyboard: kb };
 }
 
-async function sectionScreen(deps: AboutDeps, uid: number, section: Exclude<InfoSection, "questions">): Promise<TaskScreen> {
+/** Что нужно экранам разделов и вопросов (их показывает и ассистент). */
+export type AboutView = Pick<AboutDeps, "about" | "projectId" | "isAdmin" | "listTeam">;
+
+export async function sectionScreen(deps: AboutView, uid: number, section: Exclude<InfoSection, "questions">): Promise<TaskScreen> {
   const content = await deps.about.getSection(deps.projectId, section);
   const kb = new InlineKeyboard();
   if (deps.isAdmin(uid)) kb.text("✏️ Изменить", `pi:e:${section}`).row();
@@ -68,10 +71,10 @@ async function sectionScreen(deps: AboutDeps, uid: number, section: Exclude<Info
   return { text: [`<b>${SECTION_TITLE[section]}</b>`, "", content ?? "Пока пусто."].join("\n"), keyboard: kb };
 }
 
-const owner = (q: ProjectQuestion, names: ReadonlyMap<number, string>) => (q.owner_chat_id ? names.get(q.owner_chat_id) ?? "—" : q.owner_label ?? "без ответственного");
-const due = (q: ProjectQuestion, today: string) => q.due_label ?? (q.due_date ? `до ${q.due_date.slice(8, 10)}.${q.due_date.slice(5, 7)}${q.due_date < today ? " ⏰" : ""}` : "без срока");
+export const questionOwner = (q: ProjectQuestion, names: ReadonlyMap<number, string>) => (q.owner_chat_id ? names.get(q.owner_chat_id) ?? "—" : q.owner_label ?? "без ответственного");
+export const questionDue = (q: ProjectQuestion, today: string) => q.due_label ?? (q.due_date ? `до ${q.due_date.slice(8, 10)}.${q.due_date.slice(5, 7)}${q.due_date < today ? " ⏰" : ""}` : "без срока");
 
-async function questionsScreen(deps: AboutDeps, now: Date): Promise<TaskScreen> {
+export async function questionsScreen(deps: AboutView, now: Date): Promise<TaskScreen> {
   const all = await deps.about.questions(deps.projectId);
   const names = new Map((await deps.listTeam()).map((m) => [m.chat_id, personName(m)] as const));
   const today = mskToday(now);
@@ -79,7 +82,7 @@ async function questionsScreen(deps: AboutDeps, now: Date): Promise<TaskScreen> 
   const answered = all.filter((q) => q.status === "answered");
   const lines = ["<b>❓ Открытые вопросы</b>", ""];
   if (!open.length) lines.push("Открытых вопросов нет.");
-  open.forEach((q, i) => lines.push(`${i + 1}. ${escapeHtmlTeam(q.question)} — ${escapeHtmlTeam(owner(q, names))} · ${escapeHtmlTeam(due(q, today))}`));
+  open.forEach((q, i) => lines.push(`${i + 1}. ${escapeHtmlTeam(q.question)} — ${escapeHtmlTeam(questionOwner(q, names))} · ${escapeHtmlTeam(questionDue(q, today))}`));
   if (answered.length) lines.push("", "<b>Отвечено</b>", ...answered.map((q) => `✅ ${escapeHtmlTeam(q.question)}: ${escapeHtmlTeam(q.answer ?? "")}`));
   const kb = new InlineKeyboard();
   open.forEach((q, i) => {
@@ -96,7 +99,7 @@ async function questionCard(deps: AboutDeps, uid: number, q: ProjectQuestion, no
   if (q.status === "open" && (deps.isAdmin(uid) || q.owner_chat_id === uid)) kb.text("✅ Отвечено", `pi:qa:${q.id}`).row();
   kb.text("← К вопросам", "pi:q");
   return {
-    text: [`<b>${escapeHtmlTeam(q.question)}</b>`, `Решает: ${escapeHtmlTeam(owner(q, names))}`, `Срок: ${escapeHtmlTeam(due(q, mskToday(now)))}`,
+    text: [`<b>${escapeHtmlTeam(q.question)}</b>`, `Решает: ${escapeHtmlTeam(questionOwner(q, names))}`, `Срок: ${escapeHtmlTeam(questionDue(q, mskToday(now)))}`,
       ...(q.answer ? ["", `Ответ: ${escapeHtmlTeam(q.answer)}`] : [])].join("\n"),
     keyboard: kb,
   };

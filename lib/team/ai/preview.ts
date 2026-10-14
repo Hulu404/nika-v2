@@ -8,6 +8,9 @@ import type { AssignedTask } from "../../databot/task-list";
 import type { TeamEvent } from "../events";
 import { taskLine } from "./tools";
 import type { DraftBody, Reminder } from "./stores";
+import { mskToday } from "../../databot/time";
+import { STATUS_ICON, STATUS_NAME, dayLabel } from "../roadmap/copy";
+import type { RoadmapItem } from "../roadmap/store";
 
 /**
  * Предпросмотр черновика: одно сообщение, дата всегда явно с днём недели.
@@ -181,6 +184,7 @@ export interface OpData {
   tasks: AssignedTask[];
   event?: TeamEvent | null;
   reminder?: Reminder | null;
+  roadmapItem?: RoadmapItem | null;
 }
 
 /**
@@ -248,6 +252,20 @@ export function renderOpPreview(draftId: number, p: Intent, data: OpData, team: 
   } else if (p.intent === "cancel_reminder") {
     if (!data.reminder) missing("напоминание");
     else lines.push(`❌ Удалю напоминание: ${whenText(data.reminder.remind_at)} — ${escapeHtmlTeam(data.reminder.text)}`);
+  } else if (p.intent === "update_roadmap_item") {
+    const item = data.roadmapItem;
+    if (!item) missing("пункт плана");
+    else {
+      const today = mskToday(now);
+      lines.push(`🗺 Изменю пункт плана: ${escapeHtmlTeam(item.code ? `${item.code} · ${item.title}` : item.title)}`);
+      if (p.status) lines.push(`Статус: ${STATUS_ICON[p.status]} ${STATUS_NAME[p.status]} (было: ${STATUS_NAME[item.status]})`);
+      if (p.owner_chat_id) {
+        const owner = team.find((m) => m.chat_id === p.owner_chat_id);
+        lines.push(`👤 Ответственный: ${escapeHtmlTeam(owner ? personLabel(owner, senderId) : "—")}`);
+      }
+      if (p.due) lines.push(`⏰ Срок: ${dayLabel(p.due, today)}${item.due_date ? ` (было: ${dayLabel(item.due_date, today)})` : ""}`);
+      if (p.clear_due) lines.push("⏰ Срок: убрать");
+    }
   }
   rows.push(confirmRow(draftId, ready));
   return { text: lines.join("\n").replace(/\n\n$/, ""), keyboard: { inline_keyboard: rows }, ready };

@@ -1,5 +1,5 @@
 import { FABRICATION_MARKERS } from "./memory";
-import { TOOL_SPECS } from "./tools";
+import { ALL_TOOL_SPECS } from "./tools";
 
 /**
  * Защита на выходе: текст модели не уходит человеку, если в нём след вызова
@@ -11,7 +11,7 @@ import { TOOL_SPECS } from "./tools";
 export const GUARD_RETRY_NOTE = "Ты не вызвала инструмент. Вызови нужный инструмент, не пиши данные текстом.";
 export const GUARD_FAIL_TEXT = "Не получилось собрать ответ, открой нужный раздел кнопкой.";
 
-const TOOL_NAMES = TOOL_SPECS.map((t) => t.name);
+const TOOL_NAMES = ALL_TOOL_SPECS.map((t) => t.name);
 
 export interface GuardContext {
   /** Результаты инструментов этого сообщения (как их видела модель). */
