@@ -1,0 +1,557 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Техдорожная карта Rescan</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Onest:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: одна колонка 64rem. Продукт в одном абзаце, рамки, Гант на 14 недель, поток данных и контракты, три раздела по ролям, что нужно от клиники, код, риски. */
+:root {
+  --bg: #F4F7F8;
+  --surface: #FFFFFF;
+  --ink: #0F1E26;
+  --muted: #55656E;
+  --line: #D5DEE2;
+  --accent: #0B7A83;
+  --accent-soft: #D9EEF0;
+  --on-accent: #FFFFFF;
+  --warn: #9A5B00;
+  --warn-soft: #FBEBD0;
+  --stop: #B3321F;
+  --stop-soft: #F9DDD8;
+  --font-body: "Onest", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0C1519; --surface: #121E24; --ink: #E6EEF1; --muted: #93A5AE; --line: #26363E;
+    --accent: #4FC3CC; --accent-soft: #14343A; --on-accent: #04181B;
+    --warn: #E5A04A; --warn-soft: #3A2B12; --stop: #F07A67; --stop-soft: #3C1D18;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0C1519; --surface: #121E24; --ink: #E6EEF1; --muted: #93A5AE; --line: #26363E;
+  --accent: #4FC3CC; --accent-soft: #14343A; --on-accent: #04181B;
+  --warn: #E5A04A; --warn-soft: #3A2B12; --stop: #F07A67; --stop-soft: #3C1D18;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+  padding-inline: 16px; padding-block: 32px 64px;
+}
+.page { max-width: 64rem; margin-inline: auto; display: flex; flex-direction: column; gap: 3rem; }
+h1, h2, h3 { text-wrap: balance; line-height: 1.2; margin: 0; }
+h1 { font-size: clamp(1.9rem, 5vw, 2.8rem); font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: 1.35rem; font-weight: 650; letter-spacing: -0.01em; }
+h3 { font-size: 1.05rem; font-weight: 600; }
+p { margin: 0; max-width: 65ch; }
+ul, ol { margin: 0; padding-left: 1.2rem; display: flex; flex-direction: column; gap: 0.4rem; }
+a { color: var(--accent); }
+code { font-family: var(--font-mono); font-size: 0.84em; }
+.label { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.sec { display: flex; flex-direction: column; gap: 1.1rem; min-width: 0; scroll-margin-top: 1rem; }
+.sec-head { display: flex; flex-direction: column; gap: 0.35rem; }
+.sec-head p { color: var(--muted); }
+
+.top { display: flex; flex-direction: column; gap: 1rem; padding-bottom: 1.5rem; border-bottom: 2px solid var(--ink); }
+.top .lead { font-size: 1.1rem; max-width: 64ch; }
+.meta { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; }
+.meta div { display: flex; flex-direction: column; min-width: 0; }
+.meta b { font-weight: 600; }
+.toc { display: flex; flex-wrap: wrap; gap: 0.4rem 1rem; font-size: 0.88rem; }
+.scope { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; }
+.scope > div { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 0.9rem 1rem; display: flex; flex-direction: column; gap: 0.4rem; min-width: 0; }
+.scope .in { border-left: 3px solid var(--accent); }
+.scope .out { border-left: 3px solid var(--muted); }
+
+.scroll { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+table { border-collapse: collapse; width: 100%; font-size: 0.88rem; min-width: 40rem; }
+th, td { text-align: left; vertical-align: top; padding: 0.65rem 0.8rem; border-bottom: 1px solid var(--line); }
+th { font-family: var(--font-mono); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 500; background: var(--bg); }
+tr:last-child td { border-bottom: 0; }
+td.k { font-weight: 600; white-space: nowrap; }
+td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+tfoot td { font-weight: 600; background: var(--bg); }
+.st { display: inline-block; font-family: var(--font-mono); font-size: 0.7rem; padding: 0.1rem 0.45rem; border-radius: 3px; white-space: nowrap; }
+.st.keep { border: 1px solid var(--muted); color: var(--muted); }
+.st.ext { background: var(--accent-soft); color: var(--accent); border: 1px solid var(--accent); }
+.st.new { background: var(--accent); color: var(--on-accent); }
+.st.frz { border: 1px dashed var(--muted); color: var(--muted); }
+
+.gantt { min-width: 50rem; --lab: 12rem; }
+.g-row { display: grid; grid-template-columns: var(--lab) repeat(14, minmax(2.6rem, 1fr)); align-items: center; border-bottom: 1px solid var(--line); min-height: 2.6rem; position: relative; }
+.g-row:last-child { border-bottom: 0; }
+.g-row .g-name { grid-column: 1; grid-row: 1; padding: 0.35rem 0.8rem; font-size: 0.88rem; line-height: 1.3; }
+.g-name a { color: var(--ink); text-decoration: none; }
+.g-name a:hover { text-decoration: underline; }
+.g-row .guides { grid-column: 2 / -1; grid-row: 1; align-self: stretch; background-image: repeating-linear-gradient(to right, var(--line) 0 1px, transparent 1px calc(100% / 14)); opacity: 0.8; }
+.g-head { background: var(--bg); }
+.g-head .wk { grid-row: 1; text-align: center; font-family: var(--font-mono); font-size: 0.66rem; line-height: 1.25; padding: 0.4rem 0; color: var(--muted); border-left: 1px solid var(--line); align-self: stretch; }
+.g-head .wk b { display: block; color: var(--ink); font-weight: 500; font-size: 0.72rem; }
+.bar { grid-row: 1; margin: 0.4rem 2px; border-radius: 3px; padding: 0.18rem 0.5rem; font-size: 0.72rem; line-height: 1.25; font-weight: 500; position: relative; z-index: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.b-dev { background: var(--accent); color: var(--on-accent); }
+.b-ops { background: var(--warn-soft); color: var(--ink); border: 1px solid var(--warn); }
+.b-pilot { background: var(--ink); color: var(--bg); }
+.b-wait { background: transparent; color: var(--ink); border: 1px solid var(--ink); }
+.b-gate { background: var(--surface); color: var(--ink); border: 2px solid var(--ink); text-align: center; font-family: var(--font-mono); padding-inline: 0; }
+.hol { grid-row: 1; z-index: 2; margin: 0.25rem 2px; border-radius: 3px; background-image: repeating-linear-gradient(45deg, var(--stop) 0 2px, transparent 2px 7px); border: 1px solid var(--stop); opacity: 0.8; pointer-events: none; align-self: stretch; }
+.legend { display: flex; flex-wrap: wrap; gap: 0.6rem 1.2rem; font-size: 0.82rem; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 0.45rem; }
+.legend i { width: 1.6rem; height: 0.8rem; border-radius: 2px; display: inline-block; }
+.legend .l-hol { background-image: repeating-linear-gradient(45deg, var(--stop) 0 2px, transparent 2px 6px); border: 1px solid var(--stop); }
+
+.flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(10.5rem, 1fr)); gap: 0.9rem; }
+.node { border: 1px solid var(--line); background: var(--surface); border-radius: 6px; padding: 0.8rem 0.9rem; display: flex; flex-direction: column; gap: 0.35rem; font-size: 0.88rem; min-width: 0; }
+.node h3 { font-size: 0.95rem; }
+.node p { color: var(--muted); font-size: 0.84rem; }
+.node .tag { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.08em; text-transform: uppercase; }
+.node.reuse { border-color: var(--muted); }
+.node.reuse .tag { color: var(--muted); }
+.node.ext { background: var(--accent-soft); border-color: var(--accent); }
+.node.ext .tag { color: var(--accent); }
+.node.new { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.node.new p, .node.new .tag { color: var(--on-accent); opacity: 0.92; }
+.node .num { font-family: var(--font-mono); font-size: 0.72rem; }
+.flow-note { font-size: 0.85rem; color: var(--muted); }
+
+.cols2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr)); gap: 1rem; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 0.6rem; min-width: 0; }
+.card.stop { border-left: 3px solid var(--stop); }
+.card.warn { border-left: 3px solid var(--warn); }
+.card.ok { border-left: 3px solid var(--accent); }
+.risk, .dec { display: grid; grid-template-columns: 1fr; gap: 0.15rem; padding-block: 0.6rem; border-top: 1px solid var(--line); }
+.risk:first-of-type, .dec:first-of-type { border-top: 0; padding-top: 0; }
+.risk b, .dec .q { font-weight: 600; }
+.risk span, .dec .a { color: var(--muted); font-size: 0.9rem; }
+.note { font-size: 0.86rem; color: var(--muted); max-width: 70ch; }
+.foot { color: var(--muted); font-size: 0.82rem; border-top: 1px solid var(--line); padding-top: 1rem; max-width: 70ch; display: flex; flex-direction: column; gap: 0.5rem; }
+
+@media (max-width: 40rem) { .gantt { --lab: 9rem; } }
+a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+<style>body{margin:0}</style>
+</head>
+<body>
+
+<div class="page">
+
+<header class="top">
+  <span class="label">rescan · техническая дорожная карта · версия 4 · 13.10.2026</span>
+  <h1>От готового анализа к визиту в ту же клинику</h1>
+  <p class="lead">rescan для частных многопрофильных клиник. Когда анализы крови готовы, врач отмечает следующий шаг для своего пациента, а пациент получает персональное сообщение, выбирает врача и формат и оставляет заявку, которая уходит в CRM клиники. Эффект меряем в рублях против контрольной группы. Результаты анализов к нам не попадают.</p>
+  <div class="meta">
+    <div><span class="label">Разработка</span><b>14.10–27.10.2026</b></div>
+    <div><span class="label">Набор пациентов</span><b>28.10–08.12.2026</b></div>
+    <div><span class="label">Первый отчёт, 30 дней</span><b>18.12.2026</b></div>
+    <div><span class="label">Полный отчёт, 30 дней</span><b>12.01.2027</b></div>
+    <div><span class="label">Покупатель</span><b>многопрофильные клиники</b></div>
+  </div>
+  <nav class="toc" aria-label="Разделы">
+    <a href="#gantt">Сроки</a><a href="#flow">Поток данных</a><a href="#back">Бэкенд</a><a href="#front">Фронтенд</a><a href="#design">Дизайн</a><a href="#clinic">Что нужно от клиники</a><a href="#risks">Риски</a>
+  </nav>
+</header>
+
+<section class="sec" aria-labelledby="scope">
+  <div class="sec-head">
+    <span class="label">Рамки</span>
+    <h2 id="scope">Что входит в MVP</h2>
+    <p>Описание продукта, выгода, пилот и монетизация собраны в файле <code>rescan-product.md</code>. Здесь только то, что нужно для разработки.</p>
+  </div>
+  <div class="scope">
+    <div class="in">
+      <h3>Входит</h3>
+      <ul>
+        <li>Событие «анализы готовы» из МИС: вебхук или ежедневный CSV.</li>
+        <li>Деление пациентов 75/25 на основную и контрольную группы.</li>
+        <li>Очередь врача: отметка шага для своего пациента за 24 часа.</li>
+        <li>SMS с персональной ссылкой, ссылка в письме как запасной вход.</li>
+        <li>Страница пациента в брендинге клиники: ветки, цель, врачи, форматы, цены, заявка, оплата быстрого ответа по ссылке клиники.</li>
+        <li>Заявки в CRM клиники, задача «не записался за 7 дней».</li>
+        <li>Маршрут после визита: шаг от врача, напоминания, памятки.</li>
+        <li>Импорт визитов из МИС и отчёт «30 дней против контроля».</li>
+        <li>Согласия, отписка, стоп-кнопка.</li>
+      </ul>
+    </div>
+    <div class="out">
+      <h3>Не входит</h3>
+      <ul>
+        <li>Результаты анализов, PDF, диагнозы, признак отклонения.</li>
+        <li>Интерпретация, правила «показатель → врач», языковая модель на данных пациента.</li>
+        <li>Интеграция с расписанием и запись в слот.</li>
+        <li>MAX, Telegram mini app, email как отдельный канал.</li>
+        <li>Полная админка заявок: они живут в CRM клиники.</li>
+        <li>NPS, трекер лечения, аптеки.</li>
+        <li>Офтальмология и стоматология.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="gantt" aria-labelledby="gantt-h">
+  <div class="sec-head">
+    <span class="label">Сроки</span>
+    <h2 id="gantt-h">План по неделям</h2>
+    <p>Разработка идёт на синтетике. Реальные SMS только после КТ1. Отчёт по 90 дням будет 09.03.2027: это подтверждение, решение о покупке принимаем по 30 дням.</p>
+  </div>
+  <div class="scroll">
+    <div class="gantt" role="img" aria-label="Диаграмма Ганта на 14 недель: разработка в неделях 1–3, набор пациентов в неделях 3–9, наблюдение 30 дней до 07.01, отчёты 18.12 и 12.01">
+      <div class="g-row g-head">
+        <div class="g-name label">Работа</div>
+        <div class="wk" style="grid-column:2"><b>1</b>12.10</div>
+        <div class="wk" style="grid-column:3"><b>2</b>19.10</div>
+        <div class="wk" style="grid-column:4"><b>3</b>26.10</div>
+        <div class="wk" style="grid-column:5"><b>4</b>02.11</div>
+        <div class="wk" style="grid-column:6"><b>5</b>09.11</div>
+        <div class="wk" style="grid-column:7"><b>6</b>16.11</div>
+        <div class="wk" style="grid-column:8"><b>7</b>23.11</div>
+        <div class="wk" style="grid-column:9"><b>8</b>30.11</div>
+        <div class="wk" style="grid-column:10"><b>9</b>07.12</div>
+        <div class="wk" style="grid-column:11"><b>10</b>14.12</div>
+        <div class="wk" style="grid-column:12"><b>11</b>21.12</div>
+        <div class="wk" style="grid-column:13"><b>12</b>28.12</div>
+        <div class="wk" style="grid-column:14"><b>13</b>04.01</div>
+        <div class="wk" style="grid-column:15"><b>14</b>11.01</div>
+      </div>
+      <div class="g-row"><div class="g-name"><a href="#clinic">Клиника, юрист, МИС</a></div><div class="guides"></div>
+        <div class="bar b-ops" style="grid-column:2 / 4">Договор, выгрузки, базовая доля</div></div>
+      <div class="g-row"><div class="g-name"><a href="#back">Бэкенд</a></div><div class="guides"></div>
+        <div class="bar b-dev" style="grid-column:2 / 5">B1–B12</div></div>
+      <div class="g-row"><div class="g-name"><a href="#front">Фронтенд</a></div><div class="guides"></div>
+        <div class="bar b-dev" style="grid-column:2 / 5">FE1–FE9</div></div>
+      <div class="g-row"><div class="g-name"><a href="#design">Дизайн</a></div><div class="guides"></div>
+        <div class="bar b-dev" style="grid-column:2 / 4">Макеты, затем ревью</div></div>
+      <div class="g-row"><div class="g-name">Набор пациентов</div><div class="guides"></div>
+        <div class="bar b-pilot" style="grid-column:4 / 11">6 недель, 28.10–08.12</div></div>
+      <div class="g-row"><div class="g-name">Наблюдение 30 дней</div><div class="guides"></div>
+        <div class="bar b-wait" style="grid-column:11 / 15">Последняя когорта до 07.01</div>
+        <div class="hol" style="grid-column:13 / 15" title="Новогодние каникулы"></div></div>
+      <div class="g-row"><div class="g-name"><b>Контрольные точки</b></div><div class="guides"></div>
+        <div class="bar b-gate" style="grid-column:2 / 3">КТ1</div>
+        <div class="bar b-gate" style="grid-column:4 / 5">КТ2</div>
+        <div class="bar b-gate" style="grid-column:11 / 12">КТ3</div>
+        <div class="bar b-gate" style="grid-column:15 / 16">КТ4</div></div>
+    </div>
+  </div>
+  <div class="legend">
+    <span><i style="background:var(--accent)"></i>Разработка</span>
+    <span><i style="background:var(--warn-soft);border:1px solid var(--warn)"></i>Согласования</span>
+    <span><i style="background:var(--ink)"></i>Набор пациентов</span>
+    <span><i style="border:1px solid var(--ink)"></i>Наблюдение</span>
+    <span><i class="l-hol"></i>Новогодние каникулы</span>
+    <span><i style="border:2px solid var(--ink);background:var(--surface)"></i>Контрольная точка</span>
+  </div>
+  <div class="cols2">
+    <div class="card"><h3>КТ1, пятница 16.10: можно ли брать данные</h3><p>Клиника подписала пилот и договор поручения. Юрист подтвердил, что очередь врача — это коммуникация, и ответил про согласие на рекламные сообщения. Известно, как МИС отдаёт событие и выгрузку визитов. Клиника назвала базовую долю оплаченных визитов за 30 дней.</p></div>
+    <div class="card"><h3>КТ2, вторник 27.10: можно ли стартовать</h3><p>Сквозной сценарий прошёл на тестовых пациентах. Тексты утверждены клиникой и юристом. Врачи очереди обучены. Пороги решения подписаны и больше не меняются.</p></div>
+    <div class="card"><h3>КТ3, пятница 18.12: первый отчёт</h3><p>30 дней по пациентам, набранным с 28.10 по 17.11. Проверяем, видна ли разница с контролем и в какую сторону. Решение о покупке здесь не принимаем.</p></div>
+    <div class="card"><h3>КТ4, вторник 12.01.2027: решение</h3><p>30 дней по всем пациентам пилота. Покупают, продлевают или останавливаемся по порогам из <code>rescan-product.md</code>, раздел 9.</p></div>
+  </div>
+
+  <h3>Кто что делает</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Роль</th><th>14–18.10</th><th>19–23.10</th><th>26–27.10</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Бэкенд</td><td>B1 база и каркас, B2 приём событий, B3 группы, контракт и моки API к концу 15.10.</td><td>B4 очередь врача, B5 доставка, B6 API пациента, B7 заявки в CRM, B8 маршрут.</td><td>B9 дожим, B10 отчёт, B11 согласия, B12 тесты.</td></tr>
+        <tr><td class="k">Фронтенд</td><td>FE1 каркас и темы клиник, FE2 вход и ветки на моках.</td><td>FE3 врачи и заявка, FE4 пересдача и ошибки, FE5 очередь врача, подключение к API.</td><td>FE6–FE7 настройки и отчёт, FE8 состояния, FE9 сквозные проверки.</td></tr>
+        <tr><td class="k">Дизайн</td><td>Потоки, каркасы, система тем клиники, макеты пациента.</td><td>Очередь врача, настройки, отчёт, тексты SMS и письма, передача в разработку.</td><td>Ревью вёрстки, правки.</td></tr>
+        <tr><td class="k">Продукт и юрист</td><td>Договор, согласия, вопросы юристу, выгрузки из МИС, данные клиники.</td><td>Утверждение текстов, таблица «цель → врачи», обучение врачей и администраторов.</td><td>Чек-лист КТ2, подписанные пороги.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="note">Оценка в человеко-днях моя, не данные команды. Бэкенд 15,5, фронтенд 11,5, дизайн 7–8. На 10 рабочих дней это два бэкендера, полтора фронтендера и дизайнер. Если фронтендер один, настройки клиники в MVP заводит наша команда из таблицы, а экран настроек только для просмотра.</p>
+</section>
+
+<section class="sec" id="flow" aria-labelledby="flow-h">
+  <div class="sec-head">
+    <span class="label">Архитектура</span>
+    <h2 id="flow-h">Путь одного пациента</h2>
+    <p>Новый сервис <code>rescan_core</code> со своей базой PostgreSQL в РФ. Персональные данные пациентов есть только в нём. Шлюз раздаёт интерфейсы. Демо-облако Supabase остаётся для синтетики.</p>
+  </div>
+  <div class="flow">
+    <div class="node reuse"><span class="tag">У клиники</span><h3><span class="num">1</span> МИС</h3><p>Анализы готовы. Отдаёт событие без результатов.</p></div>
+    <div class="node new"><span class="tag">Новое</span><h3><span class="num">2</span> Приём и группа</h3><p>Проверка, защита от дублей, группа 75/25 фиксируется сразу.</p></div>
+    <div class="node new"><span class="tag">Новое</span><h3><span class="num">3</span> Очередь врача</h3><p>24 часа на отметку шага. Без отметки уходит стандартное сообщение.</p></div>
+    <div class="node new"><span class="tag">Новое</span><h3><span class="num">4</span> SMS</h3><p>Персональная ссылка, тихие часы, один повтор через 3 дня.</p></div>
+    <div class="node ext"><span class="tag">Новое на шлюзе</span><h3><span class="num">5</span> Страница пациента</h3><p>Шаг врача или ветки, цель, врачи, формат, заявка.</p></div>
+    <div class="node new"><span class="tag">Новое</span><h3><span class="num">6</span> Заявка в CRM</h3><p>Вебхук со статусами. Через 7 дней без записи — задача.</p></div>
+    <div class="node reuse"><span class="tag">У клиники</span><h3><span class="num">7</span> Визит</h3><p>Запись в МИС как обычно. После визита врач выбирает шаг в rescan.</p></div>
+    <div class="node new"><span class="tag">Новое</span><h3><span class="num">8</span> Отчёт</h3><p>Выгрузка визитов из МИС, 30 дней против контроля.</p></div>
+  </div>
+
+  <h3>Событие «анализы готовы»</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Поле</th><th>Что это</th><th>Обязательное</th></tr></thead>
+      <tbody>
+        <tr><td class="k"><code>event_id</code></td><td>Идентификатор события в МИС, защита от дублей.</td><td>Да</td></tr>
+        <tr><td class="k"><code>branch_id</code></td><td>Филиал клиники.</td><td>Да</td></tr>
+        <tr><td class="k"><code>patient_token</code></td><td>Постоянный обезличенный идентификатор пациента в МИС. По нему сверяем визиты.</td><td>Да</td></tr>
+        <tr><td class="k"><code>phone</code></td><td>Телефон для SMS.</td><td>Да</td></tr>
+        <tr><td class="k"><code>ordering_doctor_id</code></td><td>Врач, который назначил анализы. В его очередь попадает пациент.</td><td>Да, иначе очередь не работает</td></tr>
+        <tr><td class="k"><code>ready_at</code></td><td>Время готовности.</td><td>Да</td></tr>
+        <tr><td class="k"><code>marketing_consent</code></td><td>Есть ли у клиники согласие на рекламные сообщения.</td><td>Да</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h3>Выгрузка визитов для отчёта</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Поле</th><th>Что это</th></tr></thead>
+      <tbody>
+        <tr><td class="k"><code>patient_token</code></td><td>Тот же токен, что в событии.</td></tr>
+        <tr><td class="k"><code>visit_date</code></td><td>Дата визита.</td></tr>
+        <tr><td class="k"><code>paid_amount</code></td><td>Оплаченная сумма.</td></tr>
+        <tr><td class="k"><code>doctor_id</code></td><td>Врач визита, для отчёта по врачам.</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p class="flow-note">Не передаются: результаты, PDF, диагнозы, названия услуг, раскрывающие диагноз, ФИО. Контрольная группа попадает в базу, чтобы сравнить визиты, но никаких сообщений не получает.</p>
+</section>
+
+<section class="sec" id="back" aria-labelledby="back-h">
+  <div class="sec-head">
+    <span class="label">Бэкенд</span>
+    <h2 id="back-h">Что пишем на бэкенде</h2>
+    <p>Python 3.13, как в остальном коде, плюс драйвер PostgreSQL. Сервис пути не переносим: он на SQLite и завязан на правила. Модель статусов шагов берём из него, код пишем в <code>rescan_core</code>.</p>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>№</th><th>Что пишем</th><th class="n">Дни</th><th>Готово, когда</th></tr></thead>
+      <tbody>
+        <tr><td class="k">B1</td><td>Каркас <code>rescan_core</code>, PostgreSQL в РФ, миграции. Таблицы: <code>clinics</code>, <code>branches</code>, <code>doctors</code>, <code>formats</code>, <code>goals</code>, <code>patients</code>, <code>contacts</code>, <code>episodes</code>, <code>steps</code>, <code>messages</code>, <code>requests</code>, <code>visits</code>, <code>consents</code>, <code>events</code>, <code>audit_events</code>, <code>outbox</code>. Роли: врач, администратор, руководитель.</td><td class="n">1,5</td><td>Миграции поднимаются на пустой базе, аудит пишет входы и действия.</td></tr>
+        <tr><td class="k">B2</td><td>Приём событий: <code>POST /v1/mis/results-ready</code> с подписью HMAC, идемпотентность по <code>event_id</code>. Загрузка CSV с отчётом по строкам.</td><td class="n">1,5</td><td>Повтор не создаёт второй эпизод, ошибка в строке видна, а не теряется.</td></tr>
+        <tr><td class="k">B3</td><td>Группы: детерминированный хэш от <code>patient_token</code> и соли пилота, 25% в контроль. Группа записывается при первом событии и не меняется.</td><td class="n">0,5</td><td>Доля контроля на 10 000 синтетических пациентов 25 ± 1%, повторное событие даёт ту же группу.</td></tr>
+        <tr><td class="k">B4</td><td>Очередь врача: пациенты врача с готовыми анализами, отметка шага из фиксированного списка, только по одному пациенту. Через 24 часа без отметки эпизод уходит со стандартным сообщением.</td><td class="n">1,5</td><td>Массового действия в API нет, отметка пишет врача и время в журнал.</td></tr>
+        <tr><td class="k">B5</td><td>Доставка: SMS-провайдер в РФ через <code>outbox</code>, одноразовая ссылка со сроком жизни, тихие часы, один повтор через 3 дня, дедупликация. Текст рекламного сообщения только при <code>marketing_consent</code>.</td><td class="n">1,5</td><td>Сообщение доходит на тестовый номер, контрольной группе не уходит ничего.</td></tr>
+        <tr><td class="k">B6</td><td>API пациента: вход по токену, шаг врача или ветки, цели, список врачей с порядком (назначивший, уже был, терапевт), форматы и цены, заявка, ссылка на оплату клиники.</td><td class="n">2</td><td>Порядок врачей не зависит ни от каких медицинских данных. В ответах нет ФИО других пациентов и данных о здоровье.</td></tr>
+        <tr><td class="k">B7</td><td>Заявки в CRM: вебхук в Битрикс24 и универсальный вебхук. Статусы обратно вебхуком или ручной отметкой. Запасной канал: уведомление администратору.</td><td class="n">1,5</td><td>Заявка появляется в CRM тестовой клиники с правильными полями.</td></tr>
+        <tr><td class="k">B8</td><td>Маршрут после визита: шаг от врача (наблюдение, пересдача через N недель, приём специалиста, ничего), статусы <code>open → offered → confirmed → attended → completed</code>, напоминания и памятки по расписанию.</td><td class="n">1,5</td><td>Пересдача через N недель присылает напоминание и памятку в нужный день.</td></tr>
+        <tr><td class="k">B9</td><td>Дожим: пациент оставил заявку или получил шаг, но не записался за 7 дней — задача в CRM.</td><td class="n">0,5</td><td>Задача создаётся один раз и закрывается при записи.</td></tr>
+        <tr><td class="k">B10</td><td>Отчёт: импорт выгрузки визитов, сверка по <code>patient_token</code>, оплаченные визиты и выручка за 30 дней по группам, выручка на 100 результатов, разрезы по врачам и филиалам. Выгрузка в CSV.</td><td class="n">1,5</td><td>На синтетике с известным эффектом отчёт показывает этот эффект.</td></tr>
+        <tr><td class="k">B11</td><td>Согласия и ПДн: учёт согласий, отписка по ссылке и по ответу «СТОП», стоп-кнопка клиники, шифрование контактов, логи без ПДн, сроки хранения, резервные копии.</td><td class="n">1</td><td>Отписавшийся не получает ничего, в логах нет телефонов.</td></tr>
+        <tr><td class="k">B12</td><td>Тесты и стенд: сценарий от события до отчёта на синтетике, подмена SMS и CRM.</td><td class="n">1</td><td>Сценарий проходит одной командой.</td></tr>
+      </tbody>
+      <tfoot><tr><td></td><td>Итого, оценка</td><td class="n">15,5</td><td></td></tr></tfoot>
+    </table>
+  </div>
+  <div class="cols2">
+    <div class="card stop">
+      <h3>Чего в бэкенде нет</h3>
+      <ul>
+        <li>Полей для результатов, значений, диагнозов и признака отклонения.</li>
+        <li>Правил, которые выбирают врача или шаг по медицинским данным.</li>
+        <li>Массовой отметки шага на группу пациентов.</li>
+        <li>Запросов к языковой модели с данными пациента.</li>
+      </ul>
+    </div>
+    <div class="card warn">
+      <h3>Что нужно заранее</h3>
+      <ul>
+        <li>Контракт события и выгрузки зафиксировать 15.10, от них зависят фронтенд и отчёт.</li>
+        <li>Моки API для фронтенда к концу 15.10.</li>
+        <li>Тексты и список шагов брать из настроек клиники, а не из кода.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="front" aria-labelledby="front-h">
+  <div class="sec-head">
+    <span class="label">Фронтенд</span>
+    <h2 id="front-h">Что пишем на фронтенде</h2>
+    <p>Три интерфейса: страница пациента (телефон в первую очередь), очередь врача и раздел клиники. ES-модули без сборки, как в текущем коде. Оформление каждой клиники через токены темы: логотип, акцентный цвет, название.</p>
+  </div>
+  <h3>Экраны</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>№</th><th>Экран</th><th>Для кого</th><th>Состояния</th></tr></thead>
+      <tbody>
+        <tr><td class="k">P1</td><td>Вход по ссылке и согласие при первом входе</td><td>Пациент</td><td>Ссылка активна, истекла, клиника остановила сервис, пациент отписан.</td></tr>
+        <tr><td class="k">P2</td><td>Шаг от врача или три ветки</td><td>Пациент</td><td>Врач отметил «обсудить», «пересдача через N», «контроль у меня»; без отметки — три ветки.</td></tr>
+        <tr><td class="k">P3</td><td>Цель визита</td><td>Пациент</td><td>Четыре нейтральные цели из настроек клиники.</td></tr>
+        <tr><td class="k">P4</td><td>Список врачей</td><td>Пациент</td><td>Порядок, фото, формат, цена. Пустой список: связаться с клиникой.</td></tr>
+        <tr><td class="k">P5</td><td>Формат, удобное окно времени, заявка, оплата быстрого ответа</td><td>Пациент</td><td>Без поля для описания симптомов. Оплата уводит на страницу клиники.</td></tr>
+        <tr><td class="k">P6</td><td>Заявка принята и её статус</td><td>Пациент</td><td>Принята, в работе, записан.</td></tr>
+        <tr><td class="k">P7</td><td>Пересдача: дата, памятка, заявка на запись</td><td>Пациент</td><td>До даты, в день, просрочено.</td></tr>
+        <tr><td class="k">P8</td><td>Напоминание о шаге после визита</td><td>Пациент</td><td>Памятка, кнопка записи, «уже записан».</td></tr>
+        <tr><td class="k">D1</td><td>Очередь «готовы анализы»</td><td>Врач</td><td>Список своих пациентов, отметка по одному, таймер 24 часа, пусто.</td></tr>
+        <tr><td class="k">D2</td><td>Шаг после визита</td><td>Врач, администратор</td><td>Выбор из списка, срок, подтверждение.</td></tr>
+        <tr><td class="k">A1</td><td>Настройки клиники: врачи, форматы, цены, ссылки на оплату, цели, тексты, тема</td><td>Руководитель</td><td>Просмотр, правка цен и текстов, отметка «утверждено юристом».</td></tr>
+        <tr><td class="k">A2</td><td>Стоп-кнопка и загрузки CSV с ошибками</td><td>Администратор</td><td>Включено, выключено, ошибки строк.</td></tr>
+        <tr><td class="k">A3</td><td>Отчёт против контроля</td><td>Руководитель</td><td>Таблица по неделям и врачам, выгрузка CSV, «данных ещё мало».</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <h3>Задачи</h3>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>№</th><th>Что пишем</th><th class="n">Дни</th></tr></thead>
+      <tbody>
+        <tr><td class="k">FE1</td><td>Каркас, роутинг, клиент API с моками, вход врача и клиники, система тем клиники.</td><td class="n">1</td></tr>
+        <tr><td class="k">FE2</td><td>P1–P3: вход, согласие, шаг врача или ветки, цель.</td><td class="n">1,5</td></tr>
+        <tr><td class="k">FE3</td><td>P4–P6: врачи, формат, окно времени, заявка, переход к оплате, статус.</td><td class="n">2</td></tr>
+        <tr><td class="k">FE4</td><td>P7–P8 и все ошибки пациента.</td><td class="n">1</td></tr>
+        <tr><td class="k">FE5</td><td>D1–D2: очередь врача и шаг после визита. Удобно с телефона между приёмами.</td><td class="n">1,5</td></tr>
+        <tr><td class="k">FE6</td><td>A1–A2: настройки, стоп-кнопка, загрузки.</td><td class="n">1,5</td></tr>
+        <tr><td class="k">FE7</td><td>A3: отчёт и выгрузка.</td><td class="n">1</td></tr>
+        <tr><td class="k">FE8</td><td>Пустые состояния, адаптив 360 и 1280, клавиатура, контраст для каждой темы клиники.</td><td class="n">1</td></tr>
+        <tr><td class="k">FE9</td><td>Сквозные проверки на Playwright: путь пациента, очередь врача, отсутствие запрещённых слов и данных о здоровье на страницах.</td><td class="n">1</td></tr>
+      </tbody>
+      <tfoot><tr><td></td><td>Итого, оценка</td><td class="n">11,5</td></tr></tfoot>
+    </table>
+  </div>
+  <div class="cols2">
+    <div class="card warn">
+      <h3>Правила интерфейса</h3>
+      <ul>
+        <li>Все тексты для пациента берутся из утверждённых настроек клиники.</li>
+        <li>Нет полей, куда пациент пишет о самочувствии и симптомах.</li>
+        <li>Автотест запрещённых слов: «расшифровка», «риск», «срочно», «отклонение», «диагноз».</li>
+        <li>Шаг врача показываем от имени врача: «Ваш врач предлагает…».</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Что берём из готового</h3>
+      <ul>
+        <li>Компоненты и токены приложения пациента и кабинета врача по образцу rescan.</li>
+        <li>Роли пациента, врача и сотрудника в шлюзе.</li>
+        <li>Проверки Playwright из стенда.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="design" aria-labelledby="design-h">
+  <div class="sec-head">
+    <span class="label">Дизайн</span>
+    <h2 id="design-h">Что нужно от дизайнеров</h2>
+    <p>Продукт работает в брендинге клиники, поэтому дизайнеры делают не один интерфейс, а систему, которая выдерживает чужой логотип и цвет. Визуальные ограничения такие же жёсткие, как в коде.</p>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Что сдают</th><th>Состав</th><th>Срок</th></tr></thead>
+      <tbody>
+        <tr><td class="k">Потоки и каркасы</td><td>Путь пациента от SMS до заявки и до пересдачи. Путь врача по очереди. Каркасы P1–P5, D1.</td><td>14–15.10</td></tr>
+        <tr><td class="k">Система тем клиники</td><td>Какие токены меняет клиника (логотип, акцент, название), что остаётся нашим. Правило: если акцент клиники не проходит контраст, подставляем свой.</td><td>15.10</td></tr>
+        <tr><td class="k">Макеты пациента</td><td>P1–P8 во всех состояниях, ширина 360, проверка 390. Два примера тем разных клиник.</td><td>16–19.10</td></tr>
+        <tr><td class="k">Очередь врача</td><td>D1–D2. Врач отмечает шаг за секунды, между приёмами, с телефона и с компьютера.</td><td>19–20.10</td></tr>
+        <tr><td class="k">Раздел клиники</td><td>A1–A3, отчёт против контроля: как показать разницу групп понятно руководителю.</td><td>20–21.10</td></tr>
+        <tr><td class="k">Тексты вне интерфейса</td><td>Шаблоны SMS (до 70 знаков кириллицей на сегмент), блок со ссылкой для письма МИС, табличка с QR для стойки администратора.</td><td>21.10</td></tr>
+        <tr><td class="k">Компоненты и передача</td><td>Статусы шагов и заявок, карточка врача, выбор формата, таблица отчёта, тосты. Файл в Figma, токены переменными, отступы, адаптив, контраст WCAG AA.</td><td>22.10</td></tr>
+        <tr><td class="k">Ревью вёрстки</td><td>Один проход, список правок в одном месте.</td><td>26–27.10</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="cols2">
+    <div class="card stop">
+      <h3>Чего в дизайне нет</h3>
+      <ul>
+        <li>Цветов, значков и шкал, которые оценивают результат.</li>
+        <li>Медицинских символов, графиков здоровья, процентов и баллов.</li>
+        <li>ИИ-помощника, аватара-врача, «умной оценки».</li>
+        <li>Тревожных акцентов: восклицаний, красных плашек, таймеров для пациента.</li>
+      </ul>
+    </div>
+    <div class="card ok">
+      <h3>Что решить вместе с продуктом</h3>
+      <ul>
+        <li>Как шаг врача выглядит лично, но не тревожно.</li>
+        <li>Как подать цену быстрого ответа врача, чтобы это читалось как услуга клиники.</li>
+        <li>Как пациент понимает, что запись подтвердит администратор, а не система.</li>
+        <li>Шрифт взамен Stolzl с лицензией и кириллицей.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="sec" id="clinic" aria-labelledby="clinic-h">
+  <div class="sec-head">
+    <span class="label">Зависимости</span>
+    <h2 id="clinic-h">Что нужно от клиники и юриста до КТ1</h2>
+  </div>
+  <div class="cols2">
+    <div class="card">
+      <h3>От клиники</h3>
+      <ol>
+        <li>Объём от 500 выданных результатов анализов крови в неделю, иначе пилот не покажет эффект.</li>
+        <li>Событие «анализы готовы» из МИС или ежедневная выгрузка.</li>
+        <li>Еженедельная выгрузка визитов с суммами оплат.</li>
+        <li>Доступ к CRM для вебхука или адрес для уведомлений.</li>
+        <li>Врачи, форматы, цены, ссылки на оплату, таблица «цель → врачи», тексты памяток.</li>
+        <li>Один-два врача для очереди.</li>
+        <li>Базовая доля оплаченных визитов за 30 дней после анализа.</li>
+      </ol>
+    </div>
+    <div class="card">
+      <h3>Вопросы юристу</h3>
+      <div class="dec"><span class="q">Очередь врача и отметка шага — коммуникация, а не интерпретация?</span><span class="a">Критерии письма Росздравнадзора № 02И-297/20.</span></div>
+      <div class="dec"><span class="q">Первое SMS информационное или рекламное?</span><span class="a">Какой текст допустим без согласия на рекламу.</span></div>
+      <div class="dec"><span class="q">Договор поручения и согласия</span><span class="a">Оператор — клиника, rescan обрабатывает по поручению.</span></div>
+      <div class="dec"><span class="q">Контрольная группа</span><span class="a">Можно ли не отправлять сообщения части пациентов и нужно ли это раскрывать.</span></div>
+    </div>
+  </div>
+</section>
+
+<section class="sec" aria-labelledby="code-h">
+  <div class="sec-head">
+    <span class="label">Код</span>
+    <h2 id="code-h">Что происходит с текущими сервисами</h2>
+    <p>Состояние по документам проекта на 04–10.10.2026. Что изменилось в репозитории позже, нужно сверить.</p>
+  </div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Компонент</th><th>В MVP</th><th>Что делаем</th></tr></thead>
+      <tbody>
+        <tr><td class="k">rescan_core</td><td><span class="st new">Новое</span></td><td>События, группы, очередь врача, доставка, заявки, маршрут, отчёт. База в РФ.</td></tr>
+        <tr><td class="k">Шлюз и веб-приложение</td><td><span class="st ext">Расширяем</span></td><td>Страница пациента по токену, очередь врача, раздел клиники. ИИ-помощник на этих маршрутах выключен.</td></tr>
+        <tr><td class="k">Сервис пути</td><td><span class="st frz">Берём модель</span></td><td>Статусы шагов и журнал переносим в <code>rescan_core</code>. Правила и SQLite не используем.</td></tr>
+        <tr><td class="k">Сервис клиники</td><td><span class="st frz">Берём модель</span></td><td>Справочник клиник и врачей как образец. Направления к партнёрам после пилота.</td></tr>
+        <tr><td class="k">Схема ядра v0</td><td><span class="st ext">Частично</span></td><td>Отдельная таблица персональных данных, журнал, <code>outbox</code>. Снимки, ИИ и правила не берём.</td></tr>
+        <tr><td class="k">Снимки и медикаменты</td><td><span class="st frz">Заморожены</span></td><td>Не относятся к MVP.</td></tr>
+        <tr><td class="k">Демо-стенд и Playwright</td><td><span class="st keep">Сохраняем</span></td><td>Добавляем сценарий «анализы готовы → заявка → визит → отчёт».</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="sec" id="risks" aria-labelledby="risks-h">
+  <div class="sec-head">
+    <span class="label">Риски и решения</span>
+    <h2 id="risks-h">Что может сорвать план</h2>
+  </div>
+  <div class="cols2">
+    <div class="card warn">
+      <h3>Риски</h3>
+      <div class="risk"><b>Врачи не работают с очередью</b><span>Тогда повода нет, и продукт снова превращается в общую рассылку. Меряем долю отмеченных пациентов с первой недели. Отметка должна занимать секунды.</span></div>
+      <div class="risk"><b>Клиника слишком маленькая</b><span>При объёме меньше 500 результатов в неделю эффект не отличить от шума. Берём две клиники или сразу ищем крупную.</span></div>
+      <div class="risk"><b>МИС не отдаёт событие</b><span>Запасной путь: ежедневный CSV от администратора. Если и его нет, остаётся ссылка в письме, и вход сильно слабеет.</span></div>
+      <div class="risk"><b>CRM у всех разная</b><span>В MVP только Битрикс24 и универсальный вебхук, остальные через уведомление администратору.</span></div>
+      <div class="risk"><b>Новогодние каникулы в окне наблюдения</b><span>Последние когорты получат 30 дней с праздниками. Сравнение с контролем это учитывает, абсолютные цифры читать с поправкой.</span></div>
+      <div class="risk"><b>Нет запаса по сроку</b><span>Договор, юрист и выгрузки зависят от людей вне команды. Сдвиг КТ1 сдвигает старт день в день.</span></div>
+    </div>
+    <div class="card">
+      <h3>Открытые решения</h3>
+      <div class="dec"><span class="q">Какая МИС и CRM у пилотной клиники</span><span class="a">Нужно к 16.10, от этого зависят B2 и B7.</span></div>
+      <div class="dec"><span class="q">SMS-провайдер и имя отправителя</span><span class="a">Регистрация имени занимает время, начать сейчас.</span></div>
+      <div class="dec"><span class="q">Есть ли у клиники быстрый ответ врача</span><span class="a">Если нет, ветка «обсудить» ведёт только на очный приём.</span></div>
+      <div class="dec"><span class="q">Хостинг в РФ</span><span class="a">Облако или сервер клиники. Нужно к 16.10.</span></div>
+      <div class="dec"><span class="q">Признак отклонения для выбора, кому писать</span><span class="a">Не в MVP. Вернуться после заключения юриста.</span></div>
+    </div>
+  </div>
+</section>
+
+<div class="foot">
+  <p>Основано на черновике команды от 06.10.2026, файле <code>rescan-product.md</code> от 13.10.2026, документах проекта и разборе двумя агентами. Сроки и объёмы в днях это мои оценки, их нужно подтвердить с командой. Расчёт объёма пилота: деление 75/25, 5% ошибки, 80% мощности, рост доли оплаченных визитов с 20% до 25% (допущение).</p>
+  <p>Правовая рамка: <a href="https://brace-lf.com/ru/informaciya/farmatsevticheskoe-i-meditsinskoe-pravo/programmnoe-obespechenie-meditsinskoe-izdelie-kriterii-registratsii" target="_blank" rel="noopener">обзор юристов о критериях ПО как медицинского изделия</a>. Это не юридическое заключение.</p>
+</div>
+
+</div>
+
+</body>
+</html>
