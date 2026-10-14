@@ -95,6 +95,20 @@ async function tickTeamMinute(): Promise<void> {
 }
 
 /**
+ * «Пятница»: план развития проектов — напоминания о контрольных точках за 3 и
+ * за 1 день и план недели по понедельникам (с 10:00 МСК, дедуп — team_digests).
+ */
+async function tickRoadmap(): Promise<void> {
+  try {
+    const { tickRoadmap: tick } = await import("./lib/team/roadmap/run");
+    const done = await tick();
+    if (done.length) console.log("[roadmap] сделано:", done.join(", "));
+  } catch (err) {
+    console.error("[roadmap] тик упал:", err instanceof Error ? err.message : String(err));
+  }
+}
+
+/**
  * «Пятница» фаундерам: снимок Telegram-канала и вопрос про Instagram в
  * 21:00 МСК, сводка в 10:00 и 22:30. Окна и дедуп — в lib/team/founders/.
  */
@@ -175,6 +189,10 @@ export async function register(): Promise<void> {
       const { applyRosterAll } = await import("./lib/team/access");
       const n = await applyRosterAll();
       if (n) console.log(`[team] roster: дописаны профили ${n} чел.`);
+      // План развития RESCAN — сид один раз (повторный запуск ничего не дублирует).
+      const { applyProjectSeeds } = await import("./lib/team/roadmap/run");
+      const seeded = await applyProjectSeeds();
+      if (seeded) console.log(`[team] roadmap: добавлено пунктов ${seeded}`);
     } catch (err) {
       console.error("[team] roster:", err instanceof Error ? err.message : String(err));
     }
@@ -198,6 +216,7 @@ export async function register(): Promise<void> {
   void tickTeamDigests();
   void tickFounderReports();
   void tickCoffeeRunWeek();
+  void tickRoadmap();
   void tickDatabotCleanup();
   void tickDatabotTaskReminders();
   const timer = setInterval(() => {
@@ -206,6 +225,7 @@ export async function register(): Promise<void> {
     void tickTeamDigests();
     void tickFounderReports();
     void tickCoffeeRunWeek();
+    void tickRoadmap();
     void tickDatabotCleanup();
     void tickDatabotTaskReminders();
   }, REMINDER_TICK_MS);

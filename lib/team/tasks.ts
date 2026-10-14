@@ -9,6 +9,8 @@ import type { Zone } from "../databot/types";
 import { findMember, listProjectTeam, type TeamMember } from "./access";
 import { DEFAULT_SCOPE, recordProject, scopeForRecord, scopeOf, type Scope } from "./projects/scope";
 import { withProjectLabel } from "./projects/labels";
+import { checkRoadmapCompletion } from "./roadmap/complete";
+import { supabaseRoadmapStore } from "./roadmap/store";
 import { NIKA } from "./projects/projects";
 import { isFounder } from "./config";
 import {
@@ -60,6 +62,8 @@ export interface TeamTaskDeps {
   isAdmin?: (chatId: number) => boolean;
   /** Кнопка из старого сообщения задачи другого проекта: зависимости того проекта (null — человек в нём не состоит). */
   rescope?: (projectId: string) => Promise<TeamTaskDeps | null>;
+  /** Задача стала выполненной (план развития: все задачи пункта закрыты?). */
+  onTaskDone?: (api: Pick<Api, "sendMessage">, task: AssignedTask) => Promise<void>;
 }
 
 export function defaultTaskDeps(scope: Scope = DEFAULT_SCOPE, ctx?: Context): TeamTaskDeps {
@@ -67,6 +71,9 @@ export function defaultTaskDeps(scope: Scope = DEFAULT_SCOPE, ctx?: Context): Te
     store: createSupabaseStore(), findMember, forms: supabaseTeamForms(),
     listTeam: () => listProjectTeam(scope.project.id),
     projectId: scope.project.id, isAdmin: scope.isAdmin,
+    onTaskDone: async (api, task) => {
+      await checkRoadmapCompletion(api, { roadmap: supabaseRoadmapStore(), tasks: createSupabaseStore() }, task).catch(() => {});
+    },
     ...(ctx ? { rescope: async (projectId: string) => {
       const s = await scopeForRecord(ctx, projectId);
       return s ? defaultTaskDeps(s, ctx) : null;
@@ -354,6 +361,7 @@ async function pressStatus(ctx: Context, deps: TeamTaskDeps, uid: number, action
     return true;
   }
   const { task, previous } = result;
+  if (action === "done" && previous !== "done") await deps.onTaskDone?.(ctx.api, task);
   const [names, mates] = await Promise.all([namesOf(deps), deps.store.listAssignedTeammates(task)]);
   await show(ctx, myTaskCard(task, uid, names, mates, now, { tab: "me", page: 0 }, adminOf(deps, uid)), true);
   const notice = authorNoticeText(task, previous);

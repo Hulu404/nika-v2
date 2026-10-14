@@ -23,7 +23,11 @@ import { touchSeen } from "./seen";
 import { handleSocialSectionUpdate } from "./founders/section";
 import { defaultTeamScreenDeps, handleTeamScreenUpdate, showTeam } from "./team-screen";
 import { defaultCoffeeWeekDeps, handleCoffeeWeekUpdate } from "./coffee-run-week";
-import { closeAiDraft, defaultAssistantDeps, handleAiMessage, handleAiUpdate, type AssistantDeps } from "./ai/assistant";
+import { closeAiDraft, defaultAssistantDeps, handleAiMessage, handleAiUpdate, startTaskDraft, type AssistantDeps } from "./ai/assistant";
+import { validateIntent } from "./ai/intent";
+import { handleRoadmapUpdate } from "./roadmap/screen";
+import type { RoadmapItem } from "./roadmap/store";
+import { personName } from "./roster";
 import { supabaseDraftStore, supabaseParticipantStore } from "./ai/stores";
 import { teamAiConfig } from "./ai/yandex";
 import { aiCheckText, defaultCheckDeps } from "./ai/check";
@@ -137,6 +141,18 @@ function assistantDeps(scope: Scope = DEFAULT_SCOPE): AssistantDeps {
       },
     ),
   }, scope);
+}
+
+/** «📋 Сделать задачей» в плане развития: обычный предпросмотр, исполнитель — ответственный пункта. */
+async function makeRoadmapTask(ctx: TeamContext, item: RoadmapItem): Promise<void> {
+  if (!ctx.from) return;
+  const deps = assistantDeps(scopeOf(ctx));
+  const owner = (await deps.listTeam()).find((m) => m.chat_id === item.owner_chat_id);
+  const parsed = validateIntent({
+    intent: "create_task", what: `${item.code ? `${item.code} · ` : ""}${item.title}`, due: item.due_date ?? "",
+    assignees: owner ? [{ name: personName(owner), qualifier: null }] : [],
+  });
+  await startTaskDraft(ctx, deps, ctx.from.id, parsed, { roadmapItemId: item.id, picks: owner ? { a0: owner.chat_id } : {} });
 }
 
 /** Команды разделов, которые есть не у всех проектов. */
@@ -284,6 +300,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     if (await handleEventsUpdate(ctx)) return;
     if (await handleSocialSectionUpdate(ctx)) return;
     if (await handleTeamScreenUpdate(ctx)) return;
+    if (await handleRoadmapUpdate(ctx, undefined, new Date(), makeRoadmapTask)) return;
     if (await handleCoffeeWeekUpdate(ctx, defaultCoffeeWeekDeps())) return;
     // Кнопки черновика и «✏️ Изменить» — после всех форм: уточнение ждём, только если открыто именно оно.
     if (await handleAiUpdate(ctx, () => assistantDeps(scopeOf(ctx)))) return;

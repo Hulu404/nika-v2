@@ -1,24 +1,19 @@
 import { listProjectTeam } from "../access";
-import { supabaseProjectStore, type Project } from "../projects/projects";
+import { hasModule, supabaseProjectStore } from "../projects/projects";
+import { roadmapDigestLines } from "../roadmap/reminders";
+import { supabaseRoadmapStore } from "../roadmap/store";
 import type { FounderDigestDeps } from "./digest";
 
 /**
  * Сводка фаундерам по проектам: список проектов, команда каждого и строки
- * модулей (план развития — lib/team/roadmap). Модуль, у которого есть что
- * сказать в сводке, регистрирует себя здесь.
+ * модулей — у проекта с планом развития ближайшая точка и просрочки.
  */
-
-type ExtraFn = (project: Project, now: Date) => Promise<string[]>;
-const extras: ExtraFn[] = [];
-
-export function registerFounderDigestExtra(fn: ExtraFn): void {
-  if (!extras.includes(fn)) extras.push(fn);
-}
-
 export function founderProjectDeps(): Pick<FounderDigestDeps, "projects" | "teamOf" | "projectExtra"> {
   return {
     projects: () => supabaseProjectStore().list(),
     teamOf: (projectId) => listProjectTeam(projectId),
-    projectExtra: async (project, now) => (await Promise.all(extras.map((fn) => fn(project, now).catch(() => [])))).flat(),
+    projectExtra: async (project, now) => (hasModule(project, "roadmap")
+      ? roadmapDigestLines(supabaseRoadmapStore(), await listProjectTeam(project.id), project.id, now).catch(() => [])
+      : []),
   };
 }

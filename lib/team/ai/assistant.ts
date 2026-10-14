@@ -33,6 +33,8 @@ import {
   type ReminderStore,
 } from "./stores";
 import { executeTool, TOOL_SPECS, type ToolContext } from "./tools";
+import { checkRoadmapCompletion } from "../roadmap/complete";
+import { supabaseRoadmapStore } from "../roadmap/store";
 import { GUARD_FAIL_TEXT, GUARD_RETRY_NOTE, fabricated, looksLikeListing } from "./guard";
 import { AI_FAIL_TEXT, TeamAiError, VOICE_MAX_BYTES, VOICE_MAX_SECONDS, aiErrorText, defaultTeamAi, teamAiConfig, type TeamAi } from "./yandex";
 
@@ -73,6 +75,8 @@ export interface AssistantDeps {
   projectId?: string;
   /** Админ проекта (по умолчанию — фаундер). */
   isAdmin?: (chatId: number) => boolean;
+  /** Задача стала выполненной (проверка плана развития: все задачи пункта закрыты?). */
+  onTaskDone?: (api: Pick<Api, "sendMessage">, task: AssignedTask) => Promise<void>;
 }
 
 /** Голосовое из Telegram — в память, никуда не пишем. */
@@ -101,6 +105,9 @@ export function defaultAssistantDeps(screens: Pick<AssistantDeps, "showSchedule"
     downloadVoice,
     projectId: scope.project.id,
     isAdmin: scope.isAdmin,
+    onTaskDone: async (api, task) => {
+      await checkRoadmapCompletion(api, { roadmap: supabaseRoadmapStore(), tasks: createSupabaseStore() }, task).catch(() => {});
+    },
     ...screens,
   };
 }
@@ -319,6 +326,18 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
   return true;
 }
 
+/**
+ * Черновик задачи от кода (например, «📋 Сделать задачей» в плане развития):
+ * тот же предпросмотр и «✅ Подтвердить», что у ассистента; не хватает
+ * исполнителя — вопрос с кнопками.
+ */
+export async function startTaskDraft(ctx: Context, deps: AssistantDeps, uid: number, parsed: Intent, extra: Partial<DraftBody>, now = new Date()): Promise<void> {
+  const team = await deps.listTeam();
+  const body: DraftBody = { parsed, picks: {}, ...extra };
+  const draft = await deps.drafts.create({ chat_id: uid, intent: body, source_text: null }, now);
+  await present(ctx, deps, draft, body, team, uid, now, "reply");
+}
+
 /** Закрыть открытый черновик (кнопка меню или команда посреди него). */
 export async function closeAiDraft(api: Pick<Api, "editMessageText">, drafts: DraftStore, uid: number, form: TeamForm): Promise<void> {
   if (form.kind !== "ai.edit") return;
@@ -367,7 +386,8 @@ async function confirm(ctx: Context, deps: AssistantDeps, draft: Draft, uid: num
     }
     const due = p.due ? mskLocalToDate(p.due).toISOString() : null;
     const drafts: AssignedTaskDraft[] = usernames.map((username) => ({ line: 1, username, what: p.what, due_at: due }));
-    const tasks = await deps.tasks.importAssignedTasks(uid, draft.message_id ?? draft.id, drafts, { projectId: deps.projectId ?? NIKA });
+    const tasks = await deps.tasks.importAssignedTasks(uid, draft.message_id ?? draft.id, drafts,
+      { projectId: deps.projectId ?? NIKA, roadmapItemId: draft.intent.roadmapItemId ?? null });
     await deliverAssigned(ctx.api, deps.tasks, tasks.filter((t) => t.delivery_state === "pending"), author?.username ?? undefined, now);
     // Кто — в именительном, без собранных кодом склонений: «Маша», «SMM», «ты».
     return `✅ Задача поставлена: ${slots.map((s) => listName(s, uid)).join(", ")}, ${due ? `срок ${whenText(due)}` : "без срока"}`;
@@ -424,6 +444,7 @@ async function confirm(ctx: Context, deps: AssistantDeps, draft: Draft, uid: num
           await tell(t.assignee_id, `✅ Задача ${what} отмечена выполненной (отметил ${escapeHtmlTeam(authorTag)}).`);
         } else continue;
         if (t.assigned_by !== uid && t.assigned_by !== t.assignee_id) await tell(t.assigned_by, `✅ @${escapeHtmlTeam(t.username)}: ${what} — выполнено.`);
+        await deps.onTaskDone?.(ctx.api, t);
       } else {
         if (t.assignee_id !== uid || !isActiveAssigned(t)) continue;
         await deps.tasks.setAssignedStatus(id, uid, "take");

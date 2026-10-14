@@ -18,6 +18,8 @@ export interface DraftBody {
   asked?: number;
   /** Неудачных ответов на текущий вопрос подряд. */
   failures?: number;
+  /** Пункт плана развития, к которому привяжется задача («📋 Сделать задачей»). */
+  roadmapItemId?: number | null;
 }
 
 export interface Draft {

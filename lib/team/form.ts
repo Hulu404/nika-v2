@@ -26,9 +26,11 @@ export type TeamFormKind =
   | "cw.time"       // кофе-ран недели: своё время, params.week, params.ymd
   | "cw.place"      // кофе-ран недели: своё место, params.week, params.ymd, params.hhmm
   | "tm.edit"       // «👥 Команда»: новое имя, должность или варианты имени, params.id, params.field
-  | "ai.edit";      // уточнение к черновику из голоса или текста: params.draft
+  | "ai.edit"       // уточнение к черновику из голоса или текста: params.draft
+  | "rm.due"        // план развития: новый срок пункта, params.id
+  | "pi.edit";      // «О проекте»: новый текст раздела, params.section
 
-const KINDS: readonly TeamFormKind[] = ["task.upload", "task.due", "event.new", "event.draft", "event.time", "attend", "social.ig", "cw.time", "cw.place", "tm.edit", "ai.edit"];
+const KINDS: readonly TeamFormKind[] = ["task.upload", "task.due", "event.new", "event.draft", "event.time", "attend", "social.ig", "cw.time", "cw.place", "tm.edit", "ai.edit", "rm.due", "pi.edit"];
 
 export interface TeamForm {
   kind: TeamFormKind;
