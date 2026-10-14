@@ -26,6 +26,7 @@ import { defaultCoffeeWeekDeps, handleCoffeeWeekUpdate } from "./coffee-run-week
 import { closeAiDraft, defaultAssistantDeps, handleAiMessage, handleAiUpdate, startTaskDraft, type AssistantDeps } from "./ai/assistant";
 import { validateIntent } from "./ai/intent";
 import { handleRoadmapUpdate } from "./roadmap/screen";
+import { handleAboutUpdate } from "./about/screen";
 import type { RoadmapItem } from "./roadmap/store";
 import { personName } from "./roster";
 import { supabaseDraftStore, supabaseParticipantStore } from "./ai/stores";
@@ -301,6 +302,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     if (await handleSocialSectionUpdate(ctx)) return;
     if (await handleTeamScreenUpdate(ctx)) return;
     if (await handleRoadmapUpdate(ctx, undefined, new Date(), makeRoadmapTask)) return;
+    if (await handleAboutUpdate(ctx)) return;
     if (await handleCoffeeWeekUpdate(ctx, defaultCoffeeWeekDeps())) return;
     // Кнопки черновика и «✏️ Изменить» — после всех форм: уточнение ждём, только если открыто именно оно.
     if (await handleAiUpdate(ctx, () => assistantDeps(scopeOf(ctx)))) return;

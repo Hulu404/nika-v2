@@ -7,12 +7,19 @@ import { rescanSeed } from "../projects/rescan-seed";
 import { normUsername } from "../roster";
 import { claimDigest, dispatchRoadmapReminders } from "./reminders";
 import { supabaseRoadmapStore } from "./store";
+import { supabaseAboutStore } from "../about/store";
+import { RESCAN_ABOUT, RESCAN_QUESTIONS } from "../projects/rescan-about-seed";
 
-/** Сид плана развития RESCAN — один раз при старте (идемпотентно по project_id + code). */
+/** Сиды RESCAN — план развития и «О проекте» — один раз при старте; повторный запуск ничего не дублирует. */
 export async function applyProjectSeeds(now = new Date()): Promise<number> {
   const team = await listTeam();
   const ownerOf = (username: string) => team.find((m) => normUsername(m.username) === normUsername(username))?.chat_id ?? null;
-  return supabaseRoadmapStore().seed(RESCAN, rescanSeed(ownerOf), now);
+  const roadmap = await supabaseRoadmapStore().seed(RESCAN, rescanSeed(ownerOf), now);
+  const about = await supabaseAboutStore().seed(RESCAN, RESCAN_ABOUT, RESCAN_QUESTIONS, now).catch((err) => {
+    console.error("[team] about seed:", err instanceof Error ? err.message : String(err));
+    return 0;
+  });
+  return roadmap + about;
 }
 
 /** Проход 15-минутного тикера: напоминания о контрольных точках и план недели. */
