@@ -142,6 +142,15 @@ describe("человек только из rescan не видит ничего �
     expect(sent.join("\n")).not.toMatch(/Сальма|salmasxsx/);
   });
 
+  it("Вика в обоих проектах: задача RESCAN не видна в NIKA, задача NIKA — в RESCAN", async () => {
+    await tasks.importAssignedTasks(DIMA, 4, [{ line: 1, username: "dissidenceandtea", what: "API очереди врача", due_at: null }], { projectId: RESCAN });
+    await tasks.importAssignedTasks(DIMA, 5, [{ line: 1, username: "dissidenceandtea", what: "Обложка для поста", due_at: null }]);
+    const mine = async (projectId: string) => JSON.parse(await executeTool(tool(VIKA, projectId), { name: "list_tasks", arguments: { scope: "mine", status: "all" } }))
+      .items.map((i: { what: string }) => i.what);
+    expect(await mine(RESCAN)).toEqual(["API очереди врача"]);
+    expect(await mine(NIKA)).toEqual(["Обложка для поста"]);
+  });
+
   it("чужую задачу nika по id не закрыть из rescan", async () => {
     const res = JSON.parse(await executeTool(tool(DIMA, RESCAN), { name: "set_task_status", arguments: { task_ids: [1, 2], status: "cancelled" } }));
     expect(res.error).toBeDefined();

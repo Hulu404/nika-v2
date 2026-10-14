@@ -162,6 +162,17 @@ describe("кофе-ран недели", () => {
       expect(sentTo(/Ты ответственный за кофе-ран/)).toEqual([3]);
     });
 
+    it("кофе-ран — только в nika: событие и задачи без проекта RESCAN", async () => {
+      await press("cw:pick:2026-10-12", 8);
+      await press("cw:d:2026-10-12:2026-10-18", 8);
+      await press("cw:t:2026-10-12:2026-10-18:1000", 8);
+      await press("cw:s:2026-10-12:2026-10-18:1000:usachevo", 8);
+      expect([...events.events.values()].map((e) => e.project_id ?? "nika")).toEqual(["nika"]);
+      const made = await tasks.listAssignedOverview(new Date(0));
+      expect(made.length).toBeGreaterThan(0);
+      expect(made.every((t) => (t.project_id ?? "nika") === "nika")).toBe(true);
+    });
+
     it("своё время и своё место — сообщениями", async () => {
       await press("cw:to:2026-10-12:2026-10-17", 9);
       await send("8:30", 9);

@@ -93,11 +93,12 @@ describe("ассистент в проектах", () => {
     expect(tools).not.toContain("get_roadmap");
   });
 
-  it("get_roadmap: условия КТ1 показывает бот, модель получает пункты", async () => {
-    h.deps = scoped(RESCAN_P, MASHA_DESIGN);
-    h.script = [call("get_roadmap", { milestone: "кт1" }), reply("До КТ1 два дня.")];
-    await h.say("что осталось до первой контрольной точки?", MASHA_DESIGN);
+  it("«что у нас по КТ1?» → get_roadmap(milestone=КТ1): список с кодами показывает бот, модель получает пункты", async () => {
+    h.deps = scoped(RESCAN_P, VIKA_DEV);
+    h.script = [call("get_roadmap", { milestone: "КТ1" }), reply("До КТ1 два дня.")];
+    await h.say("что у нас по КТ1?", VIKA_DEV);
     expect(h.texts().join("\n")).toContain("Условия · готово 0 из 11");
+    expect(h.texts().join("\n")).toContain("○ CL1 · Объём от 500");
     const result = toolResult(h);
     expect(result).toContain("CL1");
   });
@@ -144,16 +145,16 @@ describe("ассистент в проектах", () => {
     expect(h.texts().join("\n")).toContain("Какая МИС у пилотной клиники");
   });
 
-  it("исполнитель в другом проекте человека: «Сальма в проекте NIKA. Поставить задачу там?» → задача в NIKA", async () => {
-    h.deps = scoped(RESCAN_P, DIMA);
+  it("«поставь Сальме…» у Вики в RESCAN: «Сальма в проекте NIKA. Поставить задачу там?» → задача в NIKA", async () => {
+    h.deps = scoped(RESCAN_P, VIKA_DEV);
     h.script = [call("create_task", { assignees: [{ name: "Сальме" }], what: "забронировать зал" }), reply("")];
-    await h.say("поставь Сальме забронировать зал", DIMA);
+    await h.say("поставь Сальме забронировать зал", VIKA_DEV);
     const ask = h.last();
     expect(ask.text).toBe("Сальма в проекте NIKA. Поставить задачу там?");
     expect(ask.buttons.map((b) => b.text)).toEqual(["Да, в NIKA", "Отмена"]);
-    await h.press(ask.buttons[0].data!, DIMA);
+    await h.press(ask.buttons[0].data!, VIKA_DEV);
     expect(h.preview().text).toMatch(/^Проверь, пожалуйста · 🏃 NIKA:/);
-    await h.press(h.button("✅ Подтвердить")!, DIMA);
+    await h.press(h.button("✅ Подтвердить")!, VIKA_DEV);
     const tasks = await h.tasks.listAssignedOverview(new Date(0));
     expect(tasks).toHaveLength(1);
     expect(tasks[0]).toMatchObject({ project_id: NIKA, assignee_id: SALMA, what: "забронировать зал" });
