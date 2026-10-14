@@ -275,6 +275,9 @@ export const MENU = {
   schedule: "🗓 Расписание",
   events: "🏃 Ивенты",
   team: "👥 Команда",
+  roadmap: "🗺 План развития",
+  about: "📌 О проекте",
+  project: "🔀 Проект",
 } as const;
 
 export type MenuSection = keyof typeof MENU;
@@ -285,23 +288,48 @@ const MENU_COMMAND: Record<MenuSection, string> = {
   schedule: "/schedule",
   events: "/events",
   team: "/team",
+  roadmap: "/roadmap",
+  about: "/about",
+  project: "/project",
 };
 
-/** Раздел по тексту кнопки меню; null — это не кнопка. */
+/** Раздел по тексту кнопки меню; null — это не кнопка. «🔀 Проект: RESCAN» — переключатель. */
 export function menuSection(text: string | undefined | null): MenuSection | null {
   const t = (text ?? "").trim();
+  if (t.startsWith(MENU.project)) return "project";
   return (Object.keys(MENU) as MenuSection[]).find((k) => MENU[k] === t) ?? null;
 }
 
-export const menuCommand = (section: MenuSection) => MENU_COMMAND[section];
+export function menuCommand(section: MenuSection): string {
+  return MENU_COMMAND[section];
+}
 
-export function menuKeyboard(): Keyboard {
-  return new Keyboard()
-    .text(MENU.tasks).text(MENU.assign).row()
-    .text(MENU.schedule).text(MENU.events).row()
-    .text(MENU.team)
-    .resized()
-    .persistent();
+/** Проект для клавиатуры: какие разделы есть и как его назвать в переключателе. */
+export interface MenuProject {
+  name: string;
+  modules: readonly string[];
+}
+
+/**
+ * Постоянная клавиатура. Разделы — по модулям проекта (по умолчанию как у
+ * NIKA), по две кнопки в ряд. У человека в нескольких проектах первая строка —
+ * переключатель «🔀 Проект: RESCAN»; у человека в одном проекте её нет.
+ */
+export function menuKeyboard(project?: MenuProject, multi = false): Keyboard {
+  const modules = project?.modules ?? ["events"];
+  const buttons: string[] = [MENU.tasks, MENU.assign];
+  if (modules.includes("roadmap")) buttons.push(MENU.roadmap);
+  buttons.push(MENU.schedule);
+  if (modules.includes("events")) buttons.push(MENU.events);
+  if (modules.includes("about")) buttons.push(MENU.about);
+  buttons.push(MENU.team);
+  const kb = new Keyboard();
+  if (multi && project) kb.text(`${MENU.project}: ${project.name}`).row();
+  buttons.forEach((b, i) => {
+    kb.text(b);
+    if (i % 2 === 1 && i < buttons.length - 1) kb.row();
+  });
+  return kb.resized().persistent();
 }
 
 /** Первый экран для чужого: как войти. Ключ, разумеется, не называем. */
@@ -875,9 +903,12 @@ export function eventDraftText(d: { title: string; startsAt: string; place: stri
   ].filter((l): l is string => l !== null).join("\n");
 }
 
-export const eventKindKeyboard = () =>
-  new InlineKeyboard().text("Ивент клуба", eventCb.kind("club")).text("Планёрка", eventCb.kind("meeting")).text("Другое", eventCb.kind("other"))
-    .row().text("Не добавлять", eventCb.drop());
+/** Тип события; «Ивент клуба» — только в проектах с клубами (модуль events). */
+export const eventKindKeyboard = (clubs = true) => {
+  const kb = new InlineKeyboard();
+  if (clubs) kb.text("Ивент клуба", eventCb.kind("club"));
+  return kb.text("Планёрка", eventCb.kind("meeting")).text("Другое", eventCb.kind("other")).row().text("Не добавлять", eventCb.drop());
+};
 
 export function eventClubKeyboard(): InlineKeyboard {
   const kb = new InlineKeyboard();

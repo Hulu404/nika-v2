@@ -35,7 +35,7 @@ import {
   type TeamEventKind,
   type TeamEventStore,
 } from "./events";
-import { DEFAULT_SCOPE, scopeOf, type Scope } from "./projects/scope";
+import { DEFAULT_SCOPE, scopeForRecord, scopeOf, type Scope } from "./projects/scope";
 import { openTeamForm, supabaseTeamForms, teamFormExpired, type TeamFormStore } from "./form";
 import { mskMidnight } from "../databot/dates";
 import { addDays } from "../databot/time";
@@ -57,13 +57,21 @@ export interface ScheduleDeps {
   isAdmin?: (chatId: number) => boolean;
   /** Модули проекта: без events нет ивентов клубов (по умолчанию — как у nika). */
   modules?: readonly string[];
+  /** Кнопка события из другого проекта: зависимости того проекта (null — человек в нём не состоит). */
+  rescope?: (projectId: string) => Promise<ScheduleDeps | null>;
+  /** Проект расписания (по умолчанию nika). */
+  projectId?: string;
 }
 
 /** Расписание проекта: события и команда только этого проекта. */
-export function defaultScheduleDeps(scope: Scope = DEFAULT_SCOPE): ScheduleDeps {
+export function defaultScheduleDeps(scope: Scope = DEFAULT_SCOPE, ctx?: Context): ScheduleDeps {
   return {
     events: scopedEvents(supabaseEventStore(), scope.project.id), forms: supabaseTeamForms(), findMember,
-    listTeam: () => listProjectTeam(scope.project.id), isAdmin: scope.isAdmin, modules: scope.project.modules,
+    listTeam: () => listProjectTeam(scope.project.id), isAdmin: scope.isAdmin, modules: scope.project.modules, projectId: scope.project.id,
+    ...(ctx ? { rescope: async (projectId: string) => {
+      const s = await scopeForRecord(ctx, projectId);
+      return s ? defaultScheduleDeps(s, ctx) : null;
+    } } : {}),
   };
 }
 
@@ -123,8 +131,23 @@ export async function handleScheduleUpdate(ctx: Context, providedDeps?: Schedule
   const isFreeText = !!text && !text.startsWith("/");
   if (!command && !cb && !isFreeText) return false;
 
-  const deps = providedDeps ?? defaultScheduleDeps(scopeOf(ctx));
+  let deps = providedDeps ?? defaultScheduleDeps(scopeOf(ctx), ctx);
   const uid = ctx.from.id;
+  // Кнопка события из другого проекта (старое сообщение): работаем в проекте события.
+  const eventId = cb && ["o", "r", "t", "x", "X"].includes(cb[1]) ? Number(cb[2]) : null;
+  if (eventId && deps.rescope) {
+    const ev = await deps.events.get(eventId).catch(() => null);
+    const evProject = ev?.project_id ?? "nika";
+    if (ev && evProject !== (deps.projectId ?? "nika")) {
+      const other = await deps.rescope(evProject);
+      if (!other) {
+        await ctx.answerCallbackQuery().catch(() => {});
+        await ctx.reply("Это событие в проекте, где тебя нет.");
+        return true;
+      }
+      deps = other;
+    }
+  }
   let form = isFreeText ? await deps.forms.get(uid) : null;
   if (isFreeText && form?.kind !== "event.new" && form?.kind !== "event.time") return false;
 
@@ -234,7 +257,7 @@ async function startDraft(ctx: Context, deps: ScheduleDeps, uid: number, text: s
     resp: responsible ? String(responsible.chat_id) : "",
     respName: responsible?.username ?? "",
   }, now), now);
-  await ctx.reply(`${eventDraftText(draft, responsible?.username ?? null)}\n\nЧто это?`, { ...HTML, reply_markup: eventKindKeyboard() });
+  await ctx.reply(`${eventDraftText(draft, responsible?.username ?? null)}\n\nЧто это?`, { ...HTML, reply_markup: eventKindKeyboard((deps.modules ?? ["events"]).includes("events")) });
 }
 
 async function draftStep(ctx: Context, deps: ScheduleDeps, uid: number, op: string, value: string, now: Date): Promise<void> {

@@ -76,5 +76,23 @@ export function scopeOf(ctx: Context | object | undefined): Scope {
 
 export const projectIdOf = (ctx: Context | object | undefined) => scopeOf(ctx).project.id;
 
+const defaultDeps = async (): Promise<ScopeDeps> => {
+  const [{ supabaseProjectStore }, { supabaseMembershipStore }] = await Promise.all([import("./projects"), import("./members")]);
+  return { projects: supabaseProjectStore(), memberships: supabaseMembershipStore() };
+};
+
+/**
+ * Область проекта записи из старой кнопки: действие выполняется в проекте
+ * задачи или события, а не в current_project, — с правами в нём. null —
+ * человек в этом проекте не состоит.
+ */
+export async function scopeForRecord(ctx: Context, projectId: string, deps?: ScopeDeps): Promise<Scope | null> {
+  const base = scopeOf(ctx);
+  if (base.project.id === projectId) return base;
+  const project = base.projects.find((p) => p.id === projectId);
+  if (!project) return null;
+  return scopeFor(deps ?? (await defaultDeps()), project, base.projects);
+}
+
 /** Запись (задача, событие) из старой кнопки — в каком она проекте. */
 export const recordProject = (r: { project_id?: string | null } | null | undefined) => r?.project_id ?? NIKA;

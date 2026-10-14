@@ -16,13 +16,13 @@ vi.mock("./access", () => ({
   applyRoster: async () => {},
   listProjectTeam: async () => [...roster.values()],
   markProfileEdited: async () => {},
-  setCurrentProject: async () => {},
+  setCurrentProject: async (id: number, p: string) => void shared.current.push([id, p]),
   updateProfile: async () => {},
 }));
 vi.mock("./projects/members", async (importOriginal) => {
   const real = await importOriginal<typeof import("./projects/members")>();
-  const store = new real.MemoryMembershipStore();
-  return { ...real, supabaseMembershipStore: () => store };
+  shared.memberships = new real.MemoryMembershipStore();
+  return { ...real, supabaseMembershipStore: () => shared.memberships };
 });
 vi.mock("./projects/projects", async (importOriginal) => {
   const real = await importOriginal<typeof import("./projects/projects")>();
@@ -33,7 +33,7 @@ vi.mock("../databot/data/supabase-store", async () => {
   const store = new MemoryStore();
   return { createSupabaseStore: () => store };
 });
-const shared = vi.hoisted(() => ({ forms: null as unknown, facts: null as unknown, events: null as unknown, drafts: null as unknown }));
+const shared = vi.hoisted(() => ({ forms: null as unknown, facts: null as unknown, events: null as unknown, drafts: null as unknown, memberships: null as unknown, current: [] as Array<[number, string]> }));
 vi.mock("./ai/stores", async (importOriginal) => {
   const real = await importOriginal<typeof import("./ai/stores")>();
   shared.drafts = new real.MemoryDraftStore();
@@ -63,6 +63,7 @@ import { MENU } from "./copy";
 import { openTeamForm, type MemoryTeamForms } from "./form";
 import type { MemoryFactStore } from "./attendance";
 import type { MemoryDraftStore } from "./ai/stores";
+import type { MemoryMembershipStore } from "./projects/members";
 
 const member = (chat_id: number, username: string): TeamMember => ({
   chat_id, username, display_name: username, role: "member", joined_at: "2026-10-01T00:00:00Z",
@@ -72,9 +73,12 @@ const member = (chat_id: number, username: string): TeamMember => ({
 describe("постоянное меню «Пятницы»", () => {
   let sent: Array<{ method: string; chat: number; text: string; markup: unknown }>;
   let send: (text: string, from?: number) => Promise<void>;
+  let pressCb: (data: string, from?: number) => Promise<void>;
 
   beforeEach(() => {
     roster.clear();
+    (shared.memberships as MemoryMembershipStore).rows = [];
+    shared.current.length = 0;
     roster.set(1, member(1, "alice"));
     resetMenuShown();
     (shared.forms as MemoryTeamForms).forms.clear();
@@ -88,6 +92,10 @@ describe("постоянное меню «Пятницы»", () => {
     });
     registerHandlers(bot);
     let id = 0;
+    pressCb = async (data, from = 1) => {
+      await bot.handleUpdate({ update_id: ++id, callback_query: { id: `c${id}`, chat_instance: "x", data, from: { id: from, is_bot: false, first_name: "x" },
+        message: { message_id: 1, date: 1, text: "x", chat: { id: from, type: "private", first_name: "x" } } } } as Update);
+    };
     send = async (text, from = 1) => {
       const entities = text.startsWith("/") ? [{ type: "bot_command" as const, offset: 0, length: text.split(" ")[0].length }] : undefined;
       await bot.handleUpdate({ update_id: ++id, message: { message_id: id, date: 1, text, entities,
@@ -162,6 +170,32 @@ describe("постоянное меню «Пятницы»", () => {
     expect(sent.at(-1)!.text).toBe("🔌 Проверка ИИ");
     expect(TEAM_COMMANDS.map((c) => c.command)).not.toContain("ai_check");
     vi.unstubAllEnvs();
+  });
+
+  it("/project у человека в одном проекте — без списка и без упоминания других проектов", async () => {
+    await send("/project");
+    expect(sent.at(-1)!.text).toBe("Ты в проекте 🏃 NIKA.");
+  });
+
+  it("человек в двух проектах: «🔀 Проект» → выбор → «Переключила на 🔬 RESCAN» и клавиатура RESCAN", async () => {
+    const ms = shared.memberships as MemoryMembershipStore;
+    await ms.add({ project_id: "nika", chat_id: 1 }, new Date());
+    await ms.add({ project_id: "rescan", chat_id: 1 }, new Date());
+    await send("/start");
+    const kb = sent.find((s) => (s.markup as { keyboard?: unknown })?.keyboard)!.markup as { keyboard: Array<Array<{ text: string }>> };
+    expect(kb.keyboard[0].map((b) => b.text)).toEqual(["🔀 Проект: NIKA"]);
+    sent = [];
+    await send("🔀 Проект: NIKA");
+    const list = sent.at(-1)!;
+    expect(list.text).toBe("Выбери проект:");
+    expect((list.markup as { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> }).inline_keyboard.flat().map((b) => b.text)).toEqual(["🏃 NIKA ✓", "🔬 RESCAN"]);
+    await pressCb("pj:rescan");
+    expect(shared.current).toEqual([[1, "rescan"]]);
+    const done = sent.at(-1)!;
+    expect(done.text).toBe("Переключила на 🔬 RESCAN");
+    expect((done.markup as { keyboard: Array<Array<{ text: string }>> }).keyboard.map((r) => r.map((b) => b.text))).toEqual([
+      ["🔀 Проект: RESCAN"], [MENU.tasks, MENU.assign], [MENU.roadmap, MENU.schedule], [MENU.about, MENU.team],
+    ]);
   });
 
   it("меню слэш-команд — только /start и /help", () => {

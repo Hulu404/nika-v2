@@ -7,7 +7,7 @@ import { normalizeTaskUsername } from "../databot/tasks";
 import { isActiveAssigned, parseTaskList, TaskListError, type AssignedTask } from "../databot/task-list";
 import type { Zone } from "../databot/types";
 import { findMember, listProjectTeam, type TeamMember } from "./access";
-import { DEFAULT_SCOPE, recordProject, scopeOf, type Scope } from "./projects/scope";
+import { DEFAULT_SCOPE, recordProject, scopeForRecord, scopeOf, type Scope } from "./projects/scope";
 import { NIKA } from "./projects/projects";
 import { isFounder } from "./config";
 import {
@@ -57,13 +57,19 @@ export interface TeamTaskDeps {
   projectId?: string;
   /** Админ проекта (по умолчанию — фаундер): видит все задачи проекта, правит и отменяет чужие. */
   isAdmin?: (chatId: number) => boolean;
+  /** Кнопка из старого сообщения задачи другого проекта: зависимости того проекта (null — человек в нём не состоит). */
+  rescope?: (projectId: string) => Promise<TeamTaskDeps | null>;
 }
 
-export function defaultTaskDeps(scope: Scope = DEFAULT_SCOPE): TeamTaskDeps {
+export function defaultTaskDeps(scope: Scope = DEFAULT_SCOPE, ctx?: Context): TeamTaskDeps {
   return {
     store: createSupabaseStore(), findMember, forms: supabaseTeamForms(),
     listTeam: () => listProjectTeam(scope.project.id),
     projectId: scope.project.id, isAdmin: scope.isAdmin,
+    ...(ctx ? { rescope: async (projectId: string) => {
+      const s = await scopeForRecord(ctx, projectId);
+      return s ? defaultTaskDeps(s, ctx) : null;
+    } } : {}),
   };
 }
 
@@ -185,8 +191,23 @@ export async function handleTeamTaskUpdate(ctx: Context, providedDeps?: TeamTask
   const isFreeText = !!text && !text.startsWith("/");
   if (!command && !cb && !legacy && !isFreeText) return false;
 
-  const deps = providedDeps ?? defaultTaskDeps(scopeOf(ctx));
+  let deps = providedDeps ?? defaultTaskDeps(scopeOf(ctx), ctx);
   const uid = ctx.from.id;
+
+  // Кнопка задачи из другого проекта (старое сообщение): работаем в проекте задачи.
+  const recordId = legacy ? Number(legacy[2]) : cb && "id" in cb ? cb.id : null;
+  if (recordId && deps.rescope) {
+    const task = await deps.store.getAssignedTask(recordId).catch(() => null);
+    if (task && recordProject(task) !== projectOf(deps)) {
+      const other = await deps.rescope(recordProject(task));
+      if (!other) {
+        await ctx.answerCallbackQuery().catch(() => {});
+        await ctx.reply("Эта задача в проекте, где тебя нет.");
+        return true;
+      }
+      deps = other;
+    }
+  }
 
   // Свободный текст наш, только если открыта форма задач.
   let form = null;

@@ -1,9 +1,10 @@
-import { Bot, type Api, type Context } from "grammy";
+import { Bot, InlineKeyboard, type Api, type Context } from "grammy";
 import { isFounder, teamToken } from "./config";
 import {
   applyRoster,
   findMember,
   joinTeam,
+  setCurrentProject,
   listTeam,
   removeMember,
   setDigestOptIn,
@@ -30,8 +31,8 @@ import { buildCoffeeBlock } from "./digest-build";
 import { fetchRunSignups } from "./stats";
 import { mskToday } from "../databot/time";
 import { scopedEvents, supabaseEventStore } from "./events";
-import { DEFAULT_SCOPE, resolveScope, scopeOf, setScope, type Scope } from "./projects/scope";
-import { hasModule, supabaseProjectStore, type ModuleKey } from "./projects/projects";
+import { DEFAULT_SCOPE, isMulti, resolveScope, scopeFor, scopeOf, setScope, type Scope } from "./projects/scope";
+import { hasModule, projectLabel, supabaseProjectStore, type ModuleKey } from "./projects/projects";
 import { supabaseMembershipStore } from "./projects/members";
 
 const scopeDeps = () => ({ projects: supabaseProjectStore(), memberships: supabaseMembershipStore() });
@@ -137,7 +138,13 @@ function assistantDeps(scope: Scope = DEFAULT_SCOPE): AssistantDeps {
 }
 
 /** Команды разделов, которые есть не у всех проектов. */
-const MODULE_COMMANDS: Record<string, ModuleKey> = { events: "events", social: "social", coffee_weekly: "coffee_run" };
+const MODULE_COMMANDS: Record<string, ModuleKey> = { events: "events", social: "social", coffee_weekly: "coffee_run", roadmap: "roadmap", about: "about", roadmap_add: "roadmap", link: "about" };
+
+/** Клавиатура под проект этого обновления: разделы по модулям, переключатель — если проектов несколько. */
+export function keyboardFor(ctx: TeamContext) {
+  const scope = scopeOf(ctx);
+  return menuKeyboard(scope.project, isMulti(scope));
+}
 
 /** Закрыть открытую форму; черновик с открытым «Изменить» закрывается вместе с ней. */
 async function closeForm(ctx: TeamContext, uid: number): Promise<void> {
@@ -188,7 +195,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
         const p = payload as { chat_id?: number; reply_markup?: unknown };
         if (method === "sendMessage" && p.chat_id === id && !p.reply_markup && !menuShown.has(id)) {
           menuShown.add(id);
-          return prev(method, { ...payload, reply_markup: menuKeyboard() } as typeof payload, signal);
+          return prev(method, { ...payload, reply_markup: keyboardFor(ctx) } as typeof payload, signal);
         }
         return prev(method, payload, signal);
       });
@@ -261,14 +268,14 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
             "",
             helpText(isFounder(res.member.chat_id), !!teamAiConfig()),
           ].join("\n"),
-          { reply_markup: menuKeyboard() },
+          { reply_markup: keyboardFor(ctx) },
         );
         break;
       case "already":
         await applyRoster(res.member);
         await setTeamCommands(bot.api, res.member);
         menuShown.add(chatId);
-        await ctx.reply(`Ты и так в команде.\n\n${helpText(isFounder(res.member.chat_id), !!teamAiConfig())}`, { reply_markup: menuKeyboard() });
+        await ctx.reply(`Ты и так в команде.\n\n${helpText(isFounder(res.member.chat_id), !!teamAiConfig())}`, { reply_markup: keyboardFor(ctx) });
         break;
       case "wrong_secret":
         // Не подсказываем, что именно не так: перебирающему знать нечего.
@@ -299,7 +306,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     }
     await setTeamCommands(bot.api, member);
     menuShown.add(member.chat_id);
-    await ctx.reply(helpText(isFounder(member.chat_id), !!teamAiConfig()), { reply_markup: menuKeyboard() });
+    await ctx.reply(helpText(isFounder(member.chat_id), !!teamAiConfig()), { reply_markup: keyboardFor(ctx) });
     if (ctx.message?.text?.startsWith("/start")) {
       await withData(ctx, async () => showSchedule(ctx, defaultScheduleDeps(scopeOf(ctx)), 0, false, new Date()));
     }
@@ -374,6 +381,35 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     }
     await ctx.replyWithChatAction("typing").catch(() => {});
     await ctx.reply(await aiCheckText(defaultCheckDeps()));
+  });
+
+  // ── Проекты ────────────────────────────────────────────────────────────────
+  bot.command("project", async (ctx) => {
+    const member = await requireMember(ctx);
+    if (!member) return;
+    const scope = scopeOf(ctx);
+    if (!isMulti(scope)) {
+      await ctx.reply(`Ты в проекте ${projectLabel(scope.project)}.`, { reply_markup: keyboardFor(ctx) });
+      return;
+    }
+    const kb = new InlineKeyboard();
+    for (const p of scope.projects) kb.text(`${projectLabel(p)}${p.id === scope.project.id ? " ✓" : ""}`, `pj:${p.id}`).row();
+    await ctx.reply("Выбери проект:", { reply_markup: kb });
+  });
+
+  bot.callbackQuery(/^pj:([a-z0-9_-]+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
+    const scope = scopeOf(ctx);
+    const target = scope.projects.find((p) => p.id === ctx.match[1]);
+    if (!target || !ctx.from) {
+      await ctx.reply("Этого проекта нет в твоём списке.");
+      return;
+    }
+    await setCurrentProject(ctx.from.id, target.id);
+    setScope(ctx, await scopeFor(scopeDeps(), target, scope.projects));
+    await ctx.editMessageText(`Проект: ${projectLabel(target)}`).catch(() => {});
+    menuShown.add(ctx.from.id);
+    await ctx.reply(`Переключила на ${projectLabel(target)}`, { reply_markup: keyboardFor(ctx) });
   });
 
   bot.command("leave", async (ctx) => {

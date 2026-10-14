@@ -5,7 +5,7 @@ import type { DatabotStore } from "../../databot/data/store";
 import { normalizeTaskUsername } from "../../databot/tasks";
 import { isActiveAssigned, type AssignedTask, type AssignedTaskDraft } from "../../databot/task-list";
 import { findMember, listProjectTeam, type TeamMember } from "../access";
-import { DEFAULT_SCOPE, type Scope } from "../projects/scope";
+import { DEFAULT_SCOPE, isMulti, scopeOf, type Scope } from "../projects/scope";
 import { NIKA } from "../projects/projects";
 import { isFounder, teamBotConfigured, teamToken } from "../config";
 import { assigneeChangeText, escapeHtmlTeam, menuKeyboard, taskCb } from "../copy";
@@ -288,7 +288,7 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, deps: As
       // Выдуманные данные человеку не уходят: безопасный ответ и кнопки разделов.
       console.warn(`[team-ai] guard: fabricated output step=${run.steps}`);
       if (!shown.list && !shown.preview) {
-        await ctx.reply(GUARD_FAIL_TEXT, { reply_markup: menuKeyboard() });
+        await ctx.reply(GUARD_FAIL_TEXT, { reply_markup: menuKeyboard(scopeOf(ctx).project, isMulti(scopeOf(ctx))) });
         sentText = GUARD_FAIL_TEXT;
       }
       text = "";
