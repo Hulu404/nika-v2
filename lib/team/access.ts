@@ -170,6 +170,24 @@ export async function listProjectTeam(projectId: string, memberships: Membership
   return projectTeam(people, members);
 }
 
+/**
+ * Человек в реестре (team_members) — для входа по приглашению в проект, без
+ * ключа /join. Уже есть — обновляет ник и имя.
+ */
+export async function ensurePerson(chatId: number, profile: { username?: string | null; displayName?: string | null }): Promise<TeamMember | null> {
+  const existing = await findMember(chatId);
+  if (existing) return existing;
+  const { data, error } = await tgAdmin().from(TABLE).insert({
+    chat_id: chatId, username: normalizeTelegramUsername(profile.username), display_name: profile.displayName ?? null,
+    role: "member", joined_at: new Date().toISOString(), added_by: null,
+  }).select(COLUMNS).single();
+  if (error) {
+    console.error("[team-access] ensurePerson:", error.message);
+    return findMember(chatId);
+  }
+  return data as TeamMember;
+}
+
 /** Состав команды по дате входа. Фаундеров /team отмечает сам (isFounder). */
 export async function listTeam(): Promise<TeamMember[]> {
   const { data, error } = await tgAdmin()

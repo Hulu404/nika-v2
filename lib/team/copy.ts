@@ -222,10 +222,11 @@ export function teamText(members: TeamMember[], meChatId: number): string {
  * «👥 Команда»: список; фаундеру — кнопка на каждого человека (имя, должность,
  * отделы, варианты имени), остальным — кнопка своих вариантов имени.
  */
-export function teamScreen(members: TeamMember[], meChatId: number, founder: boolean): TaskScreen {
+export function teamScreen(members: TeamMember[], meChatId: number, founder: boolean, canAdd = false): TaskScreen {
   const kb = new InlineKeyboard();
   if (founder) {
     for (const m of members) kb.text(teamPersonLabel(m), `dp:m:${m.chat_id}`).row();
+    if (canAdd) kb.text("➕ Добавить в проект", "dp:add").row();
   } else if (members.some((m) => m.chat_id === meChatId)) {
     kb.text("Мои варианты имени", `dp:m:${meChatId}`).row();
   }
@@ -235,8 +236,14 @@ export function teamScreen(members: TeamMember[], meChatId: number, founder: boo
 
 export type ProfileField = "name" | "title" | "aliases";
 
-/** Карточка человека. Фаундер меняет всё, участник — только свои варианты имени. */
-export function memberDepartmentsScreen(m: TeamMember, founder = true): TaskScreen {
+/** Роль в проекте для карточки: можно ли её менять и убирать человека (фаундера — нельзя). */
+export interface MemberRoleInfo {
+  role: "admin" | "member";
+  manageable: boolean;
+}
+
+/** Карточка человека. Админ проекта меняет всё, участник — только свои варианты имени. */
+export function memberDepartmentsScreen(m: TeamMember, founder = true, roleInfo?: MemberRoleInfo): TaskScreen {
   const who = m.username ? `@${m.username}` : (m.display_name ?? String(m.chat_id));
   const current = m.departments ?? [];
   const aliases = m.name_aliases ?? [];
@@ -246,16 +253,41 @@ export function memberDepartmentsScreen(m: TeamMember, founder = true): TaskScre
     kb.text("Имя", `dp:e:${m.chat_id}:name`).text("Должность", `dp:e:${m.chat_id}:title`).row();
   }
   kb.text("Варианты имени", `dp:e:${m.chat_id}:aliases`).row();
+  if (founder && roleInfo?.manageable) {
+    kb.text(roleInfo.role === "admin" ? "Сделать участником" : "Сделать админом", `dp:r:${m.chat_id}`).row();
+    kb.text("Убрать из проекта", `dp:rm:${m.chat_id}`).row();
+  }
   kb.text("← К команде", "dp:l");
   return {
     text: [
       `<b>${escapeHtmlTeam(who)}</b>`,
       `Имя: ${escapeHtmlTeam(m.first_name ?? "—")}`,
+      ...(roleInfo ? [`Роль в проекте: ${roleInfo.role === "admin" ? "админ" : "участник"}`] : []),
       `Должность: ${escapeHtmlTeam(m.title ?? "—")}`,
       `Отделы: ${current.length ? current.map(departmentName).join(", ") : "пока ни одного"}`,
       `Варианты имени: ${aliases.length ? escapeHtmlTeam(aliases.join(", ")) : "—"}`,
     ].join("\n"),
     keyboard: kb,
+  };
+}
+
+/** «➕ Добавить в проект»: кто уже писал боту, но не в проекте, — кнопками; или ссылка-приглашение. */
+export function addToProjectScreen(outsiders: TeamMember[], project: string): TaskScreen {
+  const kb = new InlineKeyboard();
+  for (const m of outsiders) kb.text(teamPersonLabel(m), `dp:ap:${m.chat_id}`).row();
+  kb.text("🔗 Ссылка-приглашение", "dp:inv").row().text("← К команде", "dp:l");
+  return {
+    text: [`<b>Добавить в ${escapeHtmlTeam(project)}</b>`, "",
+      outsiders.length ? "Выбери из тех, кто уже писал боту, или создай одноразовую ссылку (7 дней)." : "Все, кто писал боту, уже здесь. Создай одноразовую ссылку (7 дней)."].join("\n"),
+    keyboard: kb,
+  };
+}
+
+export function removeFromProjectScreen(m: TeamMember, project: string): TaskScreen {
+  const who = m.username ? `@${m.username}` : (m.display_name ?? String(m.chat_id));
+  return {
+    text: `Убрать ${escapeHtmlTeam(who)} из ${escapeHtmlTeam(project)}? Задачи останутся, новые ставить нельзя будет.`,
+    keyboard: new InlineKeyboard().text("Убрать", `dp:RM:${m.chat_id}`).text("Отмена", `dp:m:${m.chat_id}`),
   };
 }
 

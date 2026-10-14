@@ -97,10 +97,10 @@ describe("«👥 Команда»: отделы", () => {
     await send("Данила", 6);
     expect(team[2].name_aliases).toEqual(["Данила"]);
     await press("dp:e:6:name", 6);
-    expect(screens.at(-1)!.text).toContain("Имя и должность меняют фаундеры");
+    expect(screens.at(-1)!.text).toContain("Имя и должность меняют админы проекта");
     await press("dp:e:5:aliases", 6);
     await press("dp:m:5", 6);
-    expect(screens.at(-1)!.text).toContain("Чужой профиль меняют только фаундеры");
+    expect(screens.at(-1)!.text).toContain("Чужой профиль меняют только админы проекта");
     expect(team[1].name_aliases).toBeUndefined();
   });
 
@@ -118,6 +118,71 @@ describe("«👥 Команда»: отделы", () => {
   it("участник менять отделы не может", async () => {
     await press("dp:t:6:smm", 5);
     expect(team[2].departments).toEqual([]);
-    expect(screens.at(-1)!.text).toContain("только фаундеры");
+    expect(screens.at(-1)!.text).toContain("только админы проекта");
+  });
+
+  describe("состав проекта", () => {
+    let roles: Map<number, "admin" | "member">;
+    let outsiders: TeamMember[];
+    let notified: Array<[number, string]>;
+    beforeEach(() => {
+      roles = new Map([[5, "member"], [6, "member"]]);
+      outsiders = [member(20, "newbie")];
+      notified = [];
+      Object.assign(deps, {
+        projectName: "🔬 RESCAN",
+        roleOf: async (id: number) => roles.get(id) ?? null,
+        outsiders: async () => outsiders,
+        addMember: async (id: number) => {
+          const p = outsiders.find((m) => m.chat_id === id)!;
+          outsiders = outsiders.filter((m) => m.chat_id !== id);
+          team.push(p);
+          roles.set(id, "member");
+          return true;
+        },
+        setRole: async (id: number, role: "admin" | "member") => void roles.set(id, role),
+        removeMember: async (id: number) => {
+          team = team.filter((m) => m.chat_id !== id);
+          return roles.delete(id);
+        },
+        createInvite: async () => "tok123",
+      });
+    });
+
+    it("админ: «➕ Добавить в проект» → человек из писавших боту → он в проекте", async () => {
+      await open(9);
+      expect(screens.at(-1)!.buttons).toContain("➕ Добавить в проект");
+      await press("dp:add", 9);
+      expect(screens.at(-1)!.buttons).toEqual(["newbie @newbie", "🔗 Ссылка-приглашение", "← К команде"]);
+      await press("dp:ap:20", 9);
+      expect(team.some((m) => m.chat_id === 20)).toBe(true);
+      expect(screens.some((s) => s.text.startsWith("Тебя добавили в проект 🔬 RESCAN"))).toBe(true);
+    });
+
+    it("ссылка-приглашение — t.me/<бот>?start=join_<токен>", async () => {
+      await press("dp:inv", 9);
+      expect(screens.at(-1)!.text).toContain("https://t.me/t_bot?start=join_tok123");
+    });
+
+    it("роль: «Сделать админом» и обратно; убрать из проекта — с подтверждением; фаундера — нельзя", async () => {
+      await press("dp:m:6", 9);
+      expect(screens.at(-1)!.text).toContain("Роль в проекте: участник");
+      await press("dp:r:6", 9);
+      expect(roles.get(6)).toBe("admin");
+      expect(screens.at(-1)!.buttons).toContain("Сделать участником");
+      await press("dp:rm:6", 9);
+      expect(screens.at(-1)!.text).toContain("Задачи останутся");
+      await press("dp:RM:6", 9);
+      expect(team.some((m) => m.chat_id === 6)).toBe(false);
+      await press("dp:RM:9", 9);
+      expect(screens.at(-1)!.text).toContain("Фаундер — админ во всех проектах");
+    });
+
+    it("участник состав не меняет", async () => {
+      await press("dp:add", 5);
+      expect(screens.at(-1)!.text).toBe("Состав проекта меняют только админы.");
+      await press("dp:ap:20", 5);
+      expect(team.some((m) => m.chat_id === 20)).toBe(false);
+    });
   });
 });

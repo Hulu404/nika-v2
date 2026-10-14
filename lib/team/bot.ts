@@ -2,6 +2,7 @@ import { Bot, InlineKeyboard, type Api, type Context } from "grammy";
 import { isFounder, teamToken } from "./config";
 import {
   applyRoster,
+  ensurePerson,
   findMember,
   joinTeam,
   setCurrentProject,
@@ -32,8 +33,9 @@ import { fetchRunSignups } from "./stats";
 import { mskToday } from "../databot/time";
 import { scopedEvents, supabaseEventStore } from "./events";
 import { DEFAULT_SCOPE, isMulti, resolveScope, scopeFor, scopeOf, setScope, type Scope } from "./projects/scope";
-import { hasModule, projectLabel, supabaseProjectStore, type ModuleKey } from "./projects/projects";
-import { supabaseMembershipStore } from "./projects/members";
+import { hasModule, projectLabel, supabaseProjectStore, type ModuleKey, type ProjectStore } from "./projects/projects";
+import { supabaseMembershipStore, type MembershipStore } from "./projects/members";
+import { supabaseInviteStore, type InviteStore } from "./projects/invites";
 
 const scopeDeps = () => ({ projects: supabaseProjectStore(), memberships: supabaseMembershipStore() });
 import { createSupabaseStore } from "../databot/data/supabase-store";
@@ -153,6 +155,55 @@ async function closeForm(ctx: TeamContext, uid: number): Promise<void> {
   if (!form) return;
   await forms.clear(uid).catch(() => {});
   await closeAiDraft(ctx.api, supabaseDraftStore(), uid, form);
+}
+
+export interface InviteDeps {
+  invites: InviteStore;
+  memberships: MembershipStore;
+  projects: ProjectStore;
+  ensurePerson: (chatId: number, profile: { username?: string | null; displayName?: string | null }) => Promise<TeamMember | null>;
+  setCurrentProject: (chatId: number, projectId: string) => Promise<void>;
+}
+
+let inviteDepsOverride: InviteDeps | null = null;
+/** Для тестов. */
+export function setInviteDeps(deps: InviteDeps | null): void {
+  inviteDepsOverride = deps;
+}
+
+const inviteDeps = (): InviteDeps => inviteDepsOverride ?? {
+  invites: supabaseInviteStore(), memberships: supabaseMembershipStore(), projects: supabaseProjectStore(),
+  ensurePerson, setCurrentProject,
+};
+
+/**
+ * Переход по ссылке-приглашению: человек становится участником проекта,
+ * проект — текущим; приветствие и клавиатура. Использованная или
+ * просроченная ссылка не работает.
+ */
+async function acceptInvite(ctx: TeamContext, token: string): Promise<void> {
+  if (!ctx.from) return;
+  const deps = inviteDeps();
+  const uid = ctx.from.id;
+  const now = new Date();
+  const invite = await deps.invites.redeem(token, uid, now).catch(() => null);
+  if (!invite) {
+    await ctx.reply("Ссылка недействительна: она уже использована или устарела. Попроси новую у админа проекта.");
+    return;
+  }
+  const person = await deps.ensurePerson(uid, { username: ctx.from.username ?? null, displayName: ctx.from.first_name ?? null });
+  if (!person) {
+    await ctx.reply("Не получилось записать тебя. Попробуй ссылку ещё раз чуть позже.");
+    return;
+  }
+  await deps.memberships.add({ project_id: invite.project_id, chat_id: uid, role: invite.role, title: invite.title,
+    departments: invite.departments, added_by: invite.created_by }, now);
+  await deps.setCurrentProject(uid, invite.project_id);
+  const scope = await resolveScope({ projects: deps.projects, memberships: deps.memberships }, uid, invite.project_id);
+  if (scope) setScope(ctx, scope);
+  menuShown.add(uid);
+  await ctx.reply(`Добро пожаловать в ${scope ? projectLabel(scope.project) : "проект"}!\n\n${helpText(isFounder(uid), !!teamAiConfig())}`,
+    { reply_markup: keyboardFor(ctx) });
 }
 
 /** Кому клавиатура меню уже ушла в этом процессе: остальным прикрепим её к первому ответу. */
@@ -294,6 +345,12 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
   });
 
   bot.command(["start", "help"], async (ctx) => {
+    // Приглашение в проект: /start join_<token>.
+    const payload = (ctx.match ?? "").toString().trim();
+    if (ctx.message?.text?.startsWith("/start") && payload.startsWith("join_")) {
+      await acceptInvite(ctx, payload.slice(5));
+      return;
+    }
     let member = await requireMember(ctx);
     if (!member) return;
     if (ctx.message?.text?.startsWith("/start")) {
