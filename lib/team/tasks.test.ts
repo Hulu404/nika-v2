@@ -105,6 +105,12 @@ describe("Пятница: постановка задач", () => {
     expect(store.assignedTasks.size).toBe(1);
     expect(texts(2)).toContain("Загрузка задач отменена.");
   });
+
+  it("«➕ Раздать задачи отделу» (tk:u) открывает обычный ввод задач", async () => {
+    await press("tk:u", 2, "bob");
+    await send("Сверстать афишу / завтра / @carol", 2, "bob", 30);
+    expect(store.assignedTasks.size).toBe(1);
+  });
 });
 
 describe("Пятница: видимость", () => {

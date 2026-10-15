@@ -5,6 +5,7 @@ import type { TeamMember } from "./access";
 import { MemoryTeamForms } from "./form";
 import type { ProfilePatch } from "./roster";
 import { handleTeamScreenUpdate, showTeam, type TeamScreenDeps } from "./team-screen";
+import { MemorySettingsStore } from "./settings";
 
 const member = (chat_id: number, username: string, departments: string[] = []): TeamMember => ({
   chat_id, username, display_name: username, role: "member", joined_at: "2026-10-01T00:00:00Z",
@@ -69,6 +70,25 @@ describe("«👥 Команда»: отделы", () => {
     expect(screens.at(-1)!.buttons).toEqual(["Мои варианты имени"]);
     await open(9);
     expect(screens.at(-1)!.buttons).toEqual(["founder @founder", "vika @vika", "danya @danya"]);
+  });
+
+  it("☕ Кофе-ран: ответственные — фаундер меняет ответственного отдела; участникам кнопки нет", async () => {
+    const settings = new MemorySettingsStore();
+    deps.coffeeOwners = settings;
+    await open(6);
+    expect(screens.at(-1)!.buttons).not.toContain("☕ Кофе-ран: ответственные");
+    await press("dp:co", 6);
+    expect(screens.at(-1)!.text).toBe("Ответственных за кофе-ран назначают фаундеры.");
+    await open(9);
+    expect(screens.at(-1)!.buttons).toContain("☕ Кофе-ран: ответственные");
+    await press("dp:co", 9);
+    expect(screens.at(-1)!.text).toContain("СММ: не назначен");
+    expect(screens.at(-1)!.buttons).toEqual(["Сменить: СММ", "Сменить: Ивенты", "← К команде"]);
+    await press("dp:cp:0:smm", 9);
+    expect(screens.at(-1)!.buttons).toContain("vika @vika");
+    await press("dp:cs:5:smm", 9);
+    expect(await settings.get("coffee_run_smm_owner")).toBe("5");
+    expect(screens.at(-1)!.text).toContain("СММ: vika @vika");
   });
 
   it("строка участника: имя (должность) @ник", async () => {

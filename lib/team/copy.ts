@@ -222,11 +222,12 @@ export function teamText(members: TeamMember[], meChatId: number): string {
  * «👥 Команда»: список; фаундеру — кнопка на каждого человека (имя, должность,
  * отделы, варианты имени), остальным — кнопка своих вариантов имени.
  */
-export function teamScreen(members: TeamMember[], meChatId: number, founder: boolean, canAdd = false): TaskScreen {
+export function teamScreen(members: TeamMember[], meChatId: number, founder: boolean, canAdd = false, coffee = false): TaskScreen {
   const kb = new InlineKeyboard();
   if (founder) {
     for (const m of members) kb.text(teamPersonLabel(m), `dp:m:${m.chat_id}`).row();
     if (canAdd) kb.text("➕ Добавить в проект", "dp:add").row();
+    if (coffee) kb.text("☕ Кофе-ран: ответственные", "dp:co").row();
   } else if (members.some((m) => m.chat_id === meChatId)) {
     kb.text("Мои варианты имени", `dp:m:${meChatId}`).row();
   }
@@ -414,7 +415,7 @@ export function helpText(founder = false, ai = false): string {
 export type TaskTab = "me" | "by" | "done" | "all";
 
 /** callback_data задач «Пятницы». Свой префикс tk: — мимо кнопок забегов и бота данных. */
-export const TASK_CALLBACK_RE = /^tk:([logsdxX]):([a-z0-9]+)(?::([a-z0-9]+))?(?::(\d+))?$/;
+export const TASK_CALLBACK_RE = /^tk:([logsdxXu])(?::([a-z0-9]+))?(?::([a-z0-9]+))?(?::(\d+))?$/;
 
 export const taskCb = {
   list: (tab: TaskTab, page = 0) => `tk:l:${tab}:${page}`,
@@ -424,6 +425,8 @@ export const taskCb = {
   due: (id: number) => `tk:d:${id}`,
   cancelAsk: (id: number) => `tk:x:${id}`,
   cancelDo: (id: number) => `tk:X:${id}`,
+  /** Ввод задач списком (как ➕ Поставить задачу). */
+  upload: () => "tk:u",
 };
 
 export type TaskCallback =
@@ -433,7 +436,8 @@ export type TaskCallback =
   | { kind: "status"; action: "take" | "done" | "decline" | "reopen"; id: number }
   | { kind: "due"; id: number }
   | { kind: "cancelAsk"; id: number }
-  | { kind: "cancelDo"; id: number };
+  | { kind: "cancelDo"; id: number }
+  | { kind: "upload" };
 
 const TABS: readonly TaskTab[] = ["me", "by", "done", "all"];
 const ACTIONS = ["take", "done", "decline", "reopen"] as const;
@@ -451,6 +455,7 @@ export function parseTaskCallback(data: string): TaskCallback | null {
     case "d": return num(a) ? { kind: "due", id: num(a) } : null;
     case "x": return num(a) ? { kind: "cancelAsk", id: num(a) } : null;
     case "X": return num(a) ? { kind: "cancelDo", id: num(a) } : null;
+    case "u": return { kind: "upload" };
   }
   return null;
 }

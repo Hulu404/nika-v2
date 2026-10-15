@@ -10,9 +10,10 @@ import { addDays, mskHour, mskToday } from "../databot/time";
 import { tgAdmin } from "../telegram/supabase";
 import { listProjectTeam, type TeamMember } from "./access";
 import { NIKA } from "./projects/projects";
-import { COFFEE_RUN_TASKS } from "./coffee-run-template";
+import { COFFEE_OWNER_TASKS, coffeeOwner, coffeeOwnerTaskText } from "./coffee-run-template";
+import { supabaseSettingsStore } from "./settings";
 import { founderIds, isFounder, teamBotConfigured, teamToken } from "./config";
-import { dayHeader, escapeHtmlTeam, eventWhen, shortDay } from "./copy";
+import { dayHeader, escapeHtmlTeam, eventWhen, shortDay, taskCb } from "./copy";
 import { departmentName } from "./departments";
 import { isCoffeeRunEvent, supabaseEventStore, type TeamEvent, type TeamEventStore } from "./events";
 import { openTeamForm, supabaseTeamForms, teamFormExpired, type TeamFormStore } from "./form";
@@ -242,6 +243,8 @@ export interface CoffeeWeekDeps {
   /** Проводим ли кофе-раны вообще (team_settings coffee_run_weekly ≠ off). */
   enabled: () => Promise<boolean>;
   founders?: () => number[];
+  /** Настройка team_settings: chat_id ответственного отдела за кофе-ран (coffee_run_smm_owner, coffee_run_events_owner). */
+  ownerSetting?: (key: string) => Promise<string | null>;
 }
 
 const foundersOf = (deps: CoffeeWeekDeps) => (deps.founders ? deps.founders() : [...founderIds()]);
@@ -434,9 +437,10 @@ const rsvpKeyboard = (eventId: number): InlineKeyboardMarkup => ({
 });
 
 /**
- * Задачи кофе-рана по шаблону: каждая — всем текущим участникам отдела одной
- * строкой списка (у каждого свой статус, в карточке видны остальные).
- * Пустой отдел — задачи не создаются, фаундеру сообщение.
+ * Задачи кофе-рана: от каждого отдела одна задача его ответственному за
+ * кофе-ран (coffee-run-template.ts) — заголовок, чек-лист и кнопка
+ * «➕ Раздать задачи отделу». Нет ответственного — задача отдела не
+ * создаётся, фаундеру сообщение.
  */
 export async function createCoffeeTasks(
   deps: CoffeeWeekDeps,
@@ -451,19 +455,17 @@ export async function createCoffeeTasks(
   const label = `${ev.title}, ${shortDay(ev.starts_at)}`;
   const drafts: AssignedTaskDraft[] = [];
   const lateLines = new Set<number>();
-  const empty = new Set<string>();
-  COFFEE_RUN_TASKS.forEach((t, i) => {
-    const people = team.filter((m) => (m.departments ?? []).includes(t.department) && normalizeTaskUsername(m.username));
-    if (!people.length) {
-      empty.add(t.department);
-      return;
+  for (const [i, t] of COFFEE_OWNER_TASKS.entries()) {
+    const setting = deps.ownerSetting ? await deps.ownerSetting(t.setting).catch(() => null) : null;
+    const owner = coffeeOwner(t, team, setting);
+    const username = normalizeTaskUsername(owner?.username);
+    if (!owner || !username) {
+      await api.sendMessage(author, `Ответственный за кофе-ран (${t.role}) не найден, задача отдела ${departmentName(t.department)} не создана. Назначь его в 👥 Команда → «☕ Кофе-ран: ответственные».`).catch(() => {});
+      continue;
     }
     const { due, late } = coffeeTaskDue(t, week, runDate, now);
     if (late) lateLines.add(i + 1);
-    for (const m of people) drafts.push({ line: i + 1, username: normalizeTaskUsername(m.username)!, what: `${t.what} · ${label}`, due_at: due.toISOString() });
-  });
-  for (const d of empty) {
-    await api.sendMessage(author, `В отделе ${departmentName(d)} никого нет, задачи не созданы. Назначь людей в 👥 Команда.`).catch(() => {});
+    drafts.push({ line: i + 1, username, what: coffeeOwnerTaskText(t, label, { weekStart: week, runDate }), due_at: due.toISOString() });
   }
   if (!drafts.length) return [];
   await syncTeamTaskMembers({ store: deps.tasks }, now, team);
@@ -471,7 +473,10 @@ export async function createCoffeeTasks(
   await deps.weeks.setTasks(week, tasks.map((t) => t.id));
   const late = new Set(tasks.filter((t) => lateLines.has(t.line)).map((t) => t.id));
   const authorName = team.find((m) => m.chat_id === author)?.username ?? undefined;
-  await deliverAssigned(api as unknown as Parameters<typeof deliverAssigned>[0], deps.tasks, tasks.filter((t) => t.delivery_state === "pending"), authorName, now, late);
+  // Ответственному — кнопка раздать задачи отделу (обычный ввод задач).
+  await deliverAssigned(api as unknown as Parameters<typeof deliverAssigned>[0], deps.tasks, tasks.filter((t) => t.delivery_state === "pending"), authorName, now, late, {
+    rowsFor: () => [[{ text: "➕ Раздать задачи отделу", callback_data: taskCb.upload() }]],
+  });
   return tasks;
 }
 
@@ -740,6 +745,7 @@ export function defaultCoffeeWeekDeps(): CoffeeWeekDeps {
     listTeam: () => listProjectTeam(NIKA),
     // Пока кофе-раны проводим — вопрос идёт каждую неделю; выключает фаундер командой /coffee_weekly off.
     enabled: async () => (await readWeeklySetting()) !== "off",
+    ownerSetting: (key) => supabaseSettingsStore().get(key),
   };
 }
 

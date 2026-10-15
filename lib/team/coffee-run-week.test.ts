@@ -3,7 +3,7 @@ import { Bot } from "grammy";
 import type { Update, UserFromGetMe } from "grammy/types";
 import { MemoryStore } from "../databot/data/memory-store";
 import type { TeamMember } from "./access";
-import { COFFEE_RUN_TASKS } from "./coffee-run-template";
+import { COFFEE_OWNER_TASKS } from "./coffee-run-template";
 import {
   MemoryRsvpStore,
   MemoryWeekStore,
@@ -33,6 +33,7 @@ describe("кофе-ран недели", () => {
   let events: MemoryEventStore;
   let tasks: MemoryStore;
   let enabled: boolean;
+  let settings: Map<string, string>;
   let calls: Array<{ method: string; chat: number; text: string; markup?: { inline_keyboard?: Array<Array<{ text: string; callback_data?: string }>> } }>;
   let api: WeekApi;
   let press: (data: string, from: number, now?: Date) => Promise<void>;
@@ -51,10 +52,12 @@ describe("кофе-ран недели", () => {
     events = new MemoryEventStore();
     tasks = new MemoryStore();
     enabled = true;
+    settings = new Map([["coffee_run_smm_owner", "1"], ["coffee_run_events_owner", "3"]]);
     calls = [];
     deps = {
       weeks, events, tasks, rsvp: new MemoryRsvpStore(), forms: new MemoryTeamForms(),
       listTeam: async () => people, enabled: async () => enabled, founders: () => [8, 9],
+      ownerSetting: async (key) => settings.get(key) ?? null,
     };
     let mid = 100;
     api = {
@@ -213,57 +216,72 @@ describe("кофе-ран недели", () => {
       await dispatchCoffeeRunWeek(deps, api, MON);
     });
 
-    it("каждая задача — всем членам отдела одной строкой, автор — ответивший фаундер", async () => {
+    it("«Да, проводим» → одна задача ответственному SMM и одна ответственному ивентов; остальным участникам отделов ничего", async () => {
       await press("cw:s:2026-10-12:2026-10-18:1000:usachevo", 8);
       const all = [...tasks.assignedTasks.values()];
-      const smm = COFFEE_RUN_TASKS.filter((t) => t.department === "smm").length;
-      const ev = COFFEE_RUN_TASKS.filter((t) => t.department === "events").length;
-      expect(all).toHaveLength(smm * 2 + ev);
+      expect(all.map((t) => t.username)).toEqual(["vika", "danya"]);
+      expect(all.every((t) => t.assigned_by === 8 && t.delivery_state === "sent")).toBe(true);
       expect(new Set(all.map((t) => t.source_message_id)).size).toBe(1);
-      expect(all.every((t) => t.assigned_by === 8)).toBe(true);
-      const announce = all.filter((t) => t.what.startsWith("Анонс кофе-рана"));
-      expect(announce.map((t) => t.username).sort()).toEqual(["salma", "vika"]);
-      expect(new Set(announce.map((t) => t.line)).size).toBe(1);
-      expect(announce[0].what).toBe("Анонс кофе-рана: пост в ТГК и Instagram · Кофе-ран · Усачёва, вс 18.10");
-      const surf = all.filter((t) => t.what.startsWith("Договориться о посте-анонсе в Surf Coffee"));
-      expect(surf.map((t) => t.username)).toEqual(["danya"]);
-      expect(all.every((t) => t.delivery_state === "sent")).toBe(true);
+      const [smm, evs] = all;
+      expect(smm.what).toBe([
+        "Кофе-ран · Усачёва, вс 18.10: контент и анонсы",
+        "— анонс-пост в ТГК и Instagram, до вт 12:00",
+        "— рилсы на внутреннюю и внешнюю аудиторию, до ср 23:59",
+        "— шорт-контент в других соцсетях, до ср 23:59",
+        "— распределить задачи внутри отдела — кнопка «➕ Раздать задачи отделу»",
+      ].join("\n"));
+      expect(smm.due_at).toBe(msk("2026-10-13T12:00").toISOString());
+      expect(evs.what.split("\n")).toEqual([
+        "Кофе-ран · Усачёва, вс 18.10: пейсеры и договорённости",
+        "— договориться о посте-анонсе в Surf Coffee, до вт 18:00",
+        "— найти пейсеров (ведущих групп), до пт 20:00",
+        "— договорённости с площадкой и партнёрами на день забега",
+        "— распределить задачи внутри отдела — кнопка «➕ Раздать задачи отделу»",
+      ]);
+      expect(evs.due_at).toBe(msk("2026-10-13T18:00").toISOString());
+      // Salma в SMM — задач кофе-рана у неё нет.
+      expect(calls.some((c) => c.chat === 2 && /Новая задача/.test(c.text))).toBe(false);
+      const card = calls.find((c) => c.method === "sendMessage" && c.chat === 1 && /контент и анонсы/.test(c.text))!;
+      expect(card.markup!.inline_keyboard!.flat().map((b) => b.text)).toContain("➕ Раздать задачи отделу");
     });
 
-    it("пустой отдел — задач нет, фаундеру сообщение", async () => {
-      people = people.map((m) => (m.username === "danya" ? { ...m, departments: [] } : m));
+    it("смена ответственного в team_settings меняет получателя следующей недели", async () => {
+      settings.set("coffee_run_smm_owner", "2");
       await press("cw:s:2026-10-12:2026-10-18:1000:usachevo", 8);
-      expect([...tasks.assignedTasks.values()].some((t) => t.username === "danya")).toBe(false);
-      expect(sentTo(/^В отделе Ивенты никого нет, задачи не созданы\. Назначь людей в 👥 Команда\.$/)).toEqual([8]);
+      expect([...tasks.assignedTasks.values()].map((t) => t.username)).toEqual(["salma", "danya"]);
+    });
+
+    it("без настройки — главы отделов по умолчанию; нет такого человека — задачи нет, фаундеру сообщение", async () => {
+      settings.clear();
+      people = [...people, member(4, "zuzya_zyzya", ["smm"])];
+      await press("cw:s:2026-10-12:2026-10-18:1000:usachevo", 8);
+      expect([...tasks.assignedTasks.values()].map((t) => t.username)).toEqual(["zuzya_zyzya"]);
+      expect(sentTo(/^Ответственный за кофе-ран \(ивенты\) не найден/)).toEqual([8]);
     });
   });
 
   describe("сроки задач", () => {
-    const due = (what: RegExp, run: string, now: Date) => {
-      const t = COFFEE_RUN_TASKS.find((x) => what.test(x.what))!;
+    const due = (department: string, run: string, now: Date) => {
+      const t = COFFEE_OWNER_TASKS.find((x) => x.department === department)!;
       return coffeeTaskDue(t, weekStartOf(now), run, now);
     };
 
-    it("решение в понедельник, забег в воскресенье и в субботу", () => {
-      expect(due(/^Анонс/, "2026-10-18", MON)).toEqual({ due: msk("2026-10-13T12:00"), late: false });
-      expect(due(/^Рилсы/, "2026-10-18", MON)).toEqual({ due: msk("2026-10-14T23:59"), late: false });
-      expect(due(/пейсеров/, "2026-10-18", MON)).toEqual({ due: msk("2026-10-16T20:00"), late: false });
-      expect(due(/пейсеров/, "2026-10-17", MON)).toEqual({ due: msk("2026-10-15T20:00"), late: false });
-      expect(due(/Surf Coffee/, "2026-10-17", MON)).toEqual({ due: msk("2026-10-13T18:00"), late: false });
+    it("решение в понедельник: SMM — вт 12:00, ивенты — вт 18:00", () => {
+      expect(due("smm", "2026-10-18", MON)).toEqual({ due: msk("2026-10-13T12:00"), late: false });
+      expect(due("events", "2026-10-17", MON)).toEqual({ due: msk("2026-10-13T18:00"), late: false });
     });
 
-    it("решение вечером вторника: прошедшие сроки — через 3 часа и с пометкой", () => {
+    it("решение вечером вторника: прошедший срок — через 3 часа и с пометкой", () => {
       const tue = msk("2026-10-13T20:00");
-      expect(due(/^Анонс/, "2026-10-18", tue)).toEqual({ due: msk("2026-10-13T23:00"), late: true });
-      expect(due(/Surf Coffee/, "2026-10-18", tue)).toEqual({ due: msk("2026-10-13T23:00"), late: true });
-      expect(due(/^Рилсы/, "2026-10-17", tue)).toEqual({ due: msk("2026-10-14T23:59"), late: false });
+      expect(due("smm", "2026-10-18", tue)).toEqual({ due: msk("2026-10-13T23:00"), late: true });
+      expect(due("events", "2026-10-18", tue)).toEqual({ due: msk("2026-10-13T23:00"), late: true });
     });
 
     it("в карточке поздней задачи — «срок сдвинут: решение принято поздно»", async () => {
       const tue = msk("2026-10-13T20:00");
       await weeks.open("2026-10-12");
       await press("cw:s:2026-10-12:2026-10-18:1000:usachevo", 8, tue);
-      const cards = calls.filter((c) => c.method === "sendMessage" && c.chat === 1 && /Анонс кофе-рана/.test(c.text));
+      const cards = calls.filter((c) => c.method === "sendMessage" && c.chat === 1 && /контент и анонсы/.test(c.text));
       expect(cards.at(-1)!.text).toContain("срок сдвинут: решение принято поздно");
     });
   });

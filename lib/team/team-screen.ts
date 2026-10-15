@@ -3,10 +3,14 @@ import { findMember, listProjectTeam, listTeam, markProfileEdited, updateProfile
 import { supabaseMembershipStore } from "./projects/members";
 import { DEFAULT_SCOPE, isMulti, resolveScope, scopeOf, type Scope } from "./projects/scope";
 import { isFounder } from "./config";
-import { PROFILE_PROMPT, addToProjectScreen, memberDepartmentsScreen, menuKeyboard, removeFromProjectScreen, teamScreen, type ProfileField, type TaskScreen } from "./copy";
+import { PROFILE_PROMPT, escapeHtmlTeam, addToProjectScreen, memberDepartmentsScreen, menuKeyboard, removeFromProjectScreen, teamScreen, type ProfileField, type TaskScreen } from "./copy";
 import { inviteLink, supabaseInviteStore } from "./projects/invites";
-import { projectLabel, supabaseProjectStore } from "./projects/projects";
-import { DEPARTMENTS } from "./departments";
+import { hasModule, projectLabel, supabaseProjectStore } from "./projects/projects";
+import { DEPARTMENTS, departmentName } from "./departments";
+import { COFFEE_OWNER_TASKS, coffeeOwner } from "./coffee-run-template";
+import { supabaseSettingsStore, type SettingsStore } from "./settings";
+import { personLabel } from "./roster";
+import { InlineKeyboard } from "grammy";
 import { openTeamForm, supabaseTeamForms, teamFormExpired, type TeamFormStore } from "./form";
 import type { ProfilePatch } from "./roster";
 
@@ -36,6 +40,8 @@ export interface TeamScreenDeps {
   removeMember?: (chatId: number) => Promise<boolean>;
   /** Одноразовое приглашение: токен для ссылки t.me/<bot>?start=join_<token>. */
   createInvite?: (by: number) => Promise<string>;
+  /** Ответственные отделов за кофе-ран (team_settings) — только в проекте с кофе-раном, меняют фаундеры. */
+  coffeeOwners?: Pick<SettingsStore, "get" | "set">;
   /** Клавиатура человека под его текущий проект (после добавления у него может появиться переключатель). */
   keyboardOf?: (chatId: number) => Promise<ReturnType<typeof menuKeyboard> | undefined>;
 }
@@ -87,6 +93,7 @@ export const defaultTeamScreenDeps = (scope: Scope = DEFAULT_SCOPE): TeamScreenD
     setRole: (id, role) => memberships.update(projectId, id, { role }),
     removeMember: (id) => memberships.remove(projectId, id),
     createInvite: async (by) => (await supabaseInviteStore().create({ project_id: projectId, created_by: by }, new Date())).token,
+    ...(hasModule(scope.project, "coffee_run") ? { coffeeOwners: supabaseSettingsStore() } : {}),
     keyboardOf: async (id) => {
       const person = await findMember(id);
       const s = await resolveScope({ projects: supabaseProjectStore(), memberships }, id, person?.current_project ?? null);
@@ -113,10 +120,24 @@ async function show(ctx: Context, screen: TaskScreen, edit: boolean): Promise<vo
 }
 
 export async function showTeam(ctx: Context, deps: TeamScreenDeps, uid: number, edit: boolean): Promise<void> {
-  await show(ctx, teamScreen(await deps.listTeam(), uid, (deps.isAdmin ?? isFounder)(uid), !!deps.addMember), edit);
+  await show(ctx, teamScreen(await deps.listTeam(), uid, (deps.isAdmin ?? isFounder)(uid), !!deps.addMember, !!deps.coffeeOwners && isFounder(uid)), edit);
 }
 
-const TEAM_CALLBACK_RE = /^dp:(l|m|t|e|add|ap|inv|r|rm|RM)(?::(-?\d+))?(?::([a-z_]+))?$/;
+/** «☕ Кофе-ран: ответственные»: от каждого отдела — кто получает задачу кофе-рана недели. */
+async function coffeeOwnersScreen(deps: TeamScreenDeps): Promise<TaskScreen> {
+  const team = await deps.listTeam();
+  const kb = new InlineKeyboard();
+  const lines = ["<b>☕ Кофе-ран: ответственные</b>", "", "Каждую неделю после «Да, проводим» им приходит одна задача отдела с чек-листом; внутри отдела они раздают задачи сами.", ""];
+  for (const t of COFFEE_OWNER_TASKS) {
+    const owner = coffeeOwner(t, team, await deps.coffeeOwners!.get(t.setting).catch(() => null));
+    lines.push(`${escapeHtmlTeam(departmentName(t.department))}: ${owner ? escapeHtmlTeam(personLabel(owner)) : "не назначен"}`);
+    kb.text(`Сменить: ${departmentName(t.department)}`, `dp:cp:0:${t.department}`).row();
+  }
+  kb.text("← К команде", "dp:l");
+  return { text: lines.join("\n"), keyboard: kb };
+}
+
+const TEAM_CALLBACK_RE = /^dp:(l|m|t|e|add|ap|inv|r|rm|RM|co|cp|cs)(?::(-?\d+))?(?::([a-z_]+))?$/;
 const FIELDS: readonly ProfileField[] = ["name", "title", "aliases"];
 
 /** Фаундер — любого и всё; участник — только свои варианты имени. */
@@ -170,6 +191,25 @@ export async function handleTeamScreenUpdate(ctx: Context, providedDeps?: TeamSc
   const [, op, id, arg] = m;
   if (op === "l") {
     await showTeam(ctx, deps, uid, true);
+    return true;
+  }
+  if (op === "co" || op === "cp" || op === "cs") {
+    if (!deps.coffeeOwners || !isFounder(uid)) {
+      await ctx.reply("Ответственных за кофе-ран назначают фаундеры.");
+      return true;
+    }
+    const task = COFFEE_OWNER_TASKS.find((t) => t.department === arg);
+    if (op === "cp" && task) {
+      const kb = new InlineKeyboard();
+      for (const m of await deps.listTeam()) kb.text(personLabel(m), `dp:cs:${m.chat_id}:${task.department}`).row();
+      kb.text("← Назад", "dp:co");
+      await show(ctx, { text: `Кто отвечает за кофе-ран от отдела ${escapeHtmlTeam(departmentName(task.department))}?`, keyboard: kb }, true);
+      return true;
+    }
+    if (op === "cs" && task && (await deps.listTeam()).some((m) => m.chat_id === Number(id))) {
+      await deps.coffeeOwners.set(task.setting, String(Number(id)), uid, now);
+    }
+    await show(ctx, await coffeeOwnersScreen(deps), true);
     return true;
   }
   const admin = (deps.isAdmin ?? isFounder)(uid);

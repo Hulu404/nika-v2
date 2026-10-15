@@ -338,6 +338,10 @@ export async function handleTeamTaskUpdate(ctx: Context, providedDeps?: TeamTask
       case "due": return await askDue(ctx, deps, uid, cb.id, now);
       case "cancelAsk": return await askCancel(ctx, deps, uid, cb.id);
       case "cancelDo": return await doCancel(ctx, deps, uid, cb.id, now);
+      case "upload":
+        await deps.forms.set(uid, openTeamForm("task.upload", {}, now), now);
+        await ctx.reply(TASK_UPLOAD_PROMPT, HTML);
+        return true;
     }
   } catch (err) {
     const known = storeError(err);
