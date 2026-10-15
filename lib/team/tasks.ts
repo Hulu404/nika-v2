@@ -7,6 +7,7 @@ import { normalizeTaskUsername } from "../databot/tasks";
 import { isActiveAssigned, parseTaskList, TaskListError, type AssignedTask } from "../databot/task-list";
 import type { Zone } from "../databot/types";
 import { findMember, listProjectTeam, type TeamMember } from "./access";
+import { personName } from "./roster";
 import { DEFAULT_SCOPE, recordProject, scopeForRecord, scopeOf, type Scope } from "./projects/scope";
 import { withProjectLabel } from "./projects/labels";
 import { checkRoadmapCompletion } from "./roadmap/complete";
@@ -21,6 +22,7 @@ import {
   authorNoticeText,
   authorTaskCard,
   cancelConfirmScreen,
+  cut,
   escapeHtmlTeam,
   groupKey,
   myTaskCard,
@@ -34,6 +36,9 @@ import {
   type TaskTab,
 } from "./copy";
 import { openTeamForm, supabaseTeamForms, teamFormExpired, type TeamFormStore } from "./form";
+import { defaultOutbox, sendOrQueue, type OutboxStore } from "./outbox";
+import { isQuiet } from "./quiet";
+import type { InlineKeyboardButton } from "grammy/types";
 
 /**
  * Задачи «Пятницы».
@@ -153,6 +158,24 @@ function groupOf(tasks: readonly AssignedTask[], task: AssignedTask): AssignedTa
  * задачами. Каждую задачу запираем перед отправкой (lock) — повторная
  * обработка того же сообщения дублей не пришлёт.
  */
+/** delivered_message_id задачи, чьё сообщение лежит в очереди тихих часов. */
+const QUEUED_MESSAGE_ID = 1;
+
+export interface DeliverOptions {
+  /** Доп. кнопки исполнителю под его задачами («➕ Раздать задачи отделу»). */
+  rowsFor?: (assignee: number, tasks: readonly AssignedTask[]) => InlineKeyboardButton[][];
+  outbox?: OutboxStore;
+}
+
+/**
+ * Итог доставки: кому сообщение отложено до утра (тихие часы, quiet.ts).
+ * Задача при этом создана и считается доставленной — сообщение уйдёт из
+ * team_outbox в 09:00.
+ */
+export interface DeliverResult {
+  queued: Array<{ assignee: number; at: Date }>;
+}
+
 export async function deliverAssigned(
   api: Pick<Api, "sendMessage">,
   store: DatabotStore,
@@ -161,7 +184,9 @@ export async function deliverAssigned(
   now: Date,
   /** Задачи, чей срок сдвинут: решение принято поздно (кофе-ран недели). */
   late: ReadonlySet<number> = new Set(),
-): Promise<void> {
+  opts: DeliverOptions = {},
+): Promise<DeliverResult> {
+  const result: DeliverResult = { queued: [] };
   const byAssignee = new Map<number, AssignedTask[]>();
   for (const t of tasks) byAssignee.set(t.assignee_id, [...(byAssignee.get(t.assignee_id) ?? []), t]);
   for (const [assignee, list] of byAssignee) {
@@ -173,15 +198,40 @@ export async function deliverAssigned(
     if (!locked.length) continue;
     const mates = new Map<number, string[]>();
     for (const t of locked) mates.set(t.id, await store.listAssignedTeammates(t));
+    const text = await withProjectLabel(assignee, locked[0].project_id, newTasksText(locked, authorName, mates, now, late));
+    const extra = opts.rowsFor?.(assignee, locked) ?? [];
+    const keyboard = { inline_keyboard: [...openMyTasksKeyboard().inline_keyboard, ...extra] };
+    if (isQuiet(now)) {
+      // Ночью задача создана, а сообщение исполнителю уйдёт в 09:00 (одним списком с другими).
+      const what = locked.length === 1 ? cut(locked[0].what.split("\n")[0], 120) : `${locked.length} задач`;
+      const res = await sendOrQueue(api, {
+        chatId: assignee, projectId: locked[0].project_id, kind: "task.new", text, options: { ...HTML, reply_markup: keyboard },
+        line: `🆕 ${locked.length === 1 ? "Задача" : "Задачи"}${authorName ? ` от @${escapeHtmlTeam(authorName)}` : ""}: ${escapeHtmlTeam(what)}`,
+        buttons: [...locked.slice(0, 5).map((t) => [{ text: `Открыть: ${cut(t.what.split("\n")[0], 40)}`, callback_data: taskCb.open(t.id, "me", 0) }]), ...extra],
+      }, now, opts.outbox ?? defaultOutbox()).catch(() => ({ queued: null }));
+      if (res.queued) {
+        // Номер сообщения ещё неизвестен (уйдёт из очереди); база требует > 0, сам номер нигде не читается.
+        for (const t of locked) await store.assignedTaskDelivery(t.id, "sent", QUEUED_MESSAGE_ID);
+        result.queued.push({ assignee, at: res.queued });
+        continue;
+      }
+    }
     try {
-      const sent = await api.sendMessage(assignee, await withProjectLabel(assignee, locked[0].project_id, newTasksText(locked, authorName, mates, now, late)),
-        { ...HTML, reply_markup: openMyTasksKeyboard() });
+      const sent = await api.sendMessage(assignee, text, { ...HTML, reply_markup: keyboard });
       for (const t of locked) await store.assignedTaskDelivery(t.id, "sent", sent.message_id);
     } catch (err) {
       const code = err && typeof err === "object" && "error_code" in err ? Number(err.error_code) : 0;
       for (const t of locked) await store.assignedTaskDelivery(t.id, code >= 400 && code < 500 ? "failed" : "uncertain");
     }
   }
+  return result;
+}
+
+/** «Маша получит задачу в 9:00» / «Маша и Сальма получат задачи в 9:00» — автору ночью. */
+export function queuedNotice(names: readonly string[]): string | null {
+  if (!names.length) return null;
+  const who = names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} и ${names.at(-1)}`;
+  return `🌙 ${who} ${names.length === 1 ? "получит" : "получат"} задачу в 9:00.`;
 }
 
 /**
@@ -486,9 +536,11 @@ async function importList(ctx: Context, deps: TeamTaskDeps, uid: number, text: s
     const tasks = await deps.store.importAssignedTasks(uid, ctx.message!.message_id, drafts, { projectId: projectOf(deps) });
     await deps.forms.clear(uid);
     const names = await namesOf(deps);
-    await deliverAssigned(ctx.api, deps.store, tasks.filter((t) => t.delivery_state === "pending"), names.get(uid), now);
+    const delivery = await deliverAssigned(ctx.api, deps.store, tasks.filter((t) => t.delivery_state === "pending"), names.get(uid), now);
     const fresh = (await Promise.all(tasks.map((t) => deps.store.getAssignedTask(t.id)))).filter((t): t is AssignedTask => !!t);
-    await reply(assignReportText(fresh, now));
+    const team = delivery.queued.length ? await deps.listTeam() : [];
+    const night = queuedNotice(delivery.queued.map((q) => team.find((m) => m.chat_id === q.assignee)).filter((m): m is TeamMember => !!m).map(personName));
+    await reply([assignReportText(fresh, now), night].filter(Boolean).join("\n"));
   } catch (err) {
     if (err instanceof TaskListError) await reply(`Строка ${err.line}: ${escapeHtmlTeam(err.message)} Список не сохранён.`);
     else if (err instanceof Error && err.message.includes("assigned:source_changed"))

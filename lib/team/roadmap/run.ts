@@ -1,4 +1,5 @@
 import { Api } from "grammy";
+import { sendOrQueue } from "../outbox";
 import { listProjectTeam, listTeam } from "../access";
 import { teamBotConfigured, teamToken } from "../config";
 import { withProjectLabel } from "../projects/labels";
@@ -31,6 +32,9 @@ export async function tickRoadmap(now = new Date()): Promise<string[]> {
     roadmap: supabaseRoadmapStore(),
     teamOf: (projectId) => listProjectTeam(projectId),
     claim: claimDigest,
-    send: async (chatId, text, projectId) => api.sendMessage(chatId, await withProjectLabel(chatId, projectId, text), { parse_mode: "HTML" }),
+    // Тихие часы: ночью — в очередь до 09:00.
+    send: async (chatId, text, projectId) => {
+      await sendOrQueue(api, { chatId, projectId, kind: "roadmap", text: await withProjectLabel(chatId, projectId, text), options: { parse_mode: "HTML" } }, now);
+    },
   }, now);
 }

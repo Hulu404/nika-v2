@@ -15,6 +15,9 @@ import { fetchRunSignups } from "./stats";
 import { dispatchAttendanceAsks, supabaseFactStore, type FactStore } from "./attendance";
 import { supabaseTeamForms, type TeamFormStore } from "./form";
 import type { InlineKeyboardMarkup } from "grammy/types";
+import { sendOrQueue, type QueuedMessage } from "./outbox";
+import { isQuiet } from "./quiet";
+import { getTeamBot } from "./bot";
 
 /**
  * Что «Пятница» присылает сама:
@@ -61,6 +64,8 @@ export interface DigestDispatchDeps extends DigestDeps, Pick<MyDayDeps, "partici
   projectsOf?: (chatId: number) => Promise<Project[]>;
   /** События проекта (по умолчанию — events, это nika). */
   eventsFor?: (projectId: string) => Pick<TeamEventStore, "listBetween">;
+  /** Отложить сообщение до 09:00 (тихие часы). */
+  queue?: (msg: QueuedMessage, now: Date) => Promise<unknown>;
 }
 
 /** Кому план на день: все без /mute; блоки — по их проектам. */
@@ -113,6 +118,7 @@ function defaultDeps(): DigestDispatchDeps {
     claimDaily,
     markDailySent,
     send: (chatId, text, keyboard) => sendTeamMessage(chatId, text, { html: true, keyboard }),
+    queue: (msg, now) => sendOrQueue(getTeamBot().api, msg, now),
   };
 }
 
@@ -168,7 +174,12 @@ export async function dispatchTeamDigests(opts: DispatchOptions = {}): Promise<T
 
   if (!opts.dryRun) {
     try {
-      for (const key of await dispatchAttendanceAsks(deps, now)) sent.push(`attend ${key}`);
+      // Тихие часы: вопрос о явке ночью ложится в очередь до 09:00.
+      const askDeps = isQuiet(now) && deps.queue ? { ...deps, send: async (chatId: number, text: string, keyboard?: InlineKeyboardMarkup) => {
+        await deps.queue!({ chatId, kind: "attend", text, options: { parse_mode: "HTML", reply_markup: keyboard } }, now);
+        return { ok: true };
+      } } : deps;
+      for (const key of await dispatchAttendanceAsks(askDeps, now)) sent.push(`attend ${key}`);
     } catch (err) {
       console.error("[team-digest] attendance asks:", err instanceof Error ? err.message : String(err));
     }

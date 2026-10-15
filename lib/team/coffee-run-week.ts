@@ -18,6 +18,7 @@ import { isCoffeeRunEvent, supabaseEventStore, type TeamEvent, type TeamEventSto
 import { openTeamForm, supabaseTeamForms, teamFormExpired, type TeamFormStore } from "./form";
 import { SPOTS, coffeeRunName, spotBySlug } from "./spots";
 import { deliverAssigned, syncTeamTaskMembers } from "./tasks";
+import { quietApi } from "./outbox";
 
 /**
  * Кофе-ран недели.
@@ -553,10 +554,11 @@ export async function handleCoffeeWeekUpdate(ctx: Context, deps: CoffeeWeekDeps,
   const uid = ctx.from.id;
   const data = ctx.callbackQuery?.data ?? "";
   const text = ctx.message?.text?.trim() ?? "";
-  const api: WeekApi = {
+  // Нажавшему — сразу; остальным ночью — утром (тихие часы, outbox.ts).
+  const api = quietApi<WeekApi>({
     sendMessage: (chat, t, other) => ctx.api.sendMessage(chat, t, other),
     editMessageText: (chat, id, t, other) => ctx.api.editMessageText(chat, id, t, other),
-  };
+  }, "coffee", now, { except: uid });
   const edit = async (t: string, keyboard?: InlineKeyboardMarkup) => {
     await ctx.editMessageText(t, keyboard ? { reply_markup: keyboard } : undefined).catch(() => ctx.reply(t, keyboard ? { reply_markup: keyboard } : undefined));
   };
@@ -745,10 +747,11 @@ export function defaultCoffeeWeekDeps(): CoffeeWeekDeps {
 export async function tickCoffeeRunWeek(now = new Date()): Promise<string[]> {
   if (!teamBotConfigured()) return [];
   const api = new Api(teamToken());
-  const weekApi: WeekApi = {
+  // Тихие часы: подтверждение «Проводим?» и напоминания ночью ложатся в очередь до 09:00.
+  const weekApi = quietApi<WeekApi>({
     sendMessage: (chat, text, other) => api.sendMessage(chat, text, other),
     editMessageText: (chat, id, text, other) => api.editMessageText(chat, id, text, other),
-  };
+  }, "coffee", now);
   return dispatchCoffeeRunWeek(defaultCoffeeWeekDeps(), weekApi, now);
 }
 

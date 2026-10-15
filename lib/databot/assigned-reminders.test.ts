@@ -44,15 +44,14 @@ describe("noticeDue", () => {
   });
 
   it("пропущенный тикер: уходит только самый поздний порог, ранние помечаются молча", () => {
-    expect(noticeDue(task({}), msk("2026-10-03T16:00"))).toEqual({ kind: "reminder", hours: 3, mark: "r3", silent: ["r24", "r12"] });
-    expect(noticeDue(task({ reminded_24_at: "x" }), msk("2026-10-03T16:00"))).toEqual({ kind: "reminder", hours: 3, mark: "r3", silent: ["r12"] });
+    expect(noticeDue(task({}), msk("2026-10-03T16:00"))).toEqual({ kind: "reminder", hours: 3, mark: "r3", silent: ["r24", "r12"], onTime: true });
+    expect(noticeDue(task({ reminded_24_at: "x" }), msk("2026-10-03T16:00"))).toEqual({ kind: "reminder", hours: 3, mark: "r3", silent: ["r12"], onTime: true });
   });
 
-  it("тихих часов нет: напоминание уходит ночью в расчётное время", () => {
-    const night = task({ due_at: msk("2026-10-03T02:00").toISOString(), created_at: msk("2026-09-29T12:00").toISOString() });
-    expect(noticeDue(night, msk("2026-10-02T02:00"))).toMatchObject({ hours: 24 });
-    expect(noticeDue(task({ due_at: msk("2026-10-03T02:00").toISOString(), created_at: msk("2026-09-29T12:00").toISOString(),
-      reminded_24_at: "x", reminded_12_at: "x" }), msk("2026-10-02T23:00"))).toMatchObject({ hours: 3 });
+  it("horizon: порог, наступающий ночью, считается наступившим заранее и называет срок, а не «через N часов»", () => {
+    const night = task({ due_at: msk("2026-10-03T01:00").toISOString(), created_at: msk("2026-09-29T12:00").toISOString(), reminded_24_at: "x", reminded_12_at: "x" });
+    expect(noticeDue(night, msk("2026-10-02T21:30"))).toBeNull();
+    expect(noticeDue(night, msk("2026-10-02T21:30"), msk("2026-10-03T09:00"))).toMatchObject({ hours: 3, onTime: false });
   });
 
   it("просрочка — отдельное событие, даже если напоминания не было; закрытые не трогаем", () => {
@@ -86,17 +85,25 @@ describe("sendAssignedReminders", () => {
     expect(sent).toHaveLength(1);
     expect(sent[0]).toMatchObject({ chat: 1 });
     expect(sent[0].text).toContain("Через 24 часа срок: сб 03.10, 18:00");
+    // Порог «за 12 часов» (06:00) — в тихие часы: уходит накануне в 21:30 и называет срок.
     await sendAssignedReminders({ store, api }, msk("2026-10-03T06:05"));
-    expect(sent[1].text).toContain("Через 12 часов срок: сб 03.10, 18:00");
+    expect(sent).toHaveLength(1);
+    await sendAssignedReminders({ store, api }, msk("2026-10-02T21:35"));
+    expect(sent[1].text).toContain("Срок задачи #1: сб 03.10, 18:00");
   });
 
-  it("после деплоя с пропущенными порогами шлёт одно сообщение, а не три", async () => {
-    await sendAssignedReminders({ store, api }, msk("2026-10-03T16:00"));
-    await sendAssignedReminders({ store, api }, msk("2026-10-03T16:15"));
+  it("тихие часы: напоминание за 3 часа до срока 01:00 уходит в 21:30, ночью — ничего", async () => {
+    store.assignedTasks.get(1)!.status = "done";
+    await store.importAssignedTasks(9, 11, [{ line: 1, username: "alice", what: "Ночной срок", due_at: msk("2026-10-02T01:00").toISOString() }]);
+    Object.assign(store.assignedTasks.get(2)!, { reminded_24_at: "x", reminded_12_at: "x" });
+    await sendAssignedReminders({ store, api }, msk("2026-10-01T21:15"));
+    expect(sent).toHaveLength(0);
+    await sendAssignedReminders({ store, api }, msk("2026-10-01T21:30"));
     expect(sent).toHaveLength(1);
-    expect(sent[0].text).toContain("Через 3 часа срок");
-    const t = store.assignedTasks.get(1)!;
-    expect([t.reminded_24_at, t.reminded_12_at, t.reminded_3_at].every(Boolean)).toBe(true);
+    expect(sent[0].text).toContain("Срок задачи #2: пт 02.10, 01:00");
+    await sendAssignedReminders({ store, api }, msk("2026-10-01T22:00"));
+    await sendAssignedReminders({ store, api }, msk("2026-10-01T23:30"));
+    expect(sent).toHaveLength(1);
   });
 
   it("о просрочке пишет исполнителю и автору, тоже один раз", async () => {

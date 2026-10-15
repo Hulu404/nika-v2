@@ -14,7 +14,7 @@ import { DEPARTMENTS } from "../departments";
 import { scopedEvents, supabaseEventStore, type TeamEventStore } from "../events";
 import { openTeamForm, supabaseTeamForms, type TeamForm, type TeamFormStore } from "../form";
 import { personLabel, personName, resolveMention } from "../roster";
-import { deliverAssigned, syncTeamTaskMembers } from "../tasks";
+import { deliverAssigned, queuedNotice, syncTeamTaskMembers } from "../tasks";
 import { runAgent } from "./agent";
 import { applyAnswer, clarifyMessage, expandCompact, NOT_HEARD_TEXT, parseAssigneeAnswer, parseTimeAnswer } from "./clarify";
 import { missingOf, mskLocalToDate, type Intent, type Mention } from "./intent";
@@ -33,6 +33,7 @@ import {
   type ReminderStore,
 } from "./stores";
 import { executeTool, toolSpecsFor, type ToolContext } from "./tools";
+import { flushOutbox, supabaseOutboxStore, type OutboxStore } from "../outbox";
 import { checkRoadmapCompletion } from "../roadmap/complete";
 import { supabaseRoadmapStore, type RoadmapPatch, type RoadmapStore } from "../roadmap/store";
 import { supabaseAboutStore, type AboutStore } from "../about/store";
@@ -432,9 +433,11 @@ async function confirm(ctx: Context, deps: AssistantDeps, draft: Draft, uid: num
     const drafts: AssignedTaskDraft[] = usernames.map((username) => ({ line: 1, username, what: p.what, due_at: due }));
     const tasks = await deps.tasks.importAssignedTasks(uid, draft.message_id ?? draft.id, drafts,
       { projectId: deps.projectId ?? NIKA, roadmapItemId: draft.intent.roadmapItemId ?? null });
-    await deliverAssigned(ctx.api, deps.tasks, tasks.filter((t) => t.delivery_state === "pending"), author?.username ?? undefined, now);
+    const delivery = await deliverAssigned(ctx.api, deps.tasks, tasks.filter((t) => t.delivery_state === "pending"), author?.username ?? undefined, now);
+    // Ночью сообщение исполнителю уйдёт в 09:00 — автор это видит.
+    const night = queuedNotice(delivery.queued.map((q) => team.find((m) => m.chat_id === q.assignee)).filter((m): m is TeamMember => !!m).map(personName));
     // Кто — в именительном, без собранных кодом склонений: «Маша», «SMM», «ты».
-    return `✅ Задача поставлена: ${slots.map((s) => listName(s, uid)).join(", ")}, ${due ? `срок ${whenText(due)}` : "без срока"}`;
+    return `✅ Задача поставлена: ${slots.map((s) => listName(s, uid)).join(", ")}, ${due ? `срок ${whenText(due)}` : "без срока"}${night ? `\n${night}` : ""}`;
   }
 
   if (p.intent === "create_reminder") {
@@ -692,9 +695,15 @@ export interface MinuteDeps {
   reminders: ReminderStore;
   drafts: DraftStore;
   tasks: Pick<DatabotStore, "getAssignedTask">;
+  /** Очередь тихих часов: днём — отправить накопленное. */
+  outbox?: OutboxStore;
 }
 
-/** Напоминания, чьё время пришло, — их авторам; черновики старше часа — удалить. */
+/**
+ * Напоминания, чьё время пришло, — их авторам (личные напоминания уходят и
+ * в тихие часы: человек сам выбрал время); черновики старше часа — удалить;
+ * днём — отложенное на ночь из team_outbox.
+ */
 export async function dispatchTeamMinute(deps: MinuteDeps, api: Pick<Api, "sendMessage">, now: Date): Promise<string[]> {
   const done: string[] = [];
   for (const r of await deps.reminders.listDue(now)) {
@@ -708,6 +717,13 @@ export async function dispatchTeamMinute(deps: MinuteDeps, api: Pick<Api, "sendM
   }
   const purged = await deps.drafts.purge(new Date(now.getTime() - DRAFT_TTL_MS));
   if (purged) done.push(`drafts -${purged}`);
+  if (deps.outbox) {
+    const flushed = await flushOutbox(api, now, deps.outbox).catch((err) => {
+      console.error("[team-outbox] flush:", err instanceof Error ? err.message : String(err));
+      return 0;
+    });
+    if (flushed) done.push(`outbox ${flushed}`);
+  }
   return done;
 }
 
@@ -716,7 +732,7 @@ export async function dispatchTeamMinute(deps: MinuteDeps, api: Pick<Api, "sendM
 export async function tickTeamMinute(now = new Date()): Promise<string[]> {
   if (!teamBotConfigured()) return [];
   return dispatchTeamMinute(
-    { reminders: supabaseReminderStore(), drafts: supabaseDraftStore(), tasks: createSupabaseStore() },
+    { reminders: supabaseReminderStore(), drafts: supabaseDraftStore(), tasks: createSupabaseStore(), outbox: supabaseOutboxStore() },
     new Api(teamToken()), now,
   );
 }

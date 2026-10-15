@@ -1,6 +1,7 @@
 import type { Api } from "grammy";
 import { overdueOwnerText, overdueText, reminderText, taskButtons } from "./assigned-view";
 import { teamBotConfigured } from "../team/config";
+import { isQuiet, isQuietEve, quietEnd } from "../team/quiet";
 import type { DatabotStore } from "./data/store";
 import { isActiveAssigned, type AssignedNoticeMark, type AssignedTask } from "./task-list";
 
@@ -16,8 +17,10 @@ import { isActiveAssigned, type AssignedNoticeMark, type AssignedTask } from "./
  * - если тикер проспал момент (деплой, рестарт) и наступило сразу несколько
  *   порогов, уходит только самый поздний, ранние помечаются без отправки:
  *   три сообщения подряд хуже, чем одно;
- * - тихих часов нет: напоминания и просрочки уходят в расчётное время, в том
- *   числе ночью;
+ * - тихие часы 22:00–09:00 МСК (lib/team/quiet.ts): ночью ничего не уходит;
+ *   порог, который пришёлся бы на ночь, уходит накануне в 21:30 (если задача
+ *   уже была), иначе утром в 09:00, если срок ещё не прошёл. Такое
+ *   напоминание называет срок, а не «через N часов»;
  * - срок прошёл, задача не закрыта — одно сообщение исполнителю и одно автору.
  *
  * Дедуп — отметки reminded_24_at / reminded_12_at / reminded_3_at и
@@ -36,8 +39,9 @@ const MARK: Record<ReminderHours, AssignedNoticeMark> = { 24: "r24", 12: "r12", 
 const FIELD = { 24: "reminded_24_at", 12: "reminded_12_at", 3: "reminded_3_at" } as const;
 
 export type NoticePlan =
-  | { kind: "reminder"; hours: ReminderHours; mark: AssignedNoticeMark; silent: AssignedNoticeMark[] }
+  | { kind: "reminder"; hours: ReminderHours; mark: AssignedNoticeMark; silent: AssignedNoticeMark[]; /** Не сдвинут тихими часами: «через N часов» верно. */ onTime: boolean }
   | { kind: "overdue" };
+
 
 /** Пороги, которые вообще применимы к задаче: поставленные позже порога пропускаются. */
 export function reminderThresholds(t: Pick<AssignedTask, "due_at" | "created_at">): ReminderHours[] {
@@ -47,14 +51,20 @@ export function reminderThresholds(t: Pick<AssignedTask, "due_at" | "created_at"
   return REMINDER_HOURS.filter((h) => created <= due - h * HOUR);
 }
 
-export function noticeDue(t: AssignedTask, now: Date): NoticePlan | null {
+/**
+ * horizon — до какого момента пороги считаются наступившими: обычно now, а в
+ * 21:30–22:00 — утро (09:00), чтобы ночные пороги ушли до тихих часов.
+ */
+export function noticeDue(t: AssignedTask, now: Date, horizon: Date = now): NoticePlan | null {
   if (!isActiveAssigned(t) || !t.due_at) return null;
   const due = Date.parse(t.due_at);
   if (due <= now.getTime()) return t.overdue_notified_at ? null : { kind: "overdue" };
-  const reached = reminderThresholds(t).filter((h) => now.getTime() >= due - h * HOUR && !t[FIELD[h]]);
+  const reached = reminderThresholds(t).filter((h) => horizon.getTime() >= due - h * HOUR && !t[FIELD[h]]);
   if (!reached.length) return null;
   const latest = reached[reached.length - 1];
-  return { kind: "reminder", hours: latest, mark: MARK[latest], silent: reached.slice(0, -1).map((h) => MARK[h]) };
+  const at = due - latest * HOUR;
+  return { kind: "reminder", hours: latest, mark: MARK[latest], silent: reached.slice(0, -1).map((h) => MARK[h]),
+    onTime: at <= now.getTime() && !isQuiet(new Date(at)) };
 }
 
 export interface ReminderDeps {
@@ -69,8 +79,11 @@ export interface ReminderDeps {
 export async function sendAssignedReminders(deps: ReminderDeps, now = new Date()): Promise<{ reminders: number; overdue: number }> {
   const { store, api } = deps;
   const out = { reminders: 0, overdue: 0 };
+  // Тихие часы: ничего. Накануне в 21:30 — и то, что наступило бы до 09:00.
+  if (isQuiet(now)) return out;
+  const horizon = isQuietEve(now) ? quietEnd(now) : now;
   for (const task of await store.listAssignedDue()) {
-    const plan = noticeDue(task, now);
+    const plan = noticeDue(task, now, horizon);
     if (!plan) continue;
     const teammates = await store.listAssignedTeammates(task);
     const card = deps.cardButton ? [[deps.cardButton(task)]] : [];
@@ -82,7 +95,7 @@ export async function sendAssignedReminders(deps: ReminderDeps, now = new Date()
       // Проспанные ранние пороги помечаем молча: уходит только самый поздний.
       for (const mark of plan.silent) await store.markAssignedNotice(task.id, mark);
       if (!(await store.markAssignedNotice(task.id, plan.mark))) continue;
-      await api.sendMessage(task.assignee_id, `${await label(task.assignee_id)}${reminderText(task, now, teammates, plan.hours)}`, options).catch(() => {});
+      await api.sendMessage(task.assignee_id, `${await label(task.assignee_id)}${reminderText(task, now, teammates, plan.onTime ? plan.hours : undefined)}`, options).catch(() => {});
       out.reminders += 1;
     } else {
       if (!(await store.markAssignedNotice(task.id, "overdue"))) continue;
