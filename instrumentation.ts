@@ -196,6 +196,15 @@ export async function register(): Promise<void> {
     } catch (err) {
       console.error("[team] roster:", err instanceof Error ? err.message : String(err));
     }
+    // Разово: отменить просроченные задачи кофе-рана старого образца, без уведомлений.
+    try {
+      const [{ cleanupLegacyCoffeeTasks }, { createSupabaseStore }, { supabaseSettingsStore }] = await Promise.all([
+        import("./lib/team/coffee-cleanup"), import("./lib/databot/data/supabase-store"), import("./lib/team/settings"),
+      ]);
+      await cleanupLegacyCoffeeTasks({ tasks: createSupabaseStore(), settings: supabaseSettingsStore() }, new Date());
+    } catch (err) {
+      console.error("[team] cleanup:", err instanceof Error ? err.message : String(err));
+    }
   }
 
   // Бот данных команды — то же правило. Без DATABOT_TOKEN ни строки в логе:
