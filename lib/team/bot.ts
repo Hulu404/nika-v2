@@ -418,7 +418,7 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     }
     await ctx.reply(
       on
-        ? "Буду снова присылать план на день в 8:00 МСК."
+        ? "Буду снова присылать план на день в 9:00 МСК."
         : "Больше не присылаю план на день. Расписание по-прежнему в /schedule. Вернуть — /unmute.",
     );
   });

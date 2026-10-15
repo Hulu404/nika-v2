@@ -54,11 +54,9 @@ describe("noticeDue", () => {
     expect(noticeDue(night, msk("2026-10-02T21:30"), msk("2026-10-03T09:00"))).toMatchObject({ hours: 3, onTime: false });
   });
 
-  it("просрочка — отдельное событие, даже если напоминания не было; закрытые не трогаем", () => {
-    expect(noticeDue(task({}), msk("2026-10-03T18:00"))).toEqual({ kind: "overdue" });
-    expect(noticeDue(task({ overdue_notified_at: "x" }), msk("2026-10-03T19:00"))).toBeNull();
-    expect(noticeDue(task({ status: "done" }), msk("2026-10-03T19:00"))).toBeNull();
-    expect(noticeDue(task({ status: "taken" }), msk("2026-10-03T19:00"))).toEqual({ kind: "overdue" });
+  it("срок прошёл — напоминаний нет, о просрочке отдельно не пишем", () => {
+    expect(noticeDue(task({}), msk("2026-10-03T18:00"))).toBeNull();
+    expect(noticeDue(task({ status: "taken" }), msk("2026-10-03T19:00"))).toBeNull();
     expect(noticeDue(task({ status: "taken" }), msk("2026-10-02T18:00"))).toMatchObject({ hours: 24 });
   });
 });
@@ -106,12 +104,10 @@ describe("sendAssignedReminders", () => {
     expect(sent).toHaveLength(1);
   });
 
-  it("о просрочке пишет исполнителю и автору, тоже один раз", async () => {
+  it("о просрочке не пишет ни исполнителю, ни автору", async () => {
     const res = await sendAssignedReminders({ store, api }, msk("2026-10-03T18:15"));
-    await sendAssignedReminders({ store, api }, msk("2026-10-03T18:30"));
-    expect(res).toEqual({ reminders: 0, overdue: 1 });
-    expect(sent.map(s => s.chat)).toEqual([1, 9]);
-    expect(sent[1].text).toContain("Просрочена задача #1 у @alice");
+    expect(res).toEqual({ reminders: 0, overdue: 0 });
+    expect(sent).toEqual([]);
   });
 
   it("закрытая задача и новый срок: молчит, а после правки срока напоминает заново", async () => {

@@ -11,6 +11,7 @@ import { MemoryTeamForms } from "./form";
 import { MY_DAY_EMPTY, MY_DAY_FOOTER } from "./my-day";
 import type { SignupRow } from "./stats";
 import { syncTeamTaskMembers } from "./tasks";
+import { sendAssignedReminders } from "../databot/assigned-reminders";
 
 const msk = (local: string) => new Date(`${local}+03:00`);
 const signup = (over: Partial<SignupRow>): SignupRow => ({
@@ -27,7 +28,7 @@ describe("утренняя сводка — «Мой день»", () => {
   let participants: MemoryParticipantStore;
   let tasks: MemoryStore;
   let team: TeamMember[];
-  let sent: Array<{ chat: number; text: string }>;
+  let sent: Array<{ chat: number; text: string; buttons?: string[] }>;
   let claimed: Set<string>;
   let signups: SignupRow[];
   let aiEnabled: boolean;
@@ -37,7 +38,7 @@ describe("утренняя сводка — «Мой день»", () => {
     recipients: async () => team.filter((m) => m.digest_opt_in).map((m) => m.chat_id),
     claimDaily: async (ymd) => (claimed.has(ymd) ? false : (claimed.add(ymd), true)),
     markDailySent: async () => {},
-    send: async (chat, text) => (sent.push({ chat, text }), { ok: true }),
+    send: async (chat, text, keyboard) => (sent.push({ chat, text, ...(keyboard ? { buttons: keyboard.inline_keyboard.flat().map((b) => b.text) } : {}) }), { ok: true }),
   });
   const textOf = (chat: number) => sent.find((s) => s.chat === chat)!.text;
   const create = (title: string, local: string, patch: Record<string, unknown> = {}) =>
@@ -57,18 +58,18 @@ describe("утренняя сводка — «Мой день»", () => {
   });
   afterEach(() => vi.unstubAllEnvs());
 
-  it("в 8:00 — каждому своё сообщение, кроме /mute; до 8:00 и повторно — нет", async () => {
+  it("в 9:00 — каждому своё сообщение, кроме /mute; до 9:00 и повторно — нет", async () => {
     await create("Планёрка", "2026-10-13T19:00", { place: "Zoom" });
-    await dispatchTeamDigests({ now: msk("2026-10-13T07:45"), deps: deps() });
+    await dispatchTeamDigests({ now: msk("2026-10-13T08:45"), deps: deps() });
     expect(sent).toEqual([]);
-    await dispatchTeamDigests({ now: msk("2026-10-13T08:00"), deps: deps() });
-    await dispatchTeamDigests({ now: msk("2026-10-13T08:15"), deps: deps() });
+    await dispatchTeamDigests({ now: msk("2026-10-13T09:00"), deps: deps() });
+    await dispatchTeamDigests({ now: msk("2026-10-13T09:15"), deps: deps() });
     expect(sent.map((s) => s.chat)).toEqual([1, 2, 9]);
     expect(textOf(1)).toBe(["☀️ План на вт 13.10", "", "🗓 События", "- 19:00 Планёрка · Zoom", "", MY_DAY_FOOTER].join("\n"));
   });
 
   it("пустой день не отправляется", async () => {
-    await dispatchTeamDigests({ now: msk("2026-10-13T08:00"), deps: deps() });
+    await dispatchTeamDigests({ now: msk("2026-10-13T09:00"), deps: deps() });
     expect(sent).toEqual([]);
     expect(MY_DAY_EMPTY).toBe("На сегодня ничего не запланировано.");
   });
@@ -77,7 +78,7 @@ describe("утренняя сводка — «Мой день»", () => {
     await create("Планёрка", "2026-10-13T19:00", { place: "Zoom" });
     await scopedEvents(events, "rescan").create({ kind: "meeting", club: null, title: "Созвон RESCAN", starts_at: msk("2026-10-13T12:00").toISOString(), place: null, responsible_chat_id: null, created_by: 9 }, msk("2026-10-10T12:00"));
     await tasks.importAssignedTasks(9, 50, [{ line: 1, username: "vika", what: "Макет пациента", due_at: msk("2026-10-13T18:00").toISOString() }], { projectId: "rescan" });
-    await dispatchTeamDigests({ now: msk("2026-10-13T08:00"), deps: { ...deps(),
+    await dispatchTeamDigests({ now: msk("2026-10-13T09:00"), deps: { ...deps(),
       projectsOf: async (chat) => (chat === 1 ? DEFAULT_PROJECTS.slice() : DEFAULT_PROJECTS.slice(0, 1)),
       eventsFor: (id) => scopedEvents(events, id),
     } });
@@ -91,11 +92,32 @@ describe("утренняя сводка — «Мой день»", () => {
     expect(textOf(2)).toBe(["☀️ План на вт 13.10", "", "🗓 События", "- 19:00 Планёрка · Zoom", "", MY_DAY_FOOTER].join("\n"));
   });
 
+  it("10 задач у трёх людей просрочены в 23:59: в 00:00 — ни одного сообщения; в 09:00 — каждому исполнителю одно, фаундеру ни одного", async () => {
+    team.push(member(4, "masha"));
+    await syncTeamTaskMembers({ store: tasks }, msk("2026-10-10T12:00"), team);
+    const due = msk("2026-10-14T23:59").toISOString();
+    const who = ["vika", "vika", "vika", "vika", "salma", "salma", "salma", "masha", "masha", "masha"];
+    await tasks.importAssignedTasks(9, 77, who.map((username, i) => ({ line: i + 1, username, what: `Задача ${i + 1}`, due_at: due })));
+    const reminderApi = { sendMessage: async (chat: number, text: string) => (sent.push({ chat, text }), {} as never) };
+    for (const at of ["2026-10-15T00:00", "2026-10-15T00:15", "2026-10-15T08:45"]) {
+      await sendAssignedReminders({ store: tasks, api: reminderApi }, msk(at));
+      await dispatchTeamDigests({ now: msk(at), deps: deps() });
+    }
+    expect(sent).toEqual([]);
+    for (const at of ["2026-10-15T09:00", "2026-10-15T09:15"]) {
+      await sendAssignedReminders({ store: tasks, api: reminderApi }, msk(at));
+      await dispatchTeamDigests({ now: msk(at), deps: deps() });
+    }
+    expect(sent.map((s) => s.chat).sort()).toEqual([1, 2, 4]);
+    expect(textOf(1)).toContain("⏰ Просрочено у тебя\n1. Задача 1 (срок вчера 23:59)");
+    expect(sent.find((s) => s.chat === 1)!.buttons).toHaveLength(4);
+  });
+
   it("встреча с участниками — только им; общее событие — всем", async () => {
     const meeting = await create("Сбивка по кофе-рану", "2026-10-13T16:00", { place: "малая переговорная" });
     await participants.add(meeting.id, [9, 2]);
     await create("Планёрка", "2026-10-13T19:00", { place: "Zoom" });
-    await dispatchTeamDigests({ now: msk("2026-10-13T08:00"), deps: deps() });
+    await dispatchTeamDigests({ now: msk("2026-10-13T09:00"), deps: deps() });
     expect(textOf(2)).toContain("🗓 События\n- 16:00 Сбивка по кофе-рану · малая переговорная\n- 19:00 Планёрка · Zoom");
     expect(textOf(1)).not.toContain("Сбивка");
     expect(textOf(1)).toContain("- 19:00 Планёрка · Zoom");
@@ -109,14 +131,17 @@ describe("утренняя сводка — «Мой день»", () => {
     const [done] = await tasks.importAssignedTasks(9, 5, [{ line: 1, username: "vika", what: "Уже сделано", due_at: msk("2026-10-13T10:00").toISOString() }]);
     await tasks.setAssignedStatus(done.id, 1, "done");
     expect(today.id).toBeGreaterThan(0);
-    await dispatchTeamDigests({ now: msk("2026-10-13T08:00"), deps: deps() });
+    await dispatchTeamDigests({ now: msk("2026-10-13T09:00"), deps: deps() });
     expect(textOf(1)).toBe([
       "☀️ План на вт 13.10", "",
       "📋 Твои задачи на сегодня",
       "1. Найти пейсеров на кофе-ран (до 20:00)",
-      "⏰ Просрочено: Анонс кофе-рана в ТГК (срок вчера 12:00)",
+      "",
+      "⏰ Просрочено у тебя",
+      "1. Анонс кофе-рана в ТГК (срок вчера 12:00)",
       "", MY_DAY_FOOTER,
     ].join("\n"));
+    expect(sent.find((s) => s.chat === 1)!.buttons).toEqual(["⏰ Анонс кофе-рана в ТГК"]);
     // У Али задач на сегодня нет — пустой день ему не отправляется.
     expect(sent.some((s) => s.chat === 9)).toBe(false);
   });
@@ -128,7 +153,7 @@ describe("утренняя сводка — «Мой день»", () => {
       signup({ confirmed_at: "2026-10-06T10:00:00Z", tg_chat_id: 8, pace: "7:00" }),
       signup({ pace: null }),
     ];
-    await dispatchTeamDigests({ now: msk("2026-10-13T08:05"), deps: deps() });
+    await dispatchTeamDigests({ now: msk("2026-10-13T09:05"), deps: deps() });
     expect(textOf(9)).toContain("🏃 Кофе-ран · Усачёва, 10:00: ждём 2 из 3 — 6:30 мин/км — 1, 7:00 мин/км — 1, без темпа — 1");
     expect(textOf(9)).toContain("⚠️ не подтвердились 1");
     expect(textOf(9)).toContain("🚨 Кофе-ран · Усачёва: вчера окно рассылки напоминаний прошло, а не ушло ни одного");
@@ -142,7 +167,7 @@ describe("утренняя сводка — «Мой день»", () => {
       place: null, notes: null, responsible_chat_id: null, created_by: 1, created_at: "", updated_at: "", cancelled_at: null, format: "coffee_run" as const, spot: "usachevo" };
     const lines = founderCoffeeLines([{ kind: "event", event: coffee, runDate: "2026-10-13", stats: {
       total: 2, reminded: 2, waiting: 0, unconfirmed: 0, confirmed: 2, byPace: [{ pace: "6:30", count: 2 }],
-      last24h: 0, lastSignupAt: null, lastReminderAt: "2026-10-12T07:00:00Z" } }], msk("2026-10-13T08:00"));
+      last24h: 0, lastSignupAt: null, lastReminderAt: "2026-10-12T07:00:00Z" } }], msk("2026-10-13T09:00"));
     expect(lines.join("\n")).not.toContain("🚨");
     expect(lines.join("\n")).not.toContain("⚠️");
   });

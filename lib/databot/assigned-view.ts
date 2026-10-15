@@ -60,14 +60,6 @@ export function reminderText(t: AssignedTask, now: Date, teammates: string[] = [
   return taskCard(t, now, head, teammates);
 }
 
-export function overdueText(t: AssignedTask, now: Date, teammates: string[] = []): string {
-  return taskCard(t, now, `⚠️ <b>Срок задачи #${t.id} прошёл</b>`, teammates) + "\nЕсли не успеваешь, нажми «Не смогу», автор увидит.";
-}
-
-export function overdueOwnerText(t: AssignedTask): string {
-  return `⚠️ Просрочена задача #${t.id} у @${escapeHtml(t.username)} (срок ${formatDue(t.due_at!)}, ${STATUS_LABEL[t.status]})\n${escapeHtml(short(t.what, 300))}`;
-}
-
 export function short(text: string, max: number): string {
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length <= max ? flat : `${flat.slice(0, max - 1)}…`;

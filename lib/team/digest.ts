@@ -4,7 +4,7 @@ import { dailyDigestDue } from "./digest-schedule";
 import { buildCoffeeBlock, type DigestDeps } from "./digest-build";
 import { sendTeamMessage, type TeamSendResult } from "./send";
 import { isFounder, teamBotConfigured } from "./config";
-import { morningPlanText, myDayProjectBlock, type MyDayDeps } from "./my-day";
+import { morningPlanText, myDayProjectBlock, overdueButtons, type MyDayDeps } from "./my-day";
 import { DEFAULT_PROJECTS, hasModule, projectLabel, supabaseProjectStore, type Project } from "./projects/projects";
 import { projectIdsOf } from "./projects/labels";
 import { supabaseParticipantStore } from "./ai/stores";
@@ -21,9 +21,10 @@ import { getTeamBot } from "./bot";
 
 /**
  * Что «Пятница» присылает сама:
- *   • «Мой день» в 8:00 МСК каждому, кто не выключил сводку через /mute:
- *     события дня, встречи, где он участник, и его задачи на сегодня
- *     (lib/team/my-day.ts); фаундерам — ещё блоки про кофе-ран;
+ *   • «Мой день» в 9:00 МСК каждому, кто не выключил сводку через /mute:
+ *     события дня, встречи, где он участник, его задачи на сегодня и блок
+ *     «⏰ Просрочено у тебя» с кнопками (lib/team/my-day.ts) — единственное
+ *     сообщение о просрочках; фаундерам — ещё блоки про кофе-ран;
  *   • вопрос о явке через 3 часа после начала ивента клуба — ответственному
  *     или фаундерам, один раз.
  *
@@ -155,14 +156,18 @@ export async function dispatchTeamDigests(opts: DispatchOptions = {}): Promise<T
         // Одно сообщение на человека: блоки его проектов, пустой день — не отправляем.
         const projects = deps.projectsOf ? await deps.projectsOf(chatId) : DEFAULT_PROJECTS.slice(0, 1);
         const blocks = [];
+        const overdue = [];
         for (const p of projects) {
           const events = deps.eventsFor ? deps.eventsFor(p.id) : deps.events;
           const extra = isFounder(chatId) && hasModule(p, "coffee_run") ? coffee : [];
-          blocks.push({ label: projectLabel(p), lines: await myDayProjectBlock({ events, participants: deps.participants, tasks: deps.tasks, projectId: p.id }, chatId, now, extra) });
+          const lines = await myDayProjectBlock({ events, participants: deps.participants, tasks: deps.tasks, projectId: p.id }, chatId, now, extra);
+          overdue.push(...(lines.overdue ?? []));
+          blocks.push({ label: projectLabel(p), lines });
         }
         const text = morningPlanText(day, blocks, !!deps.aiEnabled);
         if (!text) continue;
-        if ((await deps.send(chatId, text)).ok) delivered++;
+        const buttons = overdueButtons(overdue);
+        if ((await deps.send(chatId, text, buttons.length ? { inline_keyboard: buttons } : undefined)).ok) delivered++;
       } catch (err) {
         console.error("[team-digest] my day:", chatId, err instanceof Error ? err.message : String(err));
       }

@@ -1,5 +1,5 @@
 import type { Api } from "grammy";
-import { overdueOwnerText, overdueText, reminderText, taskButtons } from "./assigned-view";
+import { reminderText, taskButtons } from "./assigned-view";
 import { teamBotConfigured } from "../team/config";
 import { isQuiet, isQuietEve, quietEnd } from "../team/quiet";
 import type { DatabotStore } from "./data/store";
@@ -21,10 +21,11 @@ import { isActiveAssigned, type AssignedNoticeMark, type AssignedTask } from "./
  *   порог, который пришёлся бы на ночь, уходит накануне в 21:30 (если задача
  *   уже была), иначе утром в 09:00, если срок ещё не прошёл. Такое
  *   напоминание называет срок, а не «через N часов»;
- * - срок прошёл, задача не закрыта — одно сообщение исполнителю и одно автору.
+ * - срок прошёл — отдельных сообщений нет никому: исполнитель видит свои
+ *   просрочки в утреннем плане в 09:00 (блок «⏰ Просрочено у тебя»), автор и
+ *   фаундеры — в сводке фаундерам и в «📋 Мои задачи».
  *
- * Дедуп — отметки reminded_24_at / reminded_12_at / reminded_3_at и
- * overdue_notified_at в базе: тикер делает первый проход на каждом деплое.
+ * Дедуп — отметки reminded_24_at / reminded_12_at / reminded_3_at в базе: тикер делает первый проход на каждом деплое.
  * Отметка ставится ДО отправки: лучше потерять одно напоминание при сбое
  * Telegram, чем прислать два. Смена срока сбрасывает все отметки (045).
  */
@@ -38,9 +39,7 @@ export type ReminderHours = (typeof REMINDER_HOURS)[number];
 const MARK: Record<ReminderHours, AssignedNoticeMark> = { 24: "r24", 12: "r12", 3: "r3" };
 const FIELD = { 24: "reminded_24_at", 12: "reminded_12_at", 3: "reminded_3_at" } as const;
 
-export type NoticePlan =
-  | { kind: "reminder"; hours: ReminderHours; mark: AssignedNoticeMark; silent: AssignedNoticeMark[]; /** Не сдвинут тихими часами: «через N часов» верно. */ onTime: boolean }
-  | { kind: "overdue" };
+export type NoticePlan = { kind: "reminder"; hours: ReminderHours; mark: AssignedNoticeMark; silent: AssignedNoticeMark[]; /** Не сдвинут тихими часами: «через N часов» верно. */ onTime: boolean };
 
 
 /** Пороги, которые вообще применимы к задаче: поставленные позже порога пропускаются. */
@@ -58,7 +57,8 @@ export function reminderThresholds(t: Pick<AssignedTask, "due_at" | "created_at"
 export function noticeDue(t: AssignedTask, now: Date, horizon: Date = now): NoticePlan | null {
   if (!isActiveAssigned(t) || !t.due_at) return null;
   const due = Date.parse(t.due_at);
-  if (due <= now.getTime()) return t.overdue_notified_at ? null : { kind: "overdue" };
+  // Срок прошёл — напоминать поздно, а о просрочке отдельно не пишем (утренний план).
+  if (due <= now.getTime()) return null;
   const reached = reminderThresholds(t).filter((h) => horizon.getTime() >= due - h * HOUR && !t[FIELD[h]]);
   if (!reached.length) return null;
   const latest = reached[reached.length - 1];
@@ -91,19 +91,11 @@ export async function sendAssignedReminders(deps: ReminderDeps, now = new Date()
       reply_markup: { inline_keyboard: [...(taskButtons(task) ?? []), ...card] } };
     const label = async (chatId: number) => (deps.label ? await deps.label(chatId, task.project_id).catch(() => "") : "");
     // Сбой одной отправки не останавливает остальные: отметка уже стоит, повтора не будет.
-    if (plan.kind === "reminder") {
-      // Проспанные ранние пороги помечаем молча: уходит только самый поздний.
-      for (const mark of plan.silent) await store.markAssignedNotice(task.id, mark);
-      if (!(await store.markAssignedNotice(task.id, plan.mark))) continue;
-      await api.sendMessage(task.assignee_id, `${await label(task.assignee_id)}${reminderText(task, now, teammates, plan.onTime ? plan.hours : undefined)}`, options).catch(() => {});
-      out.reminders += 1;
-    } else {
-      if (!(await store.markAssignedNotice(task.id, "overdue"))) continue;
-      await api.sendMessage(task.assignee_id, `${await label(task.assignee_id)}${overdueText(task, now, teammates)}`, options).catch(() => {});
-      if (task.assigned_by !== task.assignee_id)
-        await api.sendMessage(task.assigned_by, `${await label(task.assigned_by)}${overdueOwnerText(task)}`, { parse_mode: "HTML" }).catch(() => {});
-      out.overdue += 1;
-    }
+    // Проспанные ранние пороги помечаем молча: уходит только самый поздний.
+    for (const mark of plan.silent) await store.markAssignedNotice(task.id, mark);
+    if (!(await store.markAssignedNotice(task.id, plan.mark))) continue;
+    await api.sendMessage(task.assignee_id, `${await label(task.assignee_id)}${reminderText(task, now, teammates, plan.onTime ? plan.hours : undefined)}`, options).catch(() => {});
+    out.reminders += 1;
   }
   return out;
 }
