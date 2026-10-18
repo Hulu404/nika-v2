@@ -19,7 +19,7 @@ import { runAgent } from "./agent";
 import { applyAnswer, clarifyMessage, expandCompact, NOT_HEARD_TEXT, parseAssigneeAnswer, parseTimeAnswer } from "./clarify";
 import { missingOf, mskLocalToDate, type Intent, type Mention } from "./intent";
 import { dialogMessages, shownListText, supabaseStateStore, supabaseTurnStore, trimHistory, type StateStore, type TurnStore } from "./memory";
-import { listName, renderOpPreview, renderPreview, slotsOf, whenText, type OpData } from "./preview";
+import { listName, renderBatchPreview, renderOpPreview, renderPreview, slotsOf, whenText, type OpData } from "./preview";
 import { assistantPrompt } from "./prompt";
 import {
   DRAFT_TTL_MS,
@@ -176,6 +176,7 @@ async function opData(deps: AssistantDeps, p: Intent, uid: number): Promise<OpDa
 const isCreate = (p: Intent) => p.intent === "create_task" || p.intent === "create_event" || p.intent === "create_reminder";
 
 async function renderView(deps: AssistantDeps, draftId: number, body: DraftBody, team: TeamMember[], uid: number, now: Date) {
+  if (body.parsed.intent === "create_tasks") return renderBatchPreview(draftId, body, team, uid, now);
   return isCreate(body.parsed)
     ? renderPreview(draftId, body, team, uid, now, await linkedTaskText(deps, body))
     : renderOpPreview(draftId, body.parsed, await opData(deps, body.parsed, uid), team, uid, now);
@@ -226,6 +227,13 @@ function draftContext(draft: Draft, team: TeamMember[], uid: number): string {
   const body = draft.intent;
   const people = slotsOf(body, team, uid).map((s) => s.department ? `${s.department.group}: ${s.people.map(personName).join(", ")}`
     : s.member ? personLabel(s.member, uid) : `«${s.mention.name}» — не найден однозначно`);
+  if (body.parsed.intent === "create_tasks") {
+    return [
+      "Открытый черновик — пакет задач (человек видит предпросмотр с номерами строк; создаёт их кнопка «✅ Создать все»).",
+      "Правка пакета («вторую не надо», «у третьей срок пятница», «и ещё Диме отчёт») — edit_tasks_draft с номерами строк. create_task заново — только если человек диктует весь список с начала.",
+      ...body.parsed.tasks.map((t, i) => `${i + 1}. ${t.what} · ${t.assignees.map((m) => m.name).join(", ") || "кому — не сказано"} · ${t.due ?? "без срока"}`),
+    ].join("\n");
+  }
   return [
     "Открытый черновик (человек видит предпросмотр; меняет данные только кнопка «✅ Подтвердить»).",
     "Если сообщение — правка черновика, вызови тот же инструмент заново со всеми полями, исправив нужное: предпросмотр обновится.",
@@ -303,6 +311,8 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, baseDeps
         });
         await deps.drafts.setMessage(created.id, msg.message_id);
       },
+      openDraft: draft?.intent ?? null,
+      batch: null,
       showSchedule: deps.showSchedule,
       myDay: (at) => deps.myDay(member, at),
       setList: async (list) => {
@@ -392,7 +402,9 @@ export async function closeAiDraft(api: Pick<Api, "editMessageText">, drafts: Dr
   if (draft.message_id) await api.editMessageText(uid, draft.message_id, "Черновик закрыт.").catch(() => {});
 }
 
-const CALLBACK_RE = /^ai:(ok|x|pk|as|ad|tm|sel|pj):(\d+)(?::([ap]\d{1,2}|-?\d+|[a-z_]+)(?::(-?\d+))?)?$/;
+const CALLBACK_RE = /^ai:(ok|x|pk|as|ad|tm|sel|pj|ed):(\d+)(?::([ap]\d{1,2}|t\d{1,2}a\d{1,2}|-?\d+|[a-z_]+)(?::(-?\d+))?)?$/;
+/** Строк в одном импорте задач (databot_assigned_import). */
+const MAX_IMPORT_LINES = 50;
 
 const plural = (n: number, one: string, few: string, many: string) => {
   const m10 = n % 10, m100 = n % 100;
@@ -415,7 +427,7 @@ async function confirm(ctx: Context, deps: AssistantDeps, draft: Draft, uid: num
   const author = team.find((m) => m.chat_id === uid);
   const authorTag = author?.username ? `@${author.username}` : (author ? personName(author) : "участник команды");
   const founder = (deps.isAdmin ?? isFounder)(uid);
-  if (p.intent === "create_task" || p.intent === "set_task_status" || p.intent === "update_task") await syncTeamTaskMembers({ store: deps.tasks, isAdmin: deps.isAdmin }, now, team);
+  if (p.intent === "create_task" || p.intent === "create_tasks" || p.intent === "set_task_status" || p.intent === "update_task") await syncTeamTaskMembers({ store: deps.tasks, isAdmin: deps.isAdmin }, now, team);
   // Человеку в нескольких проектах — с меткой проекта.
   const tell = async (chat: number, text: string) => {
     if (chat === uid) return;
@@ -438,6 +450,28 @@ async function confirm(ctx: Context, deps: AssistantDeps, draft: Draft, uid: num
     const night = queuedNotice(delivery.queued.map((q) => team.find((m) => m.chat_id === q.assignee)).filter((m): m is TeamMember => !!m).map(personName));
     // Кто — в именительном, без собранных кодом склонений: «Маша», «SMM», «ты».
     return `✅ Задача поставлена: ${slots.map((s) => listName(s, uid)).join(", ")}, ${due ? `срок ${whenText(due)}` : "без срока"}${night ? `\n${night}` : ""}`;
+  }
+
+  if (p.intent === "create_tasks") {
+    // Весь пакет — одним импортом (как /assign): строка пакета = строка списка, автор — отправитель.
+    const slots = slotsOf(draft.intent, team, uid);
+    const members = await deps.tasks.listMembers();
+    const drafts: AssignedTaskDraft[] = [];
+    for (const [r, t] of p.tasks.entries()) {
+      const usernames = [...new Set(slots.filter((s) => s.row === r).flatMap((s) => s.people).map((m) => normalizeTaskUsername(m.username)!))];
+      for (const u of usernames) {
+        if (members.filter((m) => normalizeTaskUsername(m.username) === u).length !== 1) return `Не нашла @${u} среди участников задач. Попроси человека открыть бота и набрать /start.`;
+        drafts.push({ line: r + 1, username: u, what: t.what, due_at: t.due ? mskLocalToDate(t.due).toISOString() : null });
+      }
+    }
+    if (drafts.length > MAX_IMPORT_LINES) return `Слишком много строк с учётом отделов (${drafts.length}), за раз — до ${MAX_IMPORT_LINES}. Раздели пакет.`;
+    const tasks = await deps.tasks.importAssignedTasks(uid, draft.message_id ?? draft.id, drafts,
+      { projectId: deps.projectId ?? NIKA });
+    // Каждому исполнителю — свои задачи одним сообщением; ночью — в 09:00.
+    const delivery = await deliverAssigned(ctx.api, deps.tasks, tasks.filter((t) => t.delivery_state === "pending"), author?.username ?? undefined, now);
+    const night = queuedNotice(delivery.queued.map((q) => team.find((m) => m.chat_id === q.assignee)).filter((m): m is TeamMember => !!m).map(personName));
+    const people = [...new Set(tasks.map((t) => team.find((m) => m.chat_id === t.assignee_id)).filter((m): m is TeamMember => !!m).map((m) => (m.chat_id === uid ? "ты" : personName(m))))];
+    return `✅ Поставила ${tasksWord(p.tasks.length)}: ${people.join(", ")}${night ? `\n${night}` : ""}`;
   }
 
   if (p.intent === "create_reminder") {
@@ -625,6 +659,10 @@ export async function handleAiUpdate(ctx: Context, providedDeps?: AssistantDeps 
     return true;
   }
   await ctx.answerCallbackQuery().catch(() => {});
+  if (op === "ed") {
+    await ctx.reply("Напиши или надиктуй, что поменять: «вторую не надо», «у третьей срок пятница», «в пятой не Маше, а Насте», «и ещё Диме отчёт».");
+    return true;
+  }
   if (op === "x") {
     await deps.drafts.remove(draft.id);
     await close();

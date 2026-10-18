@@ -32,8 +32,20 @@ export type ScheduleRange = "today" | "tomorrow" | "week";
  */
 export type MissingField = "assignees" | "remind_at" | "starts_at";
 
+/** Строка пакета задач: кому, что, срок (как у одной задачи). */
+export interface TaskSpec {
+  assignees: Mention[];
+  what: string;
+  due: string | null;
+}
+
+/** Задач в одном пакете — не больше. */
+export const MAX_BATCH = 20;
+
 export type Intent =
   | { intent: "create_task"; assignees: Mention[]; what: string; due: string | null; missing?: MissingField[] }
+  // Несколько задач одним предпросмотром и «✅ Создать все»; проблемы — у строк.
+  | { intent: "create_tasks"; tasks: TaskSpec[] }
   | { intent: "create_reminder"; text: string; remind_at: string; task_hint: string | null; date?: string | null; missing?: MissingField[] }
   | { intent: "create_event"; title: string; starts_at: string; place: string | null; participants: Mention[]; kind: EventKind; date?: string | null; missing?: MissingField[] }
   // Изменения существующего — только через черновик и «✅ Подтвердить» (tools.ts → assistant.ts).

@@ -27,6 +27,8 @@ export const aiCb = {
   assignDept: (id: number, key: string) => `ai:ad:${id}:${key}`,
   /** Ответ кнопкой на «Во сколько?» / «Когда напомнить?»: YYYYMMDDHHmm по Москве. */
   time: (id: number, compact: string) => `ai:tm:${id}:${compact}`,
+  /** «✏️ Изменить» у пакета задач: подсказка, как править словами. */
+  edit: (id: number) => `ai:ed:${id}`,
 };
 
 /** «чт 15.10, 20:00». */
@@ -45,21 +47,89 @@ export interface Slot {
   department: Department | null;
   /** Кого слот означает: человека или всех участников отдела. */
   people: TeamMember[];
+  /** Строка пакета задач (с нуля). */
+  row?: number;
 }
 
-/** Упоминания черновика по слотам: a0, a1… — исполнители, p0, p1… — участники встречи. */
+/**
+ * Упоминания черновика по слотам: a0, a1… — исполнители, p0, p1… — участники
+ * встречи, t2a0… — исполнители третьей строки пакета задач (строка без
+ * исполнителя — пустой слот: «кому?»).
+ */
 export function slotsOf(body: DraftBody, team: readonly TeamMember[], senderId: number): Slot[] {
   const p = body.parsed;
-  const list = p.intent === "create_task" ? p.assignees.map((m, i) => [`a${i}`, m] as const)
-    : p.intent === "create_event" ? p.participants.map((m, i) => [`p${i}`, m] as const) : [];
-  return list.map(([key, mention]) => {
-    const match = resolveMention(team, mention, senderId);
+  const list: Array<readonly [string, Mention, number?]> = p.intent === "create_task" ? p.assignees.map((m, i) => [`a${i}`, m] as const)
+    : p.intent === "create_event" ? p.participants.map((m, i) => [`p${i}`, m] as const)
+      : p.intent === "create_tasks" ? p.tasks.flatMap((t, r) => (t.assignees.length ? t.assignees : [{ name: "", qualifier: null }]).map((m, i) => [`t${r}a${i}`, m, r] as const))
+        : [];
+  return list.map(([key, mention, row]) => {
+    const match: MentionMatch = mention.name ? resolveMention(team, mention, senderId) : { kind: "none", name: "" };
     const picked = body.picks[key] !== undefined ? team.find((m) => m.chat_id === body.picks[key]) ?? null : null;
     const member = picked ?? (match.kind === "one" ? match.member : null);
     const department = !picked && match.kind === "department" ? match.department : null;
     const people = member ? [member] : match.kind === "department" && !picked ? match.members : [];
-    return { key, mention, match, member, department, people };
+    return { key, mention, match, member, department, people, ...(row !== undefined ? { row } : {}) };
   });
+}
+
+/** «до вт 13.10, 12:00», «до ср 14.10» (конец дня — без времени). */
+function dueShort(local: string): string {
+  const w = whenText(mskLocalToDate(local).toISOString());
+  return `до ${local.endsWith("T23:59") ? w.split(", ")[0] : w}`;
+}
+
+/** «Настя (Глава SMM)» — человек в строке пакета, без ника. */
+const rowPerson = (m: TeamMember, senderId: number) => (m.chat_id === senderId ? "ты" : `${personName(m)}${m.title ? ` (${m.title})` : ""}`);
+
+/**
+ * Предпросмотр пакета задач: строки по номерам, проблема — у своей строки,
+ * кнопки выбора человека подписаны номером задачи. «✅ Создать все» — только
+ * когда все строки однозначны.
+ */
+export function renderBatchPreview(draftId: number, body: DraftBody, team: readonly TeamMember[], senderId: number, now: Date): Preview {
+  const p = body.parsed;
+  if (p.intent !== "create_tasks") throw new Error("not a batch");
+  const slots = slotsOf(body, team, senderId);
+  const rows: Row[] = [];
+  let ready = p.tasks.length > 0;
+  const lines = ["Проверь, пожалуйста:", "", `📋 Задачи (${p.tasks.length})`];
+  p.tasks.forEach((t, r) => {
+    const problems: string[] = [];
+    const who = slots.filter((s) => s.row === r).map((s) => {
+      if (s.department) {
+        if (!s.people.length) problems.push(`в отделе «${escapeHtmlTeam(s.department.group)}» никого нет`);
+        const noNick = s.people.filter((m) => !m.username);
+        if (noNick.length) problems.push(`у ${noNick.map((m) => escapeHtmlTeam(personName(m))).join(", ")} нет ника в Telegram`);
+        return `${escapeHtmlTeam(s.department.group)}: ${s.people.map((m) => escapeHtmlTeam(personName(m))).join(", ")}`;
+      }
+      if (s.member) {
+        if (!s.member.username) problems.push(`у ${escapeHtmlTeam(personName(s.member))} нет ника в Telegram`);
+        return escapeHtmlTeam(rowPerson(s.member, senderId));
+      }
+      const options = s.match.kind === "many" ? s.match.options : team;
+      for (const m of options) rows.push([{ text: `${r + 1} · ${personLabel(m)}`, callback_data: aiCb.pick(draftId, s.key, m.chat_id) }]);
+      problems.push(!s.mention.name ? "кому? Выбери ниже" : s.match.kind === "many"
+        ? `«${escapeHtmlTeam(s.mention.name)}» — кто именно? Выбери ниже (кнопки «${r + 1} · …»)`
+        : `не нашла «${escapeHtmlTeam(s.mention.name)}». Выбери ниже (кнопки «${r + 1} · …»)`);
+      return null;
+    }).filter((x): x is string => !!x);
+    let due = "без срока";
+    if (t.due) {
+      const check = checkWhen(t.due, now);
+      due = dueShort(t.due);
+      if (!check.ok) problems.push(check.error === "past" ? "срок уже прошёл" : "срок дальше чем через год");
+    }
+    if (problems.length) ready = false;
+    lines.push(`${r + 1}. ${problems.length ? "⚠️ " : ""}${escapeHtmlTeam(t.what)} · ${who.join(", ") || "—"} · ${due}`);
+    for (const problem of problems) lines.push(`   ↳ ${problem}`);
+  });
+  lines.push("", "✍️ Автор: ты");
+  rows.push([
+    ...(ready ? [{ text: "✅ Создать все", callback_data: aiCb.create(draftId) }] : []),
+    { text: "✏️ Изменить", callback_data: aiCb.edit(draftId) },
+    { text: "✖️ Отмена", callback_data: aiCb.cancel(draftId) },
+  ]);
+  return { text: lines.join("\n"), keyboard: { inline_keyboard: rows }, ready };
 }
 
 /** Кто в итоге — в именительном, без предлогов: «Маша», «ты», «SMM». */

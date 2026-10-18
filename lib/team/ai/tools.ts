@@ -18,7 +18,7 @@ import { canManageEvent, type TeamEvent, type TeamEventStore } from "../events";
 import { faqAnswerText, findFaq } from "../faq";
 import { personLabel, personName, resolveMention, stem } from "../roster";
 import { fillDefaults } from "./clarify";
-import { missingOf, normalizeLocal, validateIntent, type Intent, type TaskStatusChange } from "./intent";
+import { MAX_BATCH, missingOf, normalizeLocal, validateIntent, type Intent, type TaskSpec, type TaskStatusChange } from "./intent";
 import type { AiState, ShownList } from "./memory";
 import { whenText } from "./preview";
 import type { DraftBody, ReminderStore } from "./stores";
@@ -71,6 +71,10 @@ export interface ToolContext {
   otherTeams?: () => Promise<Array<{ project: Project; team: TeamMember[] }>>;
   /** «Сальма в проекте NIKA. Поставить задачу там?» — черновик ждёт ответа кнопкой. */
   offerProject?: (project: Project, person: TeamMember, body: DraftBody) => Promise<void>;
+  /** Открытый черновик (с прошлых сообщений) — для правки пакета задач по номерам. */
+  openDraft?: DraftBody | null;
+  /** Задачи, собранные в этом сообщении: повторный create_task добавляет к ним. */
+  batch?: TaskSpec[] | null;
 }
 
 // ── Описания для модели ──────────────────────────────────────────────────────
@@ -114,8 +118,24 @@ export const TOOL_SPECS: readonly ToolSpec[] = [
   { name: "answer_faq", description: "Быстрые ответы про кофе-раны для участников: место, время, дождь, темп.", parameters: { type: "object", properties: { query: { type: "string" } }, required: ["query"] } },
   {
     name: "create_task",
-    description: "Черновик задачи (сохранится после «✅ Подтвердить»). Вызови снова — черновик обновится.",
-    parameters: { type: "object", properties: { assignees: { type: "array", items: mention }, what: { type: "string" }, due: { type: "string", description: `Срок ${local} или YYYY-MM-DD (конец дня); пусто — без срока` } }, required: ["assignees", "what"] },
+    description: `Черновик задачи или пакета задач (сохранится после «✅ Подтвердить»). Одна задача — assignees, what, due. Несколько задач в сообщении — все сразу в tasks одним вызовом (до ${MAX_BATCH}). Повторный вызов в том же сообщении добавляет задачи в черновик.`,
+    parameters: { type: "object", properties: {
+      assignees: { type: "array", items: mention }, what: { type: "string" }, due: { type: "string", description: `Срок ${local} или YYYY-MM-DD (конец дня); пусто — без срока` },
+      tasks: { type: "array", description: `Несколько задач: каждая — кому, что, срок (до ${MAX_BATCH})`, items: { type: "object", properties: {
+        assignees: { type: "array", items: mention }, what: { type: "string" }, due: { type: "string", description: `${local} или YYYY-MM-DD` },
+      }, required: ["assignees", "what"] } },
+    } },
+  },
+  {
+    name: "edit_tasks_draft",
+    description: "Правка открытого пакета задач по номерам строк из предпросмотра: remove — убрать строки, changes — поменять текст, срок или исполнителей строки, add — добавить задачи.",
+    parameters: { type: "object", properties: {
+      remove: { type: "array", items: { type: "integer" }, description: "Номера строк: «вторую не надо» — [2]" },
+      changes: { type: "array", items: { type: "object", properties: {
+        n: { type: "integer" }, what: { type: "string" }, due: { type: "string", description: `${local} или YYYY-MM-DD` }, assignees: { type: "array", items: mention },
+      }, required: ["n"] } },
+      add: { type: "array", items: { type: "object", properties: { assignees: { type: "array", items: mention }, what: { type: "string" }, due: { type: "string" } }, required: ["assignees", "what"] } },
+    } },
   },
   {
     name: "update_task",
@@ -625,6 +645,94 @@ async function elsewhere(tc: ToolContext, parsed: Intent): Promise<string | null
   return null;
 }
 
+// ── Пакет задач ──────────────────────────────────────────────────────────────
+
+/** Строки задач из аргументов; строка — номер ошибки. */
+function taskSpecs(raw: unknown[], offset = 0): TaskSpec[] | string {
+  const out: TaskSpec[] = [];
+  for (const [i, r] of raw.entries()) {
+    const row = (r && typeof r === "object" ? r : {}) as Record<string, unknown>;
+    const parsed = validateIntent({ intent: "create_task", what: str(row.what), due: str(row.due), assignees: mentions(row.assignees) });
+    if (parsed.intent !== "create_task") return `Задача ${offset + i + 1}: нужен текст, срок — ${local} или YYYY-MM-DD.`;
+    out.push({ assignees: parsed.assignees, what: parsed.what, due: parsed.due });
+  }
+  return out;
+}
+
+const tooMany = (n: number) => `За раз — до ${MAX_BATCH} задач, а здесь ${n}. Раздели на части: сначала первые ${MAX_BATCH}, остальные следующим сообщением.`;
+
+/**
+ * Одна задача — как раньше (вопрос, если не хватает исполнителя). Несколько —
+ * пакет create_tasks одним предпросмотром. В пределах одного сообщения
+ * повторный вызов добавляет задачи к уже собранным.
+ */
+async function createTask(tc: ToolContext, a: Record<string, unknown>): Promise<string> {
+  const many = Array.isArray(a.tasks) && a.tasks.length > 0;
+  if (!many) {
+    const parsed = validateIntent({ intent: "create_task", what: str(a.what), due: str(a.due), assignees: mentions(a.assignees) });
+    if (parsed.intent === "unknown") return err("Нужен текст задачи: что сделать.");
+    if (!tc.batch?.length) {
+      const filled = fillDefaults(parsed, tc.saidText, tc.team, tc.uid);
+      if (filled.intent === "create_task") tc.batch = [{ assignees: filled.assignees, what: filled.what, due: filled.due }];
+      return (await elsewhere(tc, filled)) ?? draft(tc, filled);
+    }
+  }
+  const specs = taskSpecs(many ? (a.tasks as unknown[]) : [a], tc.batch?.length ?? 0);
+  if (typeof specs === "string") return err(specs);
+  const rows = [...(tc.batch ?? []), ...specs];
+  if (rows.length > MAX_BATCH) return err(tooMany(rows.length));
+  tc.batch = rows;
+  if (rows.length === 1) return draft(tc, fillDefaults({ intent: "create_task", ...rows[0] }, tc.saidText, tc.team, tc.uid));
+  await tc.upsertDraft({ parsed: { intent: "create_tasks", tasks: rows }, picks: {}, voice: tc.voice });
+  tc.shown.preview = true;
+  return json({ ok: true, tasks: rows.length, shown: "черновик пакета показан человеку, он нажмёт «✅ Создать все»; повторять его содержание не нужно" });
+}
+
+/** Правка открытого пакета: убрать, поменять, добавить строки. Выбор людей кнопками переезжает вместе со строкой. */
+async function editTasksDraft(tc: ToolContext, a: Record<string, unknown>): Promise<string> {
+  const open = tc.openDraft;
+  if (open?.parsed.intent !== "create_tasks") return err("Открытого пакета задач нет: собери задачи через create_task.");
+  let rows = open.parsed.tasks.map((t) => ({ ...t }));
+  const keep = rows.map((_, i) => i);
+  const dropPicks = new Set<number>();
+  for (const c of Array.isArray(a.changes) ? a.changes : []) {
+    const ch = (c && typeof c === "object" ? c : {}) as Record<string, unknown>;
+    const r = Number(ch.n) - 1;
+    if (!Number.isInteger(r) || !rows[r]) return err(`В пакете нет строки ${String(ch.n)}.`);
+    if (str(ch.what)) rows[r].what = str(ch.what);
+    if (str(ch.due)) {
+      const due = normalizeLocal(ch.due);
+      if (!due) return err(`Срок — ${local} или YYYY-MM-DD.`);
+      rows[r].due = due;
+    }
+    const who = mentions(ch.assignees);
+    if (who.length) {
+      rows[r].assignees = who;
+      dropPicks.add(r);
+    }
+  }
+  const removed = new Set(ints(a.remove).map((n) => n - 1));
+  if ([...removed].some((r) => !rows[r])) return err("В пакете нет таких строк.");
+  const kept = keep.filter((r) => !removed.has(r));
+  rows = kept.map((r) => rows[r]);
+  const added = taskSpecs(Array.isArray(a.add) ? a.add : [], rows.length);
+  if (typeof added === "string") return err(added);
+  rows.push(...added);
+  if (!rows.length) return err("В пакете не останется задач: если они не нужны, пусть человек нажмёт «✖️ Отмена».");
+  if (rows.length > MAX_BATCH) return err(tooMany(rows.length));
+  // t{старая строка}a{j} → t{новая строка}a{j}.
+  const picks: Record<string, number> = {};
+  for (const [key, chat] of Object.entries(open.picks)) {
+    const m = /^t(\d+)a(\d+)$/.exec(key);
+    if (!m || dropPicks.has(Number(m[1]))) continue;
+    const to = kept.indexOf(Number(m[1]));
+    if (to >= 0) picks[`t${to}a${m[2]}`] = chat;
+  }
+  await tc.upsertDraft({ ...open, parsed: { intent: "create_tasks", tasks: rows }, picks });
+  tc.shown.preview = true;
+  return json({ ok: true, tasks: rows.length, shown: "предпросмотр пакета обновлён" });
+}
+
 async function cancelReminder(tc: ToolContext, a: Record<string, unknown>): Promise<string> {
   const fromList = tc.state.last_list?.kind === "reminders" ? tc.state.last_list.items : [];
   const id = Number.isInteger(a.reminder_id) ? Number(a.reminder_id) : fromList.find((i) => i.n === a.number)?.id;
@@ -654,12 +762,10 @@ export async function executeTool(tc: ToolContext, call: ToolCall): Promise<stri
       const found = findFaq(str(a.query)).slice(0, 3);
       return json(found.length ? { answers: found.map((e) => faqAnswerText(e, tc.now)) } : { answers: [], note: "Ответа в быстрых ответах нет" });
     }
-    case "create_task": {
-      const parsed = validateIntent({ intent: "create_task", what: str(a.what), due: str(a.due), assignees: mentions(a.assignees) });
-      if (parsed.intent === "unknown") return err("Нужен текст задачи: что сделать.");
-      const filled = fillDefaults(parsed, tc.saidText, tc.team, tc.uid);
-      return (await elsewhere(tc, filled)) ?? draft(tc, filled);
-    }
+    case "create_task":
+      return createTask(tc, a);
+    case "edit_tasks_draft":
+      return editTasksDraft(tc, a);
     case "create_event": {
       const parsed = validateIntent({ intent: "create_event", title: str(a.title), starts_at: str(a.starts_at), place: str(a.place),
         participants: mentions(a.participants), kind: a.kind === "other" ? "other" : "meeting" });

@@ -23,10 +23,10 @@ describe("цикл инструментов", () => {
     ]);
   });
 
-  it("не больше 5 шагов", async () => {
+  it("не больше 8 шагов", async () => {
     const step = vi.fn(async (): Promise<StepResult> => ({ type: "tools", calls: [{ name: "get_my_day", arguments: {} }], tokensIn: 1, tokensOut: 1 }));
     const run = await runAgent({ ai: { step }, messages: [], tools, execute: async () => "{}" });
-    expect(step).toHaveBeenCalledTimes(5);
+    expect(step).toHaveBeenCalledTimes(8);
     expect(run.text).toBe("");
   });
 
