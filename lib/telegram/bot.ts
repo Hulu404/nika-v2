@@ -39,6 +39,18 @@ import {
   handlePollSummaryCommand,
 } from "./coffeerun-poll";
 import { siteKeyboard, supportKeyboard, SUPPORT_LABEL, SUPPORT_URL } from "./cta";
+import {
+  CLUB_SURVEY_CALLBACK_RE,
+  handleSurveyCallback,
+  handleSurveyStart,
+  handleSurveyText,
+} from "./club-survey";
+import {
+  handleSurveyResultCommand,
+  handleSurveySendCommand,
+  handleSurveySummaryCommand,
+} from "./club-survey-admin";
+import { surveyByStartPayload } from "../clubs/survey-config";
 
 /**
  * Бот мероприятий НИКИ. Снаружи он читается ровно как бот забегов:
@@ -92,8 +104,14 @@ function registerHandlers(bot: Bot<BotContext>): void {
       return;
     }
 
+    // Опрос клуба из поста в чате: /start yoga. Проверяем ДО токена привязки,
+    // иначе payload уйдёт в handleStartToken как «устаревшая ссылка». Если по
+    // опросу сказать нечего (итог уже разослан), идём обычной веткой без токена.
+    const survey = surveyByStartPayload(token);
+    if (survey && (await handleSurveyStart(ctx, survey))) return;
+
     // Deep-link из приложения: /start <token> → привязка аккаунта.
-    if (token) {
+    if (token && !survey) {
       await handleStartToken(ctx, token);
       return;
     }
@@ -155,6 +173,10 @@ function registerHandlers(bot: Bot<BotContext>): void {
   bot.command("open", (ctx) => handleOpenCommand(ctx));
   // Общее сообщение всем, кто бегал: /say, затем само сообщение — с предпросмотром.
   bot.command("say", (ctx) => handleSayCommand(ctx));
+  // Опрос перед запуском клуба (docs/club-survey.md): сводка, старт, итог.
+  bot.command("survey", (ctx) => handleSurveySummaryCommand(ctx));
+  bot.command("surveysend", (ctx) => handleSurveySendCommand(ctx));
+  bot.command("surveyresult", (ctx) => handleSurveyResultCommand(ctx));
   bot.command("help", async (ctx) => {
     await ctx.reply(
       `${BOT_ROLE}\n\nКоманды:\n` +
@@ -179,6 +201,8 @@ function registerHandlers(bot: Bot<BotContext>): void {
   bot.callbackQuery(BROADCAST_CALLBACK_RE, (ctx) => handleBroadcastCallback(ctx));
   // Подтверждение рассылки переклички — для организатора.
   bot.callbackQuery(ROLLCALL_CALLBACK_RE, (ctx) => handleRollcallCallback(ctx));
+  // Опрос клуба (docs/club-survey.md): кнопки участника — шаги сценария.
+  bot.callbackQuery(CLUB_SURVEY_CALLBACK_RE, (ctx) => handleSurveyCallback(ctx));
   // pure-push: интерактивного чек-ина больше нет. Хендлер оставлен пустым
   // «ловцом» — на случай устаревших сообщений с кнопками ans_* в проде: мягко
   // гасим «часик», НИЧЕГО не пишем (никаких answer/answered_at из Telegram).
@@ -188,6 +212,8 @@ function registerHandlers(bot: Bot<BotContext>): void {
   bot.on("message", async (ctx) => {
     // После /say следующее сообщение организатора — это текст рассылки.
     if (await handleBroadcastDraft(ctx)) return;
+    // Опрос клуба: ввод времени и повтор шага с кнопками. Остальное — дальше.
+    if (await handleSurveyText(ctx)) return;
     await ctx.reply(
       `${BOT_ROLE}\n\nСвободно общаться я не умею — но если нужен живой человек, ` +
         "нажми «Служба поддержки».",

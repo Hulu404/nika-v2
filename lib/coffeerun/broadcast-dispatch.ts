@@ -54,8 +54,8 @@ export function broadcastKey(src: BroadcastSource): string {
   return `say:${src.fromChatId}:${src.messageId}`;
 }
 
-/** Уникальные чаты всех подтверждённых заявок. */
-async function alumniChats(): Promise<number[]> {
+/** Уникальные чаты всех подтверждённых заявок. Её же берёт опрос клуба (/surveysend). */
+export async function alumniChats(): Promise<number[]> {
   const { data, error } = await tgAdmin()
     .from("coffee_run_signups")
     .select("tg_chat_id")

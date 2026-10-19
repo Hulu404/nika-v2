@@ -48,6 +48,23 @@ async function tickInvites(): Promise<void> {
 }
 
 /**
+ * Опрос клуба (docs/club-survey.md): напоминание незавершившим через сутки в
+ * 10:00–21:00 МСК и напоминание накануне встречи в 18:00–21:00 МСК. Окна
+ * проверяет сама, дедуп — отметки в club_survey_responses.
+ */
+async function tickClubSurveys(): Promise<void> {
+  try {
+    const { tickClubSurveys: tick } = await import("./lib/clubs/survey-reminders");
+    const res = await tick();
+    if (res.reminded || res.eve) {
+      console.log(`[club-survey] напоминаний: ${res.reminded}, накануне: ${res.eve}`);
+    }
+  } catch (err) {
+    console.error("[club-survey] тик упал:", err instanceof Error ? err.message : String(err));
+  }
+}
+
+/**
  * «Пятница» пишет сама: сводка дня в 8:00 МСК и вопрос о явке через 3 часа
  * после ивента клуба. Окно проверяет сама, дедуп держат таблицы team_digests
  * и team_event_asks (тикер делает первый проход на каждом деплое).
@@ -222,6 +239,7 @@ export async function register(): Promise<void> {
   // напоминание уйдёт не через 15 минут, а тут же.
   void tickReminders();
   void tickInvites();
+  void tickClubSurveys();
   void tickTeamDigests();
   void tickFounderReports();
   void tickCoffeeRunWeek();
@@ -231,6 +249,7 @@ export async function register(): Promise<void> {
   const timer = setInterval(() => {
     void tickReminders();
     void tickInvites();
+    void tickClubSurveys();
     void tickTeamDigests();
     void tickFounderReports();
     void tickCoffeeRunWeek();
@@ -247,6 +266,6 @@ export async function register(): Promise<void> {
   // потому, что о незапущенном слушателе нигде не было сказано.
   console.log(
     `[coffeerun] тикер запущен, интервал ${REMINDER_TICK_MS / 60000} мин ` +
-      "(напоминания накануне + приглашения по понедельникам + сводки команде + сроки задач)",
+      "(напоминания накануне + приглашения по понедельникам + опрос клуба + сводки команде + сроки задач)",
   );
 }
