@@ -162,12 +162,13 @@ describe("полный путь «Приду»", () => {
     expect(chat.last().text).toBe(TEXT.timeWeekdays("чт"));
 
     expect(await chat.say("с 19 до 21")).toBe(true);
-    expect(chat.last().text).toBe(TEXT.timeWeekend("сб"));
+    expect(chat.last().text).toBe(TEXT.timeWeekend);
 
-    expect(await chat.say("с 11 до 14")).toBe(true);
+    // Как в подсказке: день человек пишет сам, разбор берёт только время.
+    expect(await chat.say("сб с 11 до 14")).toBe(true);
     expect(chat.last().text).toBe(
       "Записали: чт 29.10 и сб 31.10, в будни с 19:00 до 21:00, в выходные с 11:00 до 14:00. " +
-        "В пятницу, 23 октября, пришлём дату, время и место.\n\nПриходи один, уйдёшь с компанией.",
+        "В пятницу, 23 октября, пришлём дату, время и место.",
     );
     expect(chat.labels()).toEqual(["Изменить ответ"]);
     expect(row()).toMatchObject({ step: "done", wd_from: "19:00", wd_to: "21:00", we_from: "11:00", we_to: "14:00" });

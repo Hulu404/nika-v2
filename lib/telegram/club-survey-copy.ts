@@ -254,13 +254,12 @@ export const TEXT = {
   time: "Во сколько тебе удобно? Напиши, с какого и до какого часа. Например: с 19 до 21 или с 18:30 до 21:00.",
   timeWeekdays: (days: string) =>
     `Во сколько удобно в будни (${days})? Напиши, с какого и до какого часа. Например: с 19 до 21.`,
-  timeWeekend: (days: string) => `А в выходные (${days})? Например: с 11 до 14.`,
+  timeWeekend: "А в выходные? Напиши день и время. Например: сб с 11 до 14.",
   timeRetry: "Напиши, пожалуйста, начало и конец. Например: с 19 до 21.",
   timeShort: "Нужен промежуток хотя бы в час, чтобы занятие поместилось. Например: с 19 до 21.",
   timeSaved: "Спасибо, сохранили твой ответ. Идём дальше.",
   done: (s: ClubSurvey, days: string, time: string) =>
-    `Записали: ${days}, ${time}. ${capitalize(s.resultLabel)}, пришлём дату, время и место.\n\n` +
-    "Приходи один, уйдёшь с компанией.",
+    `Записали: ${days}, ${time}. ${capitalize(s.resultLabel)}, пришлём дату, время и место.`,
   later:
     "Поняли! Клуб будет встречаться регулярно. Подскажи, какие дни недели тебе обычно удобны, " +
     "и подберём время следующих встреч.",
@@ -335,7 +334,7 @@ export interface SurveyMessage {
 /** Текст вопроса о времени по time_q строки: 5, 5б или 5в. */
 function timeQuestionText(survey: ClubSurvey, row: SurveyResponseRow): string {
   if (row.time_q === "wd") return TEXT.timeWeekdays(groupDaysList(survey, row, "wd"));
-  if (row.time_q === "we") return TEXT.timeWeekend(groupDaysList(survey, row, "we"));
+  if (row.time_q === "we") return TEXT.timeWeekend;
   return TEXT.time;
 }
 
