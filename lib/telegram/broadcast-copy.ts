@@ -83,6 +83,9 @@ export const ADMIN_COMMANDS = [
   { command: "cancel", description: "Отменить забег" },
   { command: "pollsend", description: "Вопрос про дождь накануне" },
   { command: "poll", description: "Сводка ответов" },
+  { command: "survey", description: "Опрос клуба: сводка" },
+  { command: "surveysend", description: "Опрос клуба: разослать" },
+  { command: "surveyresult", description: "Опрос клуба: итог" },
   { command: "pollstop", description: "Выйти из режима организатора" },
   { command: "help", description: "Что умеет бот" },
 ];
