@@ -8,7 +8,8 @@ import { fromMinutes, toMinutes } from "./time-range";
  *
  * Слот — день-кандидат + время начала с шагом 30 минут. Человек «может прийти»
  * на слот, если выбрал «Приду», отметил этот день и занятие целиком помещается
- * в его промежуток для группы этого дня (или там «любое время»). Ответы,
+ * в его промежуток на этот день: своё время дня (day_times), иначе время
+ * группы дня (или там «любое время»). Ответы,
  * сохранённые текстом, в счёт не идут: их читает организатор глазами.
  */
 
@@ -32,7 +33,11 @@ export type SlotRow = Pick<
   | "we_to"
   | "we_any"
   | "we_raw"
+  | "day_times"
 >;
+
+/** Порядок недели в списках и вопросах: Пн…Вс (JS getDay). */
+export const WEEK_ORDER: readonly number[] = [1, 2, 3, 4, 5, 6, 0];
 
 /** Группа дня недели в формате JS getDay (Вс=0…Сб=6). */
 export function weekdayGroup(weekday: number): DayGroup {
@@ -74,10 +79,38 @@ export function groupTime(row: SlotRow, group: DayGroup): GroupTime {
   return { kind: "none" };
 }
 
+/** День недели даты YYYY-MM-DD (JS getDay). */
+export function weekdayOf(date: string): number {
+  return new Date(`${date}T00:00:00Z`).getUTCDay();
+}
+
+/** Дни недели, выбранные человеком: даты ветки «Приду» или дни ветки «позже». Пн…Вс. */
+export function chosenWeekdays(row: Pick<SlotRow, "attend" | "days" | "weekdays">): number[] {
+  const set = new Set(row.attend === "later" ? row.weekdays : row.days.map(weekdayOf));
+  return WEEK_ORDER.filter((d) => set.has(d));
+}
+
+/** Время на день недели: своё (day_times), иначе время группы дня. */
+export function dayTime(row: SlotRow, weekday: number): GroupTime {
+  const own = row.day_times?.[String(weekday)];
+  if (own) return "any" in own ? { kind: "any" } : { kind: "range", from: own.from, to: own.to };
+  return groupTime(row, weekdayGroup(weekday));
+}
+
+/** Есть ли у дня своё время, а не время группы. */
+export function hasOwnTime(row: Pick<SlotRow, "day_times">, weekday: number): boolean {
+  return Boolean(row.day_times?.[String(weekday)]);
+}
+
+/** Выбранные дни, про время которых ещё ничего не ответили. */
+export function uncoveredWeekdays(row: SlotRow): number[] {
+  return chosenWeekdays(row).filter((d) => dayTime(row, d).kind === "none");
+}
+
 /** Помещается ли занятие [start, start + session) в ответ человека на этот день. */
 export function canAttend(row: SlotRow, date: string, startMin: number, sessionMin: number): boolean {
   if (row.attend !== "come" || !row.days.includes(date)) return false;
-  const t = groupTime(row, dayGroup(date));
+  const t = dayTime(row, weekdayOf(date));
   if (t.kind === "any") return true;
   if (t.kind !== "range") return false;
   return toMinutes(t.from) <= startMin && startMin + sessionMin <= toMinutes(t.to);

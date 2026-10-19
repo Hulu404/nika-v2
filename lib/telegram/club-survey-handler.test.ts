@@ -167,11 +167,16 @@ describe("полный путь «Приду»", () => {
     // Как в подсказке: день человек пишет сам, разбор берёт только время.
     expect(await chat.say("сб с 11 до 14")).toBe(true);
     expect(chat.last().text).toBe(
-      "Записали: чт 29.10 и сб 31.10, в будни с 19:00 до 21:00, в выходные с 11:00 до 14:00. " +
+      "Записали: чт 29.10 и сб 31.10, чт с 19:00 до 21:00, сб с 11:00 до 14:00. " +
         "В пятницу, 23 октября, пришлём дату, время и место.",
     );
     expect(chat.labels()).toEqual(["Изменить ответ"]);
-    expect(row()).toMatchObject({ step: "done", wd_from: "19:00", wd_to: "21:00", we_from: "11:00", we_to: "14:00" });
+    expect(row()).toMatchObject({
+      step: "done",
+      wd_from: "19:00",
+      wd_to: "21:00",
+      day_times: { "6": { from: "11:00", to: "14:00" } },
+    });
 
     // Лента организатору — одна строка на завершение.
     expect(feed).toHaveLength(1);
@@ -202,6 +207,41 @@ describe("полный путь «Приду»", () => {
     expect(chat.last().text).toBe(TEXT.resultYes);
     expect(row()?.result_answer).toBe("yes");
     expect(feed[1].text).toContain("на итог: придёт. Всего идут: 1.");
+  });
+});
+
+describe("разное время по дням", () => {
+  async function toTime(chat: Chat, days: string[]) {
+    await chat.start();
+    await chat.press("Интересно");
+    await chat.press("Даю согласие");
+    await chat.press("Приду");
+    for (const d of days) await chat.press(d);
+    await chat.press("Готово");
+  }
+
+  it("одним сообщением про все дни — сразу текст 6", async () => {
+    const chat = new Chat();
+    await toTime(chat, ["Чт 29.10", "Пт 30.10", "Сб 31.10"]);
+
+    expect(await chat.say("В четверг с 19 до 21, в пятницу после 18, а в субботу с 11 до 14")).toBe(true);
+    expect(chat.last().text).toBe(
+      "Записали: чт 29.10, пт 30.10 и сб 31.10, чт с 19:00 до 21:00, пт с 18:00 до 21:00, сб с 11:00 до 14:00. " +
+        "В пятницу, 23 октября, пришлём дату, время и место.",
+    );
+    expect(feed[0].text).toContain("чт 19:00–21:00, пт 18:00–21:00, сб 11:00–14:00");
+  });
+
+  it("назвал не все дни — бот спрашивает про оставшийся", async () => {
+    const chat = new Chat();
+    await toTime(chat, ["Чт 29.10", "Пт 30.10"]);
+
+    await chat.say("чт с 19 до 21");
+    expect(chat.last().text).toBe("А в пт? Напиши, с какого и до какого часа. Например: с 19 до 21.");
+    expect(chat.labels()).toEqual(["Подойдёт любое время"]);
+
+    await chat.press("Подойдёт любое время");
+    expect(chat.last().text).toMatch(/^Записали: чт 29\.10 и пт 30\.10, чт с 19:00 до 21:00, пт в любое время\./);
   });
 });
 

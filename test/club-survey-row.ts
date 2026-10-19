@@ -30,6 +30,7 @@ export function surveyRow(overrides: Partial<SurveyResponseRow> = {}): SurveyRes
     we_to: null,
     we_any: false,
     we_raw: null,
+    day_times: {},
     fail_count: 0,
     finished_at: null,
     reminded_at: null,

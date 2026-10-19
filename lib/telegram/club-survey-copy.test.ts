@@ -87,19 +87,60 @@ describe("тексты участнику — дословно", () => {
 
   it("5, 5б, 5в — по вопросу и выбранным дням", () => {
     const come = { attend: "come" as const, days: [THU, FRI, SAT] };
-    expect(text("time", consentedRow({ ...come, time_q: "all" }))).toBe(
+    expect(text("time", consentedRow({ attend: "come", days: [THU], time_q: "all" }))).toBe(
       "Во сколько тебе удобно? Напиши, с какого и до какого часа. Например: с 19 до 21 или с 18:30 до 21:00.",
     );
+    expect(text("time", consentedRow({ attend: "come", days: [THU, FRI], time_q: "all" }))).toBe(
+      "Во сколько тебе удобно? Напиши, с какого и до какого часа. Например: с 19 до 21 или с 18:30 до 21:00.\n\n" +
+        "Если в разные дни по-разному, напиши так: чт с 19 до 21, пт с 18 до 20.",
+    );
     expect(text("time", consentedRow({ ...come, time_q: "wd" }))).toBe(
-      "Во сколько удобно в будни (чт, пт)? Напиши, с какого и до какого часа. Например: с 19 до 21.",
+      "Во сколько удобно в будни (чт, пт)? Напиши, с какого и до какого часа. Например: с 19 до 21.\n\n" +
+        "Если в разные дни по-разному, напиши так: чт с 19 до 21, пт с 18 до 20.",
     );
     expect(text("time", consentedRow({ ...come, time_q: "we" }))).toBe(
       "А в выходные? Напиши день и время. Например: сб с 11 до 14.",
     );
 
-    const later = consentedRow({ attend: "later", weekdays: [1, 3, 6], time_q: "wd" });
+    const later = consentedRow({ attend: "later", weekdays: [1, 6], time_q: "wd" });
     expect(text("time", later)).toBe(
-      "Во сколько удобно в будни (пн, ср)? Напиши, с какого и до какого часа. Например: с 19 до 21.",
+      "Во сколько удобно в будни (пн)? Напиши, с какого и до какого часа. Например: с 19 до 21.",
+    );
+  });
+
+  it("5 по оставшимся дням и 5ж — другие дни", () => {
+    const partial = consentedRow({
+      attend: "come",
+      days: [THU, FRI, SAT],
+      time_q: "wd",
+      day_times: { "4": { from: "19:00", to: "21:00" } },
+    });
+    expect(text("time", partial)).toBe("А в пт? Напиши, с какого и до какого часа. Например: с 19 до 21.");
+
+    const weRest = consentedRow({
+      attend: "come",
+      days: [SAT, "2026-11-01"],
+      time_q: "all",
+      day_times: { "6": { any: true } },
+    });
+    expect(text("time", weRest)).toBe("А в вс? Напиши, с какого и до какого часа. Например: с 11 до 14.");
+
+    expect(text("time_other_days", consentedRow({ attend: "come", days: [THU, SAT], time_q: "wd" }))).toBe(
+      "В опросе у тебя отмечены другие дни: чт и сб. Напиши время для них. Например: чт с 19 до 21.",
+    );
+  });
+
+  it("6 — разное время по дням", () => {
+    const row = consentedRow({
+      attend: "come",
+      days: [THU, FRI, SAT],
+      wd_from: "19:00",
+      wd_to: "21:00",
+      day_times: { "4": { from: "19:00", to: "21:00" }, "6": { any: true } },
+    });
+    expect(text("done", row)).toBe(
+      "Записали: чт 29.10, пт 30.10 и сб 31.10, чт и пт с 19:00 до 21:00, сб в любое время. " +
+        "В пятницу, 23 октября, пришлём дату, время и место.",
     );
   });
 
@@ -352,6 +393,16 @@ describe("служебное организатору", () => {
     const summary = surveySummaryText(YOGA, surveySummary([row], YOGA), "https://t.me/mynikarun_bot?start=yoga");
     expect(summary).toContain("Придут: 1.");
     expect(summary).toContain("• Аня (@anya): чт 29.10, сб 31.10; будни 19:00–21:00, выходные любое время");
+
+    const perDay = consentedRow({
+      step: "done",
+      attend: "come",
+      days: [THU, FRI],
+      day_times: { "4": { from: "19:00", to: "21:00" }, "5": { from: "18:00", to: "20:00" } },
+    });
+    expect(surveyFeedLine(YOGA, perDay, { coming: 1, later: 0 })).toBe(
+      "Аня (@anya) — придёт: чт 29.10, пт 30.10; чт 19:00–21:00, пт 18:00–20:00. Итого: придут 1, позже 0.",
+    );
     expect(summary).toContain("1. чт 29.10, 19:00 — 1 чел.");
     expect(summary).toContain("https://t.me/mynikarun_bot?start=yoga");
   });

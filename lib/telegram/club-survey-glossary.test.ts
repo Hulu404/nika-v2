@@ -79,6 +79,13 @@ const ROWS = [
   consentedRow({ attend: "come", days: [THU, SAT], wd_any: true, we_any: true, time_q: "we" }),
   consentedRow({ attend: "come", days: [SAT], we_raw: "как получится", time_q: "all" }),
   consentedRow({ attend: "later", weekdays: [1, 3, 6], time_q: "wd" }),
+  consentedRow({
+    attend: "come",
+    days: [THU, SAT],
+    time_q: "wd",
+    day_times: { "6": { from: "11:00", to: "14:00" } },
+  }),
+  consentedRow({ attend: "come", days: [THU, SAT], day_times: { "4": { any: true }, "6": { from: "11:00", to: "14:00" } } }),
 ];
 
 const KINDS: OutKind[] = [
@@ -94,6 +101,7 @@ const KINDS: OutKind[] = [
   "time_retry",
   "time_short",
   "time_saved",
+  "time_other_days",
   "done",
   "later_done",
   "result_yes",

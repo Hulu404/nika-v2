@@ -1,4 +1,5 @@
 import { tgAdmin } from "../telegram/supabase";
+import type { DayTimes } from "./day-times";
 
 /**
  * Доступ к таблицам опросов клубов (migrations/063_club_surveys.sql).
@@ -65,6 +66,8 @@ export interface SurveyResponseRow {
   we_to: string | null;
   we_any: boolean;
   we_raw: string | null;
+  /** Время по дням недели (migrations/064): своё время дня важнее группы. */
+  day_times: DayTimes;
   fail_count: number;
   finished_at: string | null;
   reminded_at: string | null;
@@ -123,6 +126,7 @@ export const ANSWERS_RESET: Readonly<SurveyResponsePatch> = Object.freeze({
   we_to: null,
   we_any: false,
   we_raw: null,
+  day_times: {},
   fail_count: 0,
   finished_at: null,
 });

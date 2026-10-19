@@ -332,3 +332,67 @@ describe("группы вопроса о времени", () => {
     expect(currentGroup(consentedRow({ attend: "come", days: [THU, SAT], time_q: "we" }))).toBe("we");
   });
 });
+
+describe("шаг 5: разное время по дням", () => {
+  const twoDays = consentedRow({ step: "time", attend: "come", days: [THU, FRI], time_q: "all" });
+  const twoGroups = consentedRow({ step: "time", attend: "come", days: [THU, FRI, SAT], time_q: "wd" });
+
+  it("каждому дню своё время — финиш", () => {
+    const out = surveyStep(twoDays, text("чт с 19 до 21, пт с 18 до 20"), ctx());
+    expect(out.patch).toMatchObject({
+      day_times: { "4": { from: "19:00", to: "21:00" }, "5": { from: "18:00", to: "20:00" } },
+      step: "done",
+    });
+    expect(out.send).toEqual(["done"]);
+  });
+
+  it("назвал не все дни — переспрашиваем про оставшиеся", () => {
+    const first = surveyStep(twoGroups, text("чт с 19 до 21, сб с 11 до 14"), ctx());
+    expect(first.patch).toMatchObject({
+      day_times: { "4": { from: "19:00", to: "21:00" }, "6": { from: "11:00", to: "14:00" } },
+      time_q: "wd",
+      fail_count: 0,
+    });
+    expect(first.send).toEqual(["time"]);
+
+    // Ответ без дней — про оставшуюся пятницу: ложится на группу будней.
+    const second = surveyStep(apply(twoGroups, first.patch), text("с 18 до 20"), ctx());
+    expect(second.patch).toMatchObject({ wd_from: "18:00", wd_to: "20:00", step: "done" });
+  });
+
+  it("на вопросе про будни ответил и про выходные — вопроса про выходные нет", () => {
+    const row = consentedRow({ step: "time", attend: "come", days: [THU, SAT], time_q: "wd" });
+    const out = surveyStep(row, text("по будням с 19 до 21, в выходные с 11 до 14"), ctx());
+    expect(out.patch).toMatchObject({ step: "done" });
+  });
+
+  it("на вопросе про будни назвал только выходной — снова спрашиваем про будни", () => {
+    const row = consentedRow({ step: "time", attend: "come", days: [THU, SAT], time_q: "wd" });
+    const out = surveyStep(row, text("сб с 11 до 14"), ctx());
+    expect(out.patch).toMatchObject({ day_times: { "6": { from: "11:00", to: "14:00" } }, time_q: "wd" });
+    expect(out.send).toEqual(["time"]);
+  });
+
+  it("«любое время» текстом", () => {
+    const out = surveyStep(twoDays, text("в любое время"), ctx());
+    expect(out.patch).toMatchObject({ wd_any: true, step: "done" });
+  });
+
+  it("назвал только невыбранные дни — 5ж, считаем неудачей", () => {
+    const out = surveyStep(twoDays, text("пн с 19 до 21"), ctx());
+    expect(out).toMatchObject({ patch: { fail_count: 1 }, send: ["time_other_days"] });
+  });
+
+  it("ветка «позже» — по дням недели", () => {
+    const later = consentedRow({ step: "time", attend: "later", weekdays: [1, 3], time_q: "all" });
+    const out = surveyStep(later, text("пн с 19 до 21, ср с 8 до 10 утра"), ctx());
+    expect(out.patch).toMatchObject({
+      day_times: { "1": { from: "19:00", to: "21:00" }, "3": { from: "08:00", to: "10:00" } },
+      step: "later_done",
+    });
+  });
+
+  it("«Изменить ответ» стирает и время по дням", () => {
+    expect(ANSWERS_RESET).toMatchObject({ day_times: {} });
+  });
+});

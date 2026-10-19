@@ -1,7 +1,10 @@
 import { describe, it, expect } from "vitest";
 import {
   canAttend,
+  chosenWeekdays,
   dayGroup,
+  dayTime,
+  uncoveredWeekdays,
   groupTime,
   groupsOfDays,
   groupsOfWeekdays,
@@ -183,5 +186,30 @@ describe("surveySummary", () => {
     expect(s.asked).toBe(0);
     expect(s.slots).toEqual([]);
     expect(s.comingList).toEqual([]);
+  });
+});
+
+describe("время по дням", () => {
+  const row = consentedRow({
+    attend: "come",
+    days: [THU, FRI, SAT],
+    wd_from: "18:00",
+    wd_to: "22:00",
+    day_times: { "5": { from: "10:00", to: "12:00" }, "6": { any: true } },
+  });
+
+  it("своё время дня важнее времени группы", () => {
+    expect(canAttend(row, THU, toMinutes("19:00"), 60)).toBe(true);
+    expect(canAttend(row, FRI, toMinutes("19:00"), 60)).toBe(false);
+    expect(canAttend(row, FRI, toMinutes("10:30"), 60)).toBe(true);
+    expect(canAttend(row, SAT, toMinutes("08:00"), 60)).toBe(true);
+  });
+
+  it("dayTime и дни без времени", () => {
+    expect(dayTime(row, 5)).toEqual({ kind: "range", from: "10:00", to: "12:00" });
+    expect(dayTime(row, 4)).toEqual({ kind: "range", from: "18:00", to: "22:00" });
+    expect(chosenWeekdays(row)).toEqual([4, 5, 6]);
+    expect(uncoveredWeekdays(row)).toEqual([]);
+    expect(uncoveredWeekdays(consentedRow({ attend: "come", days: [THU, SAT], day_times: { "6": { any: true } } }))).toEqual([4]);
   });
 });

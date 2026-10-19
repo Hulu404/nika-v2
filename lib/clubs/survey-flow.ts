@@ -6,8 +6,16 @@ import {
   type SurveyStep,
   type TimeQuestion,
 } from "./survey-store";
-import { groupsOfDays, groupsOfWeekdays, type DayGroup } from "./survey-slots";
-import { parseTimeRange } from "./time-range";
+import {
+  WEEK_ORDER,
+  chosenWeekdays,
+  groupsOfDays,
+  groupsOfWeekdays,
+  uncoveredWeekdays,
+  weekdayGroup,
+  type DayGroup,
+} from "./survey-slots";
+import { parseDayTimes, type DayTime } from "./day-times";
 
 /**
  * Переходы опроса — таблица из плана, целиком здесь. Чистая функция:
@@ -44,8 +52,8 @@ export type FlowEvent =
 /**
  * Что отправить. Тексты:
  *   interest 1, skipped 1а, consent 2, declined 2а, attend 3, days 4,
- *   days_empty 4а, time 5/5б/5в (по time_q), time_retry 5г, time_short 5д,
- *   time_saved 5е, done 6, later 3а, later_done 3б, result_yes 10, result_no 11.
+ *   days_empty 4а, time 5/5б/5в (по time_q; про оставшиеся дни — «А в пт?»),
+ *   time_retry 5г, time_short 5д, time_saved 5е, time_other_days 5ж, done 6, later 3а, later_done 3б, result_yes 10, result_no 11.
  *   result_repeat — хендлер повторяет человеку его вариант итога (8 или 9);
  *   fallback — общий ответ бота: по опросу сказать нечего.
  */
@@ -62,6 +70,7 @@ export type OutKind =
   | "time_retry"
   | "time_short"
   | "time_saved"
+  | "time_other_days"
   | "done"
   | "later_done"
   | "result_yes"
@@ -117,6 +126,7 @@ export type FlowRow = Pick<
   | "we_to"
   | "we_any"
   | "we_raw"
+  | "day_times"
 >;
 
 export interface FlowContext {
@@ -189,7 +199,12 @@ function firstQuestion(groups: DayGroup[]): TimeQuestion {
   return groups.length === 2 ? "wd" : "all";
 }
 
-/** Ответ на вопрос о времени записан — следующий вопрос или финиш. */
+/**
+ * Ответ на вопрос о времени записан — следующий вопрос или финиш. Следующий
+ * вопрос — про первую по неделе группу, где у выбранных дней ещё нет времени:
+ * человек мог одним сообщением ответить и про будни, и про выходные, а мог
+ * назвать не все дни.
+ */
 function afterTimeAnswer(
   row: FlowRow,
   answer: SurveyResponsePatch,
@@ -197,10 +212,12 @@ function afterTimeAnswer(
   lead: OutKind[],
   strip: { stripPressed?: boolean; stripLast?: boolean },
 ): FlowOutcome {
-  const groups = timeGroups(row);
-  if (row.time_q === "wd" && groups.includes("we")) {
+  const next = { ...row, ...answer };
+  const rest = uncoveredWeekdays(next);
+  if (rest.length > 0) {
+    const time_q: TimeQuestion = timeGroups(next).length === 2 ? weekdayGroup(rest[0]) : "all";
     return outcome({
-      patch: { ...answer, time_q: "we", fail_count: 0 },
+      patch: { ...answer, time_q, fail_count: 0 },
       send: [...lead, "time"],
       ...strip,
     });
@@ -221,13 +238,27 @@ function groupPatch(group: DayGroup, fields: { from: string | null; to: string |
     : { we_from: fields.from, we_to: fields.to, we_any: fields.any, we_raw: fields.raw };
 }
 
+/** Ответ без дней — про всю текущую группу (её дни без своего времени). */
+function groupAnswer(group: DayGroup, time: DayTime, raw: string): SurveyResponsePatch {
+  return "any" in time
+    ? groupPatch(group, { from: null, to: null, any: true, raw })
+    : groupPatch(group, { from: time.from, to: time.to, any: false, raw });
+}
+
 function onTimeText(row: FlowRow, text: string, ctx: FlowContext): FlowOutcome {
   const raw = text.trim().slice(0, RAW_ANSWER_MAX);
   const group = currentGroup(row);
-  const parsed = parseTimeRange(raw, ctx.survey);
+  const parsed = parseDayTimes(raw, {
+    survey: ctx.survey,
+    chosen: chosenWeekdays(row),
+    uncovered: uncoveredWeekdays(row),
+  });
 
   if (parsed.ok) {
-    const answer = groupPatch(group, { from: parsed.from, to: parsed.to, any: false, raw });
+    const answer =
+      parsed.kind === "group"
+        ? groupAnswer(group, parsed.time, raw)
+        : { day_times: { ...row.day_times, ...parsed.times } };
     return afterTimeAnswer(row, answer, ctx, [], { stripLast: true });
   }
 
@@ -239,7 +270,7 @@ function onTimeText(row: FlowRow, text: string, ctx: FlowContext): FlowOutcome {
 
   return outcome({
     patch: { fail_count: failures },
-    send: [parsed.error === "short" ? "time_short" : "time_retry"],
+    send: [parsed.error === "short" ? "time_short" : parsed.error === "other_days" ? "time_other_days" : "time_retry"],
   });
 }
 
@@ -249,7 +280,7 @@ function toggle<T>(list: readonly T[], item: T, order: readonly T[]): T[] {
 }
 
 /** Порядок дней недели в кнопках и в списках: Пн…Вс (JS getDay). */
-export const WEEKDAY_ORDER: readonly number[] = [1, 2, 3, 4, 5, 6, 0];
+export const WEEKDAY_ORDER: readonly number[] = WEEK_ORDER;
 
 function startTime(patch: SurveyResponsePatch, groups: DayGroup[]): FlowOutcome {
   return outcome({

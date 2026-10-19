@@ -7,7 +7,18 @@ import {
   type OutKind,
   type ParticipantAction,
 } from "../clubs/survey-flow";
-import { groupTime, type DayGroup, type GroupTime, type SurveySummary, type SummaryRow } from "../clubs/survey-slots";
+import {
+  chosenWeekdays,
+  dayTime,
+  groupTime,
+  hasOwnTime,
+  weekdayGroup,
+  type DayGroup,
+  type GroupTime,
+  type SlotRow,
+  type SurveySummary,
+  type SummaryRow,
+} from "../clubs/survey-slots";
 import { broadcastReportText } from "./broadcast-copy";
 
 /**
@@ -195,8 +206,32 @@ function timePhrase(t: GroupTime): string {
   return "";
 }
 
-/** Время для текста 6: один промежуток или «в будни …, в выходные …». */
+/** «пт» — короткий день недели строчными. */
+function shortDay(weekday: number): string {
+  return WEEKDAY_SHORT[weekday].toLowerCase();
+}
+
+/**
+ * Время по дням с одинаковым ответом вместе, в порядке недели:
+ * «чт и пт с 19:00 до 21:00, сб в любое время».
+ */
+function perDayPhrase(row: SlotRow & Pick<SurveyResponseRow, "attend" | "days" | "weekdays">, phrase: (t: GroupTime) => string): string {
+  const byPhrase = new Map<string, number[]>();
+  for (const day of chosenWeekdays(row)) {
+    const p = phrase(dayTime(row, day));
+    byPhrase.set(p, [...(byPhrase.get(p) ?? []), day]);
+  }
+  return [...byPhrase].map(([p, days]) => `${joinRu(days.map(shortDay))} ${p}`).join(", ");
+}
+
+/** У кого-то из выбранных дней своё время — тогда время перечисляем по дням. */
+function hasPerDayTimes(row: SlotRow): boolean {
+  return chosenWeekdays(row).some((d) => hasOwnTime(row, d));
+}
+
+/** Время для текста 6: один промежуток, «в будни …, в выходные …» или по дням. */
 export function chosenTimePhrase(row: SurveyResponseRow): string {
+  if (hasPerDayTimes(row)) return perDayPhrase(row, timePhrase);
   const groups = timeGroups(row);
   if (groups.length === 1) return timePhrase(groupTime(row, groups[0]));
   return [`в будни ${timePhrase(groupTime(row, "wd"))}`, `в выходные ${timePhrase(groupTime(row, "we"))}`].join(", ");
@@ -255,6 +290,11 @@ export const TEXT = {
   timeWeekdays: (days: string) =>
     `Во сколько удобно в будни (${days})? Напиши, с какого и до какого часа. Например: с 19 до 21.`,
   timeWeekend: "А в выходные? Напиши день и время. Например: сб с 11 до 14.",
+  timeManyDays: (a: string, b: string) => `Если в разные дни по-разному, напиши так: ${a} с 19 до 21, ${b} с 18 до 20.`,
+  timeRest: (days: string, example: string) =>
+    `А в ${days}? Напиши, с какого и до какого часа. Например: ${example}.`,
+  timeOtherDays: (days: string, first: string) =>
+    `В опросе у тебя отмечены другие дни: ${days}. Напиши время для них. Например: ${first} с 19 до 21.`,
   timeRetry: "Напиши, пожалуйста, начало и конец. Например: с 19 до 21.",
   timeShort: "Нужен промежуток хотя бы в час, чтобы занятие поместилось. Например: с 19 до 21.",
   timeSaved: "Спасибо, сохранили твой ответ. Идём дальше.",
@@ -331,11 +371,30 @@ export interface SurveyMessage {
   keyboard?: InlineKeyboard;
 }
 
-/** Текст вопроса о времени по time_q строки: 5, 5б или 5в. */
+/** Дни текущего вопроса о времени: группы time_q или все выбранные. */
+function questionDays(row: SurveyResponseRow): number[] {
+  const chosen = chosenWeekdays(row);
+  const group = row.time_q;
+  return group === "wd" || group === "we" ? chosen.filter((d) => weekdayGroup(d) === group) : chosen;
+}
+
+/**
+ * Текст вопроса о времени по time_q строки: 5, 5б или 5в. Если часть дней
+ * вопроса уже со своим временем — спрашиваем про оставшиеся: «А в пт?».
+ * Дней в вопросе два и больше — подсказка, как ответить по дням.
+ */
 function timeQuestionText(survey: ClubSurvey, row: SurveyResponseRow): string {
-  if (row.time_q === "wd") return TEXT.timeWeekdays(groupDaysList(survey, row, "wd"));
+  const days = questionDays(row);
+  const rest = days.filter((d) => dayTime(row, d).kind === "none");
+  if (rest.length > 0 && rest.length < days.length) {
+    const example = weekdayGroup(rest[0]) === "we" ? "с 11 до 14" : "с 19 до 21";
+    return TEXT.timeRest(joinRu(rest.map(shortDay)), example);
+  }
+
+  const hint = days.length >= 2 ? `\n\n${TEXT.timeManyDays(shortDay(days[0]), shortDay(days[1]))}` : "";
+  if (row.time_q === "wd") return TEXT.timeWeekdays(groupDaysList(survey, row, "wd")) + hint;
   if (row.time_q === "we") return TEXT.timeWeekend;
-  return TEXT.time;
+  return TEXT.time + hint;
 }
 
 /**
@@ -385,6 +444,10 @@ export function participantMessage(
       return { text: TEXT.timeShort };
     case "time_saved":
       return { text: TEXT.timeSaved };
+    case "time_other_days": {
+      const chosen = chosenWeekdays(row);
+      return { text: TEXT.timeOtherDays(joinRu(chosen.map(shortDay)), shortDay(chosen[0] ?? 1)) };
+    }
     case "done":
       return {
         text: TEXT.done(survey, chosenDaysPhrase(survey, row), chosenTimePhrase(row)),
@@ -439,8 +502,9 @@ function adminGroupTime(t: GroupTime): string {
   return "—";
 }
 
-/** «будни 19:00–21:00, выходные любое время» — для ленты и сводки. */
+/** «будни 19:00–21:00, выходные любое время» или по дням — для ленты и сводки. */
 function adminTimes(row: SurveyResponseRow | SummaryRow): string {
+  if (hasPerDayTimes(row)) return perDayPhrase(row, adminGroupTime);
   const groups = timeGroups(row);
   return groups
     .map((g) => `${g === "wd" ? "будни" : "выходные"} ${adminGroupTime(groupTime(row, g))}`)
