@@ -13,10 +13,12 @@ let db: FakeDb;
 
 vi.mock("./supabase", () => ({ tgAdmin: () => fakeClient(db) }));
 
-const feed: { chatId: number; text: string }[] = [];
+type Markup = { inline_keyboard: { text: string; callback_data?: string }[][] } | undefined;
+
+const feed: { chatId: number; text: string; keyboard?: Markup }[] = [];
 vi.mock("./send", () => ({
-  sendBotMessage: async (chatId: number, text: string) => {
-    feed.push({ chatId, text });
+  sendBotMessage: async (chatId: number, text: string, keyboard?: Markup) => {
+    feed.push({ chatId, text, ...(keyboard ? { keyboard } : {}) });
     return { ok: true, messageId: 1 };
   },
 }));
@@ -25,10 +27,10 @@ const { handleSurveyCallback, handleSurveyStart, handleSurveyText } = await impo
 const { TEXT } = await import("./club-survey-copy");
 const { __resetPollStateForTests, addAdminChat } = await import("./poll-store");
 
+const { handleSurveyAdminCallback, __resetSurveyTestsForTests } = await import("./club-survey-admin");
+
 const CHAT = 4242;
 const ADMIN = 777;
-
-type Markup = { inline_keyboard: { text: string; callback_data?: string }[][] } | undefined;
 
 interface Sent {
   message_id: number;
@@ -123,6 +125,7 @@ beforeEach(() => {
   });
   feed.length = 0;
   __resetPollStateForTests();
+  __resetSurveyTestsForTests();
   addAdminChat(ADMIN);
 });
 
@@ -362,5 +365,55 @@ describe("повторы и старые кнопки", () => {
     await chat.start();
     expect(chat.last().text).toBe(TEXT.interest);
     expect(row()?.step).toBe("interest");
+  });
+});
+
+describe("тестовый прогон организатора", () => {
+  /** Организатор — сам CHAT: тест приходит ему в личку, сюда же вердикт. */
+  async function startTest(chat: Chat) {
+    addAdminChat(CHAT);
+    const ctx = {
+      from: { id: CHAT },
+      chat: { id: CHAT, type: "private" },
+      reply: async () => ({ message_id: 1 }),
+      answerCallbackQuery: async () => {},
+      editMessageReplyMarkup: async () => {},
+    };
+    await handleSurveyAdminCallback(ctx as unknown as BotContext, YOGA, { type: "test" });
+    const start = feed.find((f) => f.chatId === CHAT && f.text === TEXT.interest)!;
+    chat.sent.push({ message_id: 1, text: start.text, keyboard: start.keyboard });
+  }
+
+  const verdicts = () => feed.filter((f) => f.text.includes("Тест пройден"));
+
+  it("дошёл до конца — в чат организатора приходят «Апрув» и «На доработку», один раз", async () => {
+    const chat = new Chat();
+    await startTest(chat);
+    await chat.press("Пока пропущу");
+
+    expect(verdicts()).toHaveLength(1);
+    expect(verdicts()[0].chatId).toBe(CHAT);
+    expect((verdicts()[0].keyboard?.inline_keyboard ?? []).flat().map((b) => b.text)).toEqual([
+      "Апрув — разослать всем",
+      "На доработку",
+    ]);
+
+    // Повторный тап по старой кнопке вердикт не задваивает.
+    await chat.say("ещё раз");
+    expect(verdicts()).toHaveLength(1);
+  });
+
+  it("посреди теста вердикта нет", async () => {
+    const chat = new Chat();
+    await startTest(chat);
+    await chat.press("Интересно");
+    expect(verdicts()).toHaveLength(0);
+  });
+
+  it("обычный участник, дошедший до конца, вердикта не получает", async () => {
+    const chat = new Chat();
+    await chat.start();
+    await chat.press("Пока пропущу");
+    expect(verdicts()).toHaveLength(0);
   });
 });

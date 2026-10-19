@@ -2,10 +2,11 @@ import type { InlineKeyboard } from "grammy";
 import type { BotContext } from "./bot";
 import { sendBotMessage } from "./send";
 import { adminChats } from "./poll-store";
-import { handleSurveyAdminCallback } from "./club-survey-admin";
+import { handleSurveyAdminCallback, isSurveyTestRun, offerSurveyTestVerdict } from "./club-survey-admin";
 import {
   CLUB_SURVEY_CALLBACK_RE,
   daysKeyboard,
+  isAdminAction,
   parseSurveyCallback,
   participantMessage,
   resultAnswerFeedLine,
@@ -58,6 +59,9 @@ const TEXT_STEPS: ReadonlySet<SurveyStep> = new Set<SurveyStep>([
   "days",
   "later",
 ]);
+
+/** Шаги, на которых опрос для человека закончен: тут тестовому прогону — вердикт. */
+const END_STEPS: ReadonlySet<SurveyStep> = new Set<SurveyStep>(["done", "later_done", "skipped", "declined"]);
 
 function logError(where: string, err: unknown): void {
   console.error(`[club-survey] ${where}:`, err instanceof Error ? err.message : String(err));
@@ -183,6 +187,11 @@ async function deliver(
   }
 
   if (out.feed) await feed(survey, row, out.feed);
+
+  const justFinished = before?.step !== row.step && END_STEPS.has(row.step);
+  if (justFinished && isSurveyTestRun(survey.key, chatId)) {
+    await offerSurveyTestVerdict(survey, chatId).catch((err) => logError("test verdict", err));
+  }
   return true;
 }
 
@@ -234,7 +243,7 @@ export async function handleSurveyCallback(ctx: BotContext): Promise<void> {
     if (!parsed || !survey || chatId === undefined) return;
 
     const action = parsed.action;
-    if (action.type === "send" || action.type === "result_send" || action.type === "result_cancel") {
+    if (isAdminAction(action)) {
       answered = true; // «часики» организатора гасит его хендлер — с подписью.
       await handleSurveyAdminCallback(ctx, survey, action);
       return;

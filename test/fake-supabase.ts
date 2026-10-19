@@ -3,7 +3,7 @@
  * один ответ: сценарий из нескольких шагов пишет и читает одни и те же строки.
  *
  * Понимает ровно то, чем пользуются сторы бота: select / insert / upsert
- * (ignoreDuplicates) / update, фильтры eq, is, not (is null, in), lte, lt, or
+ * (ignoreDuplicates) / update / delete, фильтры eq, is, not (is null, in), lte, lt, or
  * (is.null / lt.N), order, limit и окончания maybeSingle / single / await.
  * Чего не понимает — бросает, чтобы тест не прошёл молча на неверном запросе.
  */
@@ -36,7 +36,7 @@ function orCondition(expr: string): Filter {
 }
 
 class Query implements PromiseLike<{ data: unknown; error: { message: string } | null }> {
-  private op: "select" | "update" | "upsert" | "insert" = "select";
+  private op: "select" | "update" | "upsert" | "insert" | "delete" = "select";
   private payload: Row = {};
   private upsertOpts: { onConflict?: string; ignoreDuplicates?: boolean } = {};
   private filters: Filter[] = [];
@@ -65,6 +65,10 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string } |
   insert(row: Row): this {
     this.op = "insert";
     this.payload = row;
+    return this;
+  }
+  delete(): this {
+    this.op = "delete";
     return this;
   }
   eq(col: string, val: unknown): this {
@@ -136,6 +140,12 @@ class Query implements PromiseLike<{ data: unknown; error: { message: string } |
       const row = this.withDefaults(this.payload);
       rows.push(row);
       return [row];
+    }
+
+    if (this.op === "delete") {
+      const hit = rows.filter(match);
+      this.db.tables[this.table] = rows.filter((r) => !match(r));
+      return hit;
     }
 
     if (this.op === "update") {

@@ -52,17 +52,34 @@ export const WEEKDAY_SHORT = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "�
 /** Действия организатора под предпросмотрами. */
 export type AdminAction =
   | { type: "send"; go: boolean }
+  | { type: "test" }
+  | { type: "approve" }
+  | { type: "rework" }
   | { type: "result_send"; resultId: number }
   | { type: "result_cancel" };
 
 export type SurveyCallbackAction = ParticipantAction | AdminAction;
+
+const ADMIN_ACTION_TYPES: ReadonlySet<string> = new Set<AdminAction["type"]>([
+  "send",
+  "test",
+  "approve",
+  "rework",
+  "result_send",
+  "result_cancel",
+]);
+
+/** Кнопка организатора — её разбирает club-survey-admin, а не сценарий участника. */
+export function isAdminAction(action: SurveyCallbackAction): action is AdminAction {
+  return ADMIN_ACTION_TYPES.has(action.type);
+}
 
 /**
  * `cs_<ключ опроса>_<действие>[_<аргумент>]`, только ASCII. Самая длинная —
  * `cs_<ключ до 12>_rg_<id до 10 цифр>`: 29 байт из 64.
  */
 export const CLUB_SURVEY_CALLBACK_RE =
-  /^cs_([a-z0-9]{1,12})_(iy|in|cy|cn|ay|al|dok|wok|wsk|ta|ed|go|sg|sn|rx|d_\d|w_[0-6]|r[yng]_\d{1,10})$/;
+  /^cs_([a-z0-9]{1,12})_(iy|in|cy|cn|ay|al|dok|wok|wsk|ta|ed|go|sg|sn|st|ap|rw|rx|d_\d|w_[0-6]|r[yng]_\d{1,10})$/;
 
 const SIMPLE_CODES: ReadonlyArray<[string, SurveyCallbackAction]> = [
   ["iy", { type: "interest", yes: true }],
@@ -79,6 +96,9 @@ const SIMPLE_CODES: ReadonlyArray<[string, SurveyCallbackAction]> = [
   ["go", { type: "continue" }],
   ["sg", { type: "send", go: true }],
   ["sn", { type: "send", go: false }],
+  ["st", { type: "test" }],
+  ["ap", { type: "approve" }],
+  ["rw", { type: "rework" }],
   ["rx", { type: "result_cancel" }],
 ];
 
@@ -539,13 +559,35 @@ export function surveySendPreviewText(
 
 export function surveySendConfirmKeyboard(key: string): InlineKeyboard {
   return new InlineKeyboard()
-    .text("Разослать", cb(key, { type: "send", go: true }))
+    .text("Тест — прислать мне", cb(key, { type: "test" }))
+    .row()
+    .text("Разослать всем", cb(key, { type: "send", go: true }))
     .row()
     .text("Отмена", cb(key, { type: "send", go: false }));
 }
 
 export function surveySendRetryKeyboard(key: string): InlineKeyboard {
   return new InlineKeyboard().text("Дослать остальным", cb(key, { type: "send", go: true }));
+}
+
+// ── Тестовый прогон стартовой рассылки ────────────────────────────────────────
+
+export const SURVEY_TEST_INTRO =
+  "Тестовый прогон: присылаю опрос только тебе — следующим сообщением, так же, как его увидят участники. " +
+  "Пройди до конца — пришлю кнопки «Апрув» и «На доработку». Больше никому ничего не отправляю.";
+
+export const SURVEY_TEST_VERDICT =
+  "Тест пройден. Апрув — разошлю стартовое сообщение всем, кто бегал (как в предпросмотре /surveysend). " +
+  "На доработку — никому не отправляю. В обоих случаях твои тестовые ответы сотру.";
+
+export const SURVEY_TEST_REWORK =
+  "Никому не отправила, тестовые ответы стёрла. Дорабатываем — когда будет готово, снова /surveysend.";
+
+export function surveyTestVerdictKeyboard(key: string): InlineKeyboard {
+  return new InlineKeyboard()
+    .text("Апрув — разослать всем", cb(key, { type: "approve" }))
+    .row()
+    .text("На доработку", cb(key, { type: "rework" }));
 }
 
 /** Итог рассылки (стартовой или итога) — та же формулировка, что у /say. */

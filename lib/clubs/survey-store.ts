@@ -202,6 +202,16 @@ export async function updateResponse(
 }
 
 /**
+ * Стереть строку человека в опросе. Только для тестового прогона организатора:
+ * после «Апрув» или «На доработку» его тестовые ответы не должны попасть ни
+ * в сводку, ни в дедуп рассылки.
+ */
+export async function deleteResponse(key: string, chatId: number): Promise<void> {
+  const { error } = await tgAdmin().from(RESPONSES).delete().eq("survey_key", key).eq("chat_id", chatId);
+  if (error) dbFail("delete", error);
+}
+
+/**
  * Telegram ответил 403. Строки может не быть (рассылка ещё не дошла до
  * человека) — тогда заводим её сразу с отметкой, чтобы «Дослать остальным»
  * не стучался снова.

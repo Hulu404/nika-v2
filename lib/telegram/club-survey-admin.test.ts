@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { createFakeDb, fakeClient, type FakeDb, type Row } from "../../test/fake-supabase";
-import { YOGA, consentedRow } from "../../test/club-survey-row";
+import { YOGA, consentedRow, surveyRow } from "../../test/club-survey-row";
 import type { BotContext } from "./bot";
 
 /**
@@ -12,10 +12,11 @@ import type { BotContext } from "./bot";
 let db: FakeDb;
 vi.mock("./supabase", () => ({ tgAdmin: () => fakeClient(db) }));
 
-const reports: { chatId: number; text: string }[] = [];
+type Keyboard = { inline_keyboard: { text: string; callback_data?: string }[][] };
+const reports: { chatId: number; text: string; keyboard?: Keyboard }[] = [];
 vi.mock("./send", () => ({
-  sendBotMessage: async (chatId: number, text: string) => {
-    reports.push({ chatId, text });
+  sendBotMessage: async (chatId: number, text: string, keyboard?: Keyboard) => {
+    reports.push({ chatId, text, ...(keyboard ? { keyboard } : {}) });
     return { ok: true, messageId: 1 };
   },
 }));
@@ -68,6 +69,7 @@ const flush = () => new Promise((r) => setTimeout(r, 0));
 
 beforeEach(() => {
   db = createFakeDb({
+    club_survey_responses: (r) => ({ ...surveyRow({ chat_id: r.chat_id as number }), ...r }) as Row,
     club_survey_results: (r, d) => ({
       id: (d.tables.club_survey_results?.length ?? 0) + 1,
       created_at: new Date().toISOString(),
@@ -79,6 +81,7 @@ beforeEach(() => {
   startCalls.length = 0;
   resultCalls.length = 0;
   __resetPollStateForTests();
+  admin.__resetSurveyTestsForTests();
   addAdminChat(ADMIN);
   process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME = "mynikarun_bot";
 });
@@ -124,8 +127,8 @@ describe("/surveysend", () => {
     await admin.handleSurveySendCommand(ctx);
     expect(replies[0].text).toContain("уйдёт 170 чел.");
     expect(replies[0].text).toContain("Привет! Это команда NIKA.");
-    const go = replies[0].keyboard!.inline_keyboard[0][0];
-    expect(go).toMatchObject({ text: "Разослать", callback_data: "cs_yoga_sg" });
+    const go = replies[0].keyboard!.inline_keyboard.flat().find((b) => b.text === "Разослать всем");
+    expect(go).toMatchObject({ callback_data: "cs_yoga_sg" });
 
     const first = makeCtx({ data: "cs_yoga_sg" });
     await admin.handleSurveyAdminCallback(first.ctx, YOGA, { type: "send", go: true });
@@ -152,6 +155,80 @@ describe("/surveysend", () => {
     await admin.handleSurveyAdminCallback(ctx, YOGA, { type: "send", go: false });
     expect(replies[0].text).toContain("Отменила");
     expect(startCalls).toHaveLength(0);
+  });
+});
+
+describe("тестовый прогон /surveysend", () => {
+  const labels = (k?: Keyboard) => (k?.inline_keyboard ?? []).flat().map((b) => b.text);
+  const adminRow = () => (db.tables.club_survey_responses ?? []).find((r) => r.chat_id === ADMIN);
+
+  it("в предпросмотре первой идёт кнопка «Тест — прислать мне»", async () => {
+    const { ctx, replies } = makeCtx();
+    await admin.handleSurveySendCommand(ctx);
+    expect(labels(replies[0].keyboard)).toEqual(["Тест — прислать мне", "Разослать всем", "Отмена"]);
+    expect(replies[0].keyboard!.inline_keyboard[0][0].callback_data).toBe("cs_yoga_st");
+  });
+
+  it("«Тест» — опрос приходит только организатору, рассылки нет", async () => {
+    const { ctx, replies, toasts } = makeCtx({ data: "cs_yoga_st" });
+    await admin.handleSurveyAdminCallback(ctx, YOGA, { type: "test" });
+
+    expect(toasts).toEqual(["Присылаю тебе"]);
+    expect(replies[0].text).toContain("Тестовый прогон");
+    expect(reports).toHaveLength(1);
+    expect(reports[0]).toMatchObject({ chatId: ADMIN, text: expect.stringContaining("Привет! Это команда NIKA.") });
+    expect(labels(reports[0].keyboard)).toEqual(["Интересно", "Пока пропущу"]);
+    expect(adminRow()).toMatchObject({ source: "broadcast", last_msg_id: 1 });
+    expect(startCalls).toHaveLength(0);
+    expect(admin.isSurveyTestRun("yoga", ADMIN)).toBe(true);
+  });
+
+  it("повторный тест начинает опрос заново", async () => {
+    db.tables.club_survey_responses = [consentedRow({ chat_id: ADMIN, step: "done", attend: "come" })] as unknown as Row[];
+    const { ctx } = makeCtx({ data: "cs_yoga_st" });
+    await admin.handleSurveyAdminCallback(ctx, YOGA, { type: "test" });
+    expect(db.tables.club_survey_responses).toHaveLength(1);
+    expect(adminRow()).toMatchObject({ step: "interest", consent_at: null });
+  });
+
+  it("«Апрув» — тестовая строка стёрта, запускается рассылка всем", async () => {
+    await admin.handleSurveyAdminCallback(makeCtx({ data: "cs_yoga_st" }).ctx, YOGA, { type: "test" });
+    const press = makeCtx({ data: "cs_yoga_ap" });
+    await admin.handleSurveyAdminCallback(press.ctx, YOGA, { type: "approve" });
+
+    expect(adminRow()).toBeUndefined();
+    expect(admin.isSurveyTestRun("yoga", ADMIN)).toBe(false);
+    expect(press.toasts).toEqual(["Рассылаю"]);
+    expect(startCalls.filter((c) => !c.dryRun)).toHaveLength(1);
+  });
+
+  it("«На доработку» — никому не шлём, тестовая строка стёрта", async () => {
+    await admin.handleSurveyAdminCallback(makeCtx({ data: "cs_yoga_st" }).ctx, YOGA, { type: "test" });
+    const press = makeCtx({ data: "cs_yoga_rw" });
+    await admin.handleSurveyAdminCallback(press.ctx, YOGA, { type: "rework" });
+
+    expect(press.replies[0].text).toContain("Никому не отправила");
+    expect(adminRow()).toBeUndefined();
+    expect(admin.isSurveyTestRun("yoga", ADMIN)).toBe(false);
+    expect(startCalls).toHaveLength(0);
+  });
+
+  it("чужой чат кнопки теста не запускают", async () => {
+    for (const action of [{ type: "test" }, { type: "approve" }, { type: "rework" }] as const) {
+      await admin.handleSurveyAdminCallback(makeCtx({ chatId: 1 }).ctx, YOGA, action);
+    }
+    expect(reports).toHaveLength(0);
+    expect(db.tables.club_survey_responses ?? []).toHaveLength(0);
+    expect(startCalls).toHaveLength(0);
+  });
+
+  it("вердикт после теста — кнопки «Апрув» и «На доработку» в чат организатора", async () => {
+    await admin.handleSurveyAdminCallback(makeCtx({ data: "cs_yoga_st" }).ctx, YOGA, { type: "test" });
+    await admin.offerSurveyTestVerdict(YOGA, ADMIN);
+    const verdict = reports[reports.length - 1];
+    expect(verdict.chatId).toBe(ADMIN);
+    expect(verdict.text).toContain("Тест пройден");
+    expect(verdict.keyboard!.inline_keyboard.flat().map((b) => b.callback_data)).toEqual(["cs_yoga_ap", "cs_yoga_rw"]);
   });
 });
 
