@@ -8,7 +8,8 @@ import { openTeamForm, type TeamFormStore } from "./form";
  * Фактическая явка (миграция 047): сколько человек пришло на ивент клуба.
  *
  * Вносит любой участник, если явки ещё нет; исправить уже внесённую могут
- * только фаундеры. Через 3 часа после начала ивента бот один раз спрашивает
+ * фаундеры и тот, кто её внёс, — в любой момент, даже у давно прошедшего
+ * ивента (экран ивента в «Прошедших»). Через 3 часа после начала ивента бот один раз спрашивает
  * ответственного, а если его нет — автора события. После внесения всем
  * фаундерам — одно уведомление.
  */
@@ -135,13 +136,17 @@ export type SaveOutcome =
   | { status: "exists"; attended: number }
   | { status: "bad" };
 
-/** Внести явку: любой участник, если её ещё нет; исправить — только фаундер. */
+/** Может ли человек исправить уже внесённую явку: фаундер или тот, кто её внёс. */
+export const canFixAttendance = (fact: Pick<Fact, "entered_by"> | null, uid: number) => isFounder(uid) || (!!fact && fact.entered_by === uid);
+
+/** Внести явку: любой участник, если её ещё нет; исправить — фаундер или тот, кто внёс. */
 export async function saveAttendance(store: FactStore, key: string, text: string, by: number, now: Date): Promise<SaveOutcome> {
   const attended = parseAttended(text);
   if (attended === null) return { status: "bad" };
-  const founder = isFounder(by);
-  const before = founder ? await store.get(key) : null;
-  const res = await store.save(key, attended, by, now, founder);
+  const before = await store.get(key);
+  const overwrite = !!before && canFixAttendance(before, by);
+  // Автор явки остаётся прежним: внёсший сохраняет право исправлять и после правки фаундером.
+  const res = await store.save(key, attended, overwrite ? before!.entered_by : by, now, overwrite);
   if (res === "exists") {
     const current = await store.get(key);
     return { status: "exists", attended: current?.attended ?? attended };

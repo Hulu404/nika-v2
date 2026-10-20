@@ -22,7 +22,7 @@ import { mskToday } from "../databot/time";
 import { aggregateRuns, dynamicsFor, fetchArchive, runKeysFrom, type ArchiveRow, type RunAggregate } from "./history";
 import { mergeRuns, teamRun, type RunKey, type TeamRun } from "./runs";
 import { fetchRunSignups, summarizeSignups, viewSignups, type SignupRow } from "./stats";
-import { attendanceNoticeText, saveAttendance, supabaseFactStore, type FactStore } from "./attendance";
+import { attendanceNoticeText, canFixAttendance, saveAttendance, supabaseFactStore, type FactStore } from "./attendance";
 import { founderIds, isFounder } from "./config";
 import { openTeamForm, supabaseTeamForms, teamFormExpired, type TeamFormStore } from "./form";
 
@@ -153,11 +153,18 @@ export async function openCoffeeRunScreen(ctx: Context, deps: EventsDeps, spot: 
   }
   const stats = summarizeSignups(rows, now);
   const dyn = run.past ? null : dynamicsFor(run, archive, now);
-  await show(ctx, coffeeRunScreen(run, stats, dyn, facts.get(coffeeRunKey(run)) ?? null, attendable(deps), isFounder(ctx.from?.id ?? 0)), edit);
+  await show(ctx, coffeeRunScreen(run, stats, dyn, facts.get(coffeeRunKey(run)) ?? null, attendable(deps), await mayFix(deps, coffeeRunKey(run), ctx.from?.id ?? 0)), edit);
+}
+
+/** «Исправить явку» видно фаундеру и тому, кто её внёс. */
+async function mayFix(deps: EventsDeps, key: string, uid: number): Promise<boolean> {
+  if (isFounder(uid)) return true;
+  const fact = deps.facts ? await deps.facts.get(key).catch(() => null) : null;
+  return canFixAttendance(fact, uid);
 }
 
 export async function openClubEventScreen(ctx: Context, deps: EventsDeps, ev: TeamEvent, uid: number, edit: boolean, now: Date): Promise<void> {
-  const [names, facts] = await Promise.all([namesOf(deps), factsFor(deps, [eventKey(ev)])]);
+  const [names, facts, canFix] = await Promise.all([namesOf(deps), factsFor(deps, [eventKey(ev)]), mayFix(deps, eventKey(ev), uid)]);
   const past = Date.parse(ev.starts_at) < now.getTime();
   if (isCoffeeRunEvent(ev)) {
     const key = coffeeRunKeyOf(ev);
@@ -170,12 +177,12 @@ export async function openClubEventScreen(ctx: Context, deps: EventsDeps, ev: Te
     }
     const rsvp = deps.rsvpLine ? await deps.rsvpLine(ev) : null;
     await show(ctx, coffeeEventScreen(ev, names, stats, dyn, {
-      past, fact: facts.get(eventKey(ev)) ?? null, canManage: canManageEvent(ev, uid), attendable: attendable(deps), canFix: isFounder(uid), rsvp,
+      past, fact: facts.get(eventKey(ev)) ?? null, canManage: canManageEvent(ev, uid), attendable: attendable(deps), canFix, rsvp,
     }), edit);
     return;
   }
   await show(ctx, clubEventScreen(ev, names, {
-    past, fact: facts.get(eventKey(ev)) ?? null, canManage: canManageEvent(ev, uid), attendable: attendable(deps), canFix: isFounder(uid),
+    past, fact: facts.get(eventKey(ev)) ?? null, canManage: canManageEvent(ev, uid), attendable: attendable(deps), canFix,
   }), edit);
 }
 
@@ -249,7 +256,7 @@ export async function handleEventsUpdate(ctx: Context, providedDeps?: EventsDeps
       await deps.forms!.set(uid, form, now);
       await ctx.reply("Нужно одно число: сколько человек пришло. Например: 17. Отмена: /cancel.");
     } else if (res.status === "exists") {
-      await ctx.reply(`Явку уже внесли: ${res.attended}. Исправить могут только фаундеры.`);
+      await ctx.reply(`Явку уже внесли: ${res.attended}. Исправить могут фаундеры и тот, кто её внёс.`);
     } else {
       await ctx.reply(`Записала: на «${form.params.title}» пришло ${res.attended}.`);
       await notifyFounders(ctx, deps, form.params.key, res.attended, res.previous, uid, now);
@@ -329,8 +336,8 @@ export async function handleEventsUpdate(ctx: Context, providedDeps?: EventsDeps
           title = ev.title;
         }
         const fact = await deps.facts.get(key);
-        if (fact && !isFounder(uid)) {
-          await ctx.reply(`Явку уже внесли: ${fact.attended}. Исправить могут только фаундеры.`);
+        if (fact && !canFixAttendance(fact, uid)) {
+          await ctx.reply(`Явку уже внесли: ${fact.attended}. Исправить могут фаундеры и тот, кто её внёс.`);
           return true;
         }
         await deps.forms.set(uid, openTeamForm("attend", { key, title }, now), now);

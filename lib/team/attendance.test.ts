@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CoffeeRun } from "../coffeerun/run";
 import { Bot } from "grammy";
 import type { Update, UserFromGetMe } from "grammy/types";
-import { MemoryFactStore, attendanceAsksDue, attendanceNoticeText, dispatchAttendanceAsks, parseAttended, saveAttendance } from "./attendance";
+import { MemoryFactStore, attendanceAsksDue, attendanceNoticeText, dispatchAttendanceAsks, parseAttended, saveAttendance, canFixAttendance } from "./attendance";
 import { handleEventsUpdate, type EventsDeps } from "./ivents";
 import { openTeamForm } from "./form";
 import { MemoryEventStore, type TeamEvent } from "./events";
@@ -81,9 +81,11 @@ describe("уведомление фаундерам о явке", () => {
   let events: MemoryEventStore;
   let facts: MemoryFactStore;
   let forms: MemoryTeamForms;
-  let sent: Array<{ chat: number; text: string }>;
+  let sent: Array<{ chat: number; text: string; buttons: string[] }>;
   let send: (text: string, from: number) => Promise<void>;
-  const team = [3, 9, 10].map((id) => ({ chat_id: id, username: id === 3 ? "salma" : `f${id}`, display_name: null, role: "member" as const,
+  let press: (data: string, from: number) => Promise<void>;
+  let clock: Date;
+  const team = [3, 4, 9, 10].map((id) => ({ chat_id: id, username: id === 3 ? "salma" : id === 4 ? "danya" : `f${id}`, display_name: null, role: "member" as const,
     joined_at: NOW.toISOString(), added_by: null, last_seen_at: null, digest_opt_in: true }));
 
   beforeEach(async () => {
@@ -100,17 +102,44 @@ describe("уведомление фаундерам о явке", () => {
     };
     const bot = new Bot("1:x", { botInfo: { id: 1, is_bot: true, first_name: "П", username: "t_bot" } as UserFromGetMe });
     bot.api.config.use(async (_prev, method, payload) => {
-      if (method === "sendMessage") sent.push({ chat: (payload as { chat_id: number }).chat_id, text: String((payload as { text: string }).text) });
+      const p = payload as { chat_id: number; text: string; reply_markup?: { inline_keyboard?: Array<Array<{ text: string }>> } };
+      if (method === "sendMessage" || method === "editMessageText")
+        sent.push({ chat: p.chat_id, text: String(p.text), buttons: (p.reply_markup?.inline_keyboard ?? []).flat().map((b) => b.text) });
       return { ok: true, result: true } as never;
     });
-    bot.use((ctx) => handleEventsUpdate(ctx, deps, NOW).then(() => {}));
+    clock = NOW;
+    bot.use((ctx) => handleEventsUpdate(ctx, deps, clock).then(() => {}));
     let id = 0;
+    press = async (data, from) => {
+      await bot.handleUpdate({ update_id: ++id, callback_query: { id: `c${id}`, chat_instance: "x", data, from: { id: from, is_bot: false, first_name: "x" },
+        message: { message_id: 1, date: 1, text: "x", chat: { id: from, type: "private", first_name: "x" } } } } as Update);
+    };
     send = async (text, from) => {
       await bot.handleUpdate({ update_id: ++id, message: { message_id: id, date: 1, text,
         chat: { id: from, type: "private", first_name: "x" }, from: { id: from, is_bot: false, first_name: "x" } } } as Update);
     };
   });
   afterEach(() => vi.unstubAllEnvs());
+
+  it("внёсший явку исправляет её и через месяц: кнопка «Исправить явку» у прошедшего ивента; другим участникам — нет", async () => {
+    const ev = [...events.events.values()][0];
+    await press(`ie:ae:${ev.id}`, 3);
+    await send("17", 3);
+    expect((await facts.get(`event:${ev.id}`))?.attended).toBe(17);
+    clock = msk("2026-11-20T12:00");
+    sent = [];
+    await press(`ie:e:${ev.id}`, 4);
+    expect(sent.at(-1)!.buttons).not.toContain("Исправить явку");
+    await press(`ie:ae:${ev.id}`, 4);
+    expect(sent.at(-1)!.text).toBe("Явку уже внесли: 17. Исправить могут фаундеры и тот, кто её внёс.");
+    await press(`ie:e:${ev.id}`, 3);
+    expect(sent.at(-1)!.buttons).toContain("Исправить явку");
+    await press(`ie:ae:${ev.id}`, 3);
+    expect(sent.at(-1)!.text).toContain("Сейчас записано: 17.");
+    await send("19", 3);
+    expect((await facts.get(`event:${ev.id}`))?.attended).toBe(19);
+    expect(sent.filter((s) => s.chat === 9 && /исправлено, было 17/.test(s.text))).toHaveLength(1);
+  });
 
   it("после внесения каждый фаундер получает ровно одно уведомление", async () => {
     await forms.set(3, openTeamForm("attend", { key: "event:1", title: "Интервалы" }, NOW));
@@ -138,15 +167,21 @@ describe("уведомление фаундерам о явке", () => {
 describe("права на явку", () => {
   afterEach(() => vi.unstubAllEnvs());
 
-  it("внести может любой, исправить уже внесённую — только фаундер", async () => {
+  it("внести может любой; исправить — фаундер и тот, кто внёс, даже спустя месяц; остальные — нет", async () => {
     vi.stubEnv("TEAM_FOUNDER_IDS", "9");
     const store = new MemoryFactStore();
     const now = msk("2026-10-13T22:00");
     expect(await saveAttendance(store, "event:1", "17", 3, now)).toEqual({ status: "saved", attended: 17, previous: null });
     expect(await saveAttendance(store, "event:1", "20", 4, now)).toEqual({ status: "exists", attended: 17 });
     expect((await store.get("event:1"))?.attended).toBe(17);
-    expect(await saveAttendance(store, "event:1", "пришло 21", 9, now)).toEqual({ status: "saved", attended: 21, previous: 17 });
-    expect((await store.get("event:1"))?.entered_by).toBe(9);
+    // Внёсший исправляет свою явку и через месяц.
+    expect(await saveAttendance(store, "event:1", "18", 3, msk("2026-11-15T12:00"))).toEqual({ status: "saved", attended: 18, previous: 17 });
+    expect(await saveAttendance(store, "event:1", "пришло 21", 9, now)).toEqual({ status: "saved", attended: 21, previous: 18 });
+    // После правки фаундером автор явки прежний: он по-прежнему может исправить.
+    expect((await store.get("event:1"))?.entered_by).toBe(3);
+    expect(await saveAttendance(store, "event:1", "22", 3, now)).toEqual({ status: "saved", attended: 22, previous: 21 });
+    expect(canFixAttendance(await store.get("event:1"), 4)).toBe(false);
+    expect(canFixAttendance(await store.get("event:1"), 3)).toBe(true);
   });
 
   it("число из сообщения: одно, от 0 до 10 000", () => {
