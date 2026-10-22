@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getTeamBot } from "@/lib/team/bot";
+import { processInBackground } from "@/lib/telegram/background";
 import { teamBotConfigured } from "@/lib/team/config";
 
 export const runtime = "nodejs";
@@ -68,13 +69,12 @@ export async function POST(req: Request) {
     }
   }
 
-  try {
+  // Отвечаем сразу, апдейт дорабатывается в фоне (см. background.ts).
+  processInBackground("[team-webhook]", updateId, async () => {
     const bot = getTeamBot();
     if (!bot.isInited()) await bot.init();
     await bot.handleUpdate(update as Parameters<typeof bot.handleUpdate>[0]);
-  } catch (err) {
-    console.error("[team-webhook] handleUpdate:", err instanceof Error ? err.message : String(err));
-  }
+  });
 
   return new Response("OK", { status: 200 });
 }

@@ -1,6 +1,7 @@
 import type { Update } from "grammy/types";
 import { handleUpdate } from "@/lib/databot/bot";
 import { databotConfigured } from "@/lib/databot/config";
+import { processInBackground } from "@/lib/telegram/background";
 import { tgAdmin } from "@/lib/telegram/supabase";
 
 export const runtime = "nodejs";
@@ -57,11 +58,8 @@ export async function POST(req: Request) {
     }
   }
 
-  try {
-    await handleUpdate(update);
-  } catch (err) {
-    console.error("[databot-webhook] handleUpdate:", err instanceof Error ? err.message : String(err));
-  }
+  // Отвечаем сразу, апдейт дорабатывается в фоне (см. background.ts).
+  processInBackground("[databot-webhook]", updateId, () => handleUpdate(update));
 
   return new Response("OK", { status: 200 });
 }

@@ -1,5 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getBot } from "@/lib/telegram/bot";
+import { processInBackground } from "@/lib/telegram/background";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -54,14 +55,12 @@ export async function POST(req: Request) {
     }
   }
 
-  // ── Передаём апдейт в grammY. Ошибки внутри не превращаем в не-200 ───────────
-  try {
+  // ── Отвечаем сразу, апдейт grammY дорабатывает в фоне (см. background.ts) ────
+  processInBackground("[tg-webhook]", updateId, async () => {
     const bot = getBot();
     if (!bot.isInited()) await bot.init();
     await bot.handleUpdate(update as Parameters<typeof bot.handleUpdate>[0]);
-  } catch (err) {
-    console.error("[tg-webhook] handleUpdate:", err instanceof Error ? err.message : String(err));
-  }
+  });
 
   return new Response("OK", { status: 200 });
 }
