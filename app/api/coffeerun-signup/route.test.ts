@@ -23,7 +23,7 @@ import { POST } from "./route";
 const body = (extra: Record<string, unknown> = {}) => new Request("http://x/api/coffeerun-signup", {
   method: "POST",
   body: JSON.stringify({ name: "Тест", telegram: "test_runner", email: "t@example.com", pace: "6:30",
-    source: "coffeerunsurfsport", spot: "usachevo", run_date: "2026-10-25", ...extra }),
+    source: "coffeerunsurfsport", spot: "usachevo", run_date: "2026-11-01", ...extra }),
 });
 
 describe("POST /api/coffeerun-signup: согласие", () => {
@@ -36,12 +36,12 @@ describe("POST /api/coffeerun-signup: согласие", () => {
   });
   afterEach(() => vi.unstubAllEnvs());
 
-  it("с согласием пишет consent_at, спот, дату 25.10 и темп; отдаёт ссылку на бота", async () => {
+  it("с согласием пишет consent_at, спот, дату 01.11 и темп; отдаёт ссылку на бота", async () => {
     const res = await POST(body({ consent: true }));
     const json = await res.json();
     expect(res.status).toBe(200);
     expect(json.confirmUrl).toMatch(/^https:\/\/t\.me\/mynikarun_bot\?start=cr_/);
-    expect(inserted[0]).toMatchObject({ spot: "usachevo", run_date: "2026-10-25", source: "coffeerunsurfsport", pace: "6:30" });
+    expect(inserted[0]).toMatchObject({ spot: "usachevo", run_date: "2026-11-01", source: "coffeerunsurfsport", pace: "6:30" });
     expect(typeof inserted[0].consent_at).toBe("string");
   });
 

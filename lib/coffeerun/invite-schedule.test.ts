@@ -101,18 +101,18 @@ describe("runsDueForInvite — окно «понедельник с 10:00 МСК
 });
 
 describe("runsDueForInvite — разовый перенос дня приглашений", () => {
-  const monday = new Date("2026-10-19T14:00:00+03:00");
-  const tuesday = new Date("2026-10-20T10:05:00+03:00");
-  const overrides = { "usachevo:2026-10-25": "2026-10-20" };
+  const monday = new Date("2026-10-26T14:00:00+03:00");
+  const tuesday = new Date("2026-10-27T10:05:00+03:00");
+  const overrides = { "usachevo:2026-11-01": "2026-10-27" };
 
   it("забег с переносом не зовут в понедельник", () => {
-    const got = runsDueForInvite(INVITE_WEEKDAY, 14, monday, "2026-10-19", overrides);
+    const got = runsDueForInvite(INVITE_WEEKDAY, 14, monday, "2026-10-26", overrides);
     expect(got.map((r) => r.spot)).not.toContain("usachevo");
   });
 
   it("зовут в день переноса с 10:00, хоть это и не понедельник", () => {
-    expect(runsDueForInvite(2, 9, tuesday, "2026-10-20", overrides)).toEqual([]);
-    const got = runsDueForInvite(2, 10, tuesday, "2026-10-20", overrides);
-    expect(got.map((r) => [r.spot, r.date])).toEqual([["usachevo", "2026-10-25"]]);
+    expect(runsDueForInvite(2, 9, tuesday, "2026-10-27", overrides)).toEqual([]);
+    const got = runsDueForInvite(2, 10, tuesday, "2026-10-27", overrides);
+    expect(got.map((r) => [r.spot, r.date])).toEqual([["usachevo", "2026-11-01"]]);
   });
 });
