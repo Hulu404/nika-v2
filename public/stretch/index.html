@@ -166,7 +166,9 @@ b,strong{font-weight:400;color:var(--ink)}
 .btn[disabled]{opacity:.6;cursor:progress;transform:none}
 
 /* ---------- 1 · постер ---------- */
-.hero{position:relative;overflow:hidden;background:linear-gradient(180deg,#ECECE8 0%,#F3F3F0 48%,var(--bg) 100%);isolation:isolate}
+.hero{position:relative;overflow:hidden;background:linear-gradient(180deg,#ECECE8 0%,#F3F3F0 48%,var(--bg) 100%);isolation:isolate;
+  /* Первый экран над «ватманом» (.paper-tex, 60): иначе фактура в multiply сереет белый билет. Своё зерно у экрана есть (.grain). */
+  z-index:61}
 .hero-fx{position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:0}
 .orb{position:absolute;left:0;top:0;border-radius:50%;will-change:transform}
 .orb--halo{width:1200px;height:1200px;margin:-600px 0 0 -600px;background:radial-gradient(circle,rgba(255,255,255,.95),rgba(255,255,255,.55) 38%,transparent 68%)}
@@ -212,7 +214,9 @@ b,strong{font-weight:400;color:var(--ink)}
 /* билет: шаблон клубных страниц NIKA, на светлом фоне держится тенью */
 .tk-wrap{position:relative;perspective:1400px}
 .tk{--tear:74%;position:relative;width:100%;max-width:100%;aspect-ratio:2.2;container-type:inline-size;
-  transform:rotate(-6deg);transform-origin:50% 50%;filter:drop-shadow(0 24px 34px rgba(20,20,18,.16)) drop-shadow(0 2px 6px rgba(20,20,18,.1))}
+  transform:rotate(-6deg);transform-origin:50% 50%;
+  /* Билет — отчётливо белый: тонкий контур по форме (с вырезами) и тень плотнее, чтобы не сливался со светлым фоном. */
+  filter:drop-shadow(0 0 .6px rgba(20,20,18,.38)) drop-shadow(0 22px 30px rgba(20,20,18,.24)) drop-shadow(0 3px 8px rgba(20,20,18,.14))}
 .tk-p{position:absolute;inset:0;background:var(--paper);color:#141414;border-radius:3.2cqw;will-change:transform;
   -webkit-mask:radial-gradient(circle 5.2cqw at 0 50%,#0000 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 5.2cqw at 100% 50%,#0000 98%,#000) right/51% 100% no-repeat;
           mask:radial-gradient(circle 5.2cqw at 0 50%,#0000 98%,#000) left/51% 100% no-repeat,radial-gradient(circle 5.2cqw at 100% 50%,#0000 98%,#000) right/51% 100% no-repeat}
