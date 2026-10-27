@@ -628,6 +628,28 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
   html.js:not(.ready) .r{filter:none;opacity:1}
 }
 </style>
+<style>
+/* Телефон: первый экран — ровно на высоту экрана, бегущая строка начинается ниже.
+   Элементы растут и по высоте экрана (svh), свободное место — ровными отступами, без одной большой дыры. */
+@media(max-width:720px){
+  /* −20px: у бегущей строки свой отступ сверху (32px), её текст всё равно за краем экрана. */
+  .hero-top{min-height:calc(100vh - 20px);min-height:calc(100svh - 20px);padding-block:max(20px,env(safe-area-inset-top,0px)) 0;
+    gap:clamp(8px,2svh,24px);justify-content:flex-start}
+  .p-top{font-size:clamp(10px,1.35svh,12px)}
+  .c-lock{font-size:clamp(12px,1.75svh,16px)}
+  .c-word{font-size:clamp(52px,min(20.4vw,11svh),104px)}
+  .c-alone{font-size:clamp(56px,min(25vw,11.5svh),110px)}
+  .p-low{flex:1 1 auto;display:flex;flex-direction:column;align-items:stretch;justify-content:space-evenly;gap:clamp(16px,3svh,36px);margin-top:0}
+  .p-low .tk-wrap{max-width:none;width:calc(100% + 8px);margin-inline:-4px}
+  .p-cta{gap:clamp(12px,1.8svh,20px)}
+  .p-cta .btn{height:clamp(56px,7.6svh,68px);font-size:clamp(14px,1.95svh,17px)}
+  .limit{font-size:clamp(13px,1.75svh,15px)}
+}
+/* Высокие телефоны: билет наклонён сильнее — выше и живее, как постер. */
+@media(max-width:720px) and (min-height:760px){
+  .tk{transform:rotate(-7.5deg)}
+}
+</style>
 </head>
 <body>
 <div class="paper-tex" aria-hidden="true"></div>
