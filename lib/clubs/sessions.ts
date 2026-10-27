@@ -35,6 +35,13 @@ export interface ClubSession {
   mapUrl: string;
 }
 
+/**
+ * Минимальная сумма счёта Telegram Payments в рублях (min_amount RUB = 8773 коп.,
+ * https://core.telegram.org/bots/payments/currencies.json). Меньше — sendInvoice
+ * отказывает. Курс плавает, поэтому с запасом.
+ */
+export const MIN_INVOICE_RUB = 88;
+
 export const SESSIONS: readonly ClubSession[] = [
   {
     club: "stretch",
@@ -42,7 +49,7 @@ export const SESSIONS: readonly ClubSession[] = [
     spot: "klimashkina",
     date: "2026-11-01",
     time: "10:30",
-    priceRub: 10, // ТЕСТ оплаты; боевая цена 1000
+    priceRub: 100, // ТЕСТ оплаты (минимум Telegram ≈88 ₽); боевая цена 1000
     edition: 1,
     title: "Пилатес на коврике",
     formatLabel: "пилатес на коврике, 60 минут",

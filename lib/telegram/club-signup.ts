@@ -170,10 +170,23 @@ async function findPendingByUsername(username: string): Promise<ClubSignup | nul
   return ((data as ClubSignup[] | null) ?? [])[0] ?? null;
 }
 
-async function markOpened(signup: ClubSignup, chatId: number, actual: string | null): Promise<void> {
+/**
+ * Отмечает вход в бота. Неоплаченной заявке подтягивает текущую цену занятия:
+ * цену могли поменять после заявки, и счёт должен совпасть с pre_checkout.
+ */
+async function markOpened(
+  signup: ClubSignup,
+  chatId: number,
+  actual: string | null,
+  priceRub: number,
+): Promise<void> {
   const patch: Record<string, unknown> = { tg_chat_id: chatId, updated_at: new Date().toISOString() };
   if (!signup.confirmed_at) patch.confirmed_at = new Date().toISOString();
   if (actual) patch.tg_username = actual;
+  if (signup.payment_status === "pending" && signup.amount_rub !== priceRub) {
+    patch.amount_rub = priceRub;
+    signup.amount_rub = priceRub;
+  }
   const { error } = await tgAdmin().from(TABLE).update(patch).eq("id", signup.id);
   if (error) console.error("[club] markOpened:", error.message);
 }
@@ -207,7 +220,12 @@ async function openSignup(ctx: BotContext, signup: ClubSignup, chatId: number): 
     return;
   }
 
-  await markOpened(signup, chatId, normalizeTelegramUsername(ctx.from?.username ?? null));
+  await markOpened(
+    signup,
+    chatId,
+    normalizeTelegramUsername(ctx.from?.username ?? null),
+    session.priceRub,
+  );
 
   if (signup.payment_status === "paid") {
     await ctx.reply(paidText(signup, session), { reply_markup: sessionKeyboard(session) });
@@ -230,17 +248,29 @@ async function openSignup(ctx: BotContext, signup: ClubSignup, chatId: number): 
   }
 
   await ctx.reply(invoiceIntroText(signup, session));
-  await ctx.replyWithInvoice(
-    session.title,
-    `${session.dateLabel}, ${session.time} · ${session.place}`.slice(0, 255),
-    invoicePayload(signup.id),
-    "RUB",
-    [{ label: "Занятие", amount: signup.amount_rub * 100 }],
-    {
-      provider_token: providerToken,
-      provider_data: receiptProviderData(signup, session),
-    },
-  );
+  try {
+    await ctx.replyWithInvoice(
+      session.title,
+      `${session.dateLabel}, ${session.time} · ${session.place}`.slice(0, 255),
+      invoicePayload(signup.id),
+      "RUB",
+      [{ label: "Занятие", amount: signup.amount_rub * 100 }],
+      {
+        provider_token: providerToken,
+        provider_data: receiptProviderData(signup, session),
+      },
+    );
+  } catch (err) {
+    // Частые причины: сумма ниже минимума Telegram (≈88 ₽, см. MIN_INVOICE_RUB),
+    // неверный provider token. Человеку — честно, в лог — подробно.
+    console.error(
+      `[club] sendInvoice не прошёл (заявка ${signup.id}, ${signup.amount_rub} ₽):`,
+      err instanceof Error ? err.message : String(err),
+    );
+    await ctx.reply("Не получилось выставить счёт. Мы уже разбираемся — напиши в поддержку, поможем.", {
+      reply_markup: new InlineKeyboard().url(SUPPORT_LABEL, SUPPORT_URL),
+    });
+  }
 }
 
 /** /start st_<token> с лендинга. */

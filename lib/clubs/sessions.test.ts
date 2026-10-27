@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { moscowToday, sessionForSignup, sessionOfSignup } from "./sessions";
+import { MIN_INVOICE_RUB, moscowToday, SESSIONS, sessionForSignup, sessionOfSignup } from "./sessions";
 
 const OCT_27 = new Date("2026-10-27T12:00:00Z");
 
@@ -11,7 +11,10 @@ describe("moscowToday", () => {
 
 describe("sessionForSignup", () => {
   it("находит занятие клуба по дате", () => {
-    expect(sessionForSignup({ club: "stretch", date: "2026-11-01" }, OCT_27)?.priceRub).toBe(10);
+    expect(sessionForSignup({ club: "stretch", date: "2026-11-01" }, OCT_27)?.priceRub).toBe(100);
+  });
+  it("цена каждого занятия не ниже минимума счёта Telegram", () => {
+    for (const s of SESSIONS) expect(s.priceRub).toBeGreaterThanOrEqual(MIN_INVOICE_RUB);
   });
   it("незнакомая дата — ближайшее занятие клуба", () => {
     expect(sessionForSignup({ club: "stretch", date: "2026-10-01" }, OCT_27)?.date).toBe("2026-11-01");
