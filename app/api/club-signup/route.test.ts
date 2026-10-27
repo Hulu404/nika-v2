@@ -4,9 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const inserted: Array<Record<string, unknown>> = [];
 const updated: Array<Record<string, unknown>> = [];
 let existing: Array<Record<string, unknown>> = [];
+// Сколько ковриков уже оплачено (ответ на select count head).
+let paidSeats = 0;
 vi.mock("@supabase/supabase-js", () => {
   const chain = () => {
-    const q = { eq: () => q, limit: async () => ({ data: existing, error: null }) };
+    const q = {
+      eq: () => q,
+      limit: async () => ({ data: existing, error: null }),
+      then: (resolve: (v: unknown) => unknown) => resolve({ count: paidSeats, error: null }),
+    };
     return q;
   };
   return {
@@ -28,7 +34,7 @@ vi.mock("@supabase/supabase-js", () => {
   };
 });
 
-import { POST } from "./route";
+import { GET, POST } from "./route";
 
 const form = {
   name: "Ника",
@@ -61,6 +67,7 @@ describe("POST /api/club-signup", () => {
     inserted.length = 0;
     updated.length = 0;
     existing = [];
+    paidSeats = 0;
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -83,10 +90,45 @@ describe("POST /api/club-signup", () => {
       mat: "studio",
       towel: true,
       water: false,
-      amount_rub: 100,
+      amount_rub: 1000,
     });
     expect(typeof inserted[0].consent_at).toBe("string");
-    expect(inserted[0]).not.toHaveProperty("payment_status");
+    expect(inserted[0].payment_status).toBe("pending");
+    expect(json.waitlist).toBe(false);
+  });
+
+  it("15 из 16 ковриков оплачено — ещё продаём", async () => {
+    paidSeats = 15;
+    const json = await (await post()).json();
+    expect(json.waitlist).toBe(false);
+    expect(inserted[0].payment_status).toBe("pending");
+  });
+
+  it("все 16 ковриков оплачены — заявка в лист ожидания, ссылка в бот остаётся", async () => {
+    paidSeats = 16;
+    const json = await (await post()).json();
+
+    expect(json.waitlist).toBe(true);
+    expect(json.confirmUrl).toMatch(/start=st_/);
+    expect(inserted[0].payment_status).toBe("waitlist");
+  });
+
+  it("оплатившего распродажа не выкидывает в лист ожидания", async () => {
+    paidSeats = 16;
+    existing = [{ id: "a", confirm_token: "e".repeat(32), payment_status: "paid" }];
+    const json = await (await post()).json();
+
+    expect(json).toMatchObject({ paid: true, waitlist: false });
+    expect(updated[0]).not.toHaveProperty("payment_status");
+  });
+
+  it("GET отдаёт цену и распродано ли занятие", async () => {
+    const get = (seats: number) => {
+      paidSeats = seats;
+      return GET(new Request("http://x/api/club-signup?club=stretch&date=2026-11-01")).then((r) => r.json());
+    };
+    expect(await get(3)).toEqual({ price: 1000, soldOut: false });
+    expect(await get(16)).toEqual({ price: 1000, soldOut: true });
   });
 
   it("без согласия и с кривыми полями отвечает 422 со списком полей", async () => {
@@ -103,7 +145,7 @@ describe("POST /api/club-signup", () => {
     const json = await (await post()).json();
 
     expect(inserted).toHaveLength(0);
-    expect(updated[0]).toMatchObject({ confirm_token: "f".repeat(32), amount_rub: 100 });
+    expect(updated[0]).toMatchObject({ confirm_token: "f".repeat(32), amount_rub: 1000 });
     expect(json.confirmUrl).toContain(`st_${"f".repeat(32)}`);
   });
 

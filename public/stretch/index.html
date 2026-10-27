@@ -1011,8 +1011,8 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
 var EVENT={club:'stretch',format:'pilates',spot:'klimashkina',date:'2026-11-01',time:'10:30',source:'stretch',edition:1,
   url:'https://www.mynika.online/stretch'};
 /* Одна цена для всех мест: 1000 ₽. Остаток мест на странице не показываем, только «ограничено».
-   OUT = все места проданы, в проде приходит с сервера. */
-var PRICE=100,OUT=false; /* ТЕСТ оплаты (минимум Telegram ≈88 ₽); боевая цена 1000 */
+   OUT = все места выкуплены: приходит с сервера (GET /api/club-signup), тогда форма ставит в лист ожидания. */
+var PRICE=1000,OUT=false;
 /* Прототип: форма показывает шаги без отправки. Превью «мест нет»: ?full или #full */
 var PROTOTYPE=false;
 if(PROTOTYPE){try{OUT=/[?&]full\b/.test(location.search)||location.hash==='#full'}catch(e){}}
@@ -1027,16 +1027,24 @@ function seats(n){return n+' '+plural(n,'место','места','мест')}
 function renderSeats(){
   $$('[data-price]').forEach(function(el){el.textContent=PRICE});
   if(OUT){
-    $$('[data-limit]').forEach(function(el){el.textContent='Мест нет, открыт лист ожидания'});
+    $$('[data-limit]').forEach(function(el){el.textContent='Все коврики выкуплены, открыт лист ожидания'});
     $$('[data-cta]').forEach(function(a){a.textContent='Встать в лист ожидания'});
-    document.getElementById('regLimit').innerHTML='<b>Все места заняты</b>: запишем в лист ожидания';
+    document.getElementById('regLimit').innerHTML='<b>Все коврики выкуплены</b>: запишем в лист ожидания следующего занятия';
     document.querySelector('[data-tix-k]').textContent='Лист ожидания';
-    document.querySelector('[data-tix-r]').innerHTML='все коврики заняты,<br>бот напишет, если место освободится';
+    document.querySelector('[data-tix-r]').innerHTML='все коврики выкуплены,<br>бот позовет на следующее занятие';
     document.getElementById('submit').textContent='Встать в лист ожидания';
     document.querySelector('.float-cta').firstChild.textContent='Лист ожидания';
   }
 }
 renderSeats();
+/* Распродано ли занятие — спрашиваем сервер. Не ответил — страница остается в обычном режиме,
+   а сервер все равно поставит в лист ожидания при заявке. */
+if(!PROTOTYPE&&window.fetch){
+  fetch('/api/club-signup?club='+EVENT.club+'&date='+EVENT.date,{cache:'no-store'})
+    .then(function(r){return r.ok?r.json():null})
+    .then(function(j){if(j&&j.soldOut){OUT=true;renderSeats()}})
+    .catch(function(){});
+}
 
 /* ===== тост ===== */
 var toast=document.getElementById('toast'),toastTimer;
@@ -1075,11 +1083,12 @@ function tgNick(v){
 function showDone(confirmUrl){
   if(OUT){
     document.getElementById('doneH').textContent='Ты в листе ожидания';
-    document.getElementById('doneP').textContent='Все коврики заняты. Если место освободится, оплата откроется на этой странице.';
-    document.getElementById('doneFine').textContent='Загляни сюда чуть позже.';
+    document.getElementById('doneP').textContent='Все коврики на это занятие выкуплены. Позовем тебя, как только откроем запись на следующее.';
+    document.getElementById('doneFine').textContent='Открой бота NIKA, чтобы он смог тебе написать.';
+    tgBtn.textContent='Открыть бота';
   }
-  else if(confirmUrl){tgBtn.href=confirmUrl;tgBtn.hidden=false;tgBtn.style.display=''}
-  else{document.getElementById('doneP').textContent='Заявка сохранена. Оплата откроется в Telegram-боте NIKA, мы напишем тебе.'}
+  if(confirmUrl){tgBtn.href=confirmUrl;tgBtn.hidden=false;tgBtn.style.display=''}
+  else if(!OUT){document.getElementById('doneP').textContent='Заявка сохранена. Оплата откроется в Telegram-боте NIKA, мы напишем тебе.'}
   form.hidden=true;done.hidden=false;
   done.scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -1101,7 +1110,7 @@ form.addEventListener('submit',function(e){
     return;
   }
   if(PROTOTYPE){showDone(null);return}
-  /* Заявка → club_signups (pending) → ссылка в бот, где счет ЮKassa на 1000 ₽. */
+  /* Заявка → club_signups (pending, или waitlist, если коврики выкуплены) → ссылка в бот, где счет ЮKassa. */
   var btn=document.getElementById('submit'),label=btn.textContent;
   if(btn.disabled)return;
   btn.disabled=true;btn.textContent='Отправляем…';
@@ -1115,7 +1124,7 @@ form.addEventListener('submit',function(e){
         document.getElementById('doneH').textContent='Занятие уже оплачено';
         document.getElementById('doneP').textContent='Коврик твой. Детали занятия — в Telegram-боте NIKA.';
         tgBtn.textContent='Открыть бота';
-      }
+      }else if(j.waitlist&&!OUT){OUT=true;renderSeats()}
       showDone(j.confirmUrl);
     })
     .catch(function(err){

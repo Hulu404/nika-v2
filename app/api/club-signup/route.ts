@@ -1,5 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
+import { countPaidSeats, isSoldOut } from "@/lib/clubs/seats";
 import { sessionForSignup } from "@/lib/clubs/sessions";
 import { normalizeTelegramUsername } from "@/lib/coffeerun/telegram-username";
 
@@ -29,6 +30,33 @@ function oneOf<T extends string>(v: unknown, allowed: readonly T[]): T | null {
   return typeof v === "string" && (allowed as readonly string[]).includes(v) ? (v as T) : null;
 }
 
+function db() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!supabaseUrl || !serviceRoleKey) return null;
+  return createClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } });
+}
+
+/**
+ * Состояние продажи для лендинга: GET /api/club-signup?club=stretch&date=…
+ * → { price, soldOut }. Сколько мест осталось, не отдаём — на странице только
+ * «ограничено». Без кеша: распродажа должна дойти до страницы сразу.
+ */
+export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const session = sessionForSignup({
+    club: url.searchParams.get("club"),
+    date: url.searchParams.get("date"),
+  });
+  const headers = { "Cache-Control": "no-store" };
+  if (!session) return NextResponse.json({ error: "No upcoming session" }, { status: 404, headers });
+  const supabase = db();
+  if (!supabase) return NextResponse.json({ error: "Server misconfigured" }, { status: 500, headers });
+
+  const soldOut = isSoldOut(await countPaidSeats(supabase, session), session);
+  return NextResponse.json({ price: session.priceRub, soldOut }, { headers });
+}
+
 /**
  * Заявка на занятие клуба (лендинг /stretch). По образцу /api/coffeerun-signup,
  * но с оплатой: строка ложится в club_signups со статусом pending, а ответ
@@ -36,8 +64,12 @@ function oneOf<T extends string>(v: unknown, allowed: readonly T[]): T | null {
  *
  * Цена и дата берутся из lib/clubs/sessions.ts, не из браузера.
  *
- * Ответ: { ok: true, confirmUrl, paid } — paid=true, если этот ник уже оплатил
- * это занятие (повторная форма ничего не ломает).
+ * Все места оплачены (capacity в sessions.ts) — заявка ложится со статусом
+ * waitlist: лист ожидания следующего занятия клуба. Ссылка в бот всё равно
+ * отдаётся: по ней бот узнаёт чат, чтобы потом позвать человека.
+ *
+ * Ответ: { ok: true, confirmUrl, paid, waitlist } — paid=true, если этот ник уже
+ * оплатил это занятие (повторная форма ничего не ломает).
  */
 export async function POST(req: Request) {
   let body: Record<string, unknown>;
@@ -79,14 +111,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "No upcoming session" }, { status: 404 });
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
+  const supabase = db();
+  if (!supabase) {
     return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
   }
-  const supabase = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { persistSession: false },
-  });
 
   // Повторная форма тем же ником на то же занятие обновляет заявку, а не плодит
   // строки и токены: человек мог потерять первую кнопку.
@@ -107,6 +135,8 @@ export async function POST(req: Request) {
     existingRows as { id: string; confirm_token: string; payment_status: string }[] | null
   )?.[0];
   const paid = existing?.payment_status === "paid";
+  // Оплатившему место уже принадлежит; остальным — смотрим, остались ли места.
+  const waitlist = !paid && isSoldOut(await countPaidSeats(supabase, session), session);
   const token = existing?.confirm_token ?? mintToken();
   const now = new Date().toISOString();
 
@@ -127,8 +157,10 @@ export async function POST(req: Request) {
     consent_at: now,
     confirm_token: token,
     updated_at: now,
-    // Сумму оплаченной заявки не трогаем: она уже списана.
-    ...(paid ? {} : { amount_rub: session.priceRub }),
+    // Сумму и статус оплаченной заявки не трогаем: деньги уже списаны.
+    ...(paid
+      ? {}
+      : { amount_rub: session.priceRub, payment_status: waitlist ? "waitlist" : "pending" }),
   };
 
   const { error } = existing
@@ -142,5 +174,5 @@ export async function POST(req: Request) {
   const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
   const confirmUrl = botUsername ? `https://t.me/${botUsername}?start=${START_PREFIX}${token}` : null;
 
-  return NextResponse.json({ ok: true, confirmUrl, paid }, { status: 200 });
+  return NextResponse.json({ ok: true, confirmUrl, paid, waitlist }, { status: 200 });
 }

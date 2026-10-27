@@ -20,6 +20,8 @@ export interface ClubSession {
   time: string;
   /** Цена в рублях. */
   priceRub: number;
+  /** Сколько ковриков продаём. Заняты только оплаченные, неоплаченная заявка место не держит. */
+  capacity: number;
   /** Номер выпуска на билете: «№ 001». */
   edition: number;
   /** Подписи для счёта и сообщений бота. */
@@ -49,7 +51,8 @@ export const SESSIONS: readonly ClubSession[] = [
     spot: "klimashkina",
     date: "2026-11-01",
     time: "10:30",
-    priceRub: 100, // ТЕСТ оплаты (минимум Telegram ≈88 ₽); боевая цена 1000
+    priceRub: 1000,
+    capacity: 16,
     edition: 1,
     title: "Пилатес на коврике",
     formatLabel: "пилатес на коврике, 60 минут",

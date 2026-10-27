@@ -1,5 +1,6 @@
 import { InlineKeyboard } from "grammy";
 import { tgAdmin } from "./supabase";
+import { countPaidSeats, isSoldOut } from "../clubs/seats";
 import { moscowToday, SESSIONS, sessionOfSignup, type ClubSession } from "../clubs/sessions";
 import { normalizeTelegramUsername } from "../coffeerun/telegram-username";
 import { publicOriginFromEnv } from "../public-origin";
@@ -37,7 +38,7 @@ export interface ClubSignup {
   event_date: string;
   event_time: string;
   amount_rub: number;
-  payment_status: "pending" | "paid" | "refunded";
+  payment_status: "pending" | "paid" | "refunded" | "waitlist";
   confirmed_at: string | null;
 }
 
@@ -66,15 +67,21 @@ export function parseInvoicePayload(payload: string): string | null {
  * Можно ли списывать деньги. Возвращает текст отказа для человека или null.
  * Отказ здесь — последний шанс не взять деньги за то, чего не будет.
  */
+export const SOLD_OUT_REFUSAL =
+  "Все коврики только что выкупили. Ты в листе ожидания следующего занятия — деньги не списаны.";
+
 export function checkoutRefusal(
   signup: Pick<ClubSignup, "payment_status" | "amount_rub" | "event_date"> | null,
   query: { currency: string; total_amount: number },
   today: string,
+  soldOut = false,
 ): string | null {
   if (!signup) return "Не нашла заявку. Заполни форму на странице занятия ещё раз.";
   if (signup.payment_status === "paid") return "Это занятие уже оплачено, коврик твой.";
+  if (signup.payment_status === "waitlist") return SOLD_OUT_REFUSAL;
   if (signup.payment_status !== "pending") return "Заявка закрыта. Напиши в поддержку.";
   if (signup.event_date < today) return "Занятие уже прошло.";
+  if (soldOut) return SOLD_OUT_REFUSAL;
   if (query.currency !== "RUB" || query.total_amount !== signup.amount_rub * 100) {
     return "Сумма счёта устарела. Открой ссылку со страницы занятия заново.";
   }
@@ -139,7 +146,30 @@ export function paidText(signup: Pick<ClubSignup, "name">, session: ClubSession)
   ].join("\n");
 }
 
+/** Места кончились: человек в листе ожидания следующего занятия клуба. */
+export function waitlistText(signup: Pick<ClubSignup, "name">, session: ClubSession): string {
+  return [
+    `${signup.name}, все коврики на ${session.dateLabel} уже выкуплены.`,
+    "",
+    "Ты в листе ожидания следующего занятия клуба: как только откроем запись, напишу сюда первой.",
+  ].join("\n");
+}
+
 // ── Работа с базой ──────────────────────────────────────────────────────────
+
+/** pending → waitlist. Только из pending: оплаченную заявку не трогаем. */
+async function moveToWaitlist(id: string): Promise<void> {
+  const { error } = await tgAdmin()
+    .from(TABLE)
+    .update({ payment_status: "waitlist", updated_at: new Date().toISOString() })
+    .eq("id", id)
+    .eq("payment_status", "pending");
+  if (error) console.error("[club] moveToWaitlist:", error.message);
+}
+
+async function sessionSoldOut(session: ClubSession): Promise<boolean> {
+  return isSoldOut(await countPaidSeats(tgAdmin(), session), session);
+}
 
 async function findBy(column: "confirm_token" | "id", value: string): Promise<ClubSignup | null> {
   const { data, error } = await tgAdmin().from(TABLE).select(COLUMNS).eq(column, value).maybeSingle();
@@ -237,6 +267,15 @@ async function openSignup(ctx: BotContext, signup: ClubSignup, chatId: number): 
     });
     return;
   }
+  // Места кончились, пока заявка ждала оплаты, — счёт не выставляем.
+  if (signup.payment_status === "pending" && (await sessionSoldOut(session))) {
+    await moveToWaitlist(signup.id);
+    signup.payment_status = "waitlist";
+  }
+  if (signup.payment_status === "waitlist") {
+    await ctx.reply(waitlistText(signup, session));
+    return;
+  }
 
   const providerToken = process.env.TELEGRAM_PAYMENT_PROVIDER_TOKEN?.trim();
   if (!providerToken) {
@@ -307,7 +346,11 @@ export async function handleClubPreCheckout(ctx: BotContext): Promise<void> {
   const id = parseInvoicePayload(q.invoice_payload);
   // Чужой счёт (не наш формат) — не держим человека, честно отказываем.
   const signup = id ? await findBy("id", id) : null;
-  const refusal = checkoutRefusal(signup, q, moscowToday());
+  const session = signup ? sessionOfSignup(signup) : null;
+  // Счёт мог висеть в чате с тех пор, как были места: пересчитываем перед списанием.
+  const soldOut = signup?.payment_status === "pending" && session ? await sessionSoldOut(session) : false;
+  const refusal = checkoutRefusal(signup, q, moscowToday(), soldOut);
+  if (soldOut && signup) await moveToWaitlist(signup.id);
   if (refusal) {
     console.error(`[club] pre_checkout отказ (${q.invoice_payload}): ${refusal}`);
     await ctx.answerPreCheckoutQuery(false, { error_message: refusal });

@@ -11,7 +11,7 @@ describe("moscowToday", () => {
 
 describe("sessionForSignup", () => {
   it("находит занятие клуба по дате", () => {
-    expect(sessionForSignup({ club: "stretch", date: "2026-11-01" }, OCT_27)?.priceRub).toBe(100);
+    expect(sessionForSignup({ club: "stretch", date: "2026-11-01" }, OCT_27)?.priceRub).toBe(1000);
   });
   it("цена каждого занятия не ниже минимума счёта Telegram", () => {
     for (const s of SESSIONS) expect(s.priceRub).toBeGreaterThanOrEqual(MIN_INVOICE_RUB);

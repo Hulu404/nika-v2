@@ -6,6 +6,8 @@ import {
   parseClubToken,
   parseInvoicePayload,
   receiptProviderData,
+  SOLD_OUT_REFUSAL,
+  waitlistText,
 } from "./club-signup";
 import { SESSIONS } from "../clubs/sessions";
 
@@ -46,6 +48,10 @@ describe("checkoutRefusal", () => {
     expect(checkoutRefusal(pending, { currency: "RUB", total_amount: 50000 }, "2026-10-27")).toMatch(/Сумма/);
     expect(checkoutRefusal(pending, { currency: "USD", total_amount: 100000 }, "2026-10-27")).toMatch(/Сумма/);
   });
+  it("коврики выкуплены или заявка в листе ожидания — деньги не берём", () => {
+    expect(checkoutRefusal(pending, query, "2026-10-27", true)).toBe(SOLD_OUT_REFUSAL);
+    expect(checkoutRefusal({ ...pending, payment_status: "waitlist" }, query, "2026-10-27")).toBe(SOLD_OUT_REFUSAL);
+  });
 });
 
 describe("receiptProviderData", () => {
@@ -65,6 +71,12 @@ describe("receiptProviderData", () => {
   it("система налогообложения из env, YOOKASSA_RECEIPT=0 выключает чек", () => {
     expect(JSON.parse(receiptProviderData(signup, session, { YOOKASSA_TAX_SYSTEM_CODE: "2" })!).receipt.tax_system_code).toBe(2);
     expect(receiptProviderData(signup, session, { YOOKASSA_RECEIPT: "0" })).toBeUndefined();
+  });
+});
+
+describe("waitlistText", () => {
+  it("говорит про лист ожидания следующего занятия", () => {
+    expect(waitlistText({ name: "Ника" }, session)).toMatch(/выкуплены[\s\S]*листе ожидания следующего занятия/);
   });
 });
 
