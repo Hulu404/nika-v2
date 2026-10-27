@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { countPaidSeats, isSoldOut } from "@/lib/clubs/seats";
+import { countPaidSeats, isSoldOut, seatsLeftToShow } from "@/lib/clubs/seats";
 import { sessionForSignup } from "@/lib/clubs/sessions";
 import { normalizeTelegramUsername } from "@/lib/coffeerun/telegram-username";
 
@@ -39,8 +39,9 @@ function db() {
 
 /**
  * Состояние продажи для лендинга: GET /api/club-signup?club=stretch&date=…
- * → { price, soldOut }. Сколько мест осталось, не отдаём — на странице только
- * «ограничено». Без кеша: распродажа должна дойти до страницы сразу.
+ * → { price, soldOut, left }. left — остаток, только когда мест мало
+ * (SHOW_SEATS_LEFT_AT), иначе null: раньше времени число наружу не уходит.
+ * Без кеша: распродажа должна дойти до страницы сразу.
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
@@ -53,8 +54,11 @@ export async function GET(req: Request) {
   const supabase = db();
   if (!supabase) return NextResponse.json({ error: "Server misconfigured" }, { status: 500, headers });
 
-  const soldOut = isSoldOut(await countPaidSeats(supabase, session), session);
-  return NextResponse.json({ price: session.priceRub, soldOut }, { headers });
+  const paid = await countPaidSeats(supabase, session);
+  return NextResponse.json(
+    { price: session.priceRub, soldOut: isSoldOut(paid, session), left: seatsLeftToShow(paid, session) },
+    { headers },
+  );
 }
 
 /**

@@ -1013,6 +1013,8 @@ var EVENT={club:'stretch',format:'pilates',spot:'klimashkina',date:'2026-11-01',
 /* Одна цена для всех мест: 1000 ₽. Остаток мест на странице не показываем, только «ограничено».
    OUT = все места выкуплены: приходит с сервера (GET /api/club-signup), тогда форма ставит в лист ожидания. */
 var PRICE=1000,OUT=false;
+/* LEFT — остаток ковриков. Сервер отдает его, только когда мест мало (≤5), иначе null и на странице «ограничено». */
+var LEFT=null;
 /* Прототип: форма показывает шаги без отправки. Превью «мест нет»: ?full или #full */
 var PROTOTYPE=false;
 if(PROTOTYPE){try{OUT=/[?&]full\b/.test(location.search)||location.hash==='#full'}catch(e){}}
@@ -1022,6 +1024,8 @@ else{[].forEach.call(document.querySelectorAll('[data-proto]'),function(el){el.h
 function $$(sel,root){return [].slice.call((root||document).querySelectorAll(sel))}
 function plural(n,one,few,many){var a=n%10,b=n%100;if(a===1&&b!==11)return one;if(a>=2&&a<=4&&(b<12||b>14))return few;return many}
 function seats(n){return n+' '+plural(n,'место','места','мест')}
+/* «Остался 1 коврик», «Осталось 3 коврика» */
+function matsLeft(n){return plural(n,'Остался','Осталось','Осталось')+' '+n+' '+plural(n,'коврик','коврика','ковриков')}
 
 /* ===== цена и места ===== */
 function renderSeats(){
@@ -1034,6 +1038,11 @@ function renderSeats(){
     document.querySelector('[data-tix-r]').innerHTML='все коврики выкуплены,<br>бот позовет на следующее занятие';
     document.getElementById('submit').textContent='Встать в лист ожидания';
     document.querySelector('.float-cta').firstChild.textContent='Лист ожидания';
+  }else if(LEFT){
+    var t=matsLeft(LEFT);
+    $$('[data-limit]').forEach(function(el){el.textContent=t});
+    document.getElementById('regLimit').innerHTML='<b>'+t+'</b>: коврик закрепляется после оплаты';
+    document.querySelector('[data-tix-r]').innerHTML=t.toLowerCase().replace(' ','<br>');
   }
 }
 renderSeats();
@@ -1042,7 +1051,12 @@ renderSeats();
 if(!PROTOTYPE&&window.fetch){
   fetch('/api/club-signup?club='+EVENT.club+'&date='+EVENT.date,{cache:'no-store'})
     .then(function(r){return r.ok?r.json():null})
-    .then(function(j){if(j&&j.soldOut){OUT=true;renderSeats()}})
+    .then(function(j){
+      if(!j)return;
+      if(j.soldOut)OUT=true;
+      else if(typeof j.left==='number'&&j.left>0)LEFT=j.left;
+      if(OUT||LEFT)renderSeats();
+    })
     .catch(function(){});
 }
 

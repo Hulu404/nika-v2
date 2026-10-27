@@ -127,8 +127,9 @@ describe("POST /api/club-signup", () => {
       paidSeats = seats;
       return GET(new Request("http://x/api/club-signup?club=stretch&date=2026-11-01")).then((r) => r.json());
     };
-    expect(await get(3)).toEqual({ price: 1000, soldOut: false });
-    expect(await get(16)).toEqual({ price: 1000, soldOut: true });
+    expect(await get(3)).toEqual({ price: 1000, soldOut: false, left: null });
+    expect(await get(12)).toEqual({ price: 1000, soldOut: false, left: 4 });
+    expect(await get(16)).toEqual({ price: 1000, soldOut: true, left: null });
   });
 
   it("без согласия и с кривыми полями отвечает 422 со списком полей", async () => {
