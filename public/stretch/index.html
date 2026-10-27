@@ -920,7 +920,7 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
     <div class="reg-grid">
       <div class="reg-l r">
         <h2 class="d2">Занимаемся <span class="brand-accent">вместе</span></h2>
-        <p class="lead">Оставь контакты, а оплату занятия мы откроем совсем скоро. После оплаты коврик твой.</p>
+        <p class="lead">Оставь контакты и оплати занятие в нашем Telegram-боте. После оплаты коврик твой.</p>
         <ul>
           <li><span class="li-t"><b>1 ноября, 10:30</b>, сбор с 10:10</span></li>
           <li><span class="li-t"><b>ул. Климашкина, 20</b>, м. Улица 1905 года</span></li>
@@ -969,13 +969,13 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
             <div class="msg">Отметь согласие, чтобы мы могли тебя записать</div>
           </div>
           <button type="submit" class="btn btn--ink" id="submit">Иду на занятие</button>
-          <p class="fine">Оплата откроется совсем скоро. Пишем только по делу занятия. Занятие для участников от 18 лет.</p>
+          <p class="fine">Оплата в Telegram-боте NIKA. Пишем только по делу занятия. Занятие для участников от 18 лет.</p>
         </form>
         <div class="done" id="done" hidden>
           <div class="tick"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#AF4631" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
-          <h3 id="doneH">Оплата скоро откроется</h3>
-          <p id="doneP">Мы как раз подключаем оплату занятия. Совсем скоро здесь можно будет оплатить коврик за <b><span data-price>1000</span> ₽</b>. Загляни на эту страницу чуть позже.</p>
-          <a class="btn btn--ink" id="tg-confirm" href="https://www.mynika.online/stretch" hidden style="display:none">Подтвердить в Telegram</a>
+          <h3 id="doneH">Заявка принята</h3>
+          <p id="doneP">Осталось оплатить коврик за <b><span data-price>1000</span> ₽</b>: открой бота NIKA, он пришлет счет. Оплата прямо в Telegram.</p>
+          <a class="btn btn--ink" id="tg-confirm" href="https://www.mynika.online/stretch" target="_blank" rel="noopener" hidden style="display:none">Оплатить в Telegram</a>
           <p class="fine" id="doneFine">Количество мест ограничено, коврик закрепляется после оплаты.</p>
         </div>
       </div>
@@ -1006,15 +1006,15 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
 <script>
 /* ===== Встреча этой страницы =====
    Клуб NIKA | YOU'LL NEVER STRETCH ALONE, первое занятие (формат: пилатес).
-   source и spot уезжают вместе с заявкой, по ним сервер и бот опознают встречу (по образцу кофе-рана).
-   bot: заменить на ссылку NIKA EVENTS BOT, оплата клуба идет только через него. */
+   club и date уезжают вместе с заявкой в POST /api/club-signup. Цену и адрес сервер берет из
+   lib/clubs/sessions.ts, date здесь держим равной дате занятия там. Оплата — счет ЮKassa в боте. */
 var EVENT={club:'stretch',format:'pilates',spot:'klimashkina',date:'2026-11-01',time:'10:30',source:'stretch',edition:1,
-  url:'https://www.mynika.online/stretch',bot:'https://t.me/mynikarun_bot'};
+  url:'https://www.mynika.online/stretch'};
 /* Одна цена для всех мест: 1000 ₽. Остаток мест на странице не показываем, только «ограничено».
    OUT = все места проданы, в проде приходит с сервера. */
 var PRICE=1000,OUT=false;
 /* Прототип: форма показывает шаги без отправки. Превью «мест нет»: ?full или #full */
-var PROTOTYPE=true;
+var PROTOTYPE=false;
 if(PROTOTYPE){try{OUT=/[?&]full\b/.test(location.search)||location.hash==='#full'}catch(e){}}
 else{[].forEach.call(document.querySelectorAll('[data-proto]'),function(el){el.hidden=true})}
 
@@ -1078,7 +1078,8 @@ function showDone(confirmUrl){
     document.getElementById('doneP').textContent='Все коврики заняты. Если место освободится, оплата откроется на этой странице.';
     document.getElementById('doneFine').textContent='Загляни сюда чуть позже.';
   }
-  /* Заглушка: оплаты пока нет, в бот не ведем. */
+  else if(confirmUrl){tgBtn.href=confirmUrl;tgBtn.hidden=false;tgBtn.style.display=''}
+  else{document.getElementById('doneP').textContent='Заявка сохранена. Оплата откроется в Telegram-боте NIKA, мы напишем тебе.'}
   form.hidden=true;done.hidden=false;
   done.scrollIntoView({behavior:'smooth',block:'center'});
 }
@@ -1100,10 +1101,30 @@ form.addEventListener('submit',function(e){
     return;
   }
   if(PROTOTYPE){showDone(null);return}
-  /* В проде, по образцу /api/coffeerun-signup:
-     POST /api/club-signup {name, telegram, email, level, mat, towel, water, consent:true,
-       club:EVENT.club, format:EVENT.format, spot:EVENT.spot, event_date:EVENT.date, source:EVENT.source}
-     → {confirmUrl}. Ссылку на оплату 1000 ₽ присылает NIKA EVENTS BOT. */
+  /* Заявка → club_signups (pending) → ссылка в бот, где счет ЮKassa на 1000 ₽. */
+  var btn=document.getElementById('submit'),label=btn.textContent;
+  if(btn.disabled)return;
+  btn.disabled=true;btn.textContent='Отправляем…';
+  fetch('/api/club-signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
+    name:document.getElementById('i-name').value.trim(),telegram:document.getElementById('i-tg').value.trim(),
+    email:document.getElementById('i-mail').value.trim(),level:lv,mat:mt,towel:tw,water:wt,consent:true,
+    club:EVENT.club,event_date:EVENT.date,source:EVENT.source})})
+    .then(function(r){return r.json().then(function(j){if(!r.ok)throw j;return j})})
+    .then(function(j){
+      if(j.paid){
+        document.getElementById('doneH').textContent='Занятие уже оплачено';
+        document.getElementById('doneP').textContent='Коврик твой. Детали занятия — в Telegram-боте NIKA.';
+        tgBtn.textContent='Открыть бота';
+      }
+      showDone(j.confirmUrl);
+    })
+    .catch(function(err){
+      var f=err&&err.fields;
+      if(f&&f.indexOf('telegram')>=0){document.getElementById('f-tg').classList.add('err')}
+      if(f&&f.indexOf('email')>=0){document.getElementById('f-mail').classList.add('err')}
+      say('Не получилось отправить заявку. Проверь поля и попробуй еще раз');
+    })
+    .then(function(){btn.disabled=false;btn.textContent=label});
 });
 form.querySelectorAll('input').forEach(function(i){var f=function(){var w=i.closest('.field');if(w)w.classList.remove('err')};i.addEventListener('input',f);i.addEventListener('change',f)});
 

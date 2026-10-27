@@ -61,7 +61,9 @@ export async function ensureWebhook(): Promise<EnsureWebhookResult> {
     if (!bot.isInited()) await bot.init();
     await bot.api.setWebhook(target, {
       secret_token: webhookSecret,
-      allowed_updates: ["message", "callback_query"],
+      // pre_checkout_query — оплата занятий клуба: без него Telegram не спросит
+      // бота перед списанием и платёж отвалится по таймауту.
+      allowed_updates: ["message", "callback_query", "pre_checkout_query"],
     });
     return { status: "registered", detail: target };
   } catch (err) {

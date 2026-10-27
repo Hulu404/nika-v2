@@ -51,6 +51,13 @@ import {
   handleSurveySummaryCommand,
 } from "./club-survey-admin";
 import { surveyByStartPayload } from "../clubs/survey-config";
+import {
+  CLUB_START_PREFIX,
+  handleClubByUsername,
+  handleClubPayment,
+  handleClubPreCheckout,
+  handleClubStart,
+} from "./club-signup";
 
 /**
  * Бот мероприятий НИКИ. Снаружи он читается ровно как бот забегов:
@@ -104,6 +111,12 @@ function registerHandlers(bot: Bot<BotContext>): void {
       return;
     }
 
+    // Deep-link с лендинга занятия клуба (/stretch): /start st_<token> → счёт.
+    if (token.startsWith(CLUB_START_PREFIX)) {
+      await handleClubStart(ctx, token);
+      return;
+    }
+
     // Опрос клуба из поста в чате: /start yoga. Проверяем ДО токена привязки,
     // иначе payload уйдёт в handleStartToken как «устаревшая ссылка». Если по
     // опросу сказать нечего (итог уже разослан), идём обычной веткой без токена.
@@ -119,6 +132,8 @@ function registerHandlers(bot: Bot<BotContext>): void {
     // Без токена: сначала — неподтверждённая заявка на кофе-ран по нику. Человек
     // мог найти бота поиском вместо кнопки, и для него /start значит именно это.
     if (await handleCoffeeRunByUsername(ctx)) return;
+    // Затем — неоплаченная заявка на занятие клуба: пришлём счёт ещё раз.
+    if (await handleClubByUsername(ctx)) return;
 
     // Без токена, но чат уже привязан → статус / повторный запрос согласия.
     const chatId = ctx.from?.id;
@@ -207,6 +222,14 @@ function registerHandlers(bot: Bot<BotContext>): void {
   // «ловцом» — на случай устаревших сообщений с кнопками ans_* в проде: мягко
   // гасим «часик», НИЧЕГО не пишем (никаких answer/answered_at из Telegram).
   bot.callbackQuery(/^ans_/, (ctx) => ctx.answerCallbackQuery().catch(() => {}));
+
+  // ── Оплата занятия клуба (ЮKassa через Telegram Payments) ────────────────────
+  // pre_checkout_query требует ответа за 10 секунд, иначе платёж отменится.
+  bot.on("pre_checkout_query", (ctx) => handleClubPreCheckout(ctx));
+  // successful_payment приходит обычным message — ловим ДО общего ответа ниже.
+  bot.on("message:successful_payment", async (ctx, next) => {
+    if (!(await handleClubPayment(ctx))) await next();
+  });
 
   // ── Любой прочий ввод: это не чат-бот — объясняем роль и даём кнопки ─────────
   bot.on("message", async (ctx) => {
