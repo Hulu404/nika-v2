@@ -83,7 +83,7 @@ describe("POST /api/club-signup", () => {
       mat: "studio",
       towel: true,
       water: false,
-      amount_rub: 1000,
+      amount_rub: 10,
     });
     expect(typeof inserted[0].consent_at).toBe("string");
     expect(inserted[0]).not.toHaveProperty("payment_status");
@@ -103,7 +103,7 @@ describe("POST /api/club-signup", () => {
     const json = await (await post()).json();
 
     expect(inserted).toHaveLength(0);
-    expect(updated[0]).toMatchObject({ confirm_token: "f".repeat(32), amount_rub: 1000 });
+    expect(updated[0]).toMatchObject({ confirm_token: "f".repeat(32), amount_rub: 10 });
     expect(json.confirmUrl).toContain(`st_${"f".repeat(32)}`);
   });
 

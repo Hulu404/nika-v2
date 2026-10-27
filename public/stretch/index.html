@@ -1012,7 +1012,7 @@ var EVENT={club:'stretch',format:'pilates',spot:'klimashkina',date:'2026-11-01',
   url:'https://www.mynika.online/stretch'};
 /* Одна цена для всех мест: 1000 ₽. Остаток мест на странице не показываем, только «ограничено».
    OUT = все места проданы, в проде приходит с сервера. */
-var PRICE=1000,OUT=false;
+var PRICE=10,OUT=false; /* ТЕСТ оплаты; боевая цена 1000 */
 /* Прототип: форма показывает шаги без отправки. Превью «мест нет»: ?full или #full */
 var PROTOTYPE=false;
 if(PROTOTYPE){try{OUT=/[?&]full\b/.test(location.search)||location.hash==='#full'}catch(e){}}
@@ -1045,7 +1045,7 @@ function say(t){toast.textContent=t;toast.classList.add('on');clearTimeout(toast
 /* ===== позвать с собой ===== */
 document.getElementById('share').addEventListener('click',function(){
   var data={title:"NIKA | YOU'LL NEVER STRETCH ALONE",
-            text:'1 ноября, 10:30, ул. Климашкина, 20. Пилатес на коврике, 1000 ₽, мест немного. Пойдем вместе?',
+            text:'1 ноября, 10:30, ул. Климашкина, 20. Пилатес на коврике, '+PRICE+' ₽, мест немного. Пойдем вместе?',
             url:EVENT.url};
   function copy(){
     if(navigator.clipboard&&navigator.clipboard.writeText){

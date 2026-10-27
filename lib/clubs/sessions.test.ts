@@ -11,7 +11,7 @@ describe("moscowToday", () => {
 
 describe("sessionForSignup", () => {
   it("находит занятие клуба по дате", () => {
-    expect(sessionForSignup({ club: "stretch", date: "2026-11-01" }, OCT_27)?.priceRub).toBe(1000);
+    expect(sessionForSignup({ club: "stretch", date: "2026-11-01" }, OCT_27)?.priceRub).toBe(10);
   });
   it("незнакомая дата — ближайшее занятие клуба", () => {
     expect(sessionForSignup({ club: "stretch", date: "2026-10-01" }, OCT_27)?.date).toBe("2026-11-01");

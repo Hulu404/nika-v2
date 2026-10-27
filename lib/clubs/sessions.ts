@@ -42,7 +42,7 @@ export const SESSIONS: readonly ClubSession[] = [
     spot: "klimashkina",
     date: "2026-11-01",
     time: "10:30",
-    priceRub: 1000,
+    priceRub: 10, // ТЕСТ оплаты; боевая цена 1000
     edition: 1,
     title: "Пилатес на коврике",
     formatLabel: "пилатес на коврике, 60 минут",
