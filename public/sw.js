@@ -47,7 +47,7 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: '/apple-touch-icon.png',
-      badge: '/favicon-32x32.png',
+      badge: '/favicon-32.png',
       tag: 'nika-push',
       renotify: true,
       data: { url: data.url },
