@@ -84,6 +84,11 @@ const nextConfig = {
         headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }],
       })),
       { source: "/app", headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }, { key: "X-Robots-Tag", value: "noindex, nofollow" }] },
+      // Лендинг клуба NIKA | YOU'LL NEVER STRETCH ALONE: дата и цена занятия меняются — без залежавшегося кеша.
+      ...["/stretch", "/stretch/index.html"].map((source) => ({
+        source,
+        headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }],
+      })),
       // Звук практик и иконки меняются только с новым именем файла
       { source: "/app/audio/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800" }] },
     ];
@@ -134,6 +139,8 @@ const nextConfig = {
         source: "/coffeerunluzhniki",
         destination: "/coffeerunluzhniki/index.html",
       },
+      // Лендинг клуба стретчинга и пилатеса: /stretch → его index.html.
+      { source: "/stretch", destination: "/stretch/index.html" },
       // Юридические страницы: /legal/privacy → /legal/privacy.html, без редиректа
       { source: "/legal/privacy", destination: "/legal/privacy.html" },
       { source: "/legal/consent", destination: "/legal/consent.html" },
