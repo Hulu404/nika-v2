@@ -4,14 +4,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const inserted: Array<Record<string, unknown>> = [];
 const updated: Array<Record<string, unknown>> = [];
 let existing: Array<Record<string, unknown>> = [];
+const filters: Array<[string, unknown]> = [];
 // Сколько ковриков уже оплачено (ответ на select count head).
 let paidSeats = 0;
 vi.mock("@supabase/supabase-js", () => {
   const chain = () => {
     const q = {
-      eq: () => q,
+      eq: (column: string, value: unknown) => { filters.push([column, value]); return q; },
       limit: async () => ({ data: existing, error: null }),
-      then: (resolve: (v: unknown) => unknown) => resolve({ count: paidSeats, error: null }),
+      then: (resolve: (v: unknown) => unknown) => resolve({ data: [{ quantity: paidSeats }], error: null }),
     };
     return q;
   };
@@ -67,6 +68,7 @@ describe("POST /api/club-signup", () => {
     inserted.length = 0;
     updated.length = 0;
     existing = [];
+    filters.length = 0;
     paidSeats = 0;
   });
   afterEach(() => {
@@ -119,7 +121,7 @@ describe("POST /api/club-signup", () => {
     const json = await (await post()).json();
 
     expect(json).toMatchObject({ paid: true, waitlist: false });
-    expect(updated[0]).not.toHaveProperty("payment_status");
+    expect(updated).toHaveLength(0);
   });
 
   it("GET отдаёт цену и распродано ли занятие", async () => {
@@ -141,12 +143,12 @@ describe("POST /api/club-signup", () => {
     expect(inserted).toHaveLength(0);
   });
 
-  it("повторная форма обновляет заявку и сохраняет прежний токен", async () => {
+  it("повторная старая форма возвращает заявку и сохраняет прежний токен", async () => {
     existing = [{ id: "a", confirm_token: "f".repeat(32), payment_status: "pending" }];
     const json = await (await post()).json();
 
     expect(inserted).toHaveLength(0);
-    expect(updated[0]).toMatchObject({ confirm_token: "f".repeat(32), amount_rub: 1000 });
+    expect(updated).toHaveLength(0);
     expect(json.confirmUrl).toContain(`st_${"f".repeat(32)}`);
   });
 
@@ -155,7 +157,69 @@ describe("POST /api/club-signup", () => {
     const json = await (await post()).json();
 
     expect(json.paid).toBe(true);
-    expect(updated[0]).not.toHaveProperty("amount_rub");
+    expect(updated).toHaveLength(0);
+  });
+
+  it("считает общую сумму по количеству и серверной цене", async () => {
+    const res = await post({ quantity: 3, amount_rub: 1, request_token: "a".repeat(32) });
+    expect(await res.json()).toMatchObject({ quantity: 3, amount: 3000, isGift: false });
+    expect(inserted[0]).toMatchObject({ quantity: 3, amount_rub: 3000, confirm_token: "a".repeat(32) });
+    expect(filters).toContainEqual(["confirm_token", "a".repeat(32)]);
+    expect(filters.some(([column]) => column === "tg_username")).toBe(false);
+  });
+
+  it("две покупки с одним Telegram получают отдельные заказы", async () => {
+    await post({ request_token: "a".repeat(32) });
+    await post({ request_token: "b".repeat(32), is_gift: true, gift_recipient: "Анна" });
+    expect(inserted).toHaveLength(2);
+    expect(inserted[0].tg_username).toBe(inserted[1].tg_username);
+    expect(inserted[0].confirm_token).not.toBe(inserted[1].confirm_token);
+    expect(filters.some(([column]) => column === "tg_username")).toBe(false);
+  });
+
+  it.each([0, -1, 1.5, 17, "2", null])("отклоняет количество %s", async (quantity) => {
+    const res = await post({ quantity });
+    expect(res.status).toBe(422);
+    expect((await res.json()).fields).toContain("quantity");
+    expect(inserted).toHaveLength(0);
+  });
+
+  it("сохраняет подарок без анкеты получателя", async () => {
+    const res = await post({ quantity: 2, is_gift: true, gift_recipient: "  Анна  ", level: null, mat: null, towel: null, water: null });
+    expect(res.status).toBe(200);
+    expect(inserted[0]).toMatchObject({ quantity: 2, is_gift: true, gift_recipient: "Анна", level: null, amount_rub: 2000 });
+  });
+
+  it("подарок требует имя получателя и контакты покупателя", async () => {
+    const res = await post({ is_gift: true, gift_recipient: " ", email: "" });
+    expect(res.status).toBe(422);
+    expect((await res.json()).fields).toEqual(expect.arrayContaining(["gift_recipient", "email"]));
+  });
+
+  it("не принимает группу, когда осталось меньше мест", async () => {
+    paidSeats = 15;
+    const res = await post({ quantity: 2 });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ available: 1 });
+    expect(inserted).toHaveLength(0);
+  });
+
+  it("повтор запроса с ключом не переписывает уже созданный заказ", async () => {
+    existing = [{ id: "a", confirm_token: "f".repeat(32), payment_status: "pending", quantity: 2, amount_rub: 2000, is_gift: true }];
+    const res = await post({ request_token: "f".repeat(32), quantity: 4 });
+    expect(await res.json()).toMatchObject({ quantity: 2, amount: 2000, isGift: true });
+    expect(inserted).toHaveLength(0);
+    expect(updated).toHaveLength(0);
+  });
+
+  it("не меняет выставленный счёт даже со старой формы без ключа", async () => {
+    existing = [{ id: "a", confirm_token: "e".repeat(32), payment_status: "pending", confirmed_at: "2026-10-27", quantity: 2, amount_rub: 2000, is_gift: false }];
+    expect(await (await post()).json()).toMatchObject({ amount: 2000, quantity: 2 });
+    expect(updated).toHaveLength(0);
+  });
+
+  it("не принимает JSON null", async () => {
+    expect((await POST(new Request("http://x", { method: "POST", body: "null" }))).status).toBe(400);
   });
 
   it("неизвестный клуб — 404, в базу ничего", async () => {

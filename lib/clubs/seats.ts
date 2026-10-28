@@ -16,25 +16,29 @@ export async function countPaidSeats(
   const paidQuery = () =>
     db
       .from("club_signups")
-      .select("id", { count: "exact", head: true })
+      .select("quantity")
       .eq("club", session.club)
       .eq("event_date", session.date)
       .eq("event_time", session.time)
       .eq("payment_status", "paid");
   // counts_seat = false — оплата, которая не занимает коврик (тест, гость команды).
-  let { count, error } = await paidQuery().eq("counts_seat", true);
+  let { data, error } = await paidQuery().eq("counts_seat", true);
   // Миграция 067 могла ещё не доехать до базы: считаем все оплаченные, а не
   // закрываем продажу из-за отсутствующей колонки.
   if (error && /counts_seat/.test(error.message)) {
     console.error("[club] нет counts_seat, примени 067_club_signups_counts_seat.sql:", error.message);
-    ({ count, error } = await paidQuery());
+    ({ data, error } = await paidQuery());
   }
   // Не смогли посчитать — не продаём вслепую сверх зала: считаем, что мест нет.
   if (error) {
     console.error("[club] countPaidSeats:", error.message);
     return Number.POSITIVE_INFINITY;
   }
-  return count ?? 0;
+  return (data ?? []).reduce((sum, row) => sum + row.quantity, 0);
+}
+
+export function hasEnoughSeats(paid: number, session: Pick<ClubSession, "capacity">, quantity: number): boolean {
+  return Number.isInteger(quantity) && quantity > 0 && paid + quantity <= session.capacity;
 }
 
 export function isSoldOut(paid: number, session: Pick<ClubSession, "capacity">): boolean {

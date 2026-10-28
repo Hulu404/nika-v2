@@ -472,11 +472,15 @@ html.js .f-fig.on svg *{--draw:0}
 .card-form{border-radius:28px;background:var(--paper);border:1px solid var(--line);box-shadow:0 30px 60px -36px rgba(20,20,18,.28);padding:32px 40px 40px}
 .proto{display:flex;align-items:center;gap:8px;font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-bottom:24px}
 .proto i{width:6px;height:6px;border-radius:50%;background:#C9A24A;flex:none}
-.tix{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;padding-bottom:24px;margin-bottom:24px;border-bottom:1px solid var(--line)}
+.tix{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:16px;padding-bottom:24px;margin-bottom:24px;border-bottom:1px solid var(--line)}
 .tix-k{font-size:12px;color:var(--ink-2)}
 .tix-p{font-family:var(--voice);font-size:56px;line-height:.95;color:var(--ink);margin-top:4px;font-variant-numeric:tabular-nums}
 .tix-r{text-align:right;font-size:12px;color:var(--ink-2);line-height:1.6;padding-bottom:4px}
 .tix-r b{color:var(--ink);font-weight:400}
+.order-note{font-size:12px;line-height:1.6;color:var(--ink-2);margin:8px 0 20px}
+.order-total{font-size:12px;color:var(--ink-2);margin-top:10px}
+.gift-fields{padding:16px;border:1px solid var(--line);border-radius:16px;margin-bottom:20px;background:#FBEDE8}
+.gift-fields .field{margin-bottom:0}
 .field{margin-bottom:16px}
 .field>label:not(.check),.field>.fl{display:block;font-size:12px;color:var(--ink-2);margin-bottom:8px}
 .field .in{width:100%;height:56px;border-radius:16px;background:#F7F7F5;border:1px solid var(--line-2);color:var(--ink);padding:0 16px;font-size:16px;transition:border-color .18s,background .18s,box-shadow .18s}
@@ -920,7 +924,7 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
     <div class="reg-grid">
       <div class="reg-l r">
         <h2 class="d2">Занимаемся <span class="brand-accent">вместе</span></h2>
-        <p class="lead">Оставь контакты и оплати занятие в нашем Telegram-боте. После оплаты коврик твой.</p>
+        <p class="lead">Приходи самостоятельно, с компанией или подари занятие близкому человеку. Выбери билеты и оплати их в нашем Telegram-боте.</p>
         <ul>
           <li><span class="li-t"><b>1 ноября, 10:30</b>, сбор с 10:10</span></li>
           <li><span class="li-t"><b>ул. Климашкина, 20</b>, м. Улица 1905 года</span></li>
@@ -937,12 +941,25 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
       <div class="card-form">
         <form class="form" id="form" novalidate>
           <div class="tix" id="tix">
-            <div><div class="tix-k" data-tix-k>Занятие</div><div class="tix-p"><span data-price>1000</span><span class="rub">₽</span></div></div>
+            <div aria-live="polite"><div class="tix-k" data-tix-k>Итого за билеты</div><div class="tix-p"><span id="order-total">1000</span><span class="rub">₽</span></div><div class="order-total" id="order-calculation">1 билет × 1000 ₽</div></div>
             <div class="tix-r" data-tix-r>Количество мест<br>ограничено</div>
           </div>
+          <div class="field" id="f-quantity"><label for="i-quantity">Количество билетов</label><select class="in" id="i-quantity" aria-describedby="quantity-note"></select><div class="msg">Выбери количество билетов</div></div>
+          <p class="order-note" id="quantity-note">Один билет — один участник. Все билеты придут тебе в Telegram.</p>
+          <div class="field"><span class="fl" id="l-purchase">Для кого билеты</span><div class="opts opts--2" role="radiogroup" aria-labelledby="l-purchase">
+            <label class="opt on"><input type="radio" name="purchase" value="self" checked>Для себя и друзей</label>
+            <label class="opt"><input type="radio" name="purchase" value="gift">В подарок</label>
+          </div></div>
+          <div class="gift-fields" id="gift-fields" hidden>
+            <div class="field" id="f-recipient"><label for="i-recipient">Кому даришь</label><input class="in" id="i-recipient" type="text" maxlength="200" placeholder="Имя получателя" autocomplete="off"><div class="msg">Укажи имя получателя</div></div>
+            <p class="order-note">После оплаты бот пришлёт тебе подарочный билет без цены — перешли его получателю в удобный момент. Если билетов несколько, получатель сможет прийти с компанией.</p>
+          </div>
+          <p class="order-note" id="buyer-note">Контакты покупателя — сюда придут счёт и подтверждение.</p>
           <div class="field" id="f-name"><label for="i-name">Имя</label><input class="in" id="i-name" type="text" placeholder="Как к тебе обращаться" autocomplete="name"><div class="msg">Укажи имя</div></div>
           <div class="field" id="f-tg"><label for="i-tg">Telegram</label><input class="in" id="i-tg" type="text" inputmode="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="@nickname" autocomplete="off"><div class="msg">Нужен ник в Telegram латиницей, например @nickname</div></div>
           <div class="field" id="f-mail"><label for="i-mail">E-mail</label><input class="in" id="i-mail" type="email" inputmode="email" placeholder="you@mail.ru" autocomplete="email"><div class="msg">Проверь адрес почты</div></div>
+          <div id="participant-fields">
+          <p class="order-note" id="group-note" hidden>Ниже — твои предпочтения. Остальные участники смогут уточнить пожелания на месте. На входе назовите имя покупателя.</p>
           <div class="field" id="f-level"><span class="fl" id="l-level">Пилатес для тебя</span>
             <div class="opts" role="radiogroup" aria-labelledby="l-level">
               <label class="opt"><input type="radio" name="level" id="lv-new" value="first">Впервые</label>
@@ -964,11 +981,12 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
               <label class="opt"><input type="radio" name="water" value="yes">Нужна</label>
               <label class="opt"><input type="radio" name="water" value="no">Не нужна</label>
             </div><div class="msg">Отметь, нужна ли вода</div></div>
+          </div>
           <div class="field consent" id="f-ok">
             <label class="check" for="i-ok"><input type="checkbox" id="i-ok" name="consent" value="1"><span class="box" aria-hidden="true"></span><span class="ct">Соглашаюсь на обработку персональных данных по <a href="https://www.mynika.online/legal/privacy" target="_blank" rel="noopener">политике конфиденциальности</a></span></label>
             <div class="msg">Отметь согласие, чтобы мы могли тебя записать</div>
           </div>
-          <button type="submit" class="btn btn--ink" id="submit">Иду на занятие</button>
+          <button type="submit" class="btn btn--ink" id="submit">Купить билет</button>
           <p class="fine">Оплата в Telegram-боте NIKA. Пишем только по делу занятия. Занятие для участников от 18 лет.</p>
         </form>
         <div class="done" id="done" hidden>
@@ -977,6 +995,7 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
           <p id="doneP">Осталось оплатить коврик за <b><span data-price>1000</span> ₽</b>: открой бота NIKA, он пришлет счет. Оплата прямо в Telegram.</p>
           <a class="btn btn--ink" id="tg-confirm" href="https://www.mynika.online/stretch" target="_blank" rel="noopener" hidden style="display:none">Оплатить в Telegram</a>
           <p class="fine" id="doneFine">Количество мест ограничено, коврик закрепляется после оплаты.</p>
+          <button class="btn btn--line" id="another-order" type="button">Оформить ещё билеты</button>
         </div>
       </div>
     </div>
@@ -1012,7 +1031,7 @@ var EVENT={club:'stretch',format:'pilates',spot:'klimashkina',date:'2026-11-01',
   url:'https://www.mynika.online/stretch'};
 /* Одна цена для всех мест: 1000 ₽. Остаток мест на странице не показываем, только «ограничено».
    OUT = все места выкуплены: приходит с сервера (GET /api/club-signup), тогда форма ставит в лист ожидания. */
-var PRICE=1000,OUT=false;
+var PRICE=1000,OUT=false,QUANTITY=1,IS_GIFT=false,ORDER_TOKEN=null;
 /* LEFT — остаток ковриков. Сервер отдает его, только когда мест мало (≤5), иначе null и на странице «ограничено». */
 var LEFT=null;
 /* Прототип: форма показывает шаги без отправки. Превью «мест нет»: ?full или #full */
@@ -1044,7 +1063,20 @@ function renderSeats(){
     document.getElementById('regLimit').innerHTML='<b>'+t+'</b>: коврик закрепляется после оплаты';
     document.querySelector('[data-tix-r]').innerHTML=t.toLowerCase().replace(' ','<br>');
   }
+  renderOrder();
 }
+function renderOrder(){
+  document.getElementById('order-total').textContent=(PRICE*QUANTITY).toLocaleString('ru-RU');
+  document.getElementById('order-calculation').textContent=QUANTITY+' '+plural(QUANTITY,'билет','билета','билетов')+' × '+PRICE+' ₽';
+  document.getElementById('gift-fields').hidden=!IS_GIFT;
+  document.getElementById('participant-fields').hidden=IS_GIFT;
+  document.getElementById('group-note').hidden=QUANTITY===1;
+  document.getElementById('submit').textContent=OUT?'Встать в лист ожидания':IS_GIFT?'Оформить подарок':QUANTITY>1?'Купить билеты':'Купить билет';
+}
+var quantitySelect=document.getElementById('i-quantity');
+for(var count=1;count<=16;count++){var option=document.createElement('option');option.value=count;option.textContent=count+' '+plural(count,'билет','билета','билетов');quantitySelect.appendChild(option)}
+quantitySelect.addEventListener('change',function(){QUANTITY=Number(this.value);ORDER_TOKEN=null;document.getElementById('f-quantity').classList.remove('err');renderOrder()});
+$$('input[name="purchase"]').forEach(function(input){input.addEventListener('change',function(){IS_GIFT=this.value==='gift';renderOrder()})});
 renderSeats();
 /* Распродано ли занятие — спрашиваем сервер. Не ответил — страница остается в обычном режиме,
    а сервер все равно поставит в лист ожидания при заявке. */
@@ -1053,9 +1085,10 @@ if(!PROTOTYPE&&window.fetch){
     .then(function(r){return r.ok?r.json():null})
     .then(function(j){
       if(!j)return;
+      if(typeof j.price==='number'&&j.price>0)PRICE=j.price;
       if(j.soldOut)OUT=true;
       else if(typeof j.left==='number'&&j.left>0)LEFT=j.left;
-      if(OUT||LEFT)renderSeats();
+      renderSeats();
     })
     .catch(function(){});
 }
@@ -1094,60 +1127,75 @@ function tgNick(v){
     .replace(/[/?#].*$/,'');
   return /^[a-z][a-z0-9_]{3,30}[a-z0-9]$/.test(s)?s:null;
 }
-function showDone(confirmUrl){
-  if(OUT){
+function showDone(confirmUrl,order){
+  order=order||{quantity:QUANTITY,amount:PRICE*QUANTITY,isGift:IS_GIFT,waitlist:OUT};
+  document.getElementById('doneH').textContent=order.paid?'Заказ уже оплачен':order.isGift?'Подарок почти готов':'Заявка принята';
+  document.getElementById('doneP').textContent=order.paid?'Билеты оплачены. Открой бота NIKA, чтобы получить подтверждение.':'Твой заказ: '+order.quantity+' '+plural(order.quantity,'билет','билета','билетов')+' за '+order.amount+' ₽. Открой бота NIKA — он пришлёт счёт на весь заказ.';
+  document.getElementById('doneFine').textContent=order.isGift?'После оплаты бот пришлёт подарочный билет без цены. Перешли его получателю.':'Места закрепляются после оплаты. На входе назовите имя покупателя.';
+  tgBtn.textContent=order.paid?'Открыть бота':'Оплатить в Telegram';
+  tgBtn.hidden=true;tgBtn.style.display='none';
+  if(order.waitlist){
     document.getElementById('doneH').textContent='Ты в листе ожидания';
     document.getElementById('doneP').textContent='Все коврики на это занятие выкуплены. Позовем тебя, как только откроем запись на следующее.';
     document.getElementById('doneFine').textContent='Открой бота NIKA, чтобы он смог тебе написать.';
     tgBtn.textContent='Открыть бота';
   }
   if(confirmUrl){tgBtn.href=confirmUrl;tgBtn.hidden=false;tgBtn.style.display=''}
-  else if(!OUT){document.getElementById('doneP').textContent='Заявка сохранена. Оплата откроется в Telegram-боте NIKA, мы напишем тебе.'}
+  else if(!order.waitlist){document.getElementById('doneP').textContent='Заявка сохранена, но ссылка на оплату сейчас недоступна. Попробуй открыть страницу позже.'}
   form.hidden=true;done.hidden=false;
   done.scrollIntoView({behavior:'smooth',block:'center'});
 }
+document.getElementById('another-order').addEventListener('click',function(){ORDER_TOKEN=null;done.hidden=true;form.hidden=false;renderOrder();quantitySelect.focus()});
+form.addEventListener('input',function(){ORDER_TOKEN=null});
+form.addEventListener('change',function(){ORDER_TOKEN=null});
 form.addEventListener('submit',function(e){
   e.preventDefault();
   var a=F('f-name',function(v){return v.length>=2});
   var b=F('f-tg',function(v){return tgNick(v)!==null});
   var c=F('f-mail',function(v){return /^[^\s@]+@[^\s@]+\.[a-zа-я]{2,}$/i.test(v)});
+  var recipient=F('f-recipient',function(v){return !IS_GIFT||v.length>=2});
   var lv=picked('level'),mt=picked('mat'),tw=picked('towel'),wt=picked('water');
-  document.getElementById('f-level').classList.toggle('err',!lv);
-  document.getElementById('f-mat').classList.toggle('err',!mt);
-  document.getElementById('f-towel').classList.toggle('err',!tw);
-  document.getElementById('f-water').classList.toggle('err',!wt);
+  document.getElementById('f-level').classList.toggle('err',!IS_GIFT&&!lv);
+  document.getElementById('f-mat').classList.toggle('err',!IS_GIFT&&!mt);
+  document.getElementById('f-towel').classList.toggle('err',!IS_GIFT&&!tw);
+  document.getElementById('f-water').classList.toggle('err',!IS_GIFT&&!wt);
   var ok=document.getElementById('i-ok').checked;
   document.getElementById('f-ok').classList.toggle('err',!ok);
-  if(!(a&&b&&c&&lv&&mt&&tw&&wt&&ok)){
+  if(!(a&&b&&c&&recipient&&(IS_GIFT||(lv&&mt&&tw&&wt))&&ok)){
     var bad=document.querySelector('.field.err');
     if(bad)bad.scrollIntoView({behavior:'smooth',block:'center'});
     return;
   }
   if(PROTOTYPE){showDone(null);return}
   /* Заявка → club_signups (pending, или waitlist, если коврики выкуплены) → ссылка в бот, где счет ЮKassa. */
-  var btn=document.getElementById('submit'),label=btn.textContent;
+  var btn=document.getElementById('submit');
   if(btn.disabled)return;
+  if(!ORDER_TOKEN){var bytes=crypto.getRandomValues(new Uint8Array(16));ORDER_TOKEN=Array.from(bytes,function(b){return b.toString(16).padStart(2,'0')}).join('')}
   btn.disabled=true;btn.textContent='Отправляем…';
+  form.querySelectorAll('input,select').forEach(function(input){input.disabled=true});
   fetch('/api/club-signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     name:document.getElementById('i-name').value.trim(),telegram:document.getElementById('i-tg').value.trim(),
     email:document.getElementById('i-mail').value.trim(),level:lv,mat:mt,towel:tw,water:wt,consent:true,
+    quantity:QUANTITY,is_gift:IS_GIFT,gift_recipient:IS_GIFT?document.getElementById('i-recipient').value.trim():null,request_token:ORDER_TOKEN,
     club:EVENT.club,event_date:EVENT.date,source:EVENT.source})})
     .then(function(r){return r.json().then(function(j){if(!r.ok)throw j;return j})})
     .then(function(j){
-      if(j.paid){
-        document.getElementById('doneH').textContent='Занятие уже оплачено';
-        document.getElementById('doneP').textContent='Коврик твой. Детали занятия — в Telegram-боте NIKA.';
-        tgBtn.textContent='Открыть бота';
-      }else if(j.waitlist&&!OUT){OUT=true;renderSeats()}
-      showDone(j.confirmUrl);
+      if(j.waitlist&&!OUT){OUT=true;renderSeats()}
+      showDone(j.confirmUrl,j);
     })
     .catch(function(err){
       var f=err&&err.fields;
       if(f&&f.indexOf('telegram')>=0){document.getElementById('f-tg').classList.add('err')}
       if(f&&f.indexOf('email')>=0){document.getElementById('f-mail').classList.add('err')}
+      if(f&&f.indexOf('gift_recipient')>=0){document.getElementById('f-recipient').classList.add('err')}
+      if(err&&err.error==='Not enough seats'){
+        var field=document.getElementById('f-quantity');field.classList.add('err');
+        field.querySelector('.msg').textContent='Осталось '+seats(err.available)+'. Выбери меньше билетов.';
+        field.scrollIntoView({behavior:'smooth',block:'center'});quantitySelect.focus();return;
+      }
       say('Не получилось отправить заявку. Проверь поля и попробуй еще раз');
     })
-    .then(function(){btn.disabled=false;btn.textContent=label});
+    .then(function(){btn.disabled=false;form.querySelectorAll('input,select').forEach(function(input){input.disabled=false});renderOrder()});
 });
 form.querySelectorAll('input').forEach(function(i){var f=function(){var w=i.closest('.field');if(w)w.classList.remove('err')};i.addEventListener('input',f);i.addEventListener('change',f)});
 

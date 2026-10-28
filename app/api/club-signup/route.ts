@@ -1,6 +1,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
-import { countPaidSeats, isSoldOut, seatsLeftToShow } from "@/lib/clubs/seats";
+import { countPaidSeats, hasEnoughSeats, isSoldOut, seatsLeftToShow } from "@/lib/clubs/seats";
 import { sessionForSignup } from "@/lib/clubs/sessions";
 import { normalizeTelegramUsername } from "@/lib/coffeerun/telegram-username";
 
@@ -72,13 +72,14 @@ export async function GET(req: Request) {
  * waitlist: лист ожидания следующего занятия клуба. Ссылка в бот всё равно
  * отдаётся: по ней бот узнаёт чат, чтобы потом позвать человека.
  *
- * Ответ: { ok: true, confirmUrl, paid, waitlist } — paid=true, если этот ник уже
- * оплатил это занятие (повторная форма ничего не ломает).
+ * request_token — ключ отдельного заказа. Повтор с тем же ключом возвращает
+ * неизменный заказ; старые формы без ключа находят прежнюю заявку по нику.
  */
 export async function POST(req: Request) {
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
+    if (!body || typeof body !== "object" || Array.isArray(body)) throw new Error("Invalid body");
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
@@ -93,15 +94,27 @@ export async function POST(req: Request) {
   const mat = oneOf(body.mat, MATS);
   const towel = yesNo(body.towel);
   const water = yesNo(body.water);
+  const quantity = body.quantity === undefined ? 1 : body.quantity;
+  const isGift = body.is_gift === true;
+  const giftRecipient = isGift ? clean(body.gift_recipient) : null;
+  // Случайный ключ заказа: повтор запроса возвращает тот же заказ, новая
+  // покупка (даже с тем же Telegram) получает отдельный ключ и счёт.
+  const requestToken = body.request_token;
 
   const invalid: string[] = [];
   if (name.length < 2) invalid.push("name");
   if (!tgUsername) invalid.push("telegram");
   if (!EMAIL_RE.test(email)) invalid.push("email");
-  if (!level) invalid.push("level");
-  if (!mat) invalid.push("mat");
-  if (towel === null) invalid.push("towel");
-  if (water === null) invalid.push("water");
+  if (!isGift) {
+    if (!level) invalid.push("level");
+    if (!mat) invalid.push("mat");
+    if (towel === null) invalid.push("towel");
+    if (water === null) invalid.push("water");
+  }
+  if (typeof quantity !== "number" || !Number.isInteger(quantity) || quantity < 1 || quantity > 16) invalid.push("quantity");
+  if (body.is_gift !== undefined && typeof body.is_gift !== "boolean") invalid.push("is_gift");
+  if (isGift && (typeof body.gift_recipient !== "string" || !giftRecipient || giftRecipient.length < 2)) invalid.push("gift_recipient");
+  if (requestToken !== undefined && (typeof requestToken !== "string" || !/^[a-f0-9]{32}$/.test(requestToken))) invalid.push("request_token");
   if (body.consent !== true) invalid.push("consent");
   if (invalid.length > 0) {
     return NextResponse.json({ error: "Invalid fields", fields: invalid }, { status: 422 });
@@ -114,21 +127,24 @@ export async function POST(req: Request) {
   if (!session) {
     return NextResponse.json({ error: "No upcoming session" }, { status: 404 });
   }
+  const ticketCount = quantity as number;
+  if (ticketCount > session.capacity) {
+    return NextResponse.json({ error: "Invalid fields", fields: ["quantity"] }, { status: 422 });
+  }
 
   const supabase = db();
   if (!supabase) {
     return NextResponse.json({ error: "Server misconfigured" }, { status: 500 });
   }
 
-  // Повторная форма тем же ником на то же занятие обновляет заявку, а не плодит
-  // строки и токены: человек мог потерять первую кнопку.
+  // Новая форма ищет только свой заказ. Для старой формы сохраняем поиск по нику.
   const { data: existingRows, error: readError } = await supabase
     .from("club_signups")
-    .select("id, confirm_token, payment_status")
+    .select("id, confirm_token, payment_status, quantity, amount_rub, is_gift, confirmed_at")
     .eq("club", session.club)
     .eq("event_date", session.date)
     .eq("event_time", session.time)
-    .eq("tg_username", tgUsername)
+    .eq(requestToken ? "confirm_token" : "tg_username", requestToken || tgUsername)
     .limit(1);
   if (readError) {
     console.error("club_signups read error:", readError.message);
@@ -136,12 +152,23 @@ export async function POST(req: Request) {
   }
 
   const existing = (
-    existingRows as { id: string; confirm_token: string; payment_status: string }[] | null
+    existingRows as { id: string; confirm_token: string; payment_status: string; quantity: number; amount_rub: number; is_gift: boolean; confirmed_at: string | null }[] | null
   )?.[0];
-  const paid = existing?.payment_status === "paid";
-  // Оплатившему место уже принадлежит; остальным — смотрим, остались ли места.
-  const waitlist = !paid && isSoldOut(await countPaidSeats(supabase, session), session);
-  const token = existing?.confirm_token ?? mintToken();
+  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+  const responseFor = (order: { confirm_token: string; payment_status: string; quantity: number; amount_rub: number; is_gift: boolean }) => NextResponse.json({
+    ok: true,
+    confirmUrl: botUsername ? `https://t.me/${botUsername}?start=${START_PREFIX}${order.confirm_token}` : null,
+    paid: order.payment_status === "paid", waitlist: order.payment_status === "waitlist",
+    quantity: order.quantity, amount: order.amount_rub, isGift: order.is_gift,
+  });
+  // Выставленный или оплаченный счёт нельзя переписать повторной формой.
+  if (existing) return responseFor(existing);
+  const occupied = await countPaidSeats(supabase, session);
+  const waitlist = isSoldOut(occupied, session);
+  if (!waitlist && !hasEnoughSeats(occupied, session, ticketCount)) {
+    return NextResponse.json({ error: "Not enough seats", available: Math.max(0, session.capacity - occupied) }, { status: 409 });
+  }
+  const token = (requestToken as string | undefined) ?? mintToken();
   const now = new Date().toISOString();
 
   const fields = {
@@ -154,29 +181,32 @@ export async function POST(req: Request) {
     name,
     tg_username: tgUsername,
     email,
-    level,
-    mat,
-    towel,
-    water,
+    level: isGift ? null : level,
+    mat: isGift ? null : mat,
+    towel: isGift ? null : towel,
+    water: isGift ? null : water,
+    quantity: ticketCount,
+    is_gift: isGift,
+    gift_recipient: giftRecipient,
     consent_at: now,
     confirm_token: token,
     updated_at: now,
-    // Сумму и статус оплаченной заявки не трогаем: деньги уже списаны.
-    ...(paid
-      ? {}
-      : { amount_rub: session.priceRub, payment_status: waitlist ? "waitlist" : "pending" }),
+    amount_rub: session.priceRub * ticketCount,
+    payment_status: waitlist ? "waitlist" : "pending",
   };
 
-  const { error } = existing
-    ? await supabase.from("club_signups").update(fields).eq("id", existing.id)
-    : await supabase.from("club_signups").insert(fields);
+  const { error } = await supabase.from("club_signups").insert(fields);
   if (error) {
+    // Два одинаковых сетевых повтора могли одновременно пройти чтение.
+    if (error.code === "23505" && requestToken) {
+      const { data: retry } = await supabase.from("club_signups")
+        .select("confirm_token, payment_status, quantity, amount_rub, is_gift")
+        .eq("confirm_token", requestToken).maybeSingle();
+      if (retry) return responseFor(retry);
+    }
     console.error("club_signups write error:", error.message);
     return NextResponse.json({ error: "DB error" }, { status: 500 });
   }
 
-  const botUsername = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
-  const confirmUrl = botUsername ? `https://t.me/${botUsername}?start=${START_PREFIX}${token}` : null;
-
-  return NextResponse.json({ ok: true, confirmUrl, paid, waitlist }, { status: 200 });
+  return responseFor({ confirm_token: token, payment_status: waitlist ? "waitlist" : "pending", quantity: ticketCount, amount_rub: session.priceRub * ticketCount, is_gift: isGift });
 }

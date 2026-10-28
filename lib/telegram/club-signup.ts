@@ -1,6 +1,6 @@
 import { InlineKeyboard } from "grammy";
 import { tgAdmin } from "./supabase";
-import { countPaidSeats, isSoldOut } from "../clubs/seats";
+import { countPaidSeats, hasEnoughSeats, isSoldOut } from "../clubs/seats";
 import { moscowToday, SESSIONS, sessionOfSignup, type ClubSession } from "../clubs/sessions";
 import { normalizeTelegramUsername } from "../coffeerun/telegram-username";
 import { publicOriginFromEnv } from "../public-origin";
@@ -27,7 +27,7 @@ export const CLUB_START_PREFIX = "st_";
 const PAYLOAD_PREFIX = "club:";
 const TABLE = "club_signups";
 const COLUMNS =
-  "id, name, email, tg_username, club, event_date, event_time, amount_rub, payment_status, confirmed_at";
+  "id, name, email, tg_username, club, event_date, event_time, amount_rub, payment_status, confirmed_at, quantity, is_gift, gift_recipient";
 
 export interface ClubSignup {
   id: string;
@@ -40,6 +40,16 @@ export interface ClubSignup {
   amount_rub: number;
   payment_status: "pending" | "paid" | "refunded" | "waitlist";
   confirmed_at: string | null;
+  quantity: number;
+  is_gift: boolean;
+  gift_recipient: string | null;
+}
+
+type TicketDetails = Partial<Pick<ClubSignup, "quantity" | "is_gift" | "gift_recipient">>;
+
+export function ticketLabel(quantity: number): string {
+  const last = quantity % 10, lastTwo = quantity % 100;
+  return `${quantity} ${last === 1 && lastTwo !== 11 ? "билет" : last >= 2 && last <= 4 && (lastTwo < 12 || lastTwo > 14) ? "билета" : "билетов"}`;
 }
 
 // ── Чистые функции (покрыты тестами) ────────────────────────────────────────
@@ -94,7 +104,7 @@ export function checkoutRefusal(
  * YOOKASSA_RECEIPT=0 отключает чек (магазин без фискализации).
  */
 export function receiptProviderData(
-  signup: Pick<ClubSignup, "email" | "amount_rub">,
+  signup: Pick<ClubSignup, "email" | "amount_rub"> & TicketDetails,
   session: ClubSession,
   env: Record<string, string | undefined> = process.env,
 ): string | undefined {
@@ -106,8 +116,8 @@ export function receiptProviderData(
       items: [
         {
           description: `${session.title}, ${session.dateLabel} ${session.time}`.slice(0, 128),
-          quantity: "1.00",
-          amount: { value: `${signup.amount_rub}.00`, currency: "RUB" },
+          quantity: (signup.quantity ?? 1).toFixed(2),
+          amount: { value: (signup.amount_rub / (signup.quantity ?? 1)).toFixed(2), currency: "RUB" },
           vat_code: Number(env.YOOKASSA_VAT_CODE ?? 1), // 1 — без НДС
           payment_mode: "full_payment",
           payment_subject: "service",
@@ -123,9 +133,10 @@ function whenWhere(session: ClubSession): string {
 }
 
 /** Сообщение перед счётом: что именно человек оплачивает. */
-export function invoiceIntroText(signup: Pick<ClubSignup, "name">, session: ClubSession): string {
+export function invoiceIntroText(signup: Pick<ClubSignup, "name"> & TicketDetails, session: ClubSession): string {
   return [
     `${signup.name}, заявка на занятие найдена.`,
+    `${ticketLabel(signup.quantity ?? 1)}${signup.is_gift ? ` в подарок. Получатель: ${signup.gift_recipient}` : ""}.`,
     "",
     `${session.title}: ${whenWhere(session)}.`,
     `Сбор с ${session.gatherAt}.`,
@@ -135,15 +146,31 @@ export function invoiceIntroText(signup: Pick<ClubSignup, "name">, session: Club
 }
 
 /** Ответ после оплаты и на повторный вход оплатившего. */
-export function paidText(signup: Pick<ClubSignup, "name">, session: ClubSession): string {
+export function paidText(signup: Pick<ClubSignup, "name"> & TicketDetails, session: ClubSession): string {
   return [
-    `${signup.name}, оплата прошла, коврик твой!`,
+    signup.is_gift
+      ? `${signup.name}, подарок оплачен: ${ticketLabel(signup.quantity ?? 1)}! Получатель: ${signup.gift_recipient}. Перешли получателю следующее сообщение — это подарочный билет.`
+      : (signup.quantity ?? 1) > 1
+        ? `${signup.name}, оплата прошла: ${ticketLabel(signup.quantity!)}. Места для вашей компании закреплены! На входе назовите имя покупателя: ${signup.name}.`
+        : `${signup.name}, оплата прошла, коврик твой!`,
     "",
     `${session.title}: ${whenWhere(session)}.`,
     `Приходи к ${session.gatherAt}, чтобы спокойно переодеться. С собой — удобная одежда и носки.`,
     "",
     "Есть травмы или ограничения по здоровью — расскажи тренеру до начала.",
   ].join("\n");
+}
+
+/** Отдельное сообщение без цены и контактов покупателя — можно переслать. */
+export function giftTicketText(signup: Pick<ClubSignup, "id"> & TicketDetails, session: ClubSession): string {
+  return [
+    `${signup.gift_recipient}, тебе подарили занятие в NIKA!`,
+    `${ticketLabel(signup.quantity ?? 1)} · ${session.title}`,
+    whenWhere(session),
+    `Сбор с ${session.gatherAt}. С собой — удобная одежда и носки.`,
+    "Покажи это сообщение на входе. Один билет — один участник от 18 лет.",
+    `Номер заказа: ${signup.id}`,
+  ].join("\n\n");
 }
 
 /** Места кончились: человек в листе ожидания следующего занятия клуба. */
@@ -165,10 +192,6 @@ async function moveToWaitlist(id: string): Promise<void> {
     .eq("id", id)
     .eq("payment_status", "pending");
   if (error) console.error("[club] moveToWaitlist:", error.message);
-}
-
-async function sessionSoldOut(session: ClubSession): Promise<boolean> {
-  return isSoldOut(await countPaidSeats(tgAdmin(), session), session);
 }
 
 async function findBy(column: "confirm_token" | "id", value: string): Promise<ClubSignup | null> {
@@ -201,22 +224,17 @@ async function findPendingByUsername(username: string): Promise<ClubSignup | nul
 }
 
 /**
- * Отмечает вход в бота. Неоплаченной заявке подтягивает текущую цену занятия:
- * цену могли поменять после заявки, и счёт должен совпасть с pre_checkout.
+ * Отмечает вход в бота. Количество, получатель и сумма заказа неизменны.
  */
 async function markOpened(
   signup: ClubSignup,
   chatId: number,
   actual: string | null,
-  priceRub: number,
 ): Promise<void> {
   const patch: Record<string, unknown> = { tg_chat_id: chatId, updated_at: new Date().toISOString() };
   if (!signup.confirmed_at) patch.confirmed_at = new Date().toISOString();
   if (actual) patch.tg_username = actual;
-  if (signup.payment_status === "pending" && signup.amount_rub !== priceRub) {
-    patch.amount_rub = priceRub;
-    signup.amount_rub = priceRub;
-  }
+  // Сумма заказа фиксируется при оформлении и не меняется у старого счёта.
   const { error } = await tgAdmin().from(TABLE).update(patch).eq("id", signup.id);
   if (error) console.error("[club] markOpened:", error.message);
 }
@@ -254,11 +272,11 @@ async function openSignup(ctx: BotContext, signup: ClubSignup, chatId: number): 
     signup,
     chatId,
     normalizeTelegramUsername(ctx.from?.username ?? null),
-    session.priceRub,
   );
 
   if (signup.payment_status === "paid") {
     await ctx.reply(paidText(signup, session), { reply_markup: sessionKeyboard(session) });
+    if (signup.is_gift) await ctx.reply(giftTicketText(signup, session), { reply_markup: sessionKeyboard(session) });
     return;
   }
   if (signup.event_date < moscowToday()) {
@@ -268,12 +286,22 @@ async function openSignup(ctx: BotContext, signup: ClubSignup, chatId: number): 
     return;
   }
   // Места кончились, пока заявка ждала оплаты, — счёт не выставляем.
-  if (signup.payment_status === "pending" && (await sessionSoldOut(session))) {
-    await moveToWaitlist(signup.id);
-    signup.payment_status = "waitlist";
+  if (signup.payment_status === "pending") {
+    const occupied = await countPaidSeats(tgAdmin(), session);
+    if (isSoldOut(occupied, session)) {
+      await moveToWaitlist(signup.id);
+      signup.payment_status = "waitlist";
+    } else if (!hasEnoughSeats(occupied, session, signup.quantity)) {
+      await ctx.reply("Для всего заказа мест уже не хватает. Оформи меньше билетов на странице занятия или напиши в поддержку.", { reply_markup: landingKeyboard() });
+      return;
+    }
   }
   if (signup.payment_status === "waitlist") {
     await ctx.reply(waitlistText(signup, session));
+    return;
+  }
+  if (signup.payment_status !== "pending") {
+    await ctx.reply("Заявка закрыта. Напиши в поддержку.", { reply_markup: sessionKeyboard(session) });
     return;
   }
 
@@ -293,7 +321,7 @@ async function openSignup(ctx: BotContext, signup: ClubSignup, chatId: number): 
       `${session.dateLabel}, ${session.time} · ${session.place}`.slice(0, 255),
       invoicePayload(signup.id),
       "RUB",
-      [{ label: "Занятие", amount: signup.amount_rub * 100 }],
+      [{ label: `${ticketLabel(signup.quantity)}${signup.is_gift ? " в подарок" : ""}`, amount: signup.amount_rub * 100 }],
       {
         provider_token: providerToken,
         provider_data: receiptProviderData(signup, session),
@@ -347,21 +375,30 @@ export async function handleClubPreCheckout(ctx: BotContext): Promise<void> {
   // Чужой счёт (не наш формат) — не держим человека, честно отказываем.
   const signup = id ? await findBy("id", id) : null;
   const session = signup ? sessionOfSignup(signup) : null;
-  // Счёт мог висеть в чате с тех пор, как были места: пересчитываем перед списанием.
-  const soldOut = signup?.payment_status === "pending" && session ? await sessionSoldOut(session) : false;
-  const refusal = checkoutRefusal(signup, q, moscowToday(), soldOut);
-  if (soldOut && signup) await moveToWaitlist(signup.id);
+  const refusal = checkoutRefusal(signup, q, moscowToday());
   if (refusal) {
     console.error(`[club] pre_checkout отказ (${q.invoice_payload}): ${refusal}`);
     await ctx.answerPreCheckoutQuery(false, { error_message: refusal });
+    return;
+  }
+  if (!signup || !session) {
+    await ctx.answerPreCheckoutQuery(false, { error_message: "Не нашла занятие. Напиши в поддержку." });
+    return;
+  }
+  const { data: reserved, error } = await tgAdmin().rpc("reserve_club_tickets", {
+    signup_id: signup.id, expected_amount: q.total_amount, session_capacity: session.capacity,
+  });
+  if (error || reserved !== true) {
+    if (error) console.error("[club] reserve tickets:", error.message);
+    await ctx.answerPreCheckoutQuery(false, { error_message: "Не удалось зарезервировать билеты: мест не хватает или этот заказ уже оплачивается. Деньги не списаны. Попробуй позже или напиши в поддержку." });
     return;
   }
   await ctx.answerPreCheckoutQuery(true);
 }
 
 /**
- * message.successful_payment: деньги списаны. Обновляем только из pending —
- * повтор апдейта и двойная оплата не перезапишут первую отметку.
+ * message.successful_payment: деньги списаны. Учитываем и waitlist: статус мог
+ * измениться, пока платёж шёл. Повтор не перезаписывает первую отметку.
  * Возвращает true, если платёж наш.
  */
 export async function handleClubPayment(ctx: BotContext): Promise<boolean> {
@@ -369,6 +406,7 @@ export async function handleClubPayment(ctx: BotContext): Promise<boolean> {
   if (!p) return false;
   const id = parseInvoicePayload(p.invoice_payload);
   if (!id) return false;
+  if (p.currency !== "RUB") return false;
 
   const { data, error } = await tgAdmin()
     .from(TABLE)
@@ -380,7 +418,8 @@ export async function handleClubPayment(ctx: BotContext): Promise<boolean> {
       updated_at: new Date().toISOString(),
     })
     .eq("id", id)
-    .eq("payment_status", "pending")
+    .eq("amount_rub", p.total_amount / 100)
+    .in("payment_status", ["pending", "waitlist"])
     .select(COLUMNS);
   if (error) {
     // Деньги уже у нас, а строка не обновилась — это надо разбирать руками.
@@ -396,10 +435,11 @@ export async function handleClubPayment(ctx: BotContext): Promise<boolean> {
     console.error(`[club] повторная оплата заявки ${id}: charge ${p.telegram_payment_charge_id}`);
   }
   const session = signup ? sessionOfSignup(signup) : null;
-  if (signup && session) {
+  if (signup && session && signup.payment_status === "paid") {
     await ctx.reply(paidText(signup, session), { reply_markup: sessionKeyboard(session) });
+    if (signup.is_gift) await ctx.reply(giftTicketText(signup, session), { reply_markup: sessionKeyboard(session) });
   } else {
-    await ctx.reply("Оплата прошла! Если что-то не так с записью — напиши в поддержку.", {
+    await ctx.reply("Платёж получен, но не удалось подтвердить билеты. Напиши в поддержку — проверим оплату и запись.", {
       reply_markup: new InlineKeyboard().url(SUPPORT_LABEL, SUPPORT_URL),
     });
   }

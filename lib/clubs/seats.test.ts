@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { countPaidSeats, isSoldOut, seatsLeftToShow } from "./seats";
+import { countPaidSeats, hasEnoughSeats, isSoldOut, seatsLeftToShow } from "./seats";
 import { SESSIONS } from "./sessions";
 
 describe("isSoldOut", () => {
@@ -17,7 +17,7 @@ describe("isSoldOut", () => {
 });
 
 /** База-заглушка: оплаченные строки с флагом counts_seat; hasColumn=false — до миграции 067. */
-function fakeDb(rows: Array<{ counts_seat: boolean }>, hasColumn = true): SupabaseClient {
+function fakeDb(rows: Array<{ counts_seat: boolean; quantity?: number }>, hasColumn = true): SupabaseClient {
   const query = () => {
     const filters: Record<string, unknown> = {};
     const q = {
@@ -30,8 +30,8 @@ function fakeDb(rows: Array<{ counts_seat: boolean }>, hasColumn = true): Supaba
         if ("counts_seat" in filters && !hasColumn) {
           return resolve({ count: null, error: { message: "column club_signups.counts_seat does not exist" } });
         }
-        const n = rows.filter((r) => !("counts_seat" in filters) || r.counts_seat === filters.counts_seat).length;
-        return resolve({ count: n, error: null });
+        const data = rows.filter((r) => !("counts_seat" in filters) || r.counts_seat === filters.counts_seat).map((r) => ({ quantity: r.quantity ?? 1 }));
+        return resolve({ data, error: null });
       },
     };
     return q;
@@ -48,6 +48,14 @@ describe("countPaidSeats", () => {
   });
   it("до миграции 067 считает все оплаченные, а не закрывает продажу", async () => {
     expect(await countPaidSeats(fakeDb(rows, false), session)).toBe(3);
+  });
+  it("суммирует билеты в заказах, исключая тестовые оплаты", async () => {
+    expect(await countPaidSeats(fakeDb([{ counts_seat: true, quantity: 3 }, { counts_seat: true, quantity: 2 }, { counts_seat: false, quantity: 5 }]), session)).toBe(5);
+  });
+  it("проверяет места для всей группы", () => {
+    expect(hasEnoughSeats(14, session, 2)).toBe(true);
+    expect(hasEnoughSeats(15, session, 2)).toBe(false);
+    expect(hasEnoughSeats(Infinity, session, 1)).toBe(false);
   });
 });
 
