@@ -39,8 +39,8 @@ function db() {
 
 /**
  * Состояние продажи для лендинга: GET /api/club-signup?club=stretch&date=…
- * → { price, soldOut, left }. left — остаток, только когда мест мало
- * (SHOW_SEATS_LEFT_AT), иначе null: раньше времени число наружу не уходит.
+ * → { price, soldOut, left, available }. available — лимит выбора билетов;
+ * left — остаток для промоблоков, только когда мест мало (SHOW_SEATS_LEFT_AT).
  * Без кеша: распродажа должна дойти до страницы сразу.
  */
 export async function GET(req: Request) {
@@ -55,8 +55,9 @@ export async function GET(req: Request) {
   if (!supabase) return NextResponse.json({ error: "Server misconfigured" }, { status: 500, headers });
 
   const paid = await countPaidSeats(supabase, session);
+  if (!Number.isFinite(paid)) return NextResponse.json({ error: "Availability unavailable" }, { status: 503, headers });
   return NextResponse.json(
-    { price: session.priceRub, soldOut: isSoldOut(paid, session), left: seatsLeftToShow(paid, session) },
+    { price: session.priceRub, soldOut: isSoldOut(paid, session), left: seatsLeftToShow(paid, session), available: Math.max(0, session.capacity - paid) },
     { headers },
   );
 }
@@ -164,6 +165,7 @@ export async function POST(req: Request) {
   // Выставленный или оплаченный счёт нельзя переписать повторной формой.
   if (existing) return responseFor(existing);
   const occupied = await countPaidSeats(supabase, session);
+  if (!Number.isFinite(occupied)) return NextResponse.json({ error: "Availability unavailable" }, { status: 503 });
   const waitlist = isSoldOut(occupied, session);
   if (!waitlist && !hasEnoughSeats(occupied, session, ticketCount)) {
     return NextResponse.json({ error: "Not enough seats", available: Math.max(0, session.capacity - occupied) }, { status: 409 });

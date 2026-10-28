@@ -7,12 +7,13 @@ let existing: Array<Record<string, unknown>> = [];
 const filters: Array<[string, unknown]> = [];
 // Сколько ковриков уже оплачено (ответ на select count head).
 let paidSeats = 0;
+let seatReadError = false;
 vi.mock("@supabase/supabase-js", () => {
   const chain = () => {
     const q = {
       eq: (column: string, value: unknown) => { filters.push([column, value]); return q; },
       limit: async () => ({ data: existing, error: null }),
-      then: (resolve: (v: unknown) => unknown) => resolve({ data: [{ quantity: paidSeats }], error: null }),
+      then: (resolve: (v: unknown) => unknown) => resolve({ data: seatReadError ? null : [{ quantity: paidSeats }], error: seatReadError ? { message: "Database unavailable" } : null }),
     };
     return q;
   };
@@ -70,6 +71,7 @@ describe("POST /api/club-signup", () => {
     existing = [];
     filters.length = 0;
     paidSeats = 0;
+    seatReadError = false;
   });
   afterEach(() => {
     vi.useRealTimers();
@@ -129,9 +131,27 @@ describe("POST /api/club-signup", () => {
       paidSeats = seats;
       return GET(new Request("http://x/api/club-signup?club=stretch&date=2026-11-01")).then((r) => r.json());
     };
-    expect(await get(3)).toEqual({ price: 1000, soldOut: false, left: null });
-    expect(await get(12)).toEqual({ price: 1000, soldOut: false, left: 4 });
-    expect(await get(16)).toEqual({ price: 1000, soldOut: true, left: null });
+    expect(await get(3)).toEqual({ price: 1000, soldOut: false, left: null, available: 13 });
+    expect(await get(11)).toEqual({ price: 1000, soldOut: false, left: 5, available: 5 });
+    expect(await get(12)).toEqual({ price: 1000, soldOut: false, left: 4, available: 4 });
+    expect(await get(16)).toEqual({ price: 1000, soldOut: true, left: null, available: 0 });
+  });
+
+  it("при остатке 5 принимает 5 билетов и отклоняет 6", async () => {
+    paidSeats = 11;
+    expect((await post({ quantity: 5 })).status).toBe(200);
+    const res = await post({ quantity: 6 });
+    expect(res.status).toBe(409);
+    expect(await res.json()).toMatchObject({ available: 5 });
+    expect(inserted).toHaveLength(1);
+  });
+
+  it("при ошибке подсчёта не сообщает ложную распродажу и не создаёт заказ", async () => {
+    seatReadError = true;
+    const res = await GET(new Request("http://x/api/club-signup?club=stretch&date=2026-11-01"));
+    expect(res.status).toBe(503);
+    expect((await post()).status).toBe(503);
+    expect(inserted).toHaveLength(0);
   });
 
   it("без согласия и с кривыми полями отвечает 422 со списком полей", async () => {

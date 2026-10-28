@@ -8,7 +8,7 @@ const controller = html.slice(html.indexOf("function renderOrder(){"), html.inde
 function setup() {
   const elements = new Map([...html.matchAll(/\bid="([^"]+)"/g)].map((match) => [match[1], {
     value: match[1] === "i-quantity" ? "1" : "",
-    disabled: false, hidden: false, textContent: "",
+    disabled: false, hidden: false, textContent: "", max: "16",
     attributes: {} as Record<string, string>,
     events: {} as Record<string, () => void>,
     classList: { toggle: vi.fn() },
@@ -18,12 +18,16 @@ function setup() {
   const state = {
     document: { getElementById: (id: string) => elements.get(id) },
     PRICE: 1000, QUANTITY: 1, IS_GIFT: false, OUT: false, ORDER_TOKEN: "previous-order",
+    MAX_TICKETS: 16 as number | null, SUBMITTING: false, AVAILABILITY_FAILED: false,
+    renderSeats: vi.fn(),
     plural: (_n: number, _one: string, few: string) => few,
   };
   runInNewContext(controller + "\nrenderOrder();", state);
   const input = elements.get("i-quantity")!;
   const enter = (value: string) => { input.value = value; input.events.input(); };
-  return { state, input, enter, minus: elements.get("quantity-minus")!, plus: elements.get("quantity-plus")!, elements };
+  const availability = (available: number) => runInNewContext(`applyAvailability({available:${available}});renderOrder();`, state);
+  const validate = () => runInNewContext("validateQuantity()", state);
+  return { state, input, enter, availability, validate, minus: elements.get("quantity-minus")!, plus: elements.get("quantity-plus")!, elements };
 }
 
 describe("количество билетов на /stretch", () => {
@@ -77,11 +81,82 @@ describe("количество билетов на /stretch", () => {
 
   it("блокирует обе кнопки на время отправки формы", () => {
     const ui = setup();
-    ui.input.disabled = true;
+    ui.state.SUBMITTING = true;
     ui.enter("4");
     expect(ui.minus.disabled).toBe(true);
     expect(ui.plus.disabled).toBe(true);
     ui.plus.events.click();
     expect(ui.state.QUANTITY).toBe(4);
+  });
+
+  it("при остатке 5 разрешает купить 5, но не 6 билетов", () => {
+    const ui = setup();
+    ui.availability(5);
+    expect(ui.input.max).toBe("5");
+    ui.enter("5");
+    expect(ui.validate()).toBe(true);
+    expect(ui.plus.disabled).toBe(true);
+    ui.plus.events.click();
+    expect(ui.input.value).toBe("5");
+    ui.enter("6");
+    expect(ui.validate()).toBe(false);
+    expect(ui.elements.get("quantity-error")!.textContent).toContain("от 1 до 5");
+    expect(ui.elements.get("order-total")!.textContent).toBe("—");
+    ui.minus.events.click();
+    expect(ui.input.value).toBe("5");
+    expect(ui.validate()).toBe(true);
+  });
+
+  it("ограничивает максимум и при остатке больше 5", () => {
+    const ui = setup();
+    ui.availability(9);
+    ui.enter("10");
+    expect(ui.input.max).toBe("9");
+    expect(ui.validate()).toBe(false);
+  });
+
+  it("обновление остатка делает прежний выбор недопустимым", () => {
+    const ui = setup();
+    ui.enter("5");
+    ui.availability(3);
+    expect(ui.input.value).toBe("5");
+    expect(ui.input.attributes["aria-invalid"]).toBe("true");
+    expect(ui.validate()).toBe(false);
+    ui.enter("3");
+    expect(ui.validate()).toBe(true);
+    expect(ui.plus.disabled).toBe(true);
+  });
+
+  it("последний билет блокирует обе кнопки", () => {
+    const ui = setup();
+    ui.availability(1);
+    expect(ui.minus.disabled).toBe(true);
+    expect(ui.plus.disabled).toBe(true);
+    ui.enter("2");
+    expect(ui.validate()).toBe(false);
+  });
+
+  it("при нулевом остатке скрывает покупку и оставляет лист ожидания", () => {
+    const ui = setup();
+    ui.availability(0);
+    expect(ui.elements.get("f-quantity")!.hidden).toBe(true);
+    expect(ui.input.disabled).toBe(true);
+    expect(ui.elements.get("submit")!.textContent).toBe("Встать в лист ожидания");
+    expect(ui.elements.get("order-total")!.textContent).toBe("—");
+    ui.availability(4);
+    expect(ui.elements.get("f-quantity")!.hidden).toBe(false);
+    expect(ui.input.disabled).toBe(false);
+    expect(ui.input.max).toBe("4");
+  });
+
+  it("без данных об остатке не разрешает покупку", () => {
+    const ui = setup();
+    ui.state.MAX_TICKETS = null;
+    ui.enter("1");
+    expect(ui.validate()).toBe(false);
+    expect(ui.input.disabled).toBe(true);
+    expect(ui.elements.get("submit")!.disabled).toBe(true);
+    ui.availability(5);
+    expect(ui.elements.get("submit")!.disabled).toBe(false);
   });
 });

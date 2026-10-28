@@ -957,7 +957,7 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
               <input class="in" id="i-quantity" name="quantity" type="number" min="1" max="16" step="1" value="1" inputmode="numeric" required aria-describedby="quantity-note quantity-error" aria-invalid="false">
               <button type="button" class="quantity-step" id="quantity-plus" aria-label="Увеличить количество билетов" aria-controls="i-quantity">+</button>
             </div><div class="msg" id="quantity-error" aria-live="polite">Укажи целое число билетов от 1 до 16</div></div>
-          <p class="order-note" id="quantity-note">Один билет — один участник. Все билеты придут тебе в Telegram.</p>
+          <p class="order-note" id="quantity-note"><span id="quantity-availability" aria-live="polite">Проверяем доступные места…</span><br>Один билет — один участник. Все билеты придут тебе в Telegram.</p>
           <div class="field"><span class="fl" id="l-purchase">Для кого билеты</span><div class="opts opts--2" role="radiogroup" aria-labelledby="l-purchase">
             <label class="opt on"><input type="radio" name="purchase" value="self" checked>Для себя и друзей</label>
             <label class="opt"><input type="radio" name="purchase" value="gift">В подарок</label>
@@ -1041,9 +1041,9 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
    lib/clubs/sessions.ts, date здесь держим равной дате занятия там. Оплата — счет ЮKassa в боте. */
 var EVENT={club:'stretch',format:'pilates',spot:'klimashkina',date:'2026-11-01',time:'10:30',source:'stretch',edition:1,
   url:'https://www.mynika.online/stretch'};
-/* Одна цена для всех мест: 1000 ₽. Остаток мест на странице не показываем, только «ограничено».
-   OUT = все места выкуплены: приходит с сервера (GET /api/club-signup), тогда форма ставит в лист ожидания. */
-var PRICE=1000,OUT=false,QUANTITY=1,IS_GIFT=false,ORDER_TOKEN=null;
+/* Цена и максимум билетов обновляются с сервера (GET /api/club-signup).
+   OUT = все места выкуплены: форма ставит в лист ожидания. */
+var PRICE=1000,OUT=false,QUANTITY=1,IS_GIFT=false,ORDER_TOKEN=null,MAX_TICKETS=null,SUBMITTING=false,AVAILABILITY_VERSION=0,AVAILABILITY_FAILED=false;
 /* LEFT — остаток ковриков. Сервер отдает его, только когда мест мало (≤5), иначе null и на странице «ограничено». */
 var LEFT=null;
 /* Прототип: форма показывает шаги без отправки. Превью «мест нет»: ?full или #full */
@@ -1069,70 +1069,96 @@ function renderSeats(){
     document.querySelector('[data-tix-r]').innerHTML='все коврики выкуплены,<br>бот позовет на следующее занятие';
     document.getElementById('submit').textContent='Встать в лист ожидания';
     document.querySelector('.float-cta').firstChild.textContent='Лист ожидания';
-  }else if(LEFT){
-    var t=matsLeft(LEFT);
+  }else{
+    var t=LEFT?matsLeft(LEFT):'Количество мест ограничено';
     $$('[data-limit]').forEach(function(el){el.textContent=t});
+    $$('[data-cta]').forEach(function(a){a.textContent='Занять коврик'});
     document.getElementById('regLimit').innerHTML='<b>'+t+'</b>: коврик закрепляется после оплаты';
-    document.querySelector('[data-tix-r]').innerHTML=t.toLowerCase().replace(' ','<br>');
+    document.querySelector('[data-tix-k]').textContent='Итого за билеты';
+    document.querySelector('[data-tix-r]').textContent=t;
+    document.querySelector('.float-cta').firstChild.textContent='Занять коврик';
   }
   renderOrder();
 }
 function renderOrder(){
   var validQuantity=readQuantity();
-  document.getElementById('order-total').textContent=validQuantity===null?'—':(PRICE*validQuantity).toLocaleString('ru-RU');
-  document.getElementById('order-calculation').textContent=validQuantity===null?'Укажи от 1 до 16 билетов':validQuantity+' '+plural(validQuantity,'билет','билета','билетов')+' × '+PRICE+' ₽';
+  document.getElementById('order-total').textContent=OUT||validQuantity===null?'—':(PRICE*validQuantity).toLocaleString('ru-RU');
+  document.getElementById('order-calculation').textContent=OUT?'Билетов на это занятие нет':validQuantity===null?quantityErrorText():validQuantity+' '+plural(validQuantity,'билет','билета','билетов')+' × '+PRICE+' ₽';
   renderQuantityButtons();
   document.getElementById('gift-fields').hidden=!IS_GIFT;
   document.getElementById('participant-fields').hidden=IS_GIFT;
   document.getElementById('group-note').hidden=QUANTITY===1;
-  document.getElementById('submit').textContent=OUT?'Встать в лист ожидания':IS_GIFT?'Оформить подарок':QUANTITY>1?'Купить билеты':'Купить билет';
+  document.getElementById('submit').disabled=SUBMITTING||MAX_TICKETS===null;
+  document.getElementById('submit').textContent=SUBMITTING?'Отправляем…':OUT?'Встать в лист ожидания':IS_GIFT?'Оформить подарок':QUANTITY>1?'Купить билеты':'Купить билет';
 }
 /* ===== количество билетов ===== */
 var quantityInput=document.getElementById('i-quantity'),quantityMinus=document.getElementById('quantity-minus'),quantityPlus=document.getElementById('quantity-plus');
 function readQuantity(){
+  if(OUT)return 1; // Лист ожидания не покупает билеты; выбор количества скрыт.
   var value=Number(quantityInput.value);
-  return Number.isInteger(value)&&value>=1&&value<=16?value:null;
+  return MAX_TICKETS!==null&&Number.isInteger(value)&&value>=1&&value<=Math.min(16,MAX_TICKETS)?value:null;
+}
+function quantityErrorText(){
+  return MAX_TICKETS===null?(AVAILABILITY_FAILED?'Не удалось проверить места. Обнови страницу или попробуй позже.':'Проверяем доступные места…'):MAX_TICKETS===1?'Остался только 1 билет': 'Укажи целое число билетов от 1 до '+Math.min(16,MAX_TICKETS);
 }
 function renderQuantityButtons(){
-  var value=readQuantity();
-  quantityMinus.disabled=quantityInput.disabled||value===1;
-  quantityPlus.disabled=quantityInput.disabled||value===16;
+  var value=Number(quantityInput.value),unavailable=SUBMITTING||MAX_TICKETS===null||OUT;
+  quantityInput.disabled=unavailable;
+  quantityInput.max=String(Math.max(1,MAX_TICKETS===null?16:Math.min(16,MAX_TICKETS)));
+  document.getElementById('f-quantity').hidden=OUT;
+  quantityMinus.disabled=unavailable||value<=1;
+  quantityPlus.disabled=unavailable||value>=MAX_TICKETS;
 }
 function validateQuantity(){
   var value=readQuantity(),valid=value!==null;
   document.getElementById('f-quantity').classList.toggle('err',!valid);
   quantityInput.setAttribute('aria-invalid',String(!valid));
-  document.getElementById('quantity-error').textContent='Укажи целое число билетов от 1 до 16';
+  document.getElementById('quantity-error').textContent=quantityErrorText();
   if(valid)QUANTITY=value;
   return valid;
 }
 function changeQuantity(){ORDER_TOKEN=null;validateQuantity();renderOrder()}
 function stepQuantity(step){
   if(quantityInput.disabled)return;
-  var value=readQuantity();
-  quantityInput.value=String(Math.max(1,Math.min(16,(value===null?QUANTITY:value)+step)));
+  var value=Number(quantityInput.value);
+  quantityInput.value=String(Math.max(1,Math.min(16,MAX_TICKETS,(Number.isInteger(value)?value:QUANTITY)+step)));
   changeQuantity();
 }
 quantityInput.addEventListener('input',changeQuantity);
 quantityInput.addEventListener('change',changeQuantity);
 quantityMinus.addEventListener('click',function(){stepQuantity(-1)});
 quantityPlus.addEventListener('click',function(){stepQuantity(1)});
+function applyAvailability(data){
+  if(!data||!Number.isInteger(data.available)||data.available<0)throw new Error('Invalid availability');
+  AVAILABILITY_FAILED=false;MAX_TICKETS=Math.min(16,data.available);OUT=MAX_TICKETS===0;
+  LEFT=MAX_TICKETS>0&&MAX_TICKETS<=5?MAX_TICKETS:null;
+  if(typeof data.price==='number'&&data.price>0)PRICE=data.price;
+  document.getElementById('quantity-availability').textContent=OUT?'Все билеты выкуплены. Можно записаться в лист ожидания.':'Сейчас можно купить до '+MAX_TICKETS+' '+plural(MAX_TICKETS,'билета','билетов','билетов')+'.';
+  validateQuantity();renderSeats();
+}
 /* ===== режим покупки ===== */
 $$('input[name="purchase"]').forEach(function(input){input.addEventListener('change',function(){IS_GIFT=this.value==='gift';renderOrder()})});
 renderSeats();
-/* Распродано ли занятие — спрашиваем сервер. Не ответил — страница остается в обычном режиме,
-   а сервер все равно поставит в лист ожидания при заявке. */
+/* Обновляем максимум при открытии, возвращении на вкладку и каждые 30 секунд.
+   Сервер повторно проверит места при заявке, а бот зарезервирует их перед оплатой. */
+function refreshAvailability(){
+  if(SUBMITTING)return;
+  var version=++AVAILABILITY_VERSION;
+  return fetch('/api/club-signup?club='+EVENT.club+'&date='+EVENT.date,{cache:'no-store'})
+    .then(function(r){if(!r.ok)throw new Error('Availability unavailable');return r.json()})
+    .then(function(j){if(version===AVAILABILITY_VERSION&&!SUBMITTING)applyAvailability(j)})
+    .catch(function(){
+      if(version!==AVAILABILITY_VERSION||SUBMITTING)return;
+      AVAILABILITY_FAILED=true;MAX_TICKETS=null;OUT=false;LEFT=null;
+      document.getElementById('quantity-availability').textContent=quantityErrorText();renderSeats();
+    });
+}
 if(!PROTOTYPE&&window.fetch){
-  fetch('/api/club-signup?club='+EVENT.club+'&date='+EVENT.date,{cache:'no-store'})
-    .then(function(r){return r.ok?r.json():null})
-    .then(function(j){
-      if(!j)return;
-      if(typeof j.price==='number'&&j.price>0)PRICE=j.price;
-      if(j.soldOut)OUT=true;
-      else if(typeof j.left==='number'&&j.left>0)LEFT=j.left;
-      renderSeats();
-    })
-    .catch(function(){});
+  refreshAvailability();
+  window.addEventListener('focus',refreshAvailability);
+  setInterval(function(){if(!document.hidden)refreshAvailability()},30000);
+}else if(PROTOTYPE){
+  applyAvailability({available:OUT?0:16});
 }
 
 /* ===== тост ===== */
@@ -1216,7 +1242,7 @@ form.addEventListener('submit',function(e){
   var btn=document.getElementById('submit');
   if(btn.disabled)return;
   if(!ORDER_TOKEN){var bytes=crypto.getRandomValues(new Uint8Array(16));ORDER_TOKEN=Array.from(bytes,function(b){return b.toString(16).padStart(2,'0')}).join('')}
-  btn.disabled=true;btn.textContent='Отправляем…';
+  SUBMITTING=true;++AVAILABILITY_VERSION;btn.disabled=true;btn.textContent='Отправляем…';
   form.querySelectorAll('input,select,.quantity-step').forEach(function(input){input.disabled=true});
   fetch('/api/club-signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     name:document.getElementById('i-name').value.trim(),telegram:document.getElementById('i-tg').value.trim(),
@@ -1225,7 +1251,7 @@ form.addEventListener('submit',function(e){
     club:EVENT.club,event_date:EVENT.date,source:EVENT.source})})
     .then(function(r){return r.json().then(function(j){if(!r.ok)throw j;return j})})
     .then(function(j){
-      if(j.waitlist&&!OUT){OUT=true;renderSeats()}
+      if(j.waitlist&&!OUT)applyAvailability({available:0});
       showDone(j.confirmUrl,j);
     })
     .catch(function(err){
@@ -1235,13 +1261,14 @@ form.addEventListener('submit',function(e){
       if(f&&f.indexOf('gift_recipient')>=0){document.getElementById('f-recipient').classList.add('err')}
       if(f&&f.indexOf('quantity')>=0){document.getElementById('f-quantity').classList.add('err');quantityInput.setAttribute('aria-invalid','true')}
       if(err&&err.error==='Not enough seats'){
+        applyAvailability({available:err.available});
         var field=document.getElementById('f-quantity');field.classList.add('err');
         field.querySelector('.msg').textContent='Осталось '+seats(err.available)+'. Выбери меньше билетов.';
         quantityInput.setAttribute('aria-invalid','true');field.scrollIntoView({behavior:'smooth',block:'center'});return;
       }
       say('Не получилось отправить заявку. Проверь поля и попробуй еще раз');
     })
-    .then(function(){btn.disabled=false;form.querySelectorAll('input,select,.quantity-step').forEach(function(input){input.disabled=false});renderOrder()});
+    .then(function(){SUBMITTING=false;btn.disabled=false;form.querySelectorAll('input,select,.quantity-step').forEach(function(input){input.disabled=false});renderOrder()});
 });
 form.querySelectorAll('input').forEach(function(i){if(i===quantityInput)return;var f=function(){var w=i.closest('.field');if(w)w.classList.remove('err')};i.addEventListener('input',f);i.addEventListener('change',f)});
 
