@@ -487,6 +487,13 @@ html.js .f-fig.on svg *{--draw:0}
 .field .in::placeholder{color:#8F877E;font-size:14px}
 .field .in:focus{outline:none;border-color:var(--accent);background:#fff;box-shadow:0 0 0 3px rgba(200,85,61,.14)}
 .field.err .in{background:var(--err-bg);border-color:var(--err-line)}
+.quantity-control{display:grid;grid-template-columns:56px minmax(0,1fr) 56px;gap:8px}
+.quantity-control .in{text-align:center;font-variant-numeric:tabular-nums;appearance:textfield;-moz-appearance:textfield}
+.quantity-control .in::-webkit-inner-spin-button,.quantity-control .in::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.quantity-step{height:56px;border:1px solid var(--line-2);border-radius:16px;background:#F7F7F5;color:var(--ink);font:inherit;font-size:26px;cursor:pointer;transition:background .18s,border-color .18s}
+.quantity-step:hover:not(:disabled){background:#FBEDE8;border-color:var(--accent)}
+.quantity-step:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.quantity-step:disabled{opacity:.35;cursor:default}
 .field .msg{display:none;font-size:12px;color:var(--err);margin-top:8px}
 .field.err .msg{display:block}
 .opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -944,7 +951,12 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
             <div aria-live="polite"><div class="tix-k" data-tix-k>Итого за билеты</div><div class="tix-p"><span id="order-total">1000</span><span class="rub">₽</span></div><div class="order-total" id="order-calculation">1 билет × 1000 ₽</div></div>
             <div class="tix-r" data-tix-r>Количество мест<br>ограничено</div>
           </div>
-          <div class="field" id="f-quantity"><label for="i-quantity">Количество билетов</label><select class="in" id="i-quantity" aria-describedby="quantity-note"></select><div class="msg">Выбери количество билетов</div></div>
+          <div class="field" id="f-quantity"><label for="i-quantity">Количество билетов</label>
+            <div class="quantity-control">
+              <button type="button" class="quantity-step" id="quantity-minus" aria-label="Уменьшить количество билетов" aria-controls="i-quantity" disabled>−</button>
+              <input class="in" id="i-quantity" name="quantity" type="number" min="1" max="16" step="1" value="1" inputmode="numeric" required aria-describedby="quantity-note quantity-error" aria-invalid="false">
+              <button type="button" class="quantity-step" id="quantity-plus" aria-label="Увеличить количество билетов" aria-controls="i-quantity">+</button>
+            </div><div class="msg" id="quantity-error" aria-live="polite">Укажи целое число билетов от 1 до 16</div></div>
           <p class="order-note" id="quantity-note">Один билет — один участник. Все билеты придут тебе в Telegram.</p>
           <div class="field"><span class="fl" id="l-purchase">Для кого билеты</span><div class="opts opts--2" role="radiogroup" aria-labelledby="l-purchase">
             <label class="opt on"><input type="radio" name="purchase" value="self" checked>Для себя и друзей</label>
@@ -1066,16 +1078,46 @@ function renderSeats(){
   renderOrder();
 }
 function renderOrder(){
-  document.getElementById('order-total').textContent=(PRICE*QUANTITY).toLocaleString('ru-RU');
-  document.getElementById('order-calculation').textContent=QUANTITY+' '+plural(QUANTITY,'билет','билета','билетов')+' × '+PRICE+' ₽';
+  var validQuantity=readQuantity();
+  document.getElementById('order-total').textContent=validQuantity===null?'—':(PRICE*validQuantity).toLocaleString('ru-RU');
+  document.getElementById('order-calculation').textContent=validQuantity===null?'Укажи от 1 до 16 билетов':validQuantity+' '+plural(validQuantity,'билет','билета','билетов')+' × '+PRICE+' ₽';
+  renderQuantityButtons();
   document.getElementById('gift-fields').hidden=!IS_GIFT;
   document.getElementById('participant-fields').hidden=IS_GIFT;
   document.getElementById('group-note').hidden=QUANTITY===1;
   document.getElementById('submit').textContent=OUT?'Встать в лист ожидания':IS_GIFT?'Оформить подарок':QUANTITY>1?'Купить билеты':'Купить билет';
 }
-var quantitySelect=document.getElementById('i-quantity');
-for(var count=1;count<=16;count++){var option=document.createElement('option');option.value=count;option.textContent=count+' '+plural(count,'билет','билета','билетов');quantitySelect.appendChild(option)}
-quantitySelect.addEventListener('change',function(){QUANTITY=Number(this.value);ORDER_TOKEN=null;document.getElementById('f-quantity').classList.remove('err');renderOrder()});
+/* ===== количество билетов ===== */
+var quantityInput=document.getElementById('i-quantity'),quantityMinus=document.getElementById('quantity-minus'),quantityPlus=document.getElementById('quantity-plus');
+function readQuantity(){
+  var value=Number(quantityInput.value);
+  return Number.isInteger(value)&&value>=1&&value<=16?value:null;
+}
+function renderQuantityButtons(){
+  var value=readQuantity();
+  quantityMinus.disabled=quantityInput.disabled||value===1;
+  quantityPlus.disabled=quantityInput.disabled||value===16;
+}
+function validateQuantity(){
+  var value=readQuantity(),valid=value!==null;
+  document.getElementById('f-quantity').classList.toggle('err',!valid);
+  quantityInput.setAttribute('aria-invalid',String(!valid));
+  document.getElementById('quantity-error').textContent='Укажи целое число билетов от 1 до 16';
+  if(valid)QUANTITY=value;
+  return valid;
+}
+function changeQuantity(){ORDER_TOKEN=null;validateQuantity();renderOrder()}
+function stepQuantity(step){
+  if(quantityInput.disabled)return;
+  var value=readQuantity();
+  quantityInput.value=String(Math.max(1,Math.min(16,(value===null?QUANTITY:value)+step)));
+  changeQuantity();
+}
+quantityInput.addEventListener('input',changeQuantity);
+quantityInput.addEventListener('change',changeQuantity);
+quantityMinus.addEventListener('click',function(){stepQuantity(-1)});
+quantityPlus.addEventListener('click',function(){stepQuantity(1)});
+/* ===== режим покупки ===== */
 $$('input[name="purchase"]').forEach(function(input){input.addEventListener('change',function(){IS_GIFT=this.value==='gift';renderOrder()})});
 renderSeats();
 /* Распродано ли занятие — спрашиваем сервер. Не ответил — страница остается в обычном режиме,
@@ -1145,11 +1187,14 @@ function showDone(confirmUrl,order){
   form.hidden=true;done.hidden=false;
   done.scrollIntoView({behavior:'smooth',block:'center'});
 }
-document.getElementById('another-order').addEventListener('click',function(){ORDER_TOKEN=null;done.hidden=true;form.hidden=false;renderOrder();quantitySelect.focus()});
+document.getElementById('another-order').addEventListener('click',function(){ORDER_TOKEN=null;done.hidden=true;form.hidden=false;renderOrder();quantityInput.focus()});
 form.addEventListener('input',function(){ORDER_TOKEN=null});
 form.addEventListener('change',function(){ORDER_TOKEN=null});
 form.addEventListener('submit',function(e){
   e.preventDefault();
+  if(!validateQuantity()){
+    renderOrder();quantityInput.scrollIntoView({behavior:'smooth',block:'center'});quantityInput.focus();return;
+  }
   var a=F('f-name',function(v){return v.length>=2});
   var b=F('f-tg',function(v){return tgNick(v)!==null});
   var c=F('f-mail',function(v){return /^[^\s@]+@[^\s@]+\.[a-zа-я]{2,}$/i.test(v)});
@@ -1172,7 +1217,7 @@ form.addEventListener('submit',function(e){
   if(btn.disabled)return;
   if(!ORDER_TOKEN){var bytes=crypto.getRandomValues(new Uint8Array(16));ORDER_TOKEN=Array.from(bytes,function(b){return b.toString(16).padStart(2,'0')}).join('')}
   btn.disabled=true;btn.textContent='Отправляем…';
-  form.querySelectorAll('input,select').forEach(function(input){input.disabled=true});
+  form.querySelectorAll('input,select,.quantity-step').forEach(function(input){input.disabled=true});
   fetch('/api/club-signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     name:document.getElementById('i-name').value.trim(),telegram:document.getElementById('i-tg').value.trim(),
     email:document.getElementById('i-mail').value.trim(),level:lv,mat:mt,towel:tw,water:wt,consent:true,
@@ -1188,16 +1233,17 @@ form.addEventListener('submit',function(e){
       if(f&&f.indexOf('telegram')>=0){document.getElementById('f-tg').classList.add('err')}
       if(f&&f.indexOf('email')>=0){document.getElementById('f-mail').classList.add('err')}
       if(f&&f.indexOf('gift_recipient')>=0){document.getElementById('f-recipient').classList.add('err')}
+      if(f&&f.indexOf('quantity')>=0){document.getElementById('f-quantity').classList.add('err');quantityInput.setAttribute('aria-invalid','true')}
       if(err&&err.error==='Not enough seats'){
         var field=document.getElementById('f-quantity');field.classList.add('err');
         field.querySelector('.msg').textContent='Осталось '+seats(err.available)+'. Выбери меньше билетов.';
-        field.scrollIntoView({behavior:'smooth',block:'center'});quantitySelect.focus();return;
+        quantityInput.setAttribute('aria-invalid','true');field.scrollIntoView({behavior:'smooth',block:'center'});return;
       }
       say('Не получилось отправить заявку. Проверь поля и попробуй еще раз');
     })
-    .then(function(){btn.disabled=false;form.querySelectorAll('input,select').forEach(function(input){input.disabled=false});renderOrder()});
+    .then(function(){btn.disabled=false;form.querySelectorAll('input,select,.quantity-step').forEach(function(input){input.disabled=false});renderOrder()});
 });
-form.querySelectorAll('input').forEach(function(i){var f=function(){var w=i.closest('.field');if(w)w.classList.remove('err')};i.addEventListener('input',f);i.addEventListener('change',f)});
+form.querySelectorAll('input').forEach(function(i){if(i===quantityInput)return;var f=function(){var w=i.closest('.field');if(w)w.classList.remove('err')};i.addEventListener('input',f);i.addEventListener('change',f)});
 
 /* ===== движение ===== */
 (function(){
