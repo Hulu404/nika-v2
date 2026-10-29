@@ -693,6 +693,9 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
   .hs-strip .pr img,.hs-strip .pr--v img{width:100%}
   .hs-strip .pr figcaption{font-size:16px}
 }
+/* Ссылка на поддержку под оплатой — видна и в форме, и после заявки. */
+.support-note{margin:16px 0 0;text-align:center}
+.support-note a{color:var(--accent-text);text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
 </style>
 </head>
 <body>
@@ -1016,6 +1019,7 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
           <p class="fine" id="doneFine">Количество мест ограничено, коврик закрепляется после оплаты.</p>
           <button class="btn btn--line" id="another-order" type="button">Докупить билеты</button>
         </div>
+        <p class="fine support-note">Что-то пошло не так с оплатой? <a href="https://t.me/meine_nika" target="_blank" rel="noopener">Напиши в поддержку</a></p>
       </div>
     </div>
   </div>
