@@ -936,7 +936,7 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
     <div class="reg-grid">
       <div class="reg-l r">
         <h2 class="d2">Занимаемся <span class="brand-accent">вместе</span></h2>
-        <p class="lead">Приходи самостоятельно, с компанией или подари занятие близкому человеку. Выбери билеты и оплати их в нашем Telegram-боте.</p>
+        <p class="lead">Приходи самостоятельно, с компанией или подари занятие близкому человеку. Выбери билеты и оплати их картой сразу после заявки.</p>
         <ul>
           <li><span class="li-t"><b>1 ноября, 10:30</b>, сбор с 10:10</span></li>
           <li><span class="li-t"><b>ул. Климашкина, 20</b>, м. Улица 1905 года</span></li>
@@ -973,7 +973,7 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
             <div class="field" id="f-recipient"><label for="i-recipient">Кому даришь</label><input class="in" id="i-recipient" type="text" maxlength="200" placeholder="Имя получателя" autocomplete="off"><div class="msg">Укажи имя получателя</div></div>
             <p class="order-note">После оплаты бот пришлёт тебе подарочный билет без цены — перешли его получателю в удобный момент. Если билетов несколько, получатель сможет прийти с компанией.</p>
           </div>
-          <p class="order-note" id="buyer-note">Контакты покупателя — сюда придут счёт и подтверждение.</p>
+          <p class="order-note" id="buyer-note">Контакты покупателя — на почту придёт чек, в Telegram — подтверждение.</p>
           <div class="field" id="f-name"><label for="i-name">Имя</label><input class="in" id="i-name" type="text" placeholder="Как к тебе обращаться" autocomplete="name"><div class="msg">Укажи имя</div></div>
           <div class="field" id="f-tg"><label for="i-tg">Telegram</label><input class="in" id="i-tg" type="text" inputmode="text" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="@nickname" autocomplete="off"><div class="msg">Нужен ник в Telegram латиницей, например @nickname</div></div>
           <div class="field" id="f-mail"><label for="i-mail">E-mail</label><input class="in" id="i-mail" type="email" inputmode="email" placeholder="you@mail.ru" autocomplete="email"><div class="msg">Проверь адрес почты</div></div>
@@ -1006,7 +1006,7 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
             <div class="msg">Отметь согласие, чтобы мы могли тебя записать</div>
           </div>
           <button type="submit" class="btn btn--ink" id="submit">Купить билет</button>
-          <p class="fine">Оплата в Telegram-боте NIKA. Пишем только по делу занятия. Занятие для участников от 18 лет.</p>
+          <p class="fine">После заявки откроется оплата ЮKassa. Места держим 20 минут. Пишем только по делу занятия. Занятие для участников от 18 лет.</p>
         </form>
         <div class="done" id="done" hidden>
           <div class="tick"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5" stroke="#AF4631" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
@@ -1243,6 +1243,9 @@ document.getElementById('another-order').addEventListener('click',startAdditiona
 document.getElementById('buy-more').addEventListener('click',startAdditionalOrder);
 if(new URLSearchParams(location.search).get('purchase')==='more')startAdditionalOrder();
 /* ===== отправка заказа ===== */
+var REDIRECTING=false;
+/* Назад из ЮKassa кнопкой браузера: страница из bfcache — снова можно отправить форму. */
+window.addEventListener('pageshow',function(e){if(e.persisted&&REDIRECTING){REDIRECTING=false;SUBMITTING=false;var b=document.getElementById('submit');b.disabled=false;form.querySelectorAll('input,select,.quantity-step').forEach(function(input){input.disabled=false});renderOrder()}});
 form.addEventListener('input',function(){ORDER_TOKEN=null});
 form.addEventListener('change',function(){ORDER_TOKEN=null});
 form.addEventListener('submit',function(e){
@@ -1267,7 +1270,8 @@ form.addEventListener('submit',function(e){
     return;
   }
   if(PROTOTYPE){showDone(null);return}
-  /* Заявка → club_signups (pending, или waitlist, если коврики выкуплены) → ссылка в бот, где счет ЮKassa. */
+  /* Заявка → club_signups + холд мест на 20 минут → оплата ЮKassa (redirectUrl) → /paid?o=<token>.
+     Коврики выкуплены — лист ожидания, без оплаты. */
   var btn=document.getElementById('submit');
   if(btn.disabled)return;
   if(!ORDER_TOKEN){var bytes=crypto.getRandomValues(new Uint8Array(16));ORDER_TOKEN=Array.from(bytes,function(b){return b.toString(16).padStart(2,'0')}).join('')}
@@ -1280,6 +1284,8 @@ form.addEventListener('submit',function(e){
     club:EVENT.club,event_date:EVENT.date,source:EVENT.source})})
     .then(function(r){return r.json().then(function(j){if(!r.ok)throw j;return j})})
     .then(function(j){
+      if(j.redirectUrl){btn.textContent='Переходим к оплате…';REDIRECTING=true;location.assign(j.redirectUrl);return}
+      if(j.paid&&j.statusUrl){REDIRECTING=true;location.assign(j.statusUrl);return}
       if(j.waitlist&&!OUT)applyAvailability({available:0});
       showDone(j.confirmUrl,j);
     })
@@ -1289,6 +1295,7 @@ form.addEventListener('submit',function(e){
       if(f&&f.indexOf('email')>=0){document.getElementById('f-mail').classList.add('err')}
       if(f&&f.indexOf('gift_recipient')>=0){document.getElementById('f-recipient').classList.add('err')}
       if(f&&f.indexOf('quantity')>=0){document.getElementById('f-quantity').classList.add('err');quantityInput.setAttribute('aria-invalid','true')}
+      if(err&&err.error==='Payment unavailable'){say('Оплата сейчас недоступна. Попробуй через пару минут');return}
       if(err&&err.error==='Not enough seats'){
         applyAvailability({available:err.available});
         var field=document.getElementById('f-quantity');field.classList.add('err');
@@ -1297,7 +1304,7 @@ form.addEventListener('submit',function(e){
       }
       say('Не получилось отправить заявку. Проверь поля и попробуй еще раз');
     })
-    .then(function(){SUBMITTING=false;btn.disabled=false;form.querySelectorAll('input,select,.quantity-step').forEach(function(input){input.disabled=false});renderOrder()});
+    .then(function(){if(REDIRECTING)return;SUBMITTING=false;btn.disabled=false;form.querySelectorAll('input,select,.quantity-step').forEach(function(input){input.disabled=false});renderOrder()});
 });
 form.querySelectorAll('input').forEach(function(i){if(i===quantityInput)return;var f=function(){var w=i.closest('.field');if(w)w.classList.remove('err')};i.addEventListener('input',f);i.addEventListener('change',f)});
 

@@ -2,12 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   checkoutRefusal,
   giftTicketText,
-  invoiceIntroText,
   invoicePayload,
   paidText,
   parseClubToken,
   parseInvoicePayload,
-  receiptProviderData,
   SOLD_OUT_REFUSAL,
   waitlistText,
 } from "./club-signup";
@@ -56,30 +54,6 @@ describe("checkoutRefusal", () => {
   });
 });
 
-describe("receiptProviderData", () => {
-  const signup = { email: "nika@example.com", amount_rub: 1000 };
-
-  it("чек ЮKassa: почта из заявки, сумма, без НДС, услуга", () => {
-    const data = JSON.parse(receiptProviderData(signup, session, {})!);
-    expect(data.receipt.customer.email).toBe("nika@example.com");
-    expect(data.receipt.items[0]).toMatchObject({
-      quantity: "1.00",
-      amount: { value: "1000.00", currency: "RUB" },
-      vat_code: 1,
-      payment_subject: "service",
-    });
-    expect(data.receipt).not.toHaveProperty("tax_system_code");
-  });
-  it("система налогообложения из env, YOOKASSA_RECEIPT=0 выключает чек", () => {
-    expect(JSON.parse(receiptProviderData(signup, session, { YOOKASSA_TAX_SYSTEM_CODE: "2" })!).receipt.tax_system_code).toBe(2);
-    expect(receiptProviderData(signup, session, { YOOKASSA_RECEIPT: "0" })).toBeUndefined();
-  });
-  it("чек нескольких билетов содержит количество и цену за один билет", () => {
-    const data = JSON.parse(receiptProviderData({ ...signup, quantity: 3, amount_rub: 3000 }, session, {})!);
-    expect(data.receipt.items[0]).toMatchObject({ quantity: "3.00", amount: { value: "1000.00", currency: "RUB" } });
-  });
-});
-
 describe("waitlistText", () => {
   it("говорит про лист ожидания следующего занятия", () => {
     expect(waitlistText({ name: "Ника" }, session)).toMatch(/выкуплены[\s\S]*листе ожидания следующего занятия/);
@@ -89,7 +63,7 @@ describe("waitlistText", () => {
 describe("paidText", () => {
   it("называет время сбора и адрес", () => {
     const text = paidText({ name: "Ника" }, session);
-    expect(text).toContain("коврик твой");
+    expect(text).toContain("всё супер, заявка оплачена, приходи");
     expect(text).toContain("10:10");
     expect(text).toContain("Климашкина, 20");
   });
@@ -98,7 +72,6 @@ describe("paidText", () => {
   });
   it("подарочный билет содержит получателя и заказ без цены", () => {
     const gift = { id: ID, name: "Ника", quantity: 2, is_gift: true, gift_recipient: "Анна" };
-    expect(invoiceIntroText(gift, session)).toContain("2 билета в подарок. Получатель: Анна");
     expect(paidText(gift, session)).toContain("Перешли получателю");
     const text = giftTicketText(gift, session);
     expect(text).toContain("Анна");

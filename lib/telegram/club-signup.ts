@@ -1,4 +1,8 @@
-import { InlineKeyboard } from "grammy";
+import { Api, InlineKeyboard } from "grammy";
+import { supabaseClubOrders, type ClubOrder } from "../clubs/orders";
+import { CLUB_START_PREFIX, isHoldActive, refreshOrder, startPayment, type PaymentDeps } from "../clubs/payments";
+export { CLUB_START_PREFIX };
+import { yookassaFromEnv } from "../yookassa";
 import { tgAdmin } from "./supabase";
 import { countPaidSeats, hasEnoughSeats, isSoldOut } from "../clubs/seats";
 import { moscowToday, SESSIONS, sessionOfSignup, type ClubSession } from "../clubs/sessions";
@@ -8,22 +12,20 @@ import { SUPPORT_LABEL, SUPPORT_URL } from "./cta";
 import type { BotContext } from "./bot";
 
 /**
- * Запись на занятие клуба (/stretch) и её оплата в боте мероприятий.
+ * Заказ на занятие клуба (/stretch) в боте мероприятий.
  *
- * Заявка приходит с лендинга (POST /api/club-signup) со статусом pending.
- * Кнопка «Оплатить в Telegram» ведёт на t.me/<bot>?start=st_<token>; бот
- * находит заявку и присылает счёт ЮKassa (Telegram Payments, sendInvoice).
+ * Оплата — на сайте, через API ЮKassa (lib/clubs/payments.ts): форма → холд
+ * мест на 20 минут → платёж → /paid?o=<token> → вебхук ЮKassa. Бот по
+ * /start st_<token> находит заказ, привязывает чат и отвечает по статусу:
+ * оплачено — «всё супер, приходи»; ждёт оплаты — сверяет с ЮKassa и даёт
+ * «Проверить ещё раз»; отменён или холд истёк — новая ссылка на оплату (если
+ * места есть).
  *
- * Оплата в три шага Telegram:
- *   1) sendInvoice — счёт с payload `club:<id заявки>`;
- *   2) pre_checkout_query — последняя проверка до списания (заявка есть, ещё не
- *      оплачена, сумма совпадает, занятие не прошло). Ответить надо за 10 секунд;
- *   3) message.successful_payment — деньги списаны: payment_status = 'paid'.
- *
- * Источник истины об оплате — successful_payment, а не нажатие кнопки.
- * Повтор апдейта не страшен: строка обновляется только из pending.
+ * Счёт Telegram Payments бот больше не выставляет. pre_checkout_query и
+ * successful_payment остались как фоллбэк: счета, отправленные до перехода на
+ * ЮKassa, можно оплатить, деньги не потеряются. Заказ, по которому создан
+ * платёж ЮKassa, старый счёт уже не примет (checkoutRefusal: статус не pending).
  */
-export const CLUB_START_PREFIX = "st_";
 const PAYLOAD_PREFIX = "club:";
 const TABLE = "club_signups";
 const COLUMNS =
@@ -38,7 +40,7 @@ export interface ClubSignup {
   event_date: string;
   event_time: string;
   amount_rub: number;
-  payment_status: "pending" | "paid" | "refunded" | "waitlist";
+  payment_status: ClubOrder["payment_status"];
   confirmed_at: string | null;
   quantity: number;
   is_gift: boolean;
@@ -98,51 +100,8 @@ export function checkoutRefusal(
   return null;
 }
 
-/**
- * Чек 54-ФЗ для ЮKassa: provider_data счёта. Почту берём из заявки — она там
- * обязательна, отдельно Telegram её не спрашивает.
- * YOOKASSA_RECEIPT=0 отключает чек (магазин без фискализации).
- */
-export function receiptProviderData(
-  signup: Pick<ClubSignup, "email" | "amount_rub"> & TicketDetails,
-  session: ClubSession,
-  env: Record<string, string | undefined> = process.env,
-): string | undefined {
-  if (env.YOOKASSA_RECEIPT === "0") return undefined;
-  const taxSystem = Number(env.YOOKASSA_TAX_SYSTEM_CODE);
-  return JSON.stringify({
-    receipt: {
-      customer: { email: signup.email },
-      items: [
-        {
-          description: `${session.title}, ${session.dateLabel} ${session.time}`.slice(0, 128),
-          quantity: (signup.quantity ?? 1).toFixed(2),
-          amount: { value: (signup.amount_rub / (signup.quantity ?? 1)).toFixed(2), currency: "RUB" },
-          vat_code: Number(env.YOOKASSA_VAT_CODE ?? 1), // 1 — без НДС
-          payment_mode: "full_payment",
-          payment_subject: "service",
-        },
-      ],
-      ...(Number.isInteger(taxSystem) && taxSystem > 0 ? { tax_system_code: taxSystem } : {}),
-    },
-  });
-}
-
 function whenWhere(session: ClubSession): string {
   return `${session.dateLabel} (${session.weekday}), ${session.time}, ${session.place}, ${session.metro}`;
-}
-
-/** Сообщение перед счётом: что именно человек оплачивает. */
-export function invoiceIntroText(signup: Pick<ClubSignup, "name"> & TicketDetails, session: ClubSession): string {
-  return [
-    `${signup.name}, заявка на занятие найдена.`,
-    `${ticketLabel(signup.quantity ?? 1)}${signup.is_gift ? ` в подарок. Получатель: ${signup.gift_recipient}` : ""}.`,
-    "",
-    `${session.title}: ${whenWhere(session)}.`,
-    `Сбор с ${session.gatherAt}.`,
-    "",
-    "Количество мест ограничено, коврик закрепляется после оплаты. Счёт ниже.",
-  ].join("\n");
 }
 
 /** Ответ после оплаты и на повторный вход оплатившего. */
@@ -152,7 +111,7 @@ export function paidText(signup: Pick<ClubSignup, "name"> & TicketDetails, sessi
       ? `${signup.name}, подарок оплачен: ${ticketLabel(signup.quantity ?? 1)}! Получатель: ${signup.gift_recipient}. Перешли получателю следующее сообщение — это подарочный билет.`
       : (signup.quantity ?? 1) > 1
         ? `${signup.name}, оплата прошла: ${ticketLabel(signup.quantity!)}. Места для вашей компании закреплены! На входе назовите имя покупателя: ${signup.name}.`
-        : `${signup.name}, оплата прошла, коврик твой!`,
+        : `${signup.name}, всё супер, заявка оплачена, приходи!`,
     "",
     `${session.title}: ${whenWhere(session)}.`,
     `Приходи к ${session.gatherAt}, чтобы спокойно переодеться. С собой — удобная одежда и носки.`,
@@ -203,7 +162,7 @@ async function findBy(column: "confirm_token" | "id", value: string): Promise<Cl
   return (data as ClubSignup | null) ?? null;
 }
 
-/** Неоплаченная заявка по нику на любое будущее занятие (для /start без токена). */
+/** Неоплаченный заказ по нику на любое будущее занятие (для /start без токена). */
 async function findPendingByUsername(username: string): Promise<ClubSignup | null> {
   const today = moscowToday();
   const dates = SESSIONS.filter((s) => s.date >= today).map((s) => s.date);
@@ -212,7 +171,7 @@ async function findPendingByUsername(username: string): Promise<ClubSignup | nul
     .from(TABLE)
     .select(COLUMNS)
     .eq("tg_username", username)
-    .eq("payment_status", "pending")
+    .in("payment_status", ["pending", "pending_payment", "canceled", "expired"])
     .in("event_date", dates)
     .order("created_at", { ascending: false })
     .limit(1);
@@ -267,103 +226,143 @@ function landingKeyboard(): InlineKeyboard | undefined {
 
 // ── Хендлеры ────────────────────────────────────────────────────────────────
 
-/** Общий хвост: отметить вход и прислать счёт (или «уже оплачено»). */
-async function openSignup(ctx: BotContext, signup: ClubSignup, chatId: number): Promise<void> {
-  const session = sessionOfSignup(signup);
+/** Callback «Проверить ещё раз»: stpay:<token>. */
+export const CLUB_CHECK_CALLBACK_RE = /^stpay:([a-f0-9]{16,64})$/i;
+
+export function clubPaymentDeps(): PaymentDeps {
+  return { orders: supabaseClubOrders(tgAdmin()), yk: yookassaFromEnv(), origin: publicOriginFromEnv(), notify: notifyClubOrder };
+}
+
+export function waitingText(order: Pick<ClubOrder, "name">): string {
+  return [
+    `${order.name}, ждём подтверждения оплаты от ЮKassa — обычно это минута.`,
+    "Если оплата ещё не прошла, нажми «Оплатить». Когда оплатишь, нажми «Проверить ещё раз».",
+  ].join("\n");
+}
+
+export function payLinkText(order: Pick<ClubOrder, "name" | "quantity" | "amount_rub" | "is_gift">, session: ClubSession): string {
+  return [
+    `${order.name}, ссылка на оплату готова: ${ticketLabel(order.quantity)}${order.is_gift ? " в подарок" : ""}, ${order.amount_rub} ₽.`,
+    `${session.title}: ${whenWhere(session)}.`,
+    "",
+    "Места держим 20 минут. После оплаты вернись сюда — пришлю подтверждение.",
+  ].join("\n");
+}
+
+export const NO_SEATS_TEXT = "Мест на это занятие не осталось. Если освободятся, напишу сюда первой.";
+export const OVERBOOKED_TEXT =
+  "Пока шла оплата, последние места выкупили. Деньги вернули автоматически — они придут на карту в течение нескольких дней. Прости, что так вышло.";
+
+function checkKeyboard(order: Pick<ClubOrder, "confirm_token" | "yk_confirmation_url">): InlineKeyboard {
+  const kb = new InlineKeyboard();
+  if (order.yk_confirmation_url) kb.url("Оплатить", order.yk_confirmation_url).row();
+  return kb.text("Проверить ещё раз", `stpay:${order.confirm_token}`).row().url(SUPPORT_LABEL, SUPPORT_URL);
+}
+
+async function replyPaid(ctx: BotContext, order: ClubOrder, session: ClubSession): Promise<void> {
+  await ctx.reply(paidText(order, session), { reply_markup: paidKeyboard(session) });
+  if (order.is_gift) await ctx.reply(giftTicketText(order, session), { reply_markup: sessionKeyboard(session) });
+}
+
+/**
+ * Заказ по ссылке из бота или с /paid: привязать чат, сверить оплату с ЮKassa
+ * и ответить по статусу.
+ */
+export async function openClubOrder(ctx: BotContext, input: ClubOrder, deps: PaymentDeps = clubPaymentDeps()): Promise<void> {
+  const chatId = ctx.from?.id;
+  const session = sessionOfSignup(input);
   if (!session) {
-    console.error(`[club] заявка ${signup.id}: занятие ${signup.club} ${signup.event_date} нет в SESSIONS`);
+    console.error(`[club] заказ ${input.id}: занятие ${input.club} ${input.event_date} нет в SESSIONS`);
     await ctx.reply("Не нашла это занятие в расписании. Напиши, пожалуйста, в поддержку.", {
       reply_markup: new InlineKeyboard().url(SUPPORT_LABEL, SUPPORT_URL),
     });
     return;
   }
+  if (chatId !== undefined) {
+    await deps.orders.bindChat(input.id, chatId, normalizeTelegramUsername(ctx.from?.username ?? null)).catch((err) =>
+      console.error("[club] bindChat:", err instanceof Error ? err.message : String(err)));
+  }
+  const order = await refreshOrder(deps, input);
+  const now = deps.now?.() ?? new Date();
 
-  await markOpened(
-    signup,
-    chatId,
-    normalizeTelegramUsername(ctx.from?.username ?? null),
-  );
-
-  if (signup.payment_status === "paid") {
-    await ctx.reply(paidText(signup, session), { reply_markup: paidKeyboard(session) });
-    if (signup.is_gift) await ctx.reply(giftTicketText(signup, session), { reply_markup: sessionKeyboard(session) });
+  if (order.payment_status === "paid") return replyPaid(ctx, order, session);
+  if (order.payment_status === "refunded_overbooked") {
+    await ctx.reply(OVERBOOKED_TEXT, { reply_markup: landingKeyboard() });
     return;
   }
-  if (signup.event_date < moscowToday()) {
-    await ctx.reply("Это занятие уже прошло. Следующее появится на странице клуба.", {
-      reply_markup: landingKeyboard(),
-    });
+  if (order.payment_status === "refunded") {
+    await ctx.reply("Этот заказ отменён, деньги вернули. Если что-то не так — напиши в поддержку.", { reply_markup: sessionKeyboard(session) });
     return;
   }
-  // Места кончились, пока заявка ждала оплаты, — счёт не выставляем.
-  if (signup.payment_status === "pending") {
-    const occupied = await countPaidSeats(tgAdmin(), session);
-    if (isSoldOut(occupied, session)) {
-      await moveToWaitlist(signup.id);
-      signup.payment_status = "waitlist";
-    } else if (!hasEnoughSeats(occupied, session, signup.quantity)) {
-      await ctx.reply("Для всего заказа мест уже не хватает. Оформи меньше билетов на странице занятия или напиши в поддержку.", { reply_markup: landingKeyboard() });
-      return;
-    }
-  }
-  if (signup.payment_status === "waitlist") {
-    await ctx.reply(waitlistText(signup, session));
+  if (order.payment_status === "waitlist") {
+    await ctx.reply(waitlistText(order, session));
     return;
   }
-  if (signup.payment_status !== "pending") {
-    await ctx.reply("Заявка закрыта. Напиши в поддержку.", { reply_markup: sessionKeyboard(session) });
+  if (session.date < moscowToday(now)) {
+    await ctx.reply("Это занятие уже прошло. Следующее появится на странице клуба.", { reply_markup: landingKeyboard() });
+    return;
+  }
+  if (isHoldActive(order, now) && order.yk_payment_id) {
+    await ctx.reply(waitingText(order), { reply_markup: checkKeyboard(order) });
     return;
   }
 
-  const providerToken = process.env.TELEGRAM_PAYMENT_PROVIDER_TOKEN?.trim();
-  if (!providerToken) {
-    console.error("[club] TELEGRAM_PAYMENT_PROVIDER_TOKEN не задан — счёт не отправлен");
-    await ctx.reply(
-      `${invoiceIntroText(signup, session)}\n\nОплата откроется совсем скоро — я пришлю счёт сюда.`,
-    );
+  // Не оплачен: отменён, холд истёк или старая форма без платежа — новая ссылка, если места есть.
+  const res = await startPayment(deps, order, session);
+  if (res.kind === "paid") return replyPaid(ctx, res.order, session);
+  if (res.kind === "redirect") {
+    await ctx.reply(payLinkText(res.order, session), { reply_markup: checkKeyboard({ ...res.order, yk_confirmation_url: res.url }) });
     return;
   }
-
-  await ctx.reply(invoiceIntroText(signup, session));
-  try {
-    await ctx.replyWithInvoice(
-      session.title,
-      `${session.dateLabel}, ${session.time} · ${session.place}`.slice(0, 255),
-      invoicePayload(signup.id),
-      "RUB",
-      [{ label: `${ticketLabel(signup.quantity)}${signup.is_gift ? " в подарок" : ""}`, amount: signup.amount_rub * 100 }],
-      {
-        provider_token: providerToken,
-        provider_data: receiptProviderData(signup, session),
-      },
-    );
-  } catch (err) {
-    // Частые причины: сумма ниже минимума Telegram (≈88 ₽, см. MIN_INVOICE_RUB),
-    // неверный provider token. Человеку — честно, в лог — подробно.
-    console.error(
-      `[club] sendInvoice не прошёл (заявка ${signup.id}, ${signup.amount_rub} ₽):`,
-      err instanceof Error ? err.message : String(err),
-    );
-    await ctx.reply("Не получилось выставить счёт. Мы уже разбираемся — напиши в поддержку, поможем.", {
-      reply_markup: new InlineKeyboard().url(SUPPORT_LABEL, SUPPORT_URL),
-    });
+  if (res.kind === "no_seats") {
+    await ctx.reply(NO_SEATS_TEXT, { reply_markup: landingKeyboard() });
+    return;
   }
+  console.error(`[club] новая ссылка на оплату (заказ ${order.id}) не получилась: ${res.kind === "closed" || res.kind === "unavailable" ? res.reason : ""}`);
+  await ctx.reply("Не получилось подготовить оплату. Напиши в поддержку — поможем.", {
+    reply_markup: new InlineKeyboard().url(SUPPORT_LABEL, SUPPORT_URL),
+  });
 }
 
-/** /start st_<token> с лендинга. */
-export async function handleClubStart(ctx: BotContext, payload: string): Promise<void> {
-  const chatId = ctx.from?.id;
-  if (chatId === undefined) return;
+/** /start st_<token> с сайта (/paid или форма). */
+export async function handleClubStart(ctx: BotContext, payload: string, deps: PaymentDeps = clubPaymentDeps()): Promise<void> {
+  if (ctx.from?.id === undefined) return;
   const token = parseClubToken(payload);
-  const signup = token ? await findBy("confirm_token", token) : null;
-  if (!signup) {
+  const order = token ? await deps.orders.byToken(token).catch(() => null) : null;
+  if (!order) {
     await ctx.reply(
-      "Не нашла заявку по этой ссылке — возможно, она устарела. Заполни форму на странице занятия ещё раз.",
+      "Не нашла заказ по этой ссылке — возможно, она устарела. Оформить запись можно на странице занятия.",
       { reply_markup: landingKeyboard() },
     );
     return;
   }
-  await openSignup(ctx, signup, chatId);
+  await openClubOrder(ctx, order, deps);
+}
+
+/** «Проверить ещё раз»: тот же ответ, что на вход по ссылке. */
+export async function handleClubCheck(ctx: BotContext, deps: PaymentDeps = clubPaymentDeps()): Promise<void> {
+  await ctx.answerCallbackQuery().catch(() => {});
+  const token = CLUB_CHECK_CALLBACK_RE.exec(ctx.callbackQuery?.data ?? "")?.[1];
+  const order = token ? await deps.orders.byToken(token).catch(() => null) : null;
+  if (!order) {
+    await ctx.reply("Не нашла этот заказ. Оформить запись можно на странице занятия.", { reply_markup: landingKeyboard() });
+    return;
+  }
+  await openClubOrder(ctx, order, deps);
+}
+
+/** Сообщение в чат заказа после вебхука ЮKassa (если человек уже открывал бота). */
+export async function notifyClubOrder(order: ClubOrder, event: "paid" | "refunded_overbooked"): Promise<void> {
+  const token = process.env.TELEGRAM_BOT_TOKEN ?? process.env.BOT_TOKEN;
+  const session = sessionOfSignup(order);
+  if (!order.tg_chat_id || !token || !session) return;
+  const api = new Api(token);
+  if (event === "refunded_overbooked") {
+    await api.sendMessage(order.tg_chat_id, OVERBOOKED_TEXT);
+    return;
+  }
+  await api.sendMessage(order.tg_chat_id, paidText(order, session), { reply_markup: paidKeyboard(session) });
+  if (order.is_gift) await api.sendMessage(order.tg_chat_id, giftTicketText(order, session), { reply_markup: sessionKeyboard(session) });
 }
 
 /** /start без токена: неоплаченная заявка по нику. true — нашлась и обработана. */
@@ -373,7 +372,9 @@ export async function handleClubByUsername(ctx: BotContext): Promise<boolean> {
   if (chatId === undefined || !username) return false;
   const signup = await findPendingByUsername(username);
   if (!signup) return false;
-  await openSignup(ctx, signup, chatId);
+  const order = await supabaseClubOrders(tgAdmin()).byId(signup.id).catch(() => null);
+  if (!order) return false;
+  await openClubOrder(ctx, order);
   return true;
 }
 

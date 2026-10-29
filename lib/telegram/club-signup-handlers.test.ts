@@ -47,7 +47,7 @@ const context = () => ({
   } },
 });
 
-describe("покупка билетов через Telegram", () => {
+describe("фоллбэк: счёт Telegram, отправленный до перехода на ЮKassa", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-28T12:00:00Z"));
@@ -57,25 +57,6 @@ describe("покупка билетов через Telegram", () => {
     state.reserve.mockReset().mockResolvedValue({ data: true, error: null });
   });
   afterEach(() => { vi.useRealTimers(); vi.unstubAllEnvs(); });
-
-  it("выставляет единый счёт на 3 билета и чек по 1000 рублей", async () => {
-    const ctx = context();
-    await handleClubStart(ctx as unknown as BotContext, `st_${token}`);
-    expect(ctx.replyWithInvoice).toHaveBeenCalledOnce();
-    const args = ctx.replyWithInvoice.mock.calls[0];
-    expect(args[4]).toEqual([{ label: "3 билета в подарок", amount: 300000 }]);
-    const receipt = JSON.parse(args[5].provider_data).receipt;
-    expect(receipt.items[0]).toMatchObject({ quantity: "3.00", amount: { value: "1000.00" } });
-    expect(receipt.customer.email).toBe("buyer@example.com");
-  });
-
-  it("не выставляет счёт, если мест не хватает всей группе", async () => {
-    state.rows.push({ ...booking(), id: "other", confirm_token: "b".repeat(32), quantity: 14, payment_status: "paid" });
-    const ctx = context();
-    await handleClubStart(ctx as unknown as BotContext, `st_${token}`);
-    expect(ctx.replyWithInvoice).not.toHaveBeenCalled();
-    expect(ctx.reply.mock.calls[0][0]).toContain("мест уже не хватает");
-  });
 
   it("одобряет списание только после атомарного резервирования", async () => {
     const ctx = context();
@@ -127,22 +108,6 @@ describe("покупка билетов через Telegram", () => {
     await handleClubPayment(ctx as unknown as BotContext);
     const buttons = ctx.reply.mock.calls[0][1].reply_markup.inline_keyboard.flat();
     expect(buttons).toContainEqual({ text: "Докупить билеты", url: "https://www.mynika.online/stretch?purchase=more#reg" });
-  });
-
-  it("оплачивает дополнительный билет в том же чате, не меняя первую оплату", async () => {
-    const original = { ...booking(), payment_status: "paid", quantity: 1, amount_rub: 1000, tg_chat_id: 123, tg_payment_charge_id: "first-charge" };
-    const newId = "1b5e3c1a-7f7e-4c55-9d2b-2a1f7e9c3d10";
-    state.rows = [original, { ...booking(), id: newId, confirm_token: "b".repeat(32), quantity: 1, amount_rub: 1000, is_gift: false }];
-    const snapshot = { ...original };
-    const ctx = context();
-    await handleClubStart(ctx as unknown as BotContext, `st_${"b".repeat(32)}`);
-    expect(ctx.replyWithInvoice.mock.calls[0][2]).toBe(invoicePayload(newId));
-    expect(ctx.replyWithInvoice.mock.calls[0][4]).toEqual([{ label: "1 билет", amount: 100000 }]);
-    ctx.message.successful_payment.invoice_payload = invoicePayload(newId);
-    ctx.message.successful_payment.total_amount = 100000;
-    await handleClubPayment(ctx as unknown as BotContext);
-    expect(state.rows[0]).toEqual(snapshot);
-    expect(state.rows[1]).toMatchObject({ payment_status: "paid", tg_chat_id: 123, quantity: 1, amount_rub: 1000 });
   });
 
   it("не выдаёт подарок за неподходящую сумму платежа", async () => {

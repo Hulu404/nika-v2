@@ -172,6 +172,20 @@ async function tickDatabotTaskReminders(): Promise<void> {
   }
 }
 
+/**
+ * Занятия клуба: неоплаченные заказы с истёкшим холдом (20 минут на оплату
+ * ЮKassa) → expired, места снова продаются. Раз в минуту.
+ */
+async function tickClubHolds(): Promise<void> {
+  try {
+    const { tickClubHolds: tick } = await import("./lib/clubs/holds-tick");
+    const n = await tick();
+    if (n) console.log(`[club-holds] истёк холд у заказов: ${n}`);
+  } catch (err) {
+    console.error("[club-holds] тик упал:", err instanceof Error ? err.message : String(err));
+  }
+}
+
 async function tickReminders(): Promise<void> {
   try {
     const { dispatchCoffeeRunReminders } = await import("./lib/coffeerun/reminder-dispatch");
@@ -260,7 +274,11 @@ export async function register(): Promise<void> {
   // Не держим процесс живым только ради тикера.
   timer.unref?.();
   void tickTeamMinute();
-  const minuteTimer = setInterval(() => void tickTeamMinute(), 60_000);
+  void tickClubHolds();
+  const minuteTimer = setInterval(() => {
+    void tickTeamMinute();
+    void tickClubHolds();
+  }, 60_000);
   minuteTimer.unref?.();
   // Явный след в логах: молчание бота однажды уже прошло незамеченным именно
   // потому, что о незапущенном слушателе нигде не было сказано.
