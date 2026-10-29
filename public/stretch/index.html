@@ -494,6 +494,9 @@ html.js .f-fig.on svg *{--draw:0}
 .quantity-step:hover:not(:disabled){background:#FBEDE8;border-color:var(--accent)}
 .quantity-step:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 .quantity-step:disabled{opacity:.35;cursor:default}
+.buy-more-link{display:block;min-height:44px;margin:0 0 12px;padding:8px 0;background:none;border:0;color:var(--accent-text);font:inherit;font-size:14px;text-align:left;text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.buy-more-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px;border-radius:4px}
+.buy-more-link[hidden]{display:none}
 .field .msg{display:none;font-size:12px;color:var(--err);margin-top:8px}
 .field.err .msg{display:block}
 .opts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -953,7 +956,9 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
             <div aria-live="polite"><div class="tix-k" data-tix-k>Итого за билеты</div><div class="tix-p"><span id="order-total">1000</span><span class="rub">₽</span></div><div class="order-total" id="order-calculation">1 билет × 1000 ₽</div></div>
             <div class="tix-r" data-tix-r>Количество мест<br>ограничено</div>
           </div>
-          <div class="field" id="f-quantity"><label for="i-quantity">Количество билетов</label>
+          <button type="button" class="buy-more-link" id="buy-more">Уже есть билет? Докупить билеты</button>
+          <p class="order-note" id="buy-more-note" hidden>Укажи тот же Telegram, что и при первой покупке. Выбери, сколько билетов добавить: оплатишь только новые билеты, а прежние останутся на твоём аккаунте.</p>
+          <div class="field" id="f-quantity"><label for="i-quantity" id="quantity-label">Количество билетов</label>
             <div class="quantity-control">
               <button type="button" class="quantity-step" id="quantity-minus" aria-label="Уменьшить количество билетов" aria-controls="i-quantity" disabled>−</button>
               <input class="in" id="i-quantity" name="quantity" type="number" min="1" max="16" step="1" value="1" inputmode="numeric" required aria-describedby="quantity-note quantity-error" aria-invalid="false">
@@ -1009,7 +1014,7 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
           <p id="doneP">Осталось оплатить коврик за <b><span data-price>1000</span> ₽</b>: открой бота NIKA, он пришлет счет. Оплата прямо в Telegram.</p>
           <a class="btn btn--ink" id="tg-confirm" href="https://www.mynika.online/stretch" target="_blank" rel="noopener" hidden style="display:none">Оплатить в Telegram</a>
           <p class="fine" id="doneFine">Количество мест ограничено, коврик закрепляется после оплаты.</p>
-          <button class="btn btn--line" id="another-order" type="button">Оформить ещё билеты</button>
+          <button class="btn btn--line" id="another-order" type="button">Докупить билеты</button>
         </div>
       </div>
     </div>
@@ -1045,7 +1050,7 @@ var EVENT={club:'stretch',format:'pilates',spot:'klimashkina',date:'2026-11-01',
   url:'https://www.mynika.online/stretch'};
 /* Цена и максимум билетов обновляются с сервера (GET /api/club-signup).
    OUT = все места выкуплены: форма ставит в лист ожидания. */
-var PRICE=1000,OUT=false,QUANTITY=1,IS_GIFT=false,ORDER_TOKEN=null,MAX_TICKETS=null,SUBMITTING=false,AVAILABILITY_VERSION=0,AVAILABILITY_FAILED=false;
+var PRICE=1000,OUT=false,QUANTITY=1,IS_GIFT=false,ORDER_TOKEN=null,MAX_TICKETS=null,SUBMITTING=false,AVAILABILITY_VERSION=0,AVAILABILITY_FAILED=false,ADDITIONAL_ORDER=false;
 /* LEFT — остаток ковриков. Сервер отдает его, только когда мест мало (≤5), иначе null и на странице «ограничено». */
 var LEFT=null;
 /* Прототип: форма показывает шаги без отправки. Превью «мест нет»: ?full или #full */
@@ -1090,8 +1095,11 @@ function renderOrder(){
   document.getElementById('gift-fields').hidden=!IS_GIFT;
   document.getElementById('participant-fields').hidden=IS_GIFT;
   document.getElementById('group-note').hidden=QUANTITY===1;
+  document.getElementById('buy-more').hidden=ADDITIONAL_ORDER;
+  document.getElementById('buy-more-note').hidden=!ADDITIONAL_ORDER;
+  document.getElementById('quantity-label').textContent=ADDITIONAL_ORDER?'Сколько билетов добавить':'Количество билетов';
   document.getElementById('submit').disabled=SUBMITTING||MAX_TICKETS===null;
-  document.getElementById('submit').textContent=SUBMITTING?'Отправляем…':OUT?'Встать в лист ожидания':IS_GIFT?'Оформить подарок':QUANTITY>1?'Купить билеты':'Купить билет';
+  document.getElementById('submit').textContent=SUBMITTING?'Отправляем…':OUT?'Встать в лист ожидания':IS_GIFT?'Оформить подарок':ADDITIONAL_ORDER?(QUANTITY>1?'Докупить билеты':'Докупить билет'):QUANTITY>1?'Купить билеты':'Купить билет';
 }
 /* ===== количество билетов ===== */
 var quantityInput=document.getElementById('i-quantity'),quantityMinus=document.getElementById('quantity-minus'),quantityPlus=document.getElementById('quantity-plus');
@@ -1199,9 +1207,9 @@ function tgNick(v){
 }
 function showDone(confirmUrl,order){
   order=order||{quantity:QUANTITY,amount:PRICE*QUANTITY,isGift:IS_GIFT,waitlist:OUT};
-  document.getElementById('doneH').textContent=order.paid?'Заказ уже оплачен':order.isGift?'Подарок почти готов':'Заявка принята';
+  document.getElementById('doneH').textContent=order.paid?'Заказ уже оплачен':order.isGift?'Подарок почти готов':ADDITIONAL_ORDER?'Дополнительные билеты почти твои':'Заявка принята';
   document.getElementById('doneP').textContent=order.paid?'Билеты оплачены. Открой бота NIKA, чтобы получить подтверждение.':'Твой заказ: '+order.quantity+' '+plural(order.quantity,'билет','билета','билетов')+' за '+order.amount+' ₽. Открой бота NIKA — он пришлёт счёт на весь заказ.';
-  document.getElementById('doneFine').textContent=order.isGift?'После оплаты бот пришлёт подарочный билет без цены. Перешли его получателю.':'Места закрепляются после оплаты. На входе назовите имя покупателя.';
+  document.getElementById('doneFine').textContent=order.isGift?'После оплаты бот пришлёт подарочный билет без цены. Перешли его получателю.':ADDITIONAL_ORDER?'Это отдельный заказ на новые билеты. Ранее оплаченные билеты сохраняются на твоём Telegram-аккаунте.':'Места закрепляются после оплаты. На входе назовите имя покупателя.';
   tgBtn.textContent=order.paid?'Открыть бота':'Оплатить в Telegram';
   tgBtn.hidden=true;tgBtn.style.display='none';
   if(order.waitlist){
@@ -1215,7 +1223,26 @@ function showDone(confirmUrl,order){
   form.hidden=true;done.hidden=false;
   done.scrollIntoView({behavior:'smooth',block:'center'});
 }
-document.getElementById('another-order').addEventListener('click',function(){ORDER_TOKEN=null;done.hidden=true;form.hidden=false;renderOrder();quantityInput.focus()});
+/* ===== докупка билетов ===== */
+function startAdditionalOrder(){
+  if(SUBMITTING)return;
+  ORDER_TOKEN=null;ADDITIONAL_ORDER=true;QUANTITY=1;quantityInput.value='1';IS_GIFT=false;
+  $$('input[name="purchase"]').forEach(function(input){input.checked=input.value==='self';input.parentNode.classList.toggle('on',input.checked)});
+  document.getElementById('i-recipient').value='';
+  document.getElementById('i-ok').checked=false;
+  $$('.field.err',form).forEach(function(field){field.classList.remove('err')});
+  quantityInput.setAttribute('aria-invalid','false');
+  done.hidden=true;form.hidden=false;
+  MAX_TICKETS=null;OUT=false;LEFT=null;AVAILABILITY_FAILED=false;
+  document.getElementById('quantity-availability').textContent='Проверяем доступные места…';
+  renderOrder();
+  form.scrollIntoView({behavior:'smooth',block:'start'});
+  if(PROTOTYPE)applyAvailability({available:16});else refreshAvailability();
+}
+document.getElementById('another-order').addEventListener('click',startAdditionalOrder);
+document.getElementById('buy-more').addEventListener('click',startAdditionalOrder);
+if(new URLSearchParams(location.search).get('purchase')==='more')startAdditionalOrder();
+/* ===== отправка заказа ===== */
 form.addEventListener('input',function(){ORDER_TOKEN=null});
 form.addEventListener('change',function(){ORDER_TOKEN=null});
 form.addEventListener('submit',function(e){

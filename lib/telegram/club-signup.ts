@@ -248,6 +248,16 @@ function sessionKeyboard(session: ClubSession): InlineKeyboard {
     .url(SUPPORT_LABEL, SUPPORT_URL);
 }
 
+/** Дополнительный заказ оформляется на сайте с новым ключом, старый счёт неизменен. */
+function paidKeyboard(session: ClubSession): InlineKeyboard {
+  const keyboard = sessionKeyboard(session);
+  const site = publicOriginFromEnv();
+  if (site && session.date >= moscowToday()) {
+    keyboard.row().url("Докупить билеты", `${site}${session.landing}?purchase=more#reg`);
+  }
+  return keyboard;
+}
+
 function landingKeyboard(): InlineKeyboard | undefined {
   const site = publicOriginFromEnv();
   const today = moscowToday();
@@ -275,7 +285,7 @@ async function openSignup(ctx: BotContext, signup: ClubSignup, chatId: number): 
   );
 
   if (signup.payment_status === "paid") {
-    await ctx.reply(paidText(signup, session), { reply_markup: sessionKeyboard(session) });
+    await ctx.reply(paidText(signup, session), { reply_markup: paidKeyboard(session) });
     if (signup.is_gift) await ctx.reply(giftTicketText(signup, session), { reply_markup: sessionKeyboard(session) });
     return;
   }
@@ -436,7 +446,7 @@ export async function handleClubPayment(ctx: BotContext): Promise<boolean> {
   }
   const session = signup ? sessionOfSignup(signup) : null;
   if (signup && session && signup.payment_status === "paid") {
-    await ctx.reply(paidText(signup, session), { reply_markup: sessionKeyboard(session) });
+    await ctx.reply(paidText(signup, session), { reply_markup: paidKeyboard(session) });
     if (signup.is_gift) await ctx.reply(giftTicketText(signup, session), { reply_markup: sessionKeyboard(session) });
   } else {
     await ctx.reply("Платёж получен, но не удалось подтвердить билеты. Напиши в поддержку — проверим оплату и запись.", {

@@ -18,7 +18,7 @@ function setup() {
   const state = {
     document: { getElementById: (id: string) => elements.get(id) },
     PRICE: 1000, QUANTITY: 1, IS_GIFT: false, OUT: false, ORDER_TOKEN: "previous-order",
-    MAX_TICKETS: 16 as number | null, SUBMITTING: false, AVAILABILITY_FAILED: false,
+    MAX_TICKETS: 16 as number | null, SUBMITTING: false, AVAILABILITY_FAILED: false, ADDITIONAL_ORDER: false,
     renderSeats: vi.fn(),
     plural: (_n: number, _one: string, few: string) => few,
   };
@@ -158,5 +158,49 @@ describe("количество билетов на /stretch", () => {
     expect(ui.elements.get("submit")!.disabled).toBe(true);
     ui.availability(5);
     expect(ui.elements.get("submit")!.disabled).toBe(false);
+  });
+
+  it.each(["", "?purchase=more"])("докупка (%s) начинает новый заказ и сохраняет контакты", (search) => {
+    const ui = setup();
+    ui.enter("4");
+    ui.state.IS_GIFT = true;
+    ui.state.ORDER_TOKEN = "old-order";
+    ui.elements.get("i-name")!.value = "Анна";
+    ui.elements.get("i-tg")!.value = "@anna_test";
+    ui.elements.get("i-mail")!.value = "anna@example.com";
+    ui.elements.get("i-recipient")!.value = "Мария";
+    const purchase = ["self", "gift"].map((value) => ({ value, checked: value === "gift", parentNode: { classList: { toggle: vi.fn() } } }));
+    const form = Object.assign(ui.elements.get("form")!, { hidden: true, scrollIntoView: vi.fn() });
+    const done = ui.elements.get("done")!;
+    done.hidden = false;
+    const consent = Object.assign(ui.elements.get("i-ok")!, { checked: true });
+    const refresh = vi.fn();
+    Object.assign(ui.state, {
+      form, done, PROTOTYPE: false, LEFT: 5,
+      refreshAvailability: refresh,
+      $$: (selector: string) => selector === 'input[name="purchase"]' ? purchase : [],
+      URLSearchParams, location: { search },
+    });
+    const source = html.slice(html.indexOf("/* ===== докупка билетов ===== */"), html.indexOf("/* ===== отправка заказа ===== */"));
+    runInNewContext(source, ui.state);
+    if (!search) ui.elements.get("another-order")!.events.click();
+    expect(ui.state.ORDER_TOKEN).toBeNull();
+    expect(ui.state.ADDITIONAL_ORDER).toBe(true);
+    expect(ui.state.QUANTITY).toBe(1);
+    expect(ui.input.value).toBe("1");
+    expect(ui.state.IS_GIFT).toBe(false);
+    expect(ui.elements.get("i-recipient")!.value).toBe("");
+    expect(consent.checked).toBe(false);
+    expect(ui.elements.get("i-name")!.value).toBe("Анна");
+    expect(ui.elements.get("i-tg")!.value).toBe("@anna_test");
+    expect(ui.elements.get("i-mail")!.value).toBe("anna@example.com");
+    expect(form.hidden).toBe(false);
+    expect(done.hidden).toBe(true);
+    expect(refresh).toHaveBeenCalledOnce();
+    expect(ui.state.MAX_TICKETS).toBeNull();
+    expect(ui.elements.get("submit")!.disabled).toBe(true);
+    ui.availability(1);
+    expect(ui.elements.get("submit")!.textContent).toBe("Докупить билет");
+    expect(ui.plus.disabled).toBe(true);
   });
 });

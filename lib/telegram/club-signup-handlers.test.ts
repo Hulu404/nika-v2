@@ -52,6 +52,7 @@ describe("покупка билетов через Telegram", () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-10-28T12:00:00Z"));
     vi.stubEnv("TELEGRAM_PAYMENT_PROVIDER_TOKEN", "test-token");
+    vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://www.mynika.online");
     state.rows = [booking()];
     state.reserve.mockReset().mockResolvedValue({ data: true, error: null });
   });
@@ -119,6 +120,29 @@ describe("покупка билетов через Telegram", () => {
     ctx.message.successful_payment.telegram_payment_charge_id = "duplicate";
     await handleClubPayment(ctx as unknown as BotContext);
     expect(state.rows[0].tg_payment_charge_id).toBe("tg-charge");
+  });
+
+  it("в подтверждении есть ссылка на докупку через сайт", async () => {
+    const ctx = context();
+    await handleClubPayment(ctx as unknown as BotContext);
+    const buttons = ctx.reply.mock.calls[0][1].reply_markup.inline_keyboard.flat();
+    expect(buttons).toContainEqual({ text: "Докупить билеты", url: "https://www.mynika.online/stretch?purchase=more#reg" });
+  });
+
+  it("оплачивает дополнительный билет в том же чате, не меняя первую оплату", async () => {
+    const original = { ...booking(), payment_status: "paid", quantity: 1, amount_rub: 1000, tg_chat_id: 123, tg_payment_charge_id: "first-charge" };
+    const newId = "1b5e3c1a-7f7e-4c55-9d2b-2a1f7e9c3d10";
+    state.rows = [original, { ...booking(), id: newId, confirm_token: "b".repeat(32), quantity: 1, amount_rub: 1000, is_gift: false }];
+    const snapshot = { ...original };
+    const ctx = context();
+    await handleClubStart(ctx as unknown as BotContext, `st_${"b".repeat(32)}`);
+    expect(ctx.replyWithInvoice.mock.calls[0][2]).toBe(invoicePayload(newId));
+    expect(ctx.replyWithInvoice.mock.calls[0][4]).toEqual([{ label: "1 билет", amount: 100000 }]);
+    ctx.message.successful_payment.invoice_payload = invoicePayload(newId);
+    ctx.message.successful_payment.total_amount = 100000;
+    await handleClubPayment(ctx as unknown as BotContext);
+    expect(state.rows[0]).toEqual(snapshot);
+    expect(state.rows[1]).toMatchObject({ payment_status: "paid", tg_chat_id: 123, quantity: 1, amount_rub: 1000 });
   });
 
   it("не выдаёт подарок за неподходящую сумму платежа", async () => {
