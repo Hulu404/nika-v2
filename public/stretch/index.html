@@ -697,8 +697,17 @@ html.js:not(.ready) .r{filter:blur(10px);opacity:.6;animation:unblur .4s ease 3s
 .support-note{margin:16px 0 0;text-align:center}
 .support-note a{color:var(--accent-text);text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
 </style>
+<!-- Яндекс Метрика: счётчик только этой страницы -->
+<script>
+(function(m,e,t,r,i,k,a){m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};m[i].l=1*new Date();
+for(var j=0;j<document.scripts.length;j++){if(document.scripts[j].src===r){return}}
+k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)})
+(window,document,'script','https://mc.yandex.ru/metrika/tag.js?id=113929945','ym');
+ym(113929945,'init',{webvisor:true,clickmap:true,trackLinks:true,accurateTrackBounce:true});
+</script>
 </head>
 <body>
+<noscript><div><img src="https://mc.yandex.ru/watch/113929945" style="position:absolute;left:-9999px" alt=""></div></noscript>
 <div class="paper-tex" aria-hidden="true"></div>
 <!-- 1 · ПОСТЕР: имя клуба -->
 <section class="hero" id="hero">
@@ -1284,6 +1293,8 @@ form.addEventListener('submit',function(e){
     club:EVENT.club,event_date:EVENT.date,source:EVENT.source})})
     .then(function(r){return r.json().then(function(j){if(!r.ok)throw j;return j})})
     .then(function(j){
+      /* Цель Метрики: форма прошла проверку и сервер принял заявку. */
+      if(window.ym)ym(113929945,'reachGoal','form_submit');
       if(j.waitlist&&!OUT)applyAvailability({available:0});
       showDone(j.confirmUrl,j);
     })
