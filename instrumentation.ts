@@ -18,6 +18,22 @@
 /** Как часто проверяем, не пора ли рассылать. Окно — «накануне, с 10:00 МСК». */
 const REMINDER_TICK_MS = 15 * 60 * 1000;
 
+let teamWebhookCheckRunning = false;
+async function tickTeamWebhook(): Promise<void> {
+  if (teamWebhookCheckRunning) return;
+  teamWebhookCheckRunning = true;
+  try {
+    const { ensureTeamWebhook } = await import("./lib/team/ensure-webhook");
+    const result = await ensureTeamWebhook(true);
+    if (result.status === "registered") console.log("[team] webhook восстановлен:", result.detail);
+    else if (result.status === "failed") console.error("[team] webhook:", result.detail);
+  } catch (err) {
+    console.error("[team] webhook check:", err instanceof Error ? err.message : String(err));
+  } finally {
+    teamWebhookCheckRunning = false;
+  }
+}
+
 /**
  * Приглашения на новый забег. Окно — «понедельник с 10:00 МСК», проверка внутри
  * самой рассылки, поэтому тикер зовёт её безусловно и в остальные дни получает
@@ -247,6 +263,7 @@ export async function register(): Promise<void> {
   void tickDatabotCleanup();
   void tickDatabotTaskReminders();
   const timer = setInterval(() => {
+    void tickTeamWebhook();
     void tickReminders();
     void tickInvites();
     void tickClubSurveys();

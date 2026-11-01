@@ -22,7 +22,12 @@ export interface EnsureTeamWebhookResult {
   detail?: string;
 }
 
-export async function ensureTeamWebhook(): Promise<EnsureTeamWebhookResult> {
+export const TEAM_ALLOWED_UPDATES = ["message", "callback_query"] as const;
+
+/** checkFirst — проверить и при необходимости восстановить; без синхронизации меню. */
+export async function ensureTeamWebhook(checkFirst: true): Promise<EnsureTeamWebhookResult | { status: "healthy" }>;
+export async function ensureTeamWebhook(checkFirst?: false): Promise<EnsureTeamWebhookResult>;
+export async function ensureTeamWebhook(checkFirst = false): Promise<EnsureTeamWebhookResult | { status: "healthy" }> {
   const secret = process.env.TEAM_WEBHOOK_SECRET;
   const origin = publicOriginFromEnv();
 
@@ -39,20 +44,42 @@ export async function ensureTeamWebhook(): Promise<EnsureTeamWebhookResult> {
 
   try {
     const bot = getTeamBot();
+    if (checkFirst) {
+      const info = await bot.api.getWebhookInfo();
+      const missingUpdates = info.allowed_updates?.length
+        ? TEAM_ALLOWED_UPDATES.some((type) => !info.allowed_updates!.includes(type))
+        : false;
+      // Telegram хранит последнюю ошибку и после успешной доставки. Старый
+      // 401 без очереди не повод регистрировать вебхук заново на каждом тике.
+      const unauthorized = info.pending_update_count > 0 && /\b401\b/.test(info.last_error_message ?? "");
+      if (info.url === target && !missingUpdates && !unauthorized) {
+        if (info.pending_update_count > 0 && info.last_error_message) {
+          return { status: "failed", detail: `доставка: ${info.last_error_message}; в очереди: ${info.pending_update_count}` };
+        }
+        return { status: "healthy" };
+      }
+    }
     if (!bot.isInited()) await bot.init();
     await bot.api.setWebhook(target, {
       secret_token: secret,
       // Командный бот читает только текст и нажатия — на остальное он всё
       // равно не реагирует, и незачем гонять это через сеть.
-      allowed_updates: ["message", "callback_query"],
+      allowed_updates: [...TEAM_ALLOWED_UPDATES],
+      drop_pending_updates: false,
     });
+    if (checkFirst) return { status: "registered", detail: target };
     // Меню команд ставим здесь же: оно должно приезжать вместе с кодом, а не
     // настраиваться руками в BotFather после каждой новой команды.
     await bot.api.setMyCommands(TEAM_COMMANDS).catch((err) => {
       console.warn("[team] setMyCommands:", err instanceof Error ? err.message : String(err));
     });
     // Старые scope=chat перекрывают общее меню. Обновляем их после деплоя.
-    for (const member of await listTeam()) await setTeamCommands(bot.api, member);
+    try {
+      for (const member of await listTeam()) await setTeamCommands(bot.api, member);
+    } catch (err) {
+      // Ошибка меню не означает, что уже установленный вебхук не работает.
+      console.warn("[team] sync member commands:", err instanceof Error ? err.message : String(err));
+    }
     return { status: "registered", detail: target };
   } catch (err) {
     return { status: "failed", detail: err instanceof Error ? err.message : String(err) };
