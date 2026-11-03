@@ -1,5 +1,5 @@
 import { COFFEE_RUNS, type CoffeeRun } from "../coffeerun/run";
-import { DueError, parseDue } from "../databot/assigned-due";
+import { mskMidnight, mskWeekday } from "../databot/dates";
 import { addDays, mskToday } from "../databot/time";
 import { tgAdmin } from "../telegram/supabase";
 import { COFFEE_RUN_CLUB } from "./clubs";
@@ -217,47 +217,169 @@ export interface EventDraft {
   responsible: string | null;
 }
 
+const MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"];
+const WEEKDAY_WORDS: ReadonlyArray<[RegExp, number]> = [
+  [/^(пн|понедельник[а-я]*)$/, 1], [/^(вт|вторник[а-я]*)$/, 2], [/^(ср|сред[ауы])$/, 3], [/^(чт|четверг[а-я]*)$/, 4],
+  [/^(пт|пятниц[аеуы])$/, 5], [/^(сб|суббот[аеуы])$/, 6], [/^(вс|воскресень[ея])$/, 7],
+];
+const RELATIVE_DAYS: Record<string, number> = { сегодня: 0, завтра: 1, послезавтра: 2 };
+/** «8 ноября» в декабре — это ноябрь следующего года, а не прошлое. */
+const YEAR_ROLL_DAYS = 60;
+const WORD = "[а-яё]+";
+/** Вводные слова команды в начале фразы: «поставь занятие…» → «занятие…». */
+const LEAD = /^(?:пожалуйста\s+)?(?:поставь|поставить|добавь|добавить|создай|создать|запланируй|запланировать|заведи|внеси|сделай|нужно|надо|будет)(?:\s+(?:пожалуйста|в\s+расписание|событие|ивент))*\s+/i;
+/** Висящие предлоги после того, как из фразы вырезали дату и время. */
+const DANGLING = /(?:^|\s)(?:на|в|во|к|с|со|от|и)(?=\s*(?:,|$))/gi;
+
+interface When { at: Date; rest: string }
+
+const pad = (n: number) => String(n).padStart(2, "0");
+const validYmd = (v: string) => !Number.isNaN(Date.parse(`${v}T00:00:00Z`)) && new Date(`${v}T00:00:00Z`).toISOString().slice(0, 10) === v;
+
+function ymdOf(day: number, month: number, year: number | null, now: Date, token: string): string {
+  const today = mskToday(now);
+  let y = year === null ? Number(today.slice(0, 4)) : year < 100 ? 2000 + year : year;
+  let ymd = `${y}-${pad(month)}-${pad(day)}`;
+  if (!validYmd(ymd)) throw new EventParseError(`Нет такой даты: ${token}.`);
+  if (year === null && Date.parse(`${ymd}T00:00:00Z`) < Date.parse(`${today}T00:00:00Z`) - YEAR_ROLL_DAYS * 86_400_000) {
+    y += 1;
+    ymd = `${y}-${pad(month)}-${pad(day)}`;
+  }
+  return ymd;
+}
+
 /**
- * «/event Название / дата время / место / @ответственный». Место и
- * ответственный необязательны, время обязательно. Дату и время понимает тот же
- * разборщик, что сроки задач: «пт 19:00», «завтра 12:00», «03.10 18:00».
+ * Дата и время события в свободной фразе: «в вс 8 ноября в 12:00»,
+ * «8.11 12:00», «завтра в 19.30», «пт 18:00», «в 12». Вырезает их из текста и
+ * возвращает остаток (из него получится название). null — времени нет.
+ */
+export function findEventWhen(text: string, now: Date): When | null {
+  let rest = ` ${text} `;
+  const cut = (re: RegExp): RegExpExecArray | null => {
+    const m = re.exec(rest);
+    if (m) rest = `${rest.slice(0, m.index)} ${rest.slice(m.index + m[0].length)}`;
+    return m;
+  };
+  // Дата словами: «8 ноября», «8 ноября 2026».
+  const named = cut(new RegExp(`(?<=[\\s,(])(?:(?:на|в|во|к)\\s+)?(\\d{1,2})\\s+(${MONTHS.join("|")})(?:\\s+(\\d{4}))?(?=[\\s,.)])`, "i"));
+  // Время с двоеточием: «12:00», «в 12:00».
+  let time = cut(/(?<=[\s,(])(?:(?:в|к|на)\s+)?(\d{1,2}):(\d{2})(?=[\s,.)])/i);
+  // Дата цифрами: «8.11», «08.11.2026». Если времени ещё нет, «12.00» с минутами — это время.
+  let dotted: RegExpExecArray | null = null;
+  if (!named) dotted = cut(/(?<=[\s,(])(?:(?:на|в|во|к)\s+)?(\d{1,2})\.(\d{1,2})(?:\.(\d{2}|\d{4}))?(?=[\s,)]|\.\s)/i);
+  if (dotted && !time && !dotted[3] && Number(dotted[2]) > 12) {
+    // «19.30» без даты — это время.
+    time = dotted;
+    dotted = null;
+  }
+  if (!time) time = cut(/(?<=[\s,(])(?:(?:в|к|на)\s+)?(\d{1,2})\.(\d{2})(?=[\s,)])/i);
+  // «в 12», «в 12 часов».
+  if (!time) {
+    const m = cut(/(?<=[\s,(])(?:в|к)\s+(\d{1,2})(?:\s*(?:час(?:а|ов)?|ч))?(?=[\s,.)])/i);
+    if (m) time = Object.assign([m[0], m[1], "00"], { index: m.index, input: m.input }) as unknown as RegExpExecArray;
+  }
+  // День недели и «завтра»: «в воскресенье», «вс».
+  let weekday: number | null = null;
+  let relative: number | null = null;
+  rest = rest.replace(new RegExp(`(?<=[\\s,(])(?:(?:в|во|на)\\s+)?(${WORD})(?=[\\s,.)])`, "gi"), (all, word: string) => {
+    const w = word.toLowerCase();
+    if (w in RELATIVE_DAYS && relative === null) {
+      relative = RELATIVE_DAYS[w];
+      return " ";
+    }
+    const wd = WEEKDAY_WORDS.find(([re]) => re.test(w));
+    if (wd && weekday === null) {
+      weekday = wd[1];
+      return " ";
+    }
+    return all;
+  });
+  if (!time) return null;
+  const hour = Number(time[1]);
+  const minute = Number(time[2]);
+  if (hour > 23 || minute > 59) throw new EventParseError("Время — от 00:00 до 23:59.");
+
+  const today = mskToday(now);
+  let ymd: string;
+  if (named) ymd = ymdOf(Number(named[1]), MONTHS.indexOf(named[2].toLowerCase()) + 1, named[3] ? Number(named[3]) : null, now, named[0].trim());
+  else if (dotted) ymd = ymdOf(Number(dotted[1]), Number(dotted[2]), dotted[3] ? Number(dotted[3]) : null, now, dotted[0].trim());
+  else if (relative !== null) ymd = addDays(today, relative);
+  else if (weekday !== null) {
+    ymd = addDays(today, (weekday - mskWeekday(today) + 7) % 7);
+    // «в пятницу 18:00», сказанное в пятницу вечером, — следующая пятница.
+    if (new Date(mskMidnight(ymd).getTime() + (hour * 60 + minute) * 60_000) <= now) ymd = addDays(ymd, 7);
+  } else ymd = today;
+  const at = new Date(mskMidnight(ymd).getTime() + (hour * 60 + minute) * 60_000);
+  if (at <= now) throw new EventParseError("Это время уже прошло.");
+  return { at, rest: rest.replace(/\s+/g, " ").trim() };
+}
+
+/** Остаток фразы → название: без «поставь», висящих предлогов и лишних знаков. */
+function cleanTitle(text: string): string {
+  let t = text.replace(/\s+([,.!?)])/g, "$1").replace(/\s+/g, " ").trim();
+  t = t.replace(LEAD, "");
+  for (let i = 0; i < 3; i++) t = t.replace(DANGLING, "").replace(/\s+/g, " ").trim();
+  t = t.replace(/^[\s,.;:—–-]+|[\s,.;:—–-]+$/g, "");
+  return t ? t[0].toUpperCase() + t.slice(1) : "";
+}
+
+const NO_TIME = "Не вижу времени. Напиши, например: «Пилатес в вс 8 ноября 12:00, Студия Поток» или «Планёрка / пт 19:00 / Zoom».";
+
+/**
+ * Событие из одной строки — как удобно человеку:
+ * - фразой: «поставь занятие по пилатесу на воскресенье 8 ноября в 12:00, Студия Поток @masha»;
+ * - полями: «Название / дата время / место / @ответственный» (лишние поля
+ *   уходят в место через запятую, порядок полей после названия любой).
+ * Время обязательно, место и ответственный — нет.
  */
 export function parseEventLine(text: string, now: Date): EventDraft {
   const body = text.replace(/^\/event(?:@\w+)?\s*/i, "").trim();
-  if (!body) throw new EventParseError("Формат: /event Название / дата время / место / @ответственный. Место и ответственный необязательны.");
-  const fields = body.split(/\s+\/\s+|\s*\/\s*(?=@)/).map((f) => f.trim());
-  if (fields.length < 2 || fields.length > 4) {
-    throw new EventParseError("Нужно от двух до четырёх полей через « / »: название / дата время / место / @ответственный.");
-  }
-  const [title, when, ...rest] = fields;
-  if (!title || title.length > 200) throw new EventParseError("Название события — от 1 до 200 символов.");
-  if (!/\d{1,2}:\d{2}/.test(when)) throw new EventParseError(`Не вижу времени в «${when}». Укажи его: «пт 19:00», «завтра 12:00», «03.10 18:00».`);
-  let startsAt: Date;
-  try {
-    startsAt = parseDue(when, now);
-  } catch (err) {
-    if (err instanceof DueError) {
-      throw new EventParseError(err.message === "Срок уже прошёл." ? "Это время уже прошло." : err.message.replace("Не понял срок", "Не поняла дату"));
-    }
-    throw err;
-  }
+  if (!body) throw new EventParseError(`Пришли событие одной строкой. ${NO_TIME}`);
+  const nicks = [...body.matchAll(/(?:^|[\s/,])@([a-z0-9_]{1,32})\b/gi)].map((m) => m[1].toLowerCase());
+  if (new Set(nicks).size > 1) throw new EventParseError("Ответственный один: @ник.");
+  const responsible = nicks[0] ?? null;
+  const plain = body.replace(/@[a-z0-9_]{1,32}\b/gi, " ");
+
+  const fields = plain.split(/\s*\/\s*/).map((f) => f.trim()).filter(Boolean);
+  let title: string;
+  let when: When | null = null;
   let place: string | null = null;
-  let responsible: string | null = null;
-  for (const f of rest) {
-    if (/^@[a-z0-9_]{1,32}$/i.test(f)) {
-      if (responsible) throw new EventParseError("Ответственный один: @ник.");
-      responsible = f.slice(1).toLowerCase();
-    } else if (f) {
-      if (place) throw new EventParseError("Похоже, полей больше, чем нужно: название / дата время / место / @ответственный.");
-      place = f.slice(0, 200);
+  if (fields.length > 1) {
+    // Поля: название — первое; время — в первом поле, где оно есть; остальное — место.
+    title = fields[0];
+    const others: string[] = [];
+    for (const f of fields.slice(1)) {
+      const found: When | null = when ? null : findEventWhen(f, now);
+      if (found) {
+        when = found;
+        if (found.rest) others.push(found.rest);
+      } else others.push(f);
     }
+    if (!when) {
+      when = findEventWhen(title, now);
+      if (when) title = when.rest;
+    }
+    place = others.join(", ") || null;
+  } else {
+    when = findEventWhen(plain, now);
+    if (!when) throw new EventParseError(NO_TIME);
+    // «Пилатес 8 ноября 12:00, Студия Поток»: после запятой — место.
+    const [head, ...tail] = when.rest.split(/\s*,\s*/);
+    title = head;
+    place = tail.filter((t) => cleanTitle(t)).map(cleanTitle).join(", ") || null;
   }
-  return { title, startsAt: startsAt.toISOString(), place, responsible };
+  if (!when) throw new EventParseError(NO_TIME);
+  title = cleanTitle(title);
+  if (!title) throw new EventParseError("Не вижу названия. Например: «Пилатес в вс 8 ноября 12:00».");
+  if (title.length > 200) throw new EventParseError("Название события — до 200 символов.");
+  return { title, startsAt: when.at.toISOString(), place: place ? place.slice(0, 200) : null, responsible };
 }
 
 /** Время события из одного поля: «пт 19:00». Для «Изменить время». */
 export function parseEventTime(text: string, now: Date): string {
-  return parseEventLine(`/event x / ${text.trim()}`, now).startsAt;
+  const found = findEventWhen(text.trim(), now);
+  if (!found) throw new EventParseError("Не вижу времени. Например: «пт 19:00», «завтра в 12:00», «8 ноября 12:00».");
+  return found.at.toISOString();
 }
 
 // ── Права ────────────────────────────────────────────────────────────────────

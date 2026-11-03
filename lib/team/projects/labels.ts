@@ -4,7 +4,7 @@ import { NIKA, projectLabel, type Project, type ProjectStore } from "./projects"
 
 /**
  * Метка проекта в уведомлениях: человеку в нескольких проектах —
- * «🔬 RESCAN · Через 3 часа срок: …», человеку в одном проекте — без метки.
+ * «🏃 NIKA · Через 3 часа срок: …», человеку в одном проекте — без метки.
  * Состав читается из базы не чаще раза в минуту.
  */
 
@@ -49,7 +49,7 @@ export async function projectIdsOf(chatId: number, now = Date.now()): Promise<st
   return ids;
 }
 
-/** «🔬 RESCAN · » — если человек в нескольких проектах; иначе пусто. Ошибка базы — без метки. */
+/** «🏃 NIKA · » — если человек в нескольких проектах; иначе пусто. Ошибка базы — без метки. */
 export async function projectPrefix(chatId: number, projectId: string | null | undefined): Promise<string> {
   try {
     const now = Date.now();

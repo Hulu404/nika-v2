@@ -5,7 +5,7 @@ import type { DatabotStore } from "../../databot/data/store";
 import { normalizeTaskUsername } from "../../databot/tasks";
 import { isActiveAssigned, type AssignedTask, type AssignedTaskDraft } from "../../databot/task-list";
 import { findMember, listProjectTeam, type TeamMember } from "../access";
-import { DEFAULT_SCOPE, isMulti, scopeOf, type Scope } from "../projects/scope";
+import { DEFAULT_SCOPE, scopeOf, type Scope } from "../projects/scope";
 import { withProjectLabel } from "../projects/labels";
 import { NIKA, projectInText, projectLabel, type Project } from "../projects/projects";
 import { isFounder, teamBotConfigured, teamToken } from "../config";
@@ -34,9 +34,6 @@ import {
 } from "./stores";
 import { executeTool, toolSpecsFor, type ToolContext } from "./tools";
 import { flushOutbox, supabaseOutboxStore, type OutboxStore } from "../outbox";
-import { checkRoadmapCompletion } from "../roadmap/complete";
-import { supabaseRoadmapStore, type RoadmapPatch, type RoadmapStore } from "../roadmap/store";
-import { supabaseAboutStore, type AboutStore } from "../about/store";
 import { GUARD_FAIL_TEXT, GUARD_RETRY_NOTE, fabricated, looksLikeListing } from "./guard";
 import { AI_FAIL_TEXT, TeamAiError, VOICE_MAX_BYTES, VOICE_MAX_SECONDS, aiErrorText, defaultTeamAi, teamAiConfig, type TeamAi } from "./yandex";
 
@@ -87,8 +84,6 @@ export interface AssistantDeps {
   forProject?: (projectId: string) => Promise<AssistantDeps | null>;
   /** Команда другого проекта. */
   teamOf?: (projectId: string) => Promise<TeamMember[]>;
-  roadmap?: RoadmapStore;
-  about?: AboutStore;
 }
 
 /** Голосовое из Telegram — в память, никуда не пишем. */
@@ -120,11 +115,6 @@ export function defaultAssistantDeps(screens: Pick<AssistantDeps, "showSchedule"
     project: scope.project,
     projects: scope.projects,
     teamOf: listProjectTeam,
-    roadmap: supabaseRoadmapStore(),
-    about: supabaseAboutStore(),
-    onTaskDone: async (api, task) => {
-      await checkRoadmapCompletion(api, { roadmap: supabaseRoadmapStore(), tasks: createSupabaseStore() }, task).catch(() => {});
-    },
     ...screens,
   };
 }
@@ -168,9 +158,7 @@ async function opData(deps: AssistantDeps, p: Intent, uid: number): Promise<OpDa
   const tasks = (await Promise.all(ids.map((id) => deps.tasks.getAssignedTask(id)))).filter((t): t is AssignedTask => !!t);
   const event = p.intent === "update_event" || p.intent === "cancel_event" ? await deps.events.get(p.event_id) : null;
   const reminder = p.intent === "cancel_reminder" ? (await deps.reminders.listMine(uid)).find((r) => r.id === p.reminder_id) ?? null : null;
-  const item = p.intent === "update_roadmap_item" && deps.roadmap ? await deps.roadmap.get(p.item_id) : null;
-  const roadmapItem = item && item.project_id === (deps.projectId ?? NIKA) ? item : null;
-  return { tasks, event, reminder, roadmapItem };
+  return { tasks, event, reminder };
 }
 
 const isCreate = (p: Intent) => p.intent === "create_task" || p.intent === "create_event" || p.intent === "create_reminder";
@@ -300,7 +288,6 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, baseDeps
       tasks: deps.tasks, events: deps.events, reminders: deps.reminders, shown,
       projectId, isAdmin: deps.isAdmin ?? isFounder,
       modules: deps.project?.modules, projectLabel: deps.project ? projectLabel(deps.project) : undefined,
-      roadmap: deps.roadmap, about: deps.about,
       otherTeams: deps.projects && deps.projects.length > 1 && deps.teamOf
         ? async () => Promise.all(deps.projects!.filter((p) => p.id !== projectId).map(async (p) => ({ project: p, team: await deps.teamOf!(p.id) })))
         : undefined,
@@ -351,7 +338,7 @@ export async function handleAiMessage(ctx: Context, member: TeamMember, baseDeps
       // Выдуманные данные человеку не уходят: безопасный ответ и кнопки разделов.
       console.warn(`[team-ai] guard: fabricated output step=${run.steps}`);
       if (!shown.list && !shown.preview) {
-        await ctx.reply(GUARD_FAIL_TEXT, { reply_markup: menuKeyboard(scopeOf(ctx).project, isMulti(scopeOf(ctx))) });
+        await ctx.reply(GUARD_FAIL_TEXT, { reply_markup: menuKeyboard(scopeOf(ctx).project) });
         sentText = GUARD_FAIL_TEXT;
       }
       text = "";
@@ -444,7 +431,7 @@ async function confirm(ctx: Context, deps: AssistantDeps, draft: Draft, uid: num
     const due = p.due ? mskLocalToDate(p.due).toISOString() : null;
     const drafts: AssignedTaskDraft[] = usernames.map((username) => ({ line: 1, username, what: p.what, due_at: due }));
     const tasks = await deps.tasks.importAssignedTasks(uid, draft.message_id ?? draft.id, drafts,
-      { projectId: deps.projectId ?? NIKA, roadmapItemId: draft.intent.roadmapItemId ?? null });
+      { projectId: deps.projectId ?? NIKA });
     const delivery = await deliverAssigned(ctx.api, deps.tasks, tasks.filter((t) => t.delivery_state === "pending"), author?.username ?? undefined, now);
     // Ночью сообщение исполнителю уйдёт в 09:00 — автор это видит.
     const night = queuedNotice(delivery.queued.map((q) => team.find((m) => m.chat_id === q.assignee)).filter((m): m is TeamMember => !!m).map(personName));
@@ -588,20 +575,6 @@ async function confirm(ctx: Context, deps: AssistantDeps, draft: Draft, uid: num
     return (await deps.reminders.cancel(p.reminder_id, uid)) ? "✅ Удалила напоминание." : "Это напоминание уже ушло или удалено.";
   }
 
-  if (p.intent === "update_roadmap_item") {
-    // Те же права, что у кнопок плана: админ проекта или ответственный пункта.
-    const item = deps.roadmap ? await deps.roadmap.get(p.item_id) : null;
-    if (!item || item.project_id !== (deps.projectId ?? NIKA)) return "Этого пункта уже нет в плане.";
-    if (!founder && item.owner_chat_id !== uid) return "Менять пункт могут админы проекта и его ответственный.";
-    const patch: RoadmapPatch = {
-      ...(p.status ? { status: p.status } : {}), ...(p.owner_chat_id ? { owner_chat_id: p.owner_chat_id } : {}),
-      ...(p.due ? { due_date: p.due } : p.clear_due ? { due_date: null } : {}),
-    };
-    await deps.roadmap!.update(item.id, patch, uid, now);
-    const label = item.code ? `${item.code} · ${item.title}` : item.title;
-    if (p.owner_chat_id && p.owner_chat_id !== item.owner_chat_id) await tell(p.owner_chat_id, `🗺 Ты ответственный за пункт плана: ${escapeHtmlTeam(label)}`);
-    return `✅ Обновила пункт ${item.code ?? item.title}.`;
-  }
   return "Нечего делать.";
 }
 

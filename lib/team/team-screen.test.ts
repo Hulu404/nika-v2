@@ -150,7 +150,7 @@ describe("«👥 Команда»: отделы", () => {
       outsiders = [member(20, "newbie")];
       notified = [];
       Object.assign(deps, {
-        projectName: "🔬 RESCAN",
+        projectName: "🧪 LAB",
         roleOf: async (id: number) => roles.get(id) ?? null,
         outsiders: async () => outsiders,
         addMember: async (id: number) => {
@@ -176,7 +176,7 @@ describe("«👥 Команда»: отделы", () => {
       expect(screens.at(-1)!.buttons).toEqual(["newbie @newbie", "🔗 Ссылка-приглашение", "← К команде"]);
       await press("dp:ap:20", 9);
       expect(team.some((m) => m.chat_id === 20)).toBe(true);
-      expect(screens.some((s) => s.text.startsWith("Тебя добавили в проект 🔬 RESCAN"))).toBe(true);
+      expect(screens.some((s) => s.text.startsWith("Тебя добавили в проект 🧪 LAB"))).toBe(true);
     });
 
     it("ссылка-приглашение — t.me/<бот>?start=join_<токен>", async () => {

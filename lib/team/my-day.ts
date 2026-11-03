@@ -129,7 +129,7 @@ export async function buildMyDay(deps: MyDayDeps, member: Pick<TeamMember, "chat
 
 /**
  * Утренний план: одно сообщение на человека. Человеку в одном проекте — как
- * раньше, без названий проектов; в нескольких — блоки «🏃 NIKA», «🔬 RESCAN».
+ * раньше, без названий проектов; в нескольких — блок на каждый проект («🏃 NIKA»).
  * Пустые блоки не показываются, пустой день — null (не отправлять).
  */
 export function morningPlanText(ymd: string, blocks: ReadonlyArray<{ label: string; lines: string[] }>, footer: boolean): string | null {

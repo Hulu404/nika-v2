@@ -1,7 +1,7 @@
 import type { Context } from "grammy";
 import { findMember, listProjectTeam, listTeam, markProfileEdited, updateProfile, type TeamMember } from "./access";
 import { supabaseMembershipStore } from "./projects/members";
-import { DEFAULT_SCOPE, isMulti, resolveScope, scopeOf, type Scope } from "./projects/scope";
+import { DEFAULT_SCOPE, resolveScope, scopeOf, type Scope } from "./projects/scope";
 import { isFounder } from "./config";
 import { PROFILE_PROMPT, escapeHtmlTeam, addToProjectScreen, memberDepartmentsScreen, menuKeyboard, removeFromProjectScreen, teamScreen, type ProfileField, type TaskScreen } from "./copy";
 import { inviteLink, supabaseInviteStore } from "./projects/invites";
@@ -29,7 +29,7 @@ export interface TeamScreenDeps {
   forms?: TeamFormStore;
   /** Админ проекта (по умолчанию — фаундер): меняет всем имя, должность, отделы. */
   isAdmin?: (chatId: number) => boolean;
-  /** «🔬 RESCAN» — для текстов добавления и удаления. */
+  /** «🏃 NIKA» — для текстов добавления и удаления. */
   projectName?: string;
   /** Роль человека в проекте (null — строки нет: фаундер или старая схема). */
   roleOf?: (chatId: number) => Promise<"admin" | "member" | null>;
@@ -97,7 +97,7 @@ export const defaultTeamScreenDeps = (scope: Scope = DEFAULT_SCOPE): TeamScreenD
     keyboardOf: async (id) => {
       const person = await findMember(id);
       const s = await resolveScope({ projects: supabaseProjectStore(), memberships }, id, person?.current_project ?? null);
-      return s ? menuKeyboard(s.project, isMulti(s)) : undefined;
+      return s ? menuKeyboard(s.project) : undefined;
     },
   };
 };
@@ -234,7 +234,7 @@ export async function handleTeamScreenUpdate(ctx: Context, providedDeps?: TeamSc
     const person = (deps.outsiders ? await deps.outsiders() : []).find((m) => m.chat_id === targetId);
     if (!person || !deps.addMember) return true;
     await deps.addMember(targetId, uid);
-    await ctx.api.sendMessage(targetId, `Тебя добавили в проект ${project}. Переключиться — кнопка «🔀 Проект» внизу.`,
+    await ctx.api.sendMessage(targetId, `Тебя добавили в проект ${project}.`,
       { reply_markup: deps.keyboardOf ? await deps.keyboardOf(targetId) : undefined }).catch(() => {});
     await showTeam(ctx, deps, uid, true);
     return true;

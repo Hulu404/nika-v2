@@ -1,4 +1,4 @@
-import { Bot, InlineKeyboard, type Api, type Context } from "grammy";
+import { Bot, type Api, type Context } from "grammy";
 import { isFounder, teamToken } from "./config";
 import {
   applyRoster,
@@ -23,14 +23,8 @@ import { touchSeen } from "./seen";
 import { handleSocialSectionUpdate } from "./founders/section";
 import { defaultTeamScreenDeps, handleTeamScreenUpdate, showTeam } from "./team-screen";
 import { defaultCoffeeWeekDeps, handleCoffeeWeekUpdate } from "./coffee-run-week";
-import { closeAiDraft, defaultAssistantDeps, handleAiMessage, handleAiUpdate, startTaskDraft, type AssistantDeps } from "./ai/assistant";
-import { validateIntent } from "./ai/intent";
-import { handleRoadmapUpdate } from "./roadmap/screen";
-import { handleAboutUpdate } from "./about/screen";
-import type { RoadmapItem } from "./roadmap/store";
-import { personName } from "./roster";
+import { closeAiDraft, defaultAssistantDeps, handleAiMessage, handleAiUpdate, type AssistantDeps } from "./ai/assistant";
 import { supabaseDraftStore, supabaseParticipantStore } from "./ai/stores";
-import { supabaseStateStore } from "./ai/memory";
 import { teamAiConfig } from "./ai/yandex";
 import { aiCheckText, defaultCheckDeps } from "./ai/check";
 import { buildMyDay } from "./my-day";
@@ -38,8 +32,8 @@ import { buildCoffeeBlock } from "./digest-build";
 import { fetchRunSignups } from "./stats";
 import { mskToday } from "../databot/time";
 import { scopedEvents, supabaseEventStore } from "./events";
-import { DEFAULT_SCOPE, isMulti, resolveScope, scopeFor, scopeOf, setScope, type Scope } from "./projects/scope";
-import { hasModule, projectLabel, supabaseProjectStore, type ModuleKey, type ProjectStore } from "./projects/projects";
+import { DEFAULT_SCOPE, resolveScope, scopeFor, scopeOf, setScope, type Scope } from "./projects/scope";
+import { hasModule, isRetiredProject, projectLabel, supabaseProjectStore, type ModuleKey, type ProjectStore } from "./projects/projects";
 import { supabaseMembershipStore, type MembershipStore } from "./projects/members";
 import { supabaseInviteStore, type InviteStore } from "./projects/invites";
 
@@ -151,25 +145,13 @@ function assistantDeps(scope: Scope = DEFAULT_SCOPE): AssistantDeps {
   return deps;
 }
 
-/** «📋 Сделать задачей» в плане развития: обычный предпросмотр, исполнитель — ответственный пункта. */
-async function makeRoadmapTask(ctx: TeamContext, item: RoadmapItem): Promise<void> {
-  if (!ctx.from) return;
-  const deps = assistantDeps(scopeOf(ctx));
-  const owner = (await deps.listTeam()).find((m) => m.chat_id === item.owner_chat_id);
-  const parsed = validateIntent({
-    intent: "create_task", what: `${item.code ? `${item.code} · ` : ""}${item.title}`, due: item.due_date ?? "",
-    assignees: owner ? [{ name: personName(owner), qualifier: null }] : [],
-  });
-  await startTaskDraft(ctx, deps, ctx.from.id, parsed, { roadmapItemId: item.id, picks: owner ? { a0: owner.chat_id } : {} });
-}
-
 /** Команды разделов, которые есть не у всех проектов. */
-const MODULE_COMMANDS: Record<string, ModuleKey> = { events: "events", social: "social", coffee_weekly: "coffee_run", roadmap: "roadmap", about: "about", roadmap_add: "roadmap", link: "about" };
+const MODULE_COMMANDS: Record<string, ModuleKey> = { events: "events", social: "social", coffee_weekly: "coffee_run" };
 
-/** Клавиатура под проект этого обновления: разделы по модулям, переключатель — если проектов несколько. */
+/** Клавиатура под проект этого обновления: разделы по модулям. */
 export function keyboardFor(ctx: TeamContext) {
   const scope = scopeOf(ctx);
-  return menuKeyboard(scope.project, isMulti(scope));
+  return menuKeyboard(scope.project);
 }
 
 /** Закрыть открытую форму; черновик с открытым «Изменить» закрывается вместе с ней. */
@@ -211,7 +193,7 @@ async function acceptInvite(ctx: TeamContext, token: string): Promise<void> {
   const uid = ctx.from.id;
   const now = new Date();
   const invite = await deps.invites.redeem(token, uid, now).catch(() => null);
-  if (!invite) {
+  if (!invite || isRetiredProject(invite.project_id)) {
     await ctx.reply("Ссылка недействительна: она уже использована или устарела. Попроси новую у админа проекта.");
     return;
   }
@@ -308,8 +290,6 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     if (await handleEventsUpdate(ctx)) return;
     if (await handleSocialSectionUpdate(ctx)) return;
     if (await handleTeamScreenUpdate(ctx)) return;
-    if (await handleRoadmapUpdate(ctx, undefined, new Date(), makeRoadmapTask)) return;
-    if (await handleAboutUpdate(ctx)) return;
     if (await handleCoffeeWeekUpdate(ctx, defaultCoffeeWeekDeps())) return;
     // Кнопки черновика и «✏️ Изменить» — после всех форм: уточнение ждём, только если открыто именно оно.
     if (await handleAiUpdate(ctx, () => assistantDeps(scopeOf(ctx)))) return;
@@ -464,40 +444,6 @@ export function registerHandlers(bot: Bot<TeamContext>): void {
     }
     await ctx.replyWithChatAction("typing").catch(() => {});
     await ctx.reply(await aiCheckText(defaultCheckDeps()));
-  });
-
-  // ── Проекты ────────────────────────────────────────────────────────────────
-  bot.command("project", async (ctx) => {
-    const member = await requireMember(ctx);
-    if (!member) return;
-    const scope = scopeOf(ctx);
-    if (!isMulti(scope)) {
-      await ctx.reply(`Ты в проекте ${projectLabel(scope.project)}.`, { reply_markup: keyboardFor(ctx) });
-      return;
-    }
-    const kb = new InlineKeyboard();
-    for (const p of scope.projects) kb.text(`${projectLabel(p)}${p.id === scope.project.id ? " ✓" : ""}`, `pj:${p.id}`).row();
-    await ctx.reply("Выбери проект:", { reply_markup: kb });
-  });
-
-  bot.callbackQuery(/^pj:([a-z0-9_-]+)$/, async (ctx) => {
-    await ctx.answerCallbackQuery().catch(() => {});
-    const scope = scopeOf(ctx);
-    const target = scope.projects.find((p) => p.id === ctx.match[1]);
-    if (!target || !ctx.from) {
-      await ctx.reply("Этого проекта нет в твоём списке.");
-      return;
-    }
-    await setCurrentProject(ctx.from.id, target.id);
-    setScope(ctx, await scopeFor(scopeDeps(), target, scope.projects));
-    // Открытый черновик и номера последнего списка — из прошлого проекта: сбрасываем.
-    await closeForm(ctx, ctx.from.id);
-    const state = supabaseStateStore();
-    await state.setDraft(ctx.from.id, null, new Date()).catch(() => {});
-    await state.setList(ctx.from.id, null, new Date()).catch(() => {});
-    await ctx.editMessageText(`Проект: ${projectLabel(target)}`).catch(() => {});
-    menuShown.add(ctx.from.id);
-    await ctx.reply(`Переключила на ${projectLabel(target)}`, { reply_markup: keyboardFor(ctx) });
   });
 
   bot.command("leave", async (ctx) => {

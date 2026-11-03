@@ -48,8 +48,31 @@ describe("разбор /event", () => {
     expect(() => parseEventLine("/event Планёрка / пт", NOW)).toThrow(/Не вижу времени/);
     expect(() => parseEventLine("/event Планёрка / 01.10 10:00", NOW)).toThrow(EventParseError);
     expect(() => parseEventLine("/event Планёрка / сегодня 09:00", NOW)).toThrow(/уже прошло/);
-    expect(() => parseEventLine("/event Планёрка", NOW)).toThrow(/от двух до четырёх полей/);
-    expect(() => parseEventLine("/event", NOW)).toThrow(/Формат/);
+    expect(() => parseEventLine("/event Планёрка", NOW)).toThrow(/Не вижу времени/);
+    expect(() => parseEventLine("/event", NOW)).toThrow(/Пришли событие/);
+    expect(() => parseEventLine("/event Разбор / пт 18:00 / @bob / @ann", NOW)).toThrow(/Ответственный один/);
+  });
+
+  it("понимает обычную фразу: дата словами, день недели, «в 12», место после запятой, @ответственный", () => {
+    expect(parseEventLine("поставь занятие по пилатесу на воскресенье 11 октября в 12:00", NOW)).toEqual({
+      title: "Занятие по пилатесу", startsAt: msk("2026-10-11T12:00").toISOString(), place: null, responsible: null,
+    });
+    expect(parseEventLine("Пилатес в вс 11 октября 12:00, Студия Поток @masha", NOW)).toEqual({
+      title: "Пилатес", startsAt: msk("2026-10-11T12:00").toISOString(), place: "Студия Поток", responsible: "masha",
+    });
+    expect(parseEventLine("созвон с Сальмой завтра в 16:00", NOW)).toMatchObject({ title: "Созвон с Сальмой", startsAt: msk("2026-10-09T16:00").toISOString() });
+    expect(parseEventLine("планёрка в пятницу в 10", NOW).startsAt).toBe(msk("2026-10-09T10:00").toISOString());
+    expect(parseEventLine("Пилатес 11.10 12.00", NOW).startsAt).toBe(msk("2026-10-11T12:00").toISOString());
+    expect(parseEventLine("встреча в 19.30", NOW).startsAt).toBe(msk("2026-10-08T19:30").toISOString());
+    // «2 января» в октябре — следующий год, а не прошлое.
+    expect(parseEventLine("Новогодний забег 2 января 11:00", NOW).startsAt).toBe(msk("2027-01-02T11:00").toISOString());
+  });
+
+  it("поля через « / »: лишние поля уходят в место, а не в ошибку", () => {
+    expect(parseEventLine("Пилатес / 11.10 12:00 / Пилатес клуб / Студия Поток", NOW)).toEqual({
+      title: "Пилатес", startsAt: msk("2026-10-11T12:00").toISOString(), place: "Пилатес клуб, Студия Поток", responsible: null,
+    });
+    expect(parseEventLine("Пилатес / Студия Поток / вс 12:00", NOW)).toMatchObject({ place: "Студия Поток", startsAt: msk("2026-10-11T12:00").toISOString() });
   });
 });
 

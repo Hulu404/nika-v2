@@ -308,9 +308,6 @@ export const MENU = {
   schedule: "🗓 Расписание",
   events: "🏃 Ивенты",
   team: "👥 Команда",
-  roadmap: "🗺 План развития",
-  about: "📌 О проекте",
-  project: "🔀 Проект",
 } as const;
 
 export type MenuSection = keyof typeof MENU;
@@ -321,15 +318,11 @@ const MENU_COMMAND: Record<MenuSection, string> = {
   schedule: "/schedule",
   events: "/events",
   team: "/team",
-  roadmap: "/roadmap",
-  about: "/about",
-  project: "/project",
 };
 
-/** Раздел по тексту кнопки меню; null — это не кнопка. «🔀 Проект: RESCAN» — переключатель. */
+/** Раздел по тексту кнопки меню; null — это не кнопка. */
 export function menuSection(text: string | undefined | null): MenuSection | null {
   const t = (text ?? "").trim();
-  if (t.startsWith(MENU.project)) return "project";
   return (Object.keys(MENU) as MenuSection[]).find((k) => MENU[k] === t) ?? null;
 }
 
@@ -337,7 +330,7 @@ export function menuCommand(section: MenuSection): string {
   return MENU_COMMAND[section];
 }
 
-/** Проект для клавиатуры: какие разделы есть и как его назвать в переключателе. */
+/** Проект для клавиатуры: какие разделы есть. */
 export interface MenuProject {
   name: string;
   modules: readonly string[];
@@ -345,19 +338,14 @@ export interface MenuProject {
 
 /**
  * Постоянная клавиатура. Разделы — по модулям проекта (по умолчанию как у
- * NIKA), по две кнопки в ряд. У человека в нескольких проектах первая строка —
- * переключатель «🔀 Проект: RESCAN»; у человека в одном проекте её нет.
+ * NIKA), по две кнопки в ряд. Переключателя проектов нет.
  */
-export function menuKeyboard(project?: MenuProject, multi = false): Keyboard {
+export function menuKeyboard(project?: MenuProject): Keyboard {
   const modules = project?.modules ?? ["events"];
-  const buttons: string[] = [MENU.tasks, MENU.assign];
-  if (modules.includes("roadmap")) buttons.push(MENU.roadmap);
-  buttons.push(MENU.schedule);
+  const buttons: string[] = [MENU.tasks, MENU.assign, MENU.schedule];
   if (modules.includes("events")) buttons.push(MENU.events);
-  if (modules.includes("about")) buttons.push(MENU.about);
   buttons.push(MENU.team);
   const kb = new Keyboard();
-  if (multi && project) kb.text(`${MENU.project}: ${project.name}`).row();
   buttons.forEach((b, i) => {
     kb.text(b);
     if (i % 2 === 1 && i < buttons.length - 1) kb.row();
@@ -982,14 +970,14 @@ export function eventCancelAskScreen(ev: TeamEvent): TaskScreen {
 }
 
 export const EVENT_ADD_HINT = [
-  "Пришли событие одной строкой: название / дата время / место / @ответственный.",
-  "Место и ответственный необязательны, время обязательно.",
-  "<code>Планёрка / вт 19:00 / Zoom</code>",
-  "<code>Книжный клуб / 15.10 19:30 / Surf Coffee / @masha</code>",
+  "Напиши событие как удобно, одним сообщением. Обязательно только время.",
+  "<code>Пилатес в воскресенье 8 ноября в 12:00, Студия Поток</code>",
+  "<code>Планёрка / вт 19:00 / Zoom / @masha</code>",
+  "После запятой или « / » — место, @ник — ответственный.",
   "Отмена: /cancel.",
 ].join("\n");
 
-export const EVENT_TIME_PROMPT = "Пришли новое время: «пт 19:00», «завтра 12:00», «03.10 18:00». Отмена: /cancel.";
+export const EVENT_TIME_PROMPT = "Пришли новое время: «пт 19:00», «завтра в 12:00», «8 ноября 12:00». Отмена: /cancel.";
 
 // ── Ивенты ───────────────────────────────────────────────────────────────────
 // Один раздел /events вместо /runs, /run, /who, /notif, /contacts, /history.

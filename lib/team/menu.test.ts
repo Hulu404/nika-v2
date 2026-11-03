@@ -26,7 +26,9 @@ vi.mock("./projects/members", async (importOriginal) => {
 });
 vi.mock("./projects/projects", async (importOriginal) => {
   const real = await importOriginal<typeof import("./projects/projects")>();
-  return { ...real, supabaseProjectStore: () => new real.MemoryProjectStore() };
+  // Второй проект — как LAB_PROJECT из test-projects.ts (импорт отсюда зациклил бы мок).
+  const lab = { id: "lab", name: "LAB", emoji: "🧪", modules: [...real.CORE_MODULES], sort: 2 };
+  return { ...real, supabaseProjectStore: () => new real.MemoryProjectStore([...real.DEFAULT_PROJECTS.map((p) => ({ ...p, modules: [...p.modules] })), lab]) };
 });
 vi.mock("../databot/data/supabase-store", async () => {
   const { MemoryStore } = await import("../databot/data/memory-store");
@@ -61,6 +63,7 @@ vi.mock("./stats", async (importOriginal) => ({ ...(await importOriginal<typeof 
 import { registerHandlers, resetMenuShown, setInviteDeps, TEAM_COMMANDS } from "./bot";
 import { MemoryInviteStore } from "./projects/invites";
 import { MemoryProjectStore } from "./projects/projects";
+import { testProjects } from "./projects/test-projects";
 import { MENU } from "./copy";
 import { openTeamForm, type MemoryTeamForms } from "./form";
 import type { MemoryFactStore } from "./attendance";
@@ -174,30 +177,14 @@ describe("постоянное меню «Пятницы»", () => {
     vi.unstubAllEnvs();
   });
 
-  it("/project у человека в одном проекте — без списка и без упоминания других проектов", async () => {
-    await send("/project");
-    expect(sent.at(-1)!.text).toBe("Ты в проекте 🏃 NIKA.");
-  });
-
-  it("человек в двух проектах: «🔀 Проект» → выбор → «Переключила на 🔬 RESCAN» и клавиатура RESCAN", async () => {
+  it("переключателя проектов нет: даже у человека в двух проектах — только разделы", async () => {
     const ms = shared.memberships as MemoryMembershipStore;
     await ms.add({ project_id: "nika", chat_id: 1 }, new Date());
-    await ms.add({ project_id: "rescan", chat_id: 1 }, new Date());
+    await ms.add({ project_id: "lab", chat_id: 1 }, new Date());
     await send("/start");
     const kb = sent.find((s) => (s.markup as { keyboard?: unknown })?.keyboard)!.markup as { keyboard: Array<Array<{ text: string }>> };
-    expect(kb.keyboard[0].map((b) => b.text)).toEqual(["🔀 Проект: NIKA"]);
-    sent = [];
-    await send("🔀 Проект: NIKA");
-    const list = sent.at(-1)!;
-    expect(list.text).toBe("Выбери проект:");
-    expect((list.markup as { inline_keyboard: Array<Array<{ text: string; callback_data: string }>> }).inline_keyboard.flat().map((b) => b.text)).toEqual(["🏃 NIKA ✓", "🔬 RESCAN"]);
-    await pressCb("pj:rescan");
-    expect(shared.current).toEqual([[1, "rescan"]]);
-    const done = sent.at(-1)!;
-    expect(done.text).toBe("Переключила на 🔬 RESCAN");
-    expect((done.markup as { keyboard: Array<Array<{ text: string }>> }).keyboard.map((r) => r.map((b) => b.text))).toEqual([
-      ["🔀 Проект: RESCAN"], [MENU.tasks, MENU.assign], [MENU.roadmap, MENU.schedule], [MENU.about, MENU.team],
-    ]);
+    expect(kb.keyboard.map((r) => r.map((b) => b.text))).toEqual([[MENU.tasks, MENU.assign], [MENU.schedule, MENU.events], [MENU.team]]);
+    expect(JSON.stringify(kb)).not.toContain("🔀");
   });
 
   describe("приглашение в проект", () => {
@@ -205,7 +192,7 @@ describe("постоянное меню «Пятницы»", () => {
     beforeEach(() => {
       invites = new MemoryInviteStore();
       setInviteDeps({
-        invites, memberships: shared.memberships as MemoryMembershipStore, projects: new MemoryProjectStore(),
+        invites, memberships: shared.memberships as MemoryMembershipStore, projects: new MemoryProjectStore(testProjects()),
         ensurePerson: async (id, p) => {
           if (!roster.has(id)) roster.set(id, member(id, p.username ?? `u${id}`));
           return roster.get(id)!;
@@ -216,23 +203,30 @@ describe("постоянное меню «Пятницы»", () => {
     afterEach(() => setInviteDeps(null));
 
     it("ссылка добавляет в проект один раз; повторно и после 7 дней — не работает", async () => {
-      const inv = await invites.create({ project_id: "rescan", created_by: 9, title: "Аналитик" }, new Date());
+      const inv = await invites.create({ project_id: "lab", created_by: 9, title: "Аналитик" }, new Date());
       await send(`/start join_${inv.token}`, 42);
-      expect(sent.at(-1)!.text.startsWith("Добро пожаловать в 🔬 RESCAN!")).toBe(true);
+      expect(sent.at(-1)!.text.startsWith("Добро пожаловать в 🧪 LAB!")).toBe(true);
       const kb = (sent.at(-1)!.markup as { keyboard: Array<Array<{ text: string }>> }).keyboard.flat().map((b) => b.text);
-      expect(kb).toContain(MENU.roadmap);
+      expect(kb).toContain(MENU.team);
       expect(kb).not.toContain(MENU.events);
       const rows = (shared.memberships as MemoryMembershipStore).rows.filter((r) => r.chat_id === 42);
-      expect(rows).toMatchObject([{ project_id: "rescan", title: "Аналитик", added_by: 9 }]);
-      expect(shared.current).toEqual([[42, "rescan"]]);
+      expect(rows).toMatchObject([{ project_id: "lab", title: "Аналитик", added_by: 9 }]);
+      expect(shared.current).toEqual([[42, "lab"]]);
 
       await send(`/start join_${inv.token}`, 43);
       expect(sent.at(-1)!.text).toBe("Ссылка недействительна: она уже использована или устарела. Попроси новую у админа проекта.");
       expect((shared.memberships as MemoryMembershipStore).rows.some((r) => r.chat_id === 43)).toBe(false);
 
-      const old = await invites.create({ project_id: "rescan", created_by: 9 }, new Date(Date.now() - 8 * 86_400_000));
+      const old = await invites.create({ project_id: "lab", created_by: 9 }, new Date(Date.now() - 8 * 86_400_000));
       await send(`/start join_${old.token}`, 44);
       expect(sent.at(-1)!.text).toContain("Ссылка недействительна");
+    });
+
+    it("старая ссылка в закрытый проект RESCAN не работает и никуда не добавляет", async () => {
+      const inv = await invites.create({ project_id: "rescan", created_by: 9 }, new Date());
+      await send(`/start join_${inv.token}`, 45);
+      expect(sent.at(-1)!.text).toContain("Ссылка недействительна");
+      expect((shared.memberships as MemoryMembershipStore).rows.some((r) => r.chat_id === 45)).toBe(false);
     });
   });
 

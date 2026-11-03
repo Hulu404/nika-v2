@@ -2,6 +2,7 @@ import type { Api } from "grammy";
 import { reminderText, taskButtons } from "./assigned-view";
 import { teamBotConfigured } from "../team/config";
 import { isQuiet, isQuietEve, quietEnd } from "../team/quiet";
+import { isRetiredProject } from "../team/projects/projects";
 import type { DatabotStore } from "./data/store";
 import { isActiveAssigned, type AssignedNoticeMark, type AssignedTask } from "./task-list";
 
@@ -70,7 +71,7 @@ export function noticeDue(t: AssignedTask, now: Date, horizon: Date = now): Noti
 export interface ReminderDeps {
   store: DatabotStore;
   api: Pick<Api, "sendMessage">;
-  /** Метка проекта для человека в нескольких проектах («🔬 RESCAN · »). */
+  /** Метка проекта для человека в нескольких проектах («🏃 NIKA · »). */
   label?: (chatId: number, projectId: string | null | undefined) => Promise<string>;
   /** Кнопка карточки задачи в её проекте. */
   cardButton?: (task: AssignedTask) => { text: string; callback_data: string };
@@ -83,6 +84,8 @@ export async function sendAssignedReminders(deps: ReminderDeps, now = new Date()
   if (isQuiet(now)) return out;
   const horizon = isQuietEve(now) ? quietEnd(now) : now;
   for (const task of await store.listAssignedDue()) {
+    // Задачи закрытого проекта (RETIRED_PROJECTS) больше никому не напоминаем.
+    if (isRetiredProject(task.project_id)) continue;
     const plan = noticeDue(task, now, horizon);
     if (!plan) continue;
     const teammates = await store.listAssignedTeammates(task);

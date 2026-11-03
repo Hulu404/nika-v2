@@ -12,8 +12,7 @@ import { tgAdmin } from "../../telegram/supabase";
 
 export type ModuleKey =
   | "tasks" | "schedule" | "team" | "my_day" | "assistant"
-  | "events" | "coffee_run" | "attendance" | "founders_digest" | "social"
-  | "roadmap" | "about";
+  | "events" | "coffee_run" | "attendance" | "founders_digest" | "social";
 
 export interface Project {
   id: string;
@@ -25,17 +24,22 @@ export interface Project {
 
 export const CORE_MODULES: readonly ModuleKey[] = ["tasks", "schedule", "team", "my_day", "assistant"];
 export const NIKA = "nika";
-export const RESCAN = "rescan";
 
-/** Проекты по умолчанию — те же, что создаёт миграция 058. До миграции бот работает на них. */
+/**
+ * Закрытые проекты: строки в projects и project_members остаются, но бот их
+ * не видит — ни в списках, ни в переключении, ни в напоминаниях и сводках.
+ */
+export const RETIRED_PROJECTS: ReadonlySet<string> = new Set(["rescan"]);
+export const isRetiredProject = (id: string | null | undefined) => !!id && RETIRED_PROJECTS.has(id);
+
+/** Проекты по умолчанию. До миграции 058 бот работает на них. */
 export const DEFAULT_PROJECTS: readonly Project[] = [
   { id: NIKA, name: "NIKA", emoji: "🏃", modules: [...CORE_MODULES, "events", "coffee_run", "attendance", "founders_digest", "social"], sort: 1 },
-  { id: RESCAN, name: "RESCAN", emoji: "🔬", modules: [...CORE_MODULES, "roadmap", "about"], sort: 2 },
 ];
 
 export const hasModule = (p: Pick<Project, "modules">, m: ModuleKey) => p.modules.includes(m);
 
-/** «🔬 RESCAN». */
+/** «🏃 NIKA». */
 export const projectLabel = (p: Pick<Project, "emoji" | "name">) => `${p.emoji ? `${p.emoji} ` : ""}${p.name}`;
 
 export interface ProjectStore {
@@ -53,7 +57,7 @@ export function supabaseProjectStore(): ProjectStore {
         if (!isMissingTable(error.message)) console.error("[projects] list:", error.message);
         return DEFAULT_PROJECTS.map((p) => ({ ...p, modules: [...p.modules] }));
       }
-      return ((data ?? []) as Project[]).map((p) => ({ ...p, modules: p.modules ?? [] }));
+      return ((data ?? []) as Project[]).filter((p) => !isRetiredProject(p.id)).map((p) => ({ ...p, modules: p.modules ?? [] }));
     },
   };
 }
@@ -69,11 +73,10 @@ export class MemoryProjectStore implements ProjectStore {
 const SPOKEN: Record<string, RegExp> = {
   // «Ника» бывает и именем — проект только со словом «проект»: «в проекте Ника».
   nika: /проект\S*\s+«?ник(а|е|и|у|ой)(?![а-яё])/i,
-  rescan: /р[еи]скан/i,
 };
 
 /**
- * Проект, явно названный во фразе («в рескане поставь Вике…», «в NIKA») —
+ * Проект, явно названный во фразе («в NIKA») —
  * из проектов человека. Названо несколько или ни одного — null.
  */
 export function projectInText(text: string, projects: readonly Project[]): Project | null {

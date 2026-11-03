@@ -33,21 +33,14 @@ export const ASSISTANT_RULES = [
 ];
 
 /** Правила проекта для ассистента (дополнительно к общим). */
-export const PROJECT_RULES: Record<string, readonly string[]> = {
-  rescan: [
-    "RESCAN — сервис навигации и записи пациента к врачу, а не медицина. Не обсуждай медицинскую интерпретацию: значения анализов, отклонения, диагнозы, срочность, какого врача выбрать по показателям. На такой вопрос ответь одной фразой, что это вне правил продукта, и покажи «🧭 Правила продукта» (get_project_info rules).",
-  ],
-};
+export const PROJECT_RULES: Record<string, readonly string[]> = {};
 
 /** Подсказки по модулям проекта. */
-const MODULE_RULES: Record<string, string> = {
-  roadmap: "План развития: показать — get_roadmap (контрольная точка, группа, просрочки); статус, ответственный или срок пункта — update_roadmap_item черновиком.",
-  about: "«О проекте»: суть, правила продукта, материалы, цифры — get_project_info; открытые вопросы — list_open_questions.",
-};
+const MODULE_RULES: Record<string, string> = {};
 
 export interface PromptProject {
   id: string;
-  /** «🔬 RESCAN». */
+  /** «🏃 NIKA». */
   label: string;
   name: string;
   modules: readonly string[];

@@ -10,8 +10,6 @@ import { findMember, listProjectTeam, type TeamMember } from "./access";
 import { personName } from "./roster";
 import { DEFAULT_SCOPE, recordProject, scopeForRecord, scopeOf, type Scope } from "./projects/scope";
 import { withProjectLabel } from "./projects/labels";
-import { checkRoadmapCompletion } from "./roadmap/complete";
-import { supabaseRoadmapStore } from "./roadmap/store";
 import { NIKA } from "./projects/projects";
 import { isFounder } from "./config";
 import {
@@ -76,9 +74,6 @@ export function defaultTaskDeps(scope: Scope = DEFAULT_SCOPE, ctx?: Context): Te
     store: createSupabaseStore(), findMember, forms: supabaseTeamForms(),
     listTeam: () => listProjectTeam(scope.project.id),
     projectId: scope.project.id, isAdmin: scope.isAdmin,
-    onTaskDone: async (api, task) => {
-      await checkRoadmapCompletion(api, { roadmap: supabaseRoadmapStore(), tasks: createSupabaseStore() }, task).catch(() => {});
-    },
     ...(ctx ? { rescope: async (projectId: string) => {
       const s = await scopeForRecord(ctx, projectId);
       return s ? defaultTaskDeps(s, ctx) : null;

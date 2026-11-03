@@ -6,7 +6,7 @@ import { MemoryFactStore } from "./attendance";
 import { dispatchTeamDigests, type DigestDispatchDeps } from "./digest";
 import { founderCoffeeLines } from "./digest-copy";
 import { MemoryEventStore, scopedEvents } from "./events";
-import { DEFAULT_PROJECTS } from "./projects/projects";
+import { TEST_PROJECTS } from "./projects/test-projects";
 import { MemoryTeamForms } from "./form";
 import { MY_DAY_EMPTY, MY_DAY_FOOTER } from "./my-day";
 import type { SignupRow } from "./stats";
@@ -74,19 +74,19 @@ describe("утренняя сводка — «Мой день»", () => {
     expect(MY_DAY_EMPTY).toBe("На сегодня ничего не запланировано.");
   });
 
-  it("человек в двух проектах — одно сообщение, блоки 🏃 NIKA и 🔬 RESCAN; в одном проекте — без меток", async () => {
+  it("человек в двух проектах — одно сообщение, блоки 🏃 NIKA и 🧪 LAB; в одном проекте — без меток", async () => {
     await create("Планёрка", "2026-10-13T19:00", { place: "Zoom" });
-    await scopedEvents(events, "rescan").create({ kind: "meeting", club: null, title: "Созвон RESCAN", starts_at: msk("2026-10-13T12:00").toISOString(), place: null, responsible_chat_id: null, created_by: 9 }, msk("2026-10-10T12:00"));
-    await tasks.importAssignedTasks(9, 50, [{ line: 1, username: "vika", what: "Макет пациента", due_at: msk("2026-10-13T18:00").toISOString() }], { projectId: "rescan" });
+    await scopedEvents(events, "lab").create({ kind: "meeting", club: null, title: "Созвон LAB", starts_at: msk("2026-10-13T12:00").toISOString(), place: null, responsible_chat_id: null, created_by: 9 }, msk("2026-10-10T12:00"));
+    await tasks.importAssignedTasks(9, 50, [{ line: 1, username: "vika", what: "Макет пациента", due_at: msk("2026-10-13T18:00").toISOString() }], { projectId: "lab" });
     await dispatchTeamDigests({ now: msk("2026-10-13T09:00"), deps: { ...deps(),
-      projectsOf: async (chat) => (chat === 1 ? DEFAULT_PROJECTS.slice() : DEFAULT_PROJECTS.slice(0, 1)),
+      projectsOf: async (chat) => (chat === 1 ? TEST_PROJECTS.slice() : TEST_PROJECTS.slice(0, 1)),
       eventsFor: (id) => scopedEvents(events, id),
     } });
     expect(sent.filter((s) => s.chat === 1)).toHaveLength(1);
     expect(textOf(1)).toBe([
       "☀️ План на вт 13.10", "",
       "<b>🏃 NIKA</b>", "🗓 События", "- 19:00 Планёрка · Zoom", "",
-      "<b>🔬 RESCAN</b>", "🗓 События", "- 12:00 Созвон RESCAN", "", "📋 Твои задачи на сегодня", "1. Макет пациента (до 18:00)",
+      "<b>🧪 LAB</b>", "🗓 События", "- 12:00 Созвон LAB", "", "📋 Твои задачи на сегодня", "1. Макет пациента (до 18:00)",
       "", MY_DAY_FOOTER,
     ].join("\n"));
     expect(textOf(2)).toBe(["☀️ План на вт 13.10", "", "🗓 События", "- 19:00 Планёрка · Zoom", "", MY_DAY_FOOTER].join("\n"));

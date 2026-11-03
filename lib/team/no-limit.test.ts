@@ -62,14 +62,14 @@ describe("никаких лимитов на число задач у челов
     const coffee = await createCoffeeTasks({ weeks: new MemoryWeekStore(), events, rsvp: new MemoryRsvpStore(), tasks: store, forms: new MemoryTeamForms(),
       listTeam: async () => TEAM, enabled: async () => true }, api, "2026-10-12", ev, DIMA, TEAM, NOW);
     expect(coffee.filter((t) => t.assignee_id === SALMA)).toHaveLength(1);
-    // 9–10. «📋 Сделать задачей» из плана развития — дважды.
+    // 9–10. Черновик с готовым исполнителем — дважды.
     for (const n of [9, 10]) {
       const capture = { reply: async (text: string, other?: { reply_markup?: { inline_keyboard?: Array<Array<{ text: string; callback_data: string }>> } }) => {
         h.sent.push({ method: "sendMessage", chat: DIMA, text, buttons: (other?.reply_markup?.inline_keyboard ?? []).flat().map((b) => ({ text: b.text, data: b.callback_data })) });
         return { message_id: 700 + n };
       }, api: { editMessageText: async () => true } } as never;
       const parsed = validateIntent({ intent: "create_task", what: `Пост ${n}`, due: "2026-10-16", assignees: [{ name: "Сальма", qualifier: null }] });
-      await startTaskDraft(capture, h.deps, DIMA, parsed, { roadmapItemId: n, picks: { a0: SALMA } }, NOW);
+      await startTaskDraft(capture, h.deps, DIMA, parsed, { picks: { a0: SALMA } }, NOW);
       await h.press(h.button("✅ Подтвердить")!, DIMA);
     }
 
