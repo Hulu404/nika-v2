@@ -64,6 +64,25 @@ export const SESSIONS: readonly ClubSession[] = [
     landing: "/stretch",
     mapUrl: "https://yandex.ru/maps/?rtext=~55.768024%2C37.568205&rtt=auto",
   },
+  {
+    club: "stretch",
+    format: "pilates",
+    spot: "klimashkina",
+    date: "2026-11-08",
+    time: "12:00",
+    priceRub: 1000,
+    capacity: 16,
+    edition: 2,
+    title: "Пилатес на коврике",
+    formatLabel: "пилатес на коврике, 60 минут",
+    dateLabel: "8 ноября",
+    weekday: "воскресенье",
+    place: "ул. Климашкина, 20, студия йоги «Поток», вход с торца",
+    metro: "м. Улица 1905 года",
+    gatherAt: "11:30",
+    landing: "/stretch",
+    mapUrl: "https://yandex.ru/maps/?rtext=~55.768024%2C37.568205&rtt=auto",
+  },
 ];
 
 /** Сегодняшняя дата по Москве, YYYY-MM-DD. */

@@ -21,7 +21,11 @@ describe("sessionForSignup", () => {
   });
   it("нет клуба или занятие прошло — null", () => {
     expect(sessionForSignup({ club: null, date: "2026-11-01" }, OCT_27)).toBeNull();
-    expect(sessionForSignup({ club: "stretch", date: null }, new Date("2026-11-02T12:00:00Z"))).toBeNull();
+    expect(sessionForSignup({ club: "stretch", date: null }, new Date("2026-11-09T12:00:00Z"))).toBeNull();
+  });
+  it("после 1 ноября ближайшее занятие — № 002, 8 ноября в 12:00, сбор в 11:30", () => {
+    const s = sessionForSignup({ club: "stretch", date: "2026-11-01" }, new Date("2026-11-03T12:00:00Z"));
+    expect(s).toMatchObject({ date: "2026-11-08", time: "12:00", gatherAt: "11:30", edition: 2 });
   });
 });
 
