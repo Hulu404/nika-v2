@@ -37,6 +37,24 @@ export async function countPaidSeats(
   return (data ?? []).reduce((sum, row) => sum + row.quantity, 0);
 }
 
+/**
+ * Занятые места для продажи (миграция 069): оплаченные + активные холды
+ * неоплаченных заказов (20 минут на оплату ЮKassa) + резервы старых счетов
+ * Telegram. Считает SQL-функция club_taken_seats — та же, что под блокировкой
+ * проверяет холд и подтверждение оплаты. До миграции 069 — только оплаченные.
+ */
+export async function countTakenSeats(
+  db: SupabaseClient,
+  session: Pick<ClubSession, "club" | "date" | "time">,
+): Promise<number> {
+  const { data, error } = await db.rpc("club_taken_seats", {
+    p_club: session.club, p_date: session.date, p_time: session.time, except_id: null,
+  });
+  if (!error && data !== null && data !== undefined) return Number(data);
+  if (error) console.error("[club] club_taken_seats (примени 069_club_yookassa.sql):", error.message);
+  return countPaidSeats(db, session);
+}
+
 export function hasEnoughSeats(paid: number, session: Pick<ClubSession, "capacity">, quantity: number): boolean {
   return Number.isInteger(quantity) && quantity > 0 && paid + quantity <= session.capacity;
 }

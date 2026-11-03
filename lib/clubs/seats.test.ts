@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { countPaidSeats, hasEnoughSeats, isSoldOut, seatsLeftToShow } from "./seats";
+import { countPaidSeats, countTakenSeats, hasEnoughSeats, isSoldOut, seatsLeftToShow } from "./seats";
 import { SESSIONS } from "./sessions";
 
 describe("isSoldOut", () => {
@@ -38,6 +38,21 @@ function fakeDb(rows: Array<{ counts_seat: boolean; quantity?: number }>, hasCol
   };
   return { from: () => query() } as unknown as SupabaseClient;
 }
+
+describe("countTakenSeats", () => {
+  const session = SESSIONS[0];
+  it("берёт оплаченные + активные холды из club_taken_seats (миграция 069)", async () => {
+    const calls: unknown[] = [];
+    const db = { rpc: async (name: string, args: unknown) => (calls.push([name, args]), { data: 7, error: null }) } as unknown as SupabaseClient;
+    expect(await countTakenSeats(db, session)).toBe(7);
+    expect(calls).toEqual([["club_taken_seats", { p_club: "stretch", p_date: "2026-11-01", p_time: "10:30", except_id: null }]]);
+  });
+  it("до миграции 069 — считает оплаченные, а не закрывает продажу", async () => {
+    const db = fakeDb([{ counts_seat: true, quantity: 3 }]);
+    (db as unknown as { rpc: unknown }).rpc = async () => ({ data: null, error: { message: "function club_taken_seats does not exist" } });
+    expect(await countTakenSeats(db, session)).toBe(3);
+  });
+});
 
 describe("countPaidSeats", () => {
   const session = SESSIONS[0];

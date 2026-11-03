@@ -1,4 +1,4 @@
-Работаем в nika-v2 (Next.js 14 + Supabase + grammY, прод на Railway). Задача: опрос перед запуском клуба йоги в основном боте мероприятий @mynikarun_bot (lib/telegram/bot.ts, вебхук /api/telegram/webhook). Механику делаем общей для будущих клубов, йога — первый опрос.
+Работаем в nika-v2 (Next.js 14 + Supabase + grammY, прод на Railway). Задача: опрос перед запуском клуба йоги в основном боте мероприятий @nika_cofferun_signupsbot (lib/telegram/bot.ts, вебхук /api/telegram/webhook). Механику делаем общей для будущих клубов, йога — первый опрос.
 
 Сохрани эту спецификацию в docs/club-survey.md как есть: это источник правды по сценарию и текстам. Код пока не пиши, жди следующий промпт.
 
@@ -7,7 +7,7 @@
 
 КОМУ
 1) Рассылка организатора: все, кто подтверждал участие в кофе-ране (та же аудитория, что у /say: coffee_run_signups с confirmed_at и tg_chat_id), минус отписавшиеся (optedOutChats), минус те, кого уже спросили.
-2) Вход по ссылке из поста в чате кофе-ранов: https://t.me/mynikarun_bot?start=yoga (имя бота брать из NEXT_PUBLIC_TELEGRAM_BOT_USERNAME).
+2) Вход по ссылке из поста в чате кофе-ранов: https://t.me/nika_cofferun_signupsbot?start=yoga (имя бота брать из NEXT_PUBLIC_TELEGRAM_BOT_USERNAME).
 
 КОНФИГ ОПРОСА (один объект, по образцу COFFEE_RUNS в lib/coffeerun/run.ts)
 - ключ опроса: yoga (уходит в callback_data и в БД)

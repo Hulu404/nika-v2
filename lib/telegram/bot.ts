@@ -53,7 +53,9 @@ import {
 import { surveyByStartPayload } from "../clubs/survey-config";
 import {
   CLUB_START_PREFIX,
+  CLUB_CHECK_CALLBACK_RE,
   handleClubByUsername,
+  handleClubCheck,
   handleClubPayment,
   handleClubPreCheckout,
   handleClubStart,
@@ -111,7 +113,7 @@ function registerHandlers(bot: Bot<BotContext>): void {
       return;
     }
 
-    // Deep-link с лендинга занятия клуба (/stretch): /start st_<token> → счёт.
+    // Deep-link заказа на занятие клуба (/stretch, /paid): /start st_<token> → статус оплаты.
     if (token.startsWith(CLUB_START_PREFIX)) {
       await handleClubStart(ctx, token);
       return;
@@ -223,7 +225,10 @@ function registerHandlers(bot: Bot<BotContext>): void {
   // гасим «часик», НИЧЕГО не пишем (никаких answer/answered_at из Telegram).
   bot.callbackQuery(/^ans_/, (ctx) => ctx.answerCallbackQuery().catch(() => {}));
 
-  // ── Оплата занятия клуба (ЮKassa через Telegram Payments) ────────────────────
+  // ── Оплата занятия клуба: ЮKassa на сайте, в боте — статус заказа ──────────────
+  // «Проверить ещё раз» у заказа, который ждёт подтверждения оплаты ЮKassa.
+  bot.callbackQuery(CLUB_CHECK_CALLBACK_RE, (ctx) => handleClubCheck(ctx));
+  // Фоллбэк: счета Telegram, отправленные до перехода на оплату ЮKassa на сайте.
   // pre_checkout_query требует ответа за 10 секунд, иначе платёж отменится.
   bot.on("pre_checkout_query", (ctx) => handleClubPreCheckout(ctx));
   // successful_payment приходит обычным message — ловим ДО общего ответа ниже.
