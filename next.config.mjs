@@ -64,7 +64,7 @@ const nextConfig = {
       },
       // Страницы кофе-ранов живут по ссылке из бота, в поиске им не место:
       // без JavaScript поисковик видел «This page requires JavaScript».
-      ...["/coffeerunsurfsport", "/coffeerunluzhniki"].flatMap((p) => [p, `${p}/:path*`]).map((source) => ({
+      ...["/coffeerunsurfsport", "/coffeerunluzhniki", "/coffeerunsurfcave"].flatMap((p) => [p, `${p}/:path*`]).map((source) => ({
         source,
         headers: [{ key: "X-Robots-Tag", value: "noindex, follow" }],
       })),
@@ -79,7 +79,7 @@ const nextConfig = {
       { source: "/start", headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }] },
       // Лендинг Усачёвой: раньше закешированная страница присылала старую дату.
       // no-cache — браузер и прокси каждый раз сверяются с сервером.
-      ...["/coffeerunsurfsport", "/coffeerunsurfsport/index.html"].map((source) => ({
+      ...["/coffeerunsurfsport", "/coffeerunsurfsport/index.html", "/coffeerunsurfcave", "/coffeerunsurfcave/index.html"].map((source) => ({
         source,
         headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }],
       })),
@@ -134,6 +134,10 @@ const nextConfig = {
       {
         source: "/coffeerunsurfsport",
         destination: "/coffeerunsurfsport/index.html",
+      },
+      {
+        source: "/coffeerunsurfcave",
+        destination: "/coffeerunsurfcave/index.html",
       },
       {
         source: "/coffeerunluzhniki",
