@@ -6,7 +6,7 @@ import { handleSignup, type SignupDeps } from "./signup";
 const NOW = new Date("2026-10-29T12:00:00+03:00");
 const form = {
   name: "Ника", telegram: "@Nika_Test", email: "nika@example.com", level: "first", mat: "studio", towel: "yes", water: "no",
-  consent: true, club: "stretch", event_date: "2026-11-01", source: "stretch",
+  consent: true, participation_rules: true, club: "stretch", event_date: "2026-11-01", source: "stretch",
 };
 const key = (c: string) => c.repeat(32);
 

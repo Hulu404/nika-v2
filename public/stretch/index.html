@@ -507,6 +507,7 @@ html.js .f-fig.on svg *{--draw:0}
 .opt:focus-within,.opt.on{border-color:var(--accent);background:#FBEDE8}
 .field.err .opt{background:var(--err-bg);border-color:var(--err-line)}
 .consent{margin:4px 0 24px}
+.consent + .consent{margin-top:-12px}
 .check{display:flex;align-items:flex-start;gap:12px;cursor:pointer;margin:0;font-size:13px;line-height:1.55;color:var(--ink-2)}
 .check input{position:absolute;opacity:0;width:1px;height:1px}
 .check .box{flex:none;width:22px;height:22px;border-radius:7px;border:1px solid rgba(20,20,18,.35);background:#F7F7F5;display:grid;place-items:center;transition:background .18s,border-color .18s}
@@ -1017,6 +1018,10 @@ ym(113929945,'init',{webvisor:true,clickmap:true,trackLinks:true,accurateTrackBo
             <label class="check" for="i-ok"><input type="checkbox" id="i-ok" name="consent" value="1"><span class="box" aria-hidden="true"></span><span class="ct">Соглашаюсь на обработку персональных данных по <a href="https://www.mynika.online/legal/privacy" target="_blank" rel="noopener">политике конфиденциальности</a></span></label>
             <div class="msg">Отметь согласие, чтобы мы могли тебя записать</div>
           </div>
+          <div class="field consent" id="f-rules-ok">
+            <label class="check" for="i-rules-ok"><input type="checkbox" id="i-rules-ok" name="participation_rules" value="1"><span class="box" aria-hidden="true"></span><span class="ct">Подтверждаю, что ознакомился(лась) и согласен(на) с <a href="/stretch/participation-rules.html" target="_blank" rel="noopener">правилами участия</a></span></label>
+            <div class="msg">Ознакомься с правилами и подтверди согласие</div>
+          </div>
           <button type="submit" class="btn btn--ink" id="submit">Купить билет</button>
           <p class="fine">После заявки откроется оплата ЮKassa. Места держим 20 минут. Пишем только по делу занятия. Занятие для участников от 18 лет.</p>
         </form>
@@ -1243,6 +1248,7 @@ function startAdditionalOrder(){
   $$('input[name="purchase"]').forEach(function(input){input.checked=input.value==='self';input.parentNode.classList.toggle('on',input.checked)});
   document.getElementById('i-recipient').value='';
   document.getElementById('i-ok').checked=false;
+  document.getElementById('i-rules-ok').checked=false;
   $$('.field.err',form).forEach(function(field){field.classList.remove('err')});
   quantityInput.setAttribute('aria-invalid','false');
   done.hidden=true;form.hidden=false;
@@ -1277,7 +1283,9 @@ form.addEventListener('submit',function(e){
   document.getElementById('f-water').classList.toggle('err',!IS_GIFT&&!wt);
   var ok=document.getElementById('i-ok').checked;
   document.getElementById('f-ok').classList.toggle('err',!ok);
-  if(!(a&&b&&c&&recipient&&(IS_GIFT||(lv&&mt&&tw&&wt))&&ok)){
+  var rulesOk=document.getElementById('i-rules-ok').checked;
+  document.getElementById('f-rules-ok').classList.toggle('err',!rulesOk);
+  if(!(a&&b&&c&&recipient&&(IS_GIFT||(lv&&mt&&tw&&wt))&&ok&&rulesOk)){
     var bad=document.querySelector('.field.err');
     if(bad)bad.scrollIntoView({behavior:'smooth',block:'center'});
     return;
@@ -1292,7 +1300,7 @@ form.addEventListener('submit',function(e){
   form.querySelectorAll('input,select,.quantity-step').forEach(function(input){input.disabled=true});
   fetch('/api/club-signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     name:document.getElementById('i-name').value.trim(),telegram:document.getElementById('i-tg').value.trim(),
-    email:document.getElementById('i-mail').value.trim(),level:lv,mat:mt,towel:tw,water:wt,consent:true,
+    email:document.getElementById('i-mail').value.trim(),level:lv,mat:mt,towel:tw,water:wt,consent:true,participation_rules:true,
     quantity:QUANTITY,is_gift:IS_GIFT,gift_recipient:IS_GIFT?document.getElementById('i-recipient').value.trim():null,request_token:ORDER_TOKEN,
     club:EVENT.club,event_date:EVENT.date,source:EVENT.source})})
     .then(function(r){return r.json().then(function(j){if(!r.ok)throw j;return j})})

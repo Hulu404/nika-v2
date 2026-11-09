@@ -88,6 +88,7 @@ export async function handleSignup(raw: unknown, deps: SignupDeps): Promise<Sign
   if (isGift && (typeof body.gift_recipient !== "string" || !giftRecipient || giftRecipient.length < 2)) invalid.push("gift_recipient");
   if (requestToken !== undefined && (typeof requestToken !== "string" || !/^[a-f0-9]{32}$/.test(requestToken))) invalid.push("request_token");
   if (body.consent !== true) invalid.push("consent");
+  if (body.participation_rules !== true) invalid.push("participation_rules");
   if (invalid.length) return { status: 422, body: { error: "Invalid fields", fields: invalid } };
 
   const session = sessionForSignup({
@@ -149,7 +150,8 @@ export async function handleSignup(raw: unknown, deps: SignupDeps): Promise<Sign
     name, tg_username: tgUsername, email,
     level: isGift ? null : level, mat: isGift ? null : mat, towel: isGift ? null : towel, water: isGift ? null : water,
     quantity: ticketCount, is_gift: isGift, gift_recipient: giftRecipient,
-    consent_at: now, confirm_token: token, updated_at: now,
+    consent_at: now, participation_rules_accepted_at: now, participation_rules_version: "1",
+    confirm_token: token, updated_at: now,
     amount_rub: session.priceRub * ticketCount,
     payment_status: waitlist ? "waitlist" : "pending",
   };
