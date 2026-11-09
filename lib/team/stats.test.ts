@@ -96,6 +96,7 @@ describe("summarizeSignups", () => {
     // Группа с нулём остаётся в списке: пейсеров трое, и «в 7:00 никого» —
     // это ответ, а не отсутствие ответа. Прячет пустые уже показ (copy.ts).
     expect(s.byPace).toEqual([
+      { pace: "6:00", count: 0 },
       { pace: "6:30", count: 2 },
       { pace: "7:00", count: 0 },
       { pace: "8:00", count: 1 },

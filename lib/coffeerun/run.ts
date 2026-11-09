@@ -72,6 +72,20 @@ export const COFFEE_RUNS: CoffeeRun[] = [
     mapUrl:
       "https://yandex.ru/maps/?text=%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B0%2C%20%D1%83%D0%BB%D0%B8%D1%86%D0%B0%20%D0%A3%D1%81%D0%B0%D1%87%D1%91%D0%B2%D0%B0%2C%2062",
   },
+  {
+    spot: "cave",
+    landing: "/coffeerunsurfcave",
+    spotName: "Surf Coffee® × Cave",
+    date: "2026-11-15",
+    dateLabel: "15 ноября",
+    weekday: "воскресенье",
+    gatherTime: "12:00",
+    startTime: "12:30",
+    address: "Москва, Новокузнецкая улица, дом 7",
+    place: "спот Surf Coffee × Cave",
+    distance: "5 км",
+    mapUrl: "https://yandex.ru/maps/?text=" + encodeURIComponent("Москва, Новокузнецкая улица, дом 7"),
+  },
 ];
 
 /**
@@ -88,6 +102,7 @@ export const COFFEE_RUNS: CoffeeRun[] = [
  * соответствовать — это проверяется тестом.
  */
 export const SPOT_NAMES: Record<string, string> = {
+  cave: "Surf Coffee® × Cave",
   usachevo: "Surf Coffee® × Sport, Усачёва",
   luzhniki: "Surf Coffee® Лужники",
 };

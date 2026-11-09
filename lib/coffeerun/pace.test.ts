@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { COFFEE_RUN_PACES, formatPace, normalizePace } from "./pace";
+import { COFFEE_RUN_PACES, formatPace, normalizePace, pacesForSpot } from "./pace";
 
 describe("темп кофе-рана", () => {
-  it("набор темпов — тот, под который выписан констрейнт миграции 032", () => {
-    expect(COFFEE_RUN_PACES.map((p) => p.value)).toEqual(["6:30", "7:00", "8:00"]);
+  it("набор темпов — тот, под который выписан констрейнт миграции 069", () => {
+    expect(COFFEE_RUN_PACES.map((p) => p.value)).toEqual(["6:00", "6:30", "7:00", "8:00"]);
+    expect(pacesForSpot("cave").map((p) => p.value)).toEqual(["6:00", "7:00", "8:00"]);
+    expect(pacesForSpot("usachevo").map((p) => p.value)).toEqual(["6:30", "7:00", "8:00"]);
   });
 
   it.each(COFFEE_RUN_PACES.map((p) => p.value))("%s проходит как есть", (value) => {

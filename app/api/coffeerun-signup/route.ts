@@ -106,6 +106,7 @@ export async function POST(req: Request) {
     source: clean(source || `coffeerun${run.spot}`, 100),
     spot: run.spot,
     run_date: run.date,
+    address: run.address,
     confirm_token: token,
     // Темп дописываем, только когда он пришёл: повторная отправка со старой
     // страницы не должна стирать группу, которую человек уже выбрал.

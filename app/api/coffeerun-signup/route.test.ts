@@ -2,11 +2,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Supabase вместо базы: запоминаем, что ушло в insert, и умеем отказать по колонке.
 const inserted: Array<Record<string, unknown>> = [];
+const filters: Array<[string, unknown]> = [];
+let existingRows: Array<{ id: string; confirm_token: string }> = [];
+const updated: Array<Record<string, unknown>> = [];
 let failConsentColumn = false;
 vi.mock("@supabase/supabase-js", () => ({
   createClient: () => ({
     from: () => ({
-      select: () => ({ eq: () => ({ eq: () => ({ eq: () => ({ order: () => ({ limit: async () => ({ data: [] }) }) }) }) }) }),
+      select: () => {
+        const query = {
+          eq: (key: string, value: unknown) => { filters.push([key, value]); return query; },
+          order: () => query,
+          limit: async () => ({ data: existingRows }),
+        };
+        return query;
+      },
+      update: (row: Record<string, unknown>) => ({
+        eq: async (key: string, value: unknown) => {
+          filters.push([key, value]);
+          updated.push(row);
+          return { error: null };
+        },
+      }),
       insert: async (row: Record<string, unknown>) => {
         if (failConsentColumn && "consent_at" in row) {
           return { error: { message: "Could not find the 'consent_at' column of 'coffee_run_signups' in the schema cache" } };
@@ -32,6 +49,9 @@ describe("POST /api/coffeerun-signup: согласие", () => {
     vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "service");
     vi.stubEnv("NEXT_PUBLIC_TELEGRAM_BOT_USERNAME", "mynikarun_bot");
     inserted.length = 0;
+    updated.length = 0;
+    filters.length = 0;
+    existingRows = [];
     failConsentColumn = false;
   });
   afterEach(() => vi.unstubAllEnvs());
@@ -48,6 +68,34 @@ describe("POST /api/coffeerun-signup: согласие", () => {
   it("без согласия (старая страница) заявка валидна, consent_at не пишется", async () => {
     await POST(body());
     expect(inserted[0]).not.toHaveProperty("consent_at");
+  });
+
+  it.each(["6:00", "7:00", "8:00"])("Cave: сохраняет дату, адрес и темп %s", async (pace) => {
+    const res = await POST(body({
+      spot: "cave", run_date: "2026-11-15", source: "coffeerunsurfcave",
+      pace, consent: true, address: "Адрес из браузера не должен попасть в базу",
+    }));
+    expect(res.status).toBe(200);
+    expect(inserted).toHaveLength(1);
+    expect(inserted[0]).toMatchObject({
+      spot: "cave", run_date: "2026-11-15", source: "coffeerunsurfcave",
+      address: "Москва, Новокузнецкая улица, дом 7", pace,
+    });
+    expect(filters).toContainEqual(["spot", "cave"]);
+    expect(filters).toContainEqual(["run_date", "2026-11-15"]);
+  });
+
+  it("повторная заявка Cave обновляет свою строку и сохраняет токен подтверждения", async () => {
+    existingRows = [{ id: "cave-signup", confirm_token: "a".repeat(32) }];
+    const res = await POST(body({ spot: "cave", run_date: "2026-11-01", source: "coffeerunsurfcave", pace: "6:00" }));
+    expect(res.status).toBe(200);
+    expect(inserted).toHaveLength(0);
+    expect(updated[0]).toMatchObject({
+      spot: "cave", run_date: "2026-11-15", address: "Москва, Новокузнецкая улица, дом 7",
+      confirm_token: "a".repeat(32), pace: "6:00",
+    });
+    expect(filters).toContainEqual(["id", "cave-signup"]);
+    expect((await res.json()).confirmUrl).toContain("a".repeat(32));
   });
 
   it("если миграция 050 ещё не применена, заявка всё равно сохраняется", async () => {

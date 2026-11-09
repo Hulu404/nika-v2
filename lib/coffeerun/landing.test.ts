@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { describe, it, expect } from "vitest";
-import { COFFEE_RUN_PACES } from "./pace";
+import { pacesForSpot } from "./pace";
 import { COFFEE_RUNS, runForSignup } from "./run";
 
 /**
@@ -75,7 +75,7 @@ describe("лендинги кофе-рана — какой забег уезж�
       // Значения кнопок — те же строки, что лягут в coffee_run_signups.pace:
       // разойдутся — сервер молча выбросит выбор человека (normalizePace → null).
       const values = [...src.matchAll(/name="pace"\s+value="([^"]+)"/g)].map((m) => m[1]);
-      expect(values).toEqual(COFFEE_RUN_PACES.map((p) => p.value));
+      expect(values).toEqual(pacesForSpot(run.spot).map((p) => p.value));
 
       // Выбор должен реально уезжать в заявку, а не просто радовать глаз.
       expect(src).toContain("pace:pc");
