@@ -224,8 +224,16 @@ function sessionKeyboard(session: ClubSession): InlineKeyboard {
 }
 
 /** Дополнительный заказ оформляется на сайте с новым ключом, старый счёт неизменен. */
+/** «Вступить в чат комьюнити» — первой строкой, если у встречи есть чат сообщества. */
+export const COMMUNITY_LABEL = "Вступить в чат комьюнити";
+
+function withCommunity(session: ClubSession, keyboard: InlineKeyboard): InlineKeyboard {
+  if (!session.communityUrl) return keyboard;
+  return InlineKeyboard.from([[InlineKeyboard.url(COMMUNITY_LABEL, session.communityUrl)], ...keyboard.inline_keyboard]);
+}
+
 function paidKeyboard(session: ClubSession): InlineKeyboard {
-  const keyboard = sessionKeyboard(session);
+  const keyboard = withCommunity(session, sessionKeyboard(session));
   const site = publicOriginFromEnv();
   if (site && session.date >= moscowToday() && !isFreeSession(session)) {
     keyboard.row().url("Докупить билеты", `${site}${session.landing}?purchase=more#reg`);
@@ -311,7 +319,7 @@ export async function openClubOrder(ctx: BotContext, input: ClubOrder, deps: Pay
     return;
   }
   if (order.payment_status === "waitlist") {
-    await ctx.reply(waitlistText(order, session));
+    await ctx.reply(waitlistText(order, session), session.communityUrl ? { reply_markup: withCommunity(session, new InlineKeyboard()) } : {});
     return;
   }
   if (session.date < moscowToday(now)) {

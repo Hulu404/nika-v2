@@ -47,6 +47,25 @@ describe("бот мероприятий: /start st_<token> после оплат
     expect((await orders.byId("o1"))!).toMatchObject({ tg_chat_id: 123, tg_username: "nika_test" });
   });
 
+  it("книжный клуб: подтверждение и лист ожидания — с кнопкой «Вступить в чат комьюнити» первой", async () => {
+    const read = { club: "read", event_date: "2026-11-12", event_time: "19:00", amount_rub: 0 };
+    add({ ...read, payment_status: "paid" });
+    await handleClubStart(ctx(), `st_${TOKEN}`, deps);
+    expect(last().text).toContain("ты записан(а), ждём тебя!");
+    expect(last().buttons[0]).toMatchObject({ text: "Вступить в чат комьюнити", url: "https://t.me/nika_community" });
+    expect(last().buttons.map((b) => b.text)).toContain("Служба поддержки");
+    orders.add({ id: "o2", confirm_token: "e".repeat(32), ...read, payment_status: "waitlist" });
+    await handleClubStart(ctx(), `st_${"e".repeat(32)}`, deps);
+    expect(last().text).toContain("листе ожидания");
+    expect(last().buttons[0]).toMatchObject({ text: "Вступить в чат комьюнити" });
+  });
+
+  it("пилатес: в подтверждении кнопки чата нет", async () => {
+    add({ payment_status: "paid" });
+    await handleClubStart(ctx(), `st_${TOKEN}`, deps);
+    expect(last().buttons.map((b) => b.text)).not.toContain("Вступить в чат комьюнити");
+  });
+
   it("ждёт оплаты, а в ЮKassa уже оплачено — бот сам сверяет и отвечает «оплачено»", async () => {
     await startPayment(deps, add(), session);
     yk.succeed("pay_1");

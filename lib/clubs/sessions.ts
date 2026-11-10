@@ -44,6 +44,8 @@ export interface ClubSession {
   arrivalNote?: string;
   /** Последняя строка подтверждения. По умолчанию — про травмы и тренера. */
   closingNote?: string;
+  /** Чат сообщества: кнопка «Вступить в чат комьюнити» в подтверждении и листе ожидания. */
+  communityUrl?: string;
 }
 
 /**
@@ -123,6 +125,7 @@ export const SESSIONS: readonly ClubSession[] = [
     mapUrl: "https://yandex.ru/maps/?text=" + encodeURIComponent("Москва, Новинский бульвар, 7"),
     arrivalNote: "Приходи к 18:45, чтобы спокойно взять кофе и занять место. Читаем «Палату № 6» Чехова.",
     closingNote: "Не успел дочитать — всё равно приходи, обсуждение тоже будет интересно.",
+    communityUrl: "https://t.me/nika_community",
   },
 ];
 

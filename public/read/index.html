@@ -131,6 +131,7 @@ body{background:var(--paper-warm);color:var(--ink);font-family:var(--serif);-web
 .form .cta{width:100%;margin-top:8px}
 .fine{font-family:var(--sans);font-size:13px;line-height:18px;color:var(--ink-muted)}
 .done{display:none}.done.on{display:block}
+.support-note{margin:18px 0 0;text-align:center}.support-note a{color:inherit;text-decoration:underline;text-underline-offset:3px;white-space:nowrap}
 .field label.check,.check{display:grid;margin:0;grid-template-columns:24px 1fr;gap:12px;align-items:start;cursor:pointer;font-family:var(--sans);font-size:14px;line-height:20px;color:var(--ink-muted);letter-spacing:0}
 .check input{position:absolute;opacity:0;width:1px;height:1px}
 .check .box{width:22px;height:22px;margin-top:-1px;border-radius:6px;border:1.5px solid color-mix(in srgb,var(--ink) 35%,transparent);background:rgba(239,230,210,.6);display:grid;place-items:center;transition:background .15s,border-color .15s}
@@ -277,11 +278,13 @@ footer.foot>.paper{position:absolute;inset:0;opacity:.35;z-index:0;pointer-event
           <button class="cta glass glass-cta" type="submit">Я буду</button>
           <p class="fine" id="formErr" hidden style="color:var(--crimson);text-align:center"></p>
         </form>
+        <p class="fine support-note">Есть вопрос или что-то не&nbsp;получилось? Напиши в&nbsp;поддержку: <a href="https://t.me/meine_nika" target="_blank" rel="noopener">@meine_nika</a></p>
       </div>
       <div class="done" id="done" aria-live="polite">
         <h3 id="doneH">До встречи в <span class="mk">четверг</span></h3>
         <p id="doneP">Заявка принята. Переходим в Telegram: бот подтвердит запись.</p>
         <a class="cta glass glass-cta" id="doneBot" href="#" hidden style="width:100%;margin-top:24px">Открыть бота</a>
+        <p class="fine support-note">Есть вопрос или что-то не&nbsp;получилось? Напиши в&nbsp;поддержку: <a href="https://t.me/meine_nika" target="_blank" rel="noopener">@meine_nika</a></p>
       </div>
     </div>
   </div>
@@ -311,6 +314,7 @@ footer.foot>.paper{position:absolute;inset:0;opacity:.35;z-index:0;pointer-event
         <h4>Сообщество</h4>
         <a href="https://t.me/nika_your_assistant" target="_blank" rel="noopener">Telegram-канал</a>
         <a href="https://t.me/nika_community" target="_blank" rel="noopener">Чат NIKA COMMUNITY</a>
+        <a href="https://t.me/meine_nika" target="_blank" rel="noopener">Служба поддержки</a>
       </div>
     </div>
   </div>
