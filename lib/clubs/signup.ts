@@ -3,7 +3,7 @@ import type { YooKassaApi } from "../yookassa";
 import type { ClubOrder, ClubOrderStore } from "./orders";
 import { botStartUrl, paidPageUrl, startPayment } from "./payments";
 import { hasEnoughSeats, isSoldOut } from "./seats";
-import { sessionForSignup, type ClubSession } from "./sessions";
+import { isFreeSession, sessionForSignup, type ClubSession } from "./sessions";
 
 /**
  * Заявка с лендинга занятия (/stretch) → сразу оплата ЮKassa.
@@ -73,11 +73,21 @@ export async function handleSignup(raw: unknown, deps: SignupDeps): Promise<Sign
   const giftRecipient = isGift ? clean(body.gift_recipient) : null;
   const requestToken = body.request_token;
 
+  // Встреча нужна до проверки полей: от неё зависит, нужны ли анкета и почта.
+  const session = sessionForSignup({
+    club: typeof body.club === "string" ? body.club.trim().slice(0, 50) : null,
+    date: /^\d{4}-\d{2}-\d{2}$/.test(String(body.event_date ?? "")) ? String(body.event_date) : null,
+  }, deps.now?.());
+  const free = session ? isFreeSession(session) : false;
+  // Нет встречи — старое поведение (анкета пилатеса), потом честный 404.
+  const askQuestionnaire = !session || session.questionnaire === "pilates";
+
   const invalid: string[] = [];
   if (name.length < 2) invalid.push("name");
   if (!tgUsername) invalid.push("telegram");
-  if (!EMAIL_RE.test(email)) invalid.push("email");
-  if (!isGift) {
+  // Почта нужна для чека. Бесплатной встрече чек не нужен: пустую пропускаем, кривую — нет.
+  if (free ? email !== "" && !EMAIL_RE.test(email) : !EMAIL_RE.test(email)) invalid.push("email");
+  if (!isGift && askQuestionnaire) {
     if (!level) invalid.push("level");
     if (!mat) invalid.push("mat");
     if (towel === null) invalid.push("towel");
@@ -89,12 +99,9 @@ export async function handleSignup(raw: unknown, deps: SignupDeps): Promise<Sign
   if (requestToken !== undefined && (typeof requestToken !== "string" || !/^[a-f0-9]{32}$/.test(requestToken))) invalid.push("request_token");
   if (body.consent !== true) invalid.push("consent");
   if (body.participation_rules !== true) invalid.push("participation_rules");
+  if (free && (isGift || quantity !== 1)) invalid.push("quantity");
   if (invalid.length) return { status: 422, body: { error: "Invalid fields", fields: invalid } };
 
-  const session = sessionForSignup({
-    club: typeof body.club === "string" ? body.club.trim().slice(0, 50) : null,
-    date: /^\d{4}-\d{2}-\d{2}$/.test(String(body.event_date ?? "")) ? String(body.event_date) : null,
-  }, deps.now?.());
   if (!session) return { status: 404, body: { error: "No upcoming session" } };
   const ticketCount = quantity as number;
   if (ticketCount > session.capacity) return { status: 422, body: { error: "Invalid fields", fields: ["quantity"] } };
@@ -148,12 +155,15 @@ export async function handleSignup(raw: unknown, deps: SignupDeps): Promise<Sign
     club: session.club, format: session.format, spot: session.spot, event_date: session.date, event_time: session.time,
     source: clean(body.source || session.club, 100),
     name, tg_username: tgUsername, email,
-    level: isGift ? null : level, mat: isGift ? null : mat, towel: isGift ? null : towel, water: isGift ? null : water,
+    level: isGift || !askQuestionnaire ? null : level, mat: isGift || !askQuestionnaire ? null : mat,
+    towel: isGift || !askQuestionnaire ? null : towel, water: isGift || !askQuestionnaire ? null : water,
     quantity: ticketCount, is_gift: isGift, gift_recipient: giftRecipient,
     consent_at: now, participation_rules_accepted_at: now, participation_rules_version: "1",
     confirm_token: token, updated_at: now,
     amount_rub: session.priceRub * ticketCount,
-    payment_status: waitlist ? "waitlist" : "pending",
+    // Бесплатная встреча: оплачивать нечего, место закреплено сразу.
+    payment_status: waitlist ? "waitlist" : free ? "paid" : "pending",
+    ...(free && !waitlist ? { paid_at: now } : {}),
   };
   const inserted = await deps.insert(fields);
   const order = await deps.orders.byToken(token);
@@ -162,5 +172,6 @@ export async function handleSignup(raw: unknown, deps: SignupDeps): Promise<Sign
     return { status: 500, body: { error: "DB error" } };
   }
   if (order.payment_status === "waitlist" || order.payment_status === "paid") return respond(order);
+  if (free) return respond(order);
   return pay(order);
 }

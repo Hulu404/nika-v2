@@ -126,6 +126,30 @@ describe("заявка с лендинга → сразу оплата ЮKassa",
     expect(orders.rows).toHaveLength(0);
   });
 
+  it("бесплатная встреча (книжный клуб): без анкеты и почты, сразу paid, ссылка в бота, без ЮKassa", async () => {
+    const read = { name: "Ника", telegram: "@Nika_Test", consent: true, participation_rules: true, club: "read", event_date: "2026-11-12", source: "read", request_token: key("f") };
+    const res = await handleSignup(read, deps);
+    expect(res).toMatchObject({ status: 200, body: { ok: true, redirectUrl: null, paid: true, amount: 0, confirmUrl: `https://t.me/nika_cofferun_signupsbot?start=st_${key("f")}` } });
+    expect(orders.rows[0]).toMatchObject({ club: "read", format: "bookclub", event_time: "19:00", payment_status: "paid", amount_rub: 0, email: "", level: null, mat: null, towel: null, water: null });
+    expect(orders.rows[0].paid_at).toBeTruthy();
+    expect(yk.payments.size).toBe(0);
+    // Повторная отправка той же формы — тот же заказ, без второй строки.
+    expect((await handleSignup(read, deps)).body).toMatchObject({ paid: true });
+    expect(orders.rows).toHaveLength(1);
+  });
+
+  it("бесплатная встреча: кривая почта, подарок и несколько мест — 422; мест нет — лист ожидания", async () => {
+    const read = { name: "Ника", telegram: "@Nika_Test", consent: true, participation_rules: true, club: "read", event_date: "2026-11-12" };
+    expect(await handleSignup({ ...read, email: "x" }, deps)).toMatchObject({ status: 422, body: { fields: ["email"] } });
+    expect(await handleSignup({ ...read, quantity: 2 }, deps)).toMatchObject({ status: 422, body: { fields: ["quantity"] } });
+    expect(await handleSignup({ ...read, is_gift: true, gift_recipient: "Анна" }, deps)).toMatchObject({ status: 422, body: { fields: ["quantity"] } });
+    expect(await handleSignup({ ...read, participation_rules: false }, deps)).toMatchObject({ status: 422, body: { fields: ["participation_rules"] } });
+    taken = 30;
+    expect(await handleSignup({ ...read, email: "nika@example.com" }, deps)).toMatchObject({ status: 200, body: { waitlist: true, paid: false } });
+    expect(orders.rows[0]).toMatchObject({ payment_status: "waitlist", email: "nika@example.com" });
+    expect(yk.payments.size).toBe(0);
+  });
+
   it("проверка полей: 422 со списком, null — 400, неизвестный клуб — 404", async () => {
     expect(await handleSignup({ ...form, consent: false, email: "x", telegram: "@" }, deps)).toMatchObject({ status: 422, body: { fields: ["telegram", "email", "consent"] } });
     expect((await handleSignup(null, deps)).status).toBe(400);

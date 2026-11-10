@@ -5,7 +5,7 @@ export { CLUB_START_PREFIX };
 import { yookassaFromEnv } from "../yookassa";
 import { tgAdmin } from "./supabase";
 import { countPaidSeats, hasEnoughSeats, isSoldOut } from "../clubs/seats";
-import { moscowToday, SESSIONS, sessionOfSignup, type ClubSession } from "../clubs/sessions";
+import { isFreeSession, moscowToday, SESSIONS, sessionOfSignup, type ClubSession } from "../clubs/sessions";
 import { normalizeTelegramUsername } from "../coffeerun/telegram-username";
 import { publicOriginFromEnv } from "../public-origin";
 import { SUPPORT_LABEL, SUPPORT_URL } from "./cta";
@@ -106,6 +106,15 @@ function whenWhere(session: ClubSession): string {
 
 /** Ответ после оплаты и на повторный вход оплатившего. */
 export function paidText(signup: Pick<ClubSignup, "name"> & TicketDetails, session: ClubSession): string {
+  if (isFreeSession(session)) {
+    return [
+      `${signup.name}, ты записан(а), ждём тебя!`,
+      "",
+      `${session.title}: ${whenWhere(session)}.`,
+      session.arrivalNote ?? `Приходи к ${session.gatherAt}.`,
+      ...(session.closingNote ? ["", session.closingNote] : []),
+    ].join("\n");
+  }
   return [
     signup.is_gift
       ? `${signup.name}, подарок оплачен: ${ticketLabel(signup.quantity ?? 1)}! Получатель: ${signup.gift_recipient}. Перешли получателю следующее сообщение — это подарочный билет.`
@@ -114,9 +123,9 @@ export function paidText(signup: Pick<ClubSignup, "name"> & TicketDetails, sessi
         : `${signup.name}, всё супер, заявка оплачена, приходи!`,
     "",
     `${session.title}: ${whenWhere(session)}.`,
-    `Приходи к ${session.gatherAt}, чтобы спокойно переодеться. С собой — удобная одежда и носки.`,
+    session.arrivalNote ?? `Приходи к ${session.gatherAt}, чтобы спокойно переодеться. С собой — удобная одежда и носки.`,
     "",
-    "Есть травмы или ограничения по здоровью — расскажи тренеру до начала.",
+    session.closingNote ?? "Есть травмы или ограничения по здоровью — расскажи тренеру до начала.",
   ].join("\n");
 }
 
@@ -134,6 +143,13 @@ export function giftTicketText(signup: Pick<ClubSignup, "id"> & TicketDetails, s
 
 /** Места кончились: человек в листе ожидания следующего занятия клуба. */
 export function waitlistText(signup: Pick<ClubSignup, "name">, session: ClubSession): string {
+  if (isFreeSession(session)) {
+    return [
+      `${signup.name}, все места на ${session.dateLabel} уже заняты.`,
+      "",
+      "Ты в листе ожидания: если кто-то не сможет прийти или откроем следующую встречу, напишу сюда первой.",
+    ].join("\n");
+  }
   return [
     `${signup.name}, все коврики на ${session.dateLabel} уже выкуплены.`,
     "",
@@ -211,7 +227,7 @@ function sessionKeyboard(session: ClubSession): InlineKeyboard {
 function paidKeyboard(session: ClubSession): InlineKeyboard {
   const keyboard = sessionKeyboard(session);
   const site = publicOriginFromEnv();
-  if (site && session.date >= moscowToday()) {
+  if (site && session.date >= moscowToday() && !isFreeSession(session)) {
     keyboard.row().url("Докупить билеты", `${site}${session.landing}?purchase=more#reg`);
   }
   return keyboard;

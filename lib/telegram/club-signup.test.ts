@@ -61,6 +61,16 @@ describe("waitlistText", () => {
 });
 
 describe("paidText", () => {
+  it("книжный клуб: без оплаты, коврика и тренера", () => {
+    const read = SESSIONS.find((s) => s.club === "read")!;
+    const text = paidText({ name: "Ника" }, read);
+    expect(text).toContain("ты записан(а), ждём тебя");
+    expect(text).toContain("12 ноября (четверг), 19:00");
+    expect(text).toContain("Новинский бульвар, 7");
+    expect(text).toContain("Палату № 6");
+    expect(text).not.toMatch(/оплач|коврик|тренер|носки/);
+    expect(waitlistText({ name: "Ника" }, read)).not.toMatch(/коврик/);
+  });
   it("называет время сбора и адрес", () => {
     const text = paidText({ name: "Ника" }, session);
     expect(text).toContain("всё супер, заявка оплачена, приходи");

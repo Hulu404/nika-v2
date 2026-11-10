@@ -35,6 +35,23 @@ export interface ClubSession {
   /** Путь лендинга на сайте, без хвостового слэша. */
   landing: string;
   mapUrl: string;
+  /**
+   * Анкета пилатеса (уровень, коврик, полотенце, вода). Книжному клубу и другим
+   * форматам без инвентаря она не нужна: форма её не шлёт, сервер не требует.
+   */
+  questionnaire?: "pilates";
+  /** Как прийти: строка в подтверждении бота. По умолчанию — пилатесная. */
+  arrivalNote?: string;
+  /** Последняя строка подтверждения. По умолчанию — про травмы и тренера. */
+  closingNote?: string;
+}
+
+/**
+ * Бесплатная встреча (priceRub = 0): заявка подтверждается сразу, без ЮKassa,
+ * почта не обязательна (чек не нужен). Место занимает так же, как оплаченная.
+ */
+export function isFreeSession(session: Pick<ClubSession, "priceRub">): boolean {
+  return session.priceRub === 0;
 }
 
 /**
@@ -63,6 +80,7 @@ export const SESSIONS: readonly ClubSession[] = [
     gatherAt: "10:10",
     landing: "/stretch",
     mapUrl: "https://yandex.ru/maps/?rtext=~55.768024%2C37.568205&rtt=auto",
+    questionnaire: "pilates",
   },
   {
     club: "stretch",
@@ -82,6 +100,29 @@ export const SESSIONS: readonly ClubSession[] = [
     gatherAt: "11:30",
     landing: "/stretch",
     mapUrl: "https://yandex.ru/maps/?rtext=~55.768024%2C37.568205&rtt=auto",
+    questionnaire: "pilates",
+  },
+  {
+    // NIKA | YOU'LL NEVER READ ALONE — книжный клуб, первая встреча. Бесплатно.
+    club: "read",
+    format: "bookclub",
+    spot: "supernova",
+    date: "2026-11-12",
+    time: "19:00",
+    priceRub: 0,
+    capacity: 30,
+    edition: 1,
+    title: "Книжный клуб",
+    formatLabel: "книжный клуб, обсуждаем «Палату № 6» Чехова",
+    dateLabel: "12 ноября",
+    weekday: "четверг",
+    place: "Surf Coffee × Supernova, Новинский бульвар, 7",
+    metro: "м. Смоленская",
+    gatherAt: "18:45",
+    landing: "/read",
+    mapUrl: "https://yandex.ru/maps/?text=" + encodeURIComponent("Москва, Новинский бульвар, 7"),
+    arrivalNote: "Приходи к 18:45, чтобы спокойно взять кофе и занять место. Читаем «Палату № 6» Чехова.",
+    closingNote: "Не успел дочитать — всё равно приходи, обсуждение тоже будет интересно.",
   },
 ];
 
