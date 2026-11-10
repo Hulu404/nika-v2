@@ -118,7 +118,7 @@ export const SESSIONS: readonly ClubSession[] = [
     formatLabel: "книжный клуб, обсуждаем «Палату № 6» Чехова",
     dateLabel: "12 ноября",
     weekday: "четверг",
-    place: "Surf Coffee × Supernova, Новинский бульвар, 7",
+    place: "Surf Coffee® × Supernova, Новинский бульвар, 7",
     metro: "м. Смоленская",
     gatherAt: "18:45",
     landing: "/read",

@@ -54,7 +54,7 @@ export const COFFEE_OWNER_TASKS: readonly CoffeeOwnerTask[] = [
     department: "events", setting: "coffee_run_events_owner", defaultOwner: "salmasxsx", role: "ивенты",
     title: (label) => `${label}: пейсеры и договорённости`,
     checklist: ({ runDate }) => [
-      "договориться о посте-анонсе в Surf Coffee, до вт 18:00",
+      "договориться о посте-анонсе в Surf Coffee®, до вт 18:00",
       `найти пейсеров (ведущих групп), до ${day(addDays(runDate, -2))} 20:00`,
       "договорённости с площадкой и партнёрами на день забега",
       "распределить задачи внутри отдела — кнопка «➕ Раздать задачи отделу»",
