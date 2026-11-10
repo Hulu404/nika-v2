@@ -11,7 +11,7 @@ export interface Spot {
 }
 
 export const SPOTS: readonly Spot[] = [
-  { slug: "cave", name: "Cave", address: "Москва, Новокузнецкая улица, дом 7" },
+  { slug: "cave", name: "Cave", address: "Москва, Новокузнецкая улица, дом 6" },
   { slug: "usachevo", name: "Усачёва", address: "Москва, ул. Усачёва, 62" },
   { slug: "luzhniki", name: "Лужники", address: "Москва, ул. Лужники, 24, стр. 41" },
 ];

@@ -81,10 +81,10 @@ export const COFFEE_RUNS: CoffeeRun[] = [
     weekday: "воскресенье",
     gatherTime: "12:00",
     startTime: "12:30",
-    address: "Москва, Новокузнецкая улица, дом 7",
+    address: "Москва, Новокузнецкая улица, дом 6",
     place: "спот Surf Coffee × Cave",
     distance: "5 км",
-    mapUrl: "https://yandex.ru/maps/?text=" + encodeURIComponent("Москва, Новокузнецкая улица, дом 7"),
+    mapUrl: "https://yandex.ru/maps/?text=" + encodeURIComponent("Москва, Новокузнецкая улица, дом 6"),
   },
 ];
 

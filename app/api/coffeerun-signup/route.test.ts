@@ -79,7 +79,7 @@ describe("POST /api/coffeerun-signup: согласие", () => {
     expect(inserted).toHaveLength(1);
     expect(inserted[0]).toMatchObject({
       spot: "cave", run_date: "2026-11-15", source: "coffeerunsurfcave",
-      address: "Москва, Новокузнецкая улица, дом 7", pace,
+      address: "Москва, Новокузнецкая улица, дом 6", pace,
     });
     expect(filters).toContainEqual(["spot", "cave"]);
     expect(filters).toContainEqual(["run_date", "2026-11-15"]);
@@ -91,7 +91,7 @@ describe("POST /api/coffeerun-signup: согласие", () => {
     expect(res.status).toBe(200);
     expect(inserted).toHaveLength(0);
     expect(updated[0]).toMatchObject({
-      spot: "cave", run_date: "2026-11-15", address: "Москва, Новокузнецкая улица, дом 7",
+      spot: "cave", run_date: "2026-11-15", address: "Москва, Новокузнецкая улица, дом 6",
       confirm_token: "a".repeat(32), pace: "6:00",
     });
     expect(filters).toContainEqual(["id", "cave-signup"]);
