@@ -274,7 +274,7 @@ footer.foot>.paper{position:absolute;inset:0;opacity:.35;z-index:0;pointer-event
             <label class="check" for="i-ok"><input type="checkbox" id="i-ok" name="rules_privacy"><span class="box" aria-hidden="true"></span><span class="ct">Подтверждаю, что ознакомился(лась) и согласен(на) с <a href="/read/participation-rules.html" target="_blank" rel="noopener">правилами участия</a> и <a href="https://www.mynika.online/legal/privacy" target="_blank" rel="noopener">политикой конфиденциальности</a></span></label>
             <div class="msg">Отметь согласие, чтобы записаться</div>
           </div>
-          <button class="cta glass glass-cta" type="submit">Я приду</button>
+          <button class="cta glass glass-cta" type="submit">Я буду</button>
           <p class="fine" id="formErr" hidden style="color:var(--crimson);text-align:center"></p>
         </form>
       </div>
@@ -494,6 +494,36 @@ footer.foot>.paper{position:absolute;inset:0;opacity:.35;z-index:0;pointer-event
       })
       .then(() => { sending = false; btn.disabled = false; if (btn.textContent === 'Отправляем…') btn.textContent = label; });
   });
+})();
+</script>
+<script>
+/* Якоря без «#» в адресе: прокрутка к разделу, адрес остаётся /read. Пришли по /read#reg (с правил участия) — прокручиваем и убираем «#reg». */
+(function(){
+  function go(id, smooth){
+    var el = id && document.getElementById(id);
+    if (!el) return false;
+    el.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+    return true;
+  }
+  document.addEventListener('click', function(e){
+    var a = e.target.closest && e.target.closest('a[href^="#"]');
+    if (!a || e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+    var id = a.getAttribute('href').slice(1);
+    if (!id) { e.preventDefault(); return; }
+    if (go(id, true)) e.preventDefault();
+  });
+  function strip(){
+    if (!location.hash) return null;
+    var id = decodeURIComponent(location.hash.slice(1));
+    try { history.replaceState(history.state, '', location.pathname + location.search); } catch (_) {}
+    return id;
+  }
+  var first = strip();
+  if (first) {
+    var land = function(){ go(first, false); };
+    if (document.readyState === 'complete') land(); else window.addEventListener('load', land);
+  }
+  window.addEventListener('hashchange', function(){ var id = strip(); if (id) go(id, true); });
 })();
 </script>
 </body>
