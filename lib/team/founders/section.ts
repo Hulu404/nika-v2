@@ -2,19 +2,18 @@ import { InlineKeyboard, type Context } from "grammy";
 import { fetchTraffic, type TrafficRow } from "../../databot/data/traffic";
 import { periodFromCode } from "../../databot/dates";
 import { findMember, listTeam, type TeamMember } from "../access";
-import { founderIds, isFounder } from "../config";
+import { canSeeSocial } from "../config";
 import { escapeHtmlTeam, type TaskScreen } from "../copy";
 import { supabaseTeamForms, type TeamFormStore } from "../form";
-import { INSTAGRAM_OWNER_SETTING } from "./constants";
-import { buildFounderDigestNow, type FounderDigestDeps } from "./digest";
-import { founderProjectDeps } from "./projects";
+import type { FounderDigestDeps } from "./digest";
 import { formatNumber, handleInstagramInput, telegramChannel } from "./social";
 import { supabaseSocialStore, type Platform, type Snapshot, type SocialStore } from "./social-store";
 
 /**
- * Раздел «Соцсети» в «Пятнице» (/social). Смотреть и вносить Instagram может
- * любой участник команды; назначать, кто вносит Instagram, и запрашивать
- * сводку фаундерам — только фаундеры.
+ * Раздел «Соцсети» в «Пятнице» (/social). Только для ников из
+ * TEAM_SOCIAL_USERNAMES (по умолчанию @srbrkvss, lib/team/config.ts):
+ * остальным раздел не виден, команда отвечает как на раздел, которого нет.
+ * Instagram вносит он же кнопкой «Внести Instagram».
  *
  * Экран: подписчики Telegram-канала и Instagram с приростом за сутки, неделю и
  * месяц, переходы по меткам (RPC databot_traffic) за выбранный период.
@@ -58,7 +57,7 @@ const CHANNEL_LABELS: Record<string, string> = {
 const TOP_CODES = 5;
 const HTML = { parse_mode: "HTML" as const, link_preview_options: { is_disabled: true } };
 
-export const SOCIAL_CALLBACK_RE = /^so:(p|ig|yes|fix|own|dig)(?::([a-z0-9]+))?$/;
+export const SOCIAL_CALLBACK_RE = /^so:(p|ig|yes|fix)(?::([a-z0-9]+))?$/;
 
 const ddmm = (iso: string) =>
   new Intl.DateTimeFormat("ru-RU", { timeZone: "Europe/Moscow", day: "2-digit", month: "2-digit" }).format(new Date(iso));
@@ -108,13 +107,6 @@ export function trafficLines(rows: readonly TrafficRow[]): string[] {
   return lines;
 }
 
-async function ownerLabel(deps: SocialSectionDeps): Promise<string> {
-  const raw = await deps.store.getSetting(INSTAGRAM_OWNER_SETTING);
-  if (!raw) return "фаундеры (ответственный не назначен)";
-  const m = await deps.findMember(Number(raw)).catch(() => null);
-  return m?.username ? `@${escapeHtmlTeam(m.username)}` : m?.display_name ? escapeHtmlTeam(m.display_name) : "участник вне команды";
-}
-
 /**
  * Почему блок не загрузился — словами, а не «попробуй позже». Чаще всего это
  * не применённая миграция: таблицы ещё нет, и ждать бессмысленно.
@@ -143,10 +135,9 @@ async function safe<T>(label: string, work: () => Promise<T>): Promise<{ ok: tru
 
 export async function socialScreen(deps: SocialSectionDeps, uid: number, code: string, now: Date): Promise<TaskScreen> {
   const period = periodFromCode(code, now) ?? periodFromCode(DEFAULT_PERIOD, now)!;
-  const [tg, ig, owner, traffic] = await Promise.all([
+  const [tg, ig, traffic] = await Promise.all([
     safe("tg", () => followersLine(deps.store, "telegram", now)),
     safe("ig", () => followersLine(deps.store, "instagram", now)),
-    safe("owner", () => ownerLabel(deps)),
     safe("traffic", () => deps.fetchTraffic(period.from, period.to)),
   ]);
   const text = [
@@ -154,7 +145,6 @@ export async function socialScreen(deps: SocialSectionDeps, uid: number, code: s
     "",
     tg.ok ? tg.value : `TG-канал: ${tg.error}`,
     ig.ok ? ig.value : `Instagram: ${ig.error}`,
-    `Кто вносит Instagram: ${owner.ok ? owner.value : owner.error}`,
     "",
     `<b>Метки и переходы</b> · ${ddmmYmd(period.fromYmd)}–${ddmmYmd(period.toYmd)}`,
     ...(traffic.ok ? trafficLines(traffic.value) : [`Переходы: ${traffic.error}`]),
@@ -165,7 +155,6 @@ export async function socialScreen(deps: SocialSectionDeps, uid: number, code: s
     if (i % 2 === 1) kb.row();
   });
   kb.text("Внести Instagram", "so:ig").row();
-  if (isFounder(uid)) kb.text("Кто вносит Instagram", "so:own").text("Сводка сейчас", "so:dig").row();
   return { text, keyboard: kb };
 }
 
@@ -182,7 +171,6 @@ async function show(ctx: Context, screen: TaskScreen, edit: boolean): Promise<vo
   await ctx.reply(screen.text, opts);
 }
 
-const back = () => new InlineKeyboard().text("← К соцсетям", `so:p:${DEFAULT_PERIOD}`);
 const SOCIAL_COMMAND = /^\/social(?:@([a-z0-9_]+))?(?=\s|$)/i;
 
 export async function handleSocialSectionUpdate(ctx: Context, providedDeps?: SocialSectionDeps, now = new Date()): Promise<boolean> {
@@ -201,9 +189,11 @@ export async function handleSocialSectionUpdate(ctx: Context, providedDeps?: Soc
     if (form?.kind !== "social.ig") return false;
   }
   if (cb) await ctx.answerCallbackQuery().catch(() => {});
-  if (!(await deps.findMember(uid))) {
-    if (!command && !cb) return false;
-    await ctx.reply("Соцсети доступны участникам команды. Войди через /join.");
+  // Раздел только для своих ников (TEAM_SOCIAL_USERNAMES). Остальным — как
+  // раздел, которого в проекте нет, без намёка, что он существует.
+  if (!canSeeSocial(ctx.from.username)) {
+    if (!command) return false;
+    await ctx.reply("В этом проекте такого раздела нет.");
     return true;
   }
 
@@ -218,34 +208,8 @@ export async function handleSocialSectionUpdate(ctx: Context, providedDeps?: Soc
       await show(ctx, await socialScreen(deps, uid, PERIODS.some((p) => p.code === arg) ? arg! : DEFAULT_PERIOD, now), true);
       return true;
     }
-    if (op === "ig" || op === "yes" || op === "fix") {
-      // so:yes:<число> разбирает handleInstagramInput по полному callback_data.
-      return await handleInstagramInput(ctx, deps, now);
-    }
-    if (!isFounder(uid)) {
-      await ctx.reply("Это могут только фаундеры.");
-      return true;
-    }
-    if (op === "own") {
-      if (arg === undefined) {
-        const kb = new InlineKeyboard();
-        for (const m of (await deps.listTeam()).slice(0, 40)) {
-          kb.text(m.username ? `@${m.username}` : (m.display_name ?? String(m.chat_id)), `so:own:${m.chat_id}`).row();
-        }
-        kb.text("Никто, спрашивать фаундеров", "so:own:0").row().text("← К соцсетям", `so:p:${DEFAULT_PERIOD}`);
-        await show(ctx, { text: `Кто вносит Instagram? Сейчас: ${await ownerLabel(deps)}.\nВ 21:00 МСК «Пятница» спросит этого человека.`, keyboard: kb }, true);
-        return true;
-      }
-      await deps.store.setSetting(INSTAGRAM_OWNER_SETTING, arg === "0" ? null : arg, uid, now);
-      await show(ctx, { text: `Готово. Instagram вносит: ${await ownerLabel(deps)}.`, keyboard: back() }, true);
-      return true;
-    }
-    // op === "dig": сводка фаундерам прямо сейчас, без отметки дедупа.
-    const digest = await buildFounderDigestNow({
-      tasks: deps.tasks, team: deps.listTeam, founders: () => [...founderIds()], social: deps.store, ...founderProjectDeps(),
-    }, now);
-    await show(ctx, { text: escapeHtmlTeam(digest), keyboard: back() }, true);
-    return true;
+    // so:ig / so:yes:<число> / so:fix разбирает handleInstagramInput по полному callback_data.
+    return await handleInstagramInput(ctx, deps, now);
   } catch (err) {
     console.error("[team-social]", err instanceof Error ? err.message : String(err));
     await ctx.reply(`Не получилось: ${blockError(err)}.`);

@@ -1,17 +1,16 @@
-import { createSupabaseStore } from "../../databot/data/supabase-store";
-import { listProjectTeam } from "../access";
-import { NIKA } from "../projects/projects";
-import { founderProjectDeps } from "./projects";
 import { founderIds, teamBotConfigured } from "../config";
 import { supabaseTeamForms } from "../form";
-import { dispatchFounderDigest } from "./digest";
 import { dispatchSocialDaily, type SocialDeps } from "./social";
 import { supabaseSocialStore } from "./social-store";
 
 /**
- * Точка входа 15-минутного тикера (instrumentation.ts) для того, что «Пятница»
- * присылает фаундерам сама: сводка в 10:00 и 22:30, снимок Telegram-канала и
- * вопрос про Instagram в 21:00 МСК. Без TEAM_BOT_TOKEN — absent.
+ * Точка входа 15-минутного тикера (instrumentation.ts): раз в сутки в 21:00
+ * МСК снимок подписчиков Telegram-канала — по нему /social считает динамику.
+ * Без TEAM_BOT_TOKEN — absent.
+ *
+ * Сводку фаундерам (10:00 и 22:30) больше не шлём: Дмитрий 11.11.2026 —
+ * «бесполезна, я и так в курсе». Вопрос про Instagram в 21:00 тоже убран:
+ * число вносит сам в /social кнопкой «Внести Instagram».
  */
 export async function dispatchFounderReports(now = new Date()): Promise<{ status: "absent" | "done"; done?: string[] }> {
   if (!teamBotConfigured()) return { status: "absent" };
@@ -26,21 +25,6 @@ export async function dispatchFounderReports(now = new Date()): Promise<{ status
     founders: () => [...founderIds()],
   };
   const done: string[] = [];
-  try {
-    const store = createSupabaseStore();
-    const sent = await dispatchFounderDigest({
-      tasks: (since) => store.listAssignedOverview(since),
-      team: () => listProjectTeam(NIKA),
-      ...founderProjectDeps(),
-      founders: social.founders,
-      social: social.store,
-      memberCount: social.memberCount,
-      send: social.send,
-    }, now);
-    if (sent) done.push(`founders ${sent}`);
-  } catch (err) {
-    console.error("[founders] digest:", err instanceof Error ? err.message : String(err));
-  }
-  done.push(...(await dispatchSocialDaily(social, now)));
+  done.push(...(await dispatchSocialDaily(social, now, { askInstagram: false })));
   return { status: "done", done };
 }

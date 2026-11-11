@@ -245,6 +245,15 @@ export async function register(): Promise<void> {
     } catch (err) {
       console.error("[team] cleanup:", err instanceof Error ? err.message : String(err));
     }
+    // Разово: отменить просроченные задачи по списку от 11.11.2026, без уведомлений.
+    try {
+      const [{ cleanupListedOverdue }, { createSupabaseStore }, { supabaseSettingsStore }] = await Promise.all([
+        import("./lib/team/overdue-cleanup"), import("./lib/databot/data/supabase-store"), import("./lib/team/settings"),
+      ]);
+      await cleanupListedOverdue({ tasks: createSupabaseStore(), settings: supabaseSettingsStore() }, new Date());
+    } catch (err) {
+      console.error("[team] overdue cleanup:", err instanceof Error ? err.message : String(err));
+    }
   }
 
   // Бот данных команды — то же правило. Без DATABOT_TOKEN ни строки в логе:

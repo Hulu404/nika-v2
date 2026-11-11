@@ -84,7 +84,7 @@ describe("сводка фаундерам по проектам", () => {
     expect(text.startsWith("Сводка 22:30 · 14 октября\n\n🏃 NIKA\nЗадачи")).toBe(true);
     expect(nikaPart).toContain("✅ Выполнено: 1");
     expect(nikaPart).toContain("· @vika · Пост в ТГК");
-    expect(nikaPart).toContain("Команда");
+    expect(nikaPart).not.toContain("Заходили");
     expect(nikaPart).toContain("Соцсети");
     expect(labPart).toContain("· @vika · B1 каркас");
     expect(labPart).not.toContain("Команда");

@@ -54,16 +54,16 @@ describe("текст сводки", () => {
     expect(text).not.toContain("Вчерашнее");
     expect(text).toContain("↩️ Отказались: 1\n  · @danya · Пост про Усачёву");
     expect(text).toContain("⏰ Просрочено сейчас: 1\n  · @danya · Пост про Усачёву · срок вчера 18:00");
-    expect(text).toContain("Заходили: @vika");
-    expect(text).toContain("Давно не было (3+ дня): @danya · 5 дн., @nastya · ни разу");
+    // Кто когда заходил — в сводке больше нет.
+    expect(text).not.toContain("Заходили");
+    expect(text).not.toContain("Давно не было");
     expect(text).not.toContain("@founder");
   });
 
   it("пустые блоки не прячет, длинные списки режет до 10 строк", () => {
     const empty = founderDigestText({ slot, now, tasks: [], team: [member(9, "founder", null)], founders: [9], social: [] });
     expect(empty).toContain("✅ Выполнено: 0\n↩️ Отказались: 0\n⏰ Просрочено сейчас: 0");
-    expect(empty).toContain("Заходили: никто");
-    expect(empty).toContain("Давно не было (3+ дня): нет");
+    expect(empty).not.toContain("Заходили");
     const many = Array.from({ length: 14 }, (_, i) => task({ id: i + 1, status: "done", status_at: iso("2026-10-07T15:00"), what: `Дело ${i + 1}` }));
     const text = founderDigestText({ slot, now, tasks: many, team, founders: [9], social: [] });
     expect(text).toContain("✅ Выполнено: 14");

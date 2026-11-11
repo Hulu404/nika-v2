@@ -4,7 +4,6 @@ import type { Update, UserFromGetMe } from "grammy/types";
 import type { TrafficRow } from "../../databot/data/traffic";
 import type { TeamMember } from "../access";
 import { MemoryTeamForms } from "../form";
-import { INSTAGRAM_OWNER_SETTING } from "./constants";
 import { handleSocialSectionUpdate, trafficLines, type SocialSectionDeps } from "./section";
 import { MemorySocialStore } from "./social-store";
 
@@ -13,7 +12,8 @@ const member = (chat_id: number, username: string): TeamMember => ({
   chat_id, username, display_name: username, role: "member", joined_at: NOW.toISOString(), added_by: null,
   last_seen_at: null, digest_opt_in: true,
 });
-const team = [member(9, "founder"), member(5, "masha"), member(6, "lena")];
+const team = [member(9, "founder"), member(5, "masha"), member(6, "lena"), member(7, "srbrkvss")];
+const usernameOf = (id: number) => team.find((m) => m.chat_id === id)?.username;
 
 describe("/social в «Пятнице»", () => {
   let store: MemorySocialStore;
@@ -45,7 +45,7 @@ describe("/social в «Пятнице»", () => {
     });
     bot.use((ctx) => handleSocialSectionUpdate(ctx, deps, NOW).then(() => {}));
     let id = 0;
-    const user = (from: number) => ({ id: from, is_bot: false, first_name: "x" });
+    const user = (from: number) => ({ id: from, is_bot: false, first_name: "x", username: usernameOf(from) });
     const chat = (from: number) => ({ id: from, type: "private" as const, first_name: "x" });
     send = async (text, from) => {
       await bot.handleUpdate({ update_id: ++id, message: { message_id: id, date: 1, text, chat: chat(from), from: user(from) } } as Update);
@@ -57,39 +57,37 @@ describe("/social в «Пятнице»", () => {
   });
   afterEach(() => vi.unstubAllEnvs());
 
-  it("участник видит экран и может внести Instagram; фаундерских кнопок у него нет", async () => {
-    await send("/social", 5);
+  it("@srbrkvss видит экран с динамикой и вносит Instagram сам", async () => {
+    await send("/social", 7);
     const s = screens.at(-1)!;
     expect(s.text).toContain("TG-канал: снимков пока нет (не задан NIKA_TG_CHANNEL)");
     expect(s.text).toContain("Instagram: ещё ни разу не вносили");
-    expect(s.text).toContain("Кто вносит Instagram: фаундеры (ответственный не назначен)");
+    expect(s.text).not.toContain("Кто вносит Instagram");
     expect(s.text).toContain("Переходов по меткам за период нет");
     expect(s.buttons).toContain("Внести Instagram");
-    expect(s.buttons).not.toContain("Кто вносит Instagram");
     expect(s.buttons).not.toContain("Сводка сейчас");
-    await press("so:ig", 5);
-    await send("3 870", 5);
-    expect(store.snapshots).toMatchObject([{ platform: "instagram", followers: 3870, entered_by: 5 }]);
-    await press("so:own", 5);
-    expect(screens.at(-1)!.text).toBe("Это могут только фаундеры.");
+    await press("so:ig", 7);
+    await send("3 870", 7);
+    expect(store.snapshots).toMatchObject([{ platform: "instagram", followers: 3870, entered_by: 7 }]);
   });
 
-  it("фаундер назначает, кто вносит Instagram, и смотрит сводку сейчас без дедупа", async () => {
-    await send("/social", 9);
-    expect(screens.at(-1)!.buttons).toEqual(expect.arrayContaining(["Кто вносит Instagram", "Сводка сейчас"]));
-    await press("so:own", 9);
-    expect(screens.at(-1)!.buttons).toEqual(expect.arrayContaining(["@masha", "Никто, спрашивать фаундеров"]));
-    await press("so:own:5", 9);
-    expect(store.settings.get(INSTAGRAM_OWNER_SETTING)).toBe("5");
-    expect(screens.at(-1)!.text).toContain("Instagram вносит: @masha");
-    await press("so:dig", 9);
-    expect(screens.at(-1)!.text).toMatch(/^Сводка \d\d:\d\d · 7 октября/);
-    expect(store.claimed.size).toBe(0);
+  it("остальным — ни участникам, ни фаундеру — раздела нет и данные не видны", async () => {
+    for (const id of [5, 9, 42]) {
+      await send("/social", id);
+      expect(screens.at(-1)!.text).toBe("В этом проекте такого раздела нет.");
+    }
+    const before = screens.length;
+    await press("so:p:7d", 5);
+    await press("so:ig", 9);
+    expect(screens.length).toBe(before);
   });
 
-  it("чужому не отвечает данными", async () => {
-    await send("/social", 42);
-    expect(screens.at(-1)!.text).toContain("Войди через /join");
+  it("TEAM_SOCIAL_USERNAMES меняет, кому виден раздел", async () => {
+    vi.stubEnv("TEAM_SOCIAL_USERNAMES", "masha");
+    await send("/social", 5);
+    expect(screens.at(-1)!.text).toContain("<b>Соцсети</b>");
+    await send("/social", 7);
+    expect(screens.at(-1)!.text).toBe("В этом проекте такого раздела нет.");
   });
 
   it("переходы по меткам: всего, по каналам и топ меток", () => {
@@ -124,9 +122,8 @@ describe("/social, когда база не готова", () => {
     });
     bot.use((ctx) => handleSocialSectionUpdate(ctx, deps, NOW).then(() => {}));
     await bot.handleUpdate({ update_id: 1, message: { message_id: 1, date: 1, text: "/social",
-      chat: { id: 5, type: "private", first_name: "x" }, from: { id: 5, is_bot: false, first_name: "x" } } } as Update);
+      chat: { id: 7, type: "private", first_name: "x" }, from: { id: 7, is_bot: false, first_name: "x", username: "srbrkvss" } } } as Update);
     expect(texts[0]).toContain("TG-канал: нет таблицы social_snapshots: примени миграцию 049_social_snapshots.sql в Supabase");
-    expect(texts[0]).toContain("Кто вносит Instagram: нет таблицы team_settings");
     expect(texts[0]).toContain("Переходов по меткам за период нет");
     vi.unstubAllEnvs();
   });

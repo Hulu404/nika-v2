@@ -208,12 +208,11 @@ export function teamText(members: TeamMember[], meChatId: number): string {
     const who = teamPersonLabel(m);
     const role = isFounder(m.chat_id) && !/фаундер/i.test(m.title ?? "") ? " · фаундер" : "";
     const me = m.chat_id === meChatId ? " · это ты" : "";
-    const seen = m.last_seen_at ? ` · был ${mskDateTime(m.last_seen_at)}` : " · ещё не заходил";
     // Отписку от сводок показываем: иначе «почему мне не пришло утром» будет
     // выясняться в переписке, а ответ всё это время лежит в одной строке.
     const muted = m.digest_opt_in ? "" : " · сводки выключены";
     const deps = m.departments?.length ? ` · ${m.departments.map(departmentName).join(", ")}` : "";
-    return `• ${who}${role}${deps}${me}${muted}${seen}`;
+    return `• ${who}${role}${deps}${me}${muted}`;
   };
   return [`В команде ${members.length} чел.:`, "", ...members.map(line)].join("\n");
 }
@@ -373,17 +372,15 @@ export function helpText(founder = false, ai = false): string {
     "/assign — поставить задачу: что делать / срок / @ник",
     "/schedule — расписание на неделю, /event — добавить событие",
     "/events — ивенты клубов: цифры, участники, явка",
-    "/social — соцсети: подписчики, переходы по меткам, внести Instagram",
     "/team — кто в команде",
     "/faq — быстрые ответы на частые вопросы",
     "/mute — не присылать план на день, /unmute — снова присылать",
     "/help — что я умею",
     "",
     "Каждое утро в 9:00 МСК присылаю план на день: события, встречи и твои задачи на сегодня. " +
-      "Через 3 часа после ивента клуба спрошу ответственного, сколько пришло. " +
-      "В 21:00 спрошу, сколько подписчиков в Instagram.",
+      "Через 3 часа после ивента клуба спрошу ответственного, сколько пришло.",
   ];
-  if (founder) lines.push("", "Фаундерам: сводка команды в 10:00 и 22:30, «Вся команда» в /tasks, в /social — кто вносит Instagram и «Сводка сейчас».",
+  if (founder) lines.push("", "Фаундерам: «Вся команда» в /tasks.",
     "/kick @ник — убрать человека из команды (только фаундеры)");
   lines.push(
     "/leave — выйти самому",

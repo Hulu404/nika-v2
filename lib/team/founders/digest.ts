@@ -4,7 +4,7 @@ import { mskMidnight } from "../../databot/dates";
 import { addDays, mskToday } from "../../databot/time";
 import type { TeamMember } from "../access";
 import { NIKA, hasModule, projectLabel, type Project } from "../projects/projects";
-import { AWAY_DAYS, DIGEST_LIST_LIMIT, FOUNDER_DIGEST_SLOTS } from "./constants";
+import { DIGEST_LIST_LIMIT, FOUNDER_DIGEST_SLOTS } from "./constants";
 import { formatNumber, takenToday, telegramChannel } from "./social";
 import type { Platform, Snapshot, SocialStore } from "./social-store";
 
@@ -135,8 +135,8 @@ function multiProjectText(input: FounderDigestInput, blocks: readonly ProjectDig
   return out.join("\n");
 }
 
-function sectionsText(input: FounderDigestInput, withTeam: boolean, withSocial: boolean): string[] {
-  const { slot, now, tasks, team, founders, social } = input;
+function sectionsText(input: FounderDigestInput, _withTeam: boolean, withSocial: boolean): string[] {
+  const { slot, now, tasks, team, social } = input;
   const names = new Map(team.filter((m) => m.username).map((m) => [m.chat_id, m.username!] as const));
   const inWindow = (iso: string) => {
     const t = Date.parse(iso);
@@ -149,13 +149,7 @@ function sectionsText(input: FounderDigestInput, withTeam: boolean, withSocial: 
   const overdue = tasks.filter((t) => (t.status === "open" || t.status === "taken") && t.due_at && Date.parse(t.due_at) <= now.getTime())
     .sort((a, b) => Date.parse(a.due_at!) - Date.parse(b.due_at!));
 
-  const crew = team.filter((m) => !founders.includes(m.chat_id));
-  const visited = crew.filter((m) => m.last_seen_at && inWindow(m.last_seen_at));
-  const away = crew
-    .map((m) => ({ m, days: m.last_seen_at ? Math.floor((now.getTime() - Date.parse(m.last_seen_at)) / DAY) : null }))
-    .filter((x) => x.days === null || x.days >= AWAY_DAYS)
-    .sort((a, b) => (a.days ?? Infinity) - (b.days ?? Infinity));
-  const who = (m: TeamMember) => (m.username ? `@${m.username}` : m.display_name ?? String(m.chat_id));
+  // Блок «Команда» (кто когда заходил) убран по просьбе Дмитрия 11.11.2026.
 
   return [
     `Сводка ${slot.key} · ${dayMonth(slot.ymd)}`,
@@ -167,12 +161,6 @@ function sectionsText(input: FounderDigestInput, withTeam: boolean, withSocial: 
     ...capped(declined.map((t) => `  · @${t.username} · ${t.what}`)),
     `⏰ Просрочено сейчас: ${overdue.length}`,
     ...capped(overdue.map((t) => `  · @${t.username} · ${t.what} · срок ${relativeDue(t.due_at!, now)}`)),
-    ...(withTeam ? [
-      "",
-      "Команда",
-      `Заходили: ${visited.length ? visited.map(who).join(", ") : "никто"}`,
-      `Давно не было (${AWAY_DAYS}+ дня): ${away.length ? away.map(({ m, days }) => `${who(m)} · ${days === null ? "ни разу" : `${days} дн.`}`).join(", ") : "нет"}`,
-    ] : []),
     ...(withSocial ? ["", "Соцсети", ...social.map((s) => socialText(s, now))] : []),
   ];
 }

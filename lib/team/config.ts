@@ -48,3 +48,16 @@ export function founderIds(
 export function isFounder(chatId: number, env?: string): boolean {
   return (env === undefined ? founderIds() : founderIds(env, "")).has(chatId);
 }
+
+/**
+ * Кто видит раздел «Соцсети» (/social): подписчики, динамика, переходы и
+ * «Внести Instagram». Только ники из TEAM_SOCIAL_USERNAMES, по умолчанию
+ * srbrkvss. Сравнение без @ и регистра.
+ */
+export function socialViewers(env: string | undefined = process.env.TEAM_SOCIAL_USERNAMES): Set<string> {
+  return new Set((env ?? "srbrkvss").split(",").map((u) => u.trim().replace(/^@/, "").toLowerCase()).filter(Boolean));
+}
+
+export function canSeeSocial(username: string | null | undefined, env?: string): boolean {
+  return !!username && socialViewers(env).has(username.replace(/^@/, "").toLowerCase());
+}

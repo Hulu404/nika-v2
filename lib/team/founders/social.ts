@@ -97,7 +97,7 @@ export async function instagramRecipients(deps: Pick<SocialDeps, "store" | "foun
  * Оба — один раз в день (отметка в team_digests). Вопрос не задаётся, если
  * число за сегодня уже внесено.
  */
-export async function dispatchSocialDaily(deps: SocialDeps, now: Date): Promise<string[]> {
+export async function dispatchSocialDaily(deps: SocialDeps, now: Date, opts: { askInstagram?: boolean } = {}): Promise<string[]> {
   if (mskHour(now) < SOCIAL_DAILY_HOUR) return [];
   const ymd = mskToday(now);
   const done: string[] = [];
@@ -105,6 +105,7 @@ export async function dispatchSocialDaily(deps: SocialDeps, now: Date): Promise<
     await snapshotTelegram(deps, now);
     done.push("tg_snapshot");
   }
+  if (opts.askInstagram === false) return done;
   if (takenToday(await deps.store.latest("instagram"), now)) return done;
   if (!(await deps.store.claim("ig_ask", "instagram", ymd))) return done;
   for (const chatId of await instagramRecipients(deps)) {
