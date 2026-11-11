@@ -478,14 +478,6 @@ html.js .f-fig.on svg *{--draw:0}
 .tix-r{text-align:right;font-size:12px;color:var(--ink-2);line-height:1.6;padding-bottom:4px}
 .tix-r b{color:var(--ink);font-weight:400}
 .order-note{font-size:12px;line-height:1.6;color:var(--ink-2);margin:8px 0 20px}
-.promo-box{margin:0 0 20px;padding:16px;border:1px solid var(--line);border-radius:16px;background:#fff}
-.promo-title{font-size:12px;color:var(--ink-2);margin:0 0 8px}
-.promo-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
-.promo-row .in{height:48px}
-.promo-apply{height:48px;padding:0 16px;border:1px solid var(--line-2);border-radius:14px;background:#F7F7F5;color:var(--ink);font:inherit;font-size:13px;cursor:pointer}
-.promo-apply:disabled{opacity:.55;cursor:wait}
-.promo-status{min-height:18px;margin:7px 0 0;font-size:12px;color:var(--ink-2)}
-.promo-status.err{color:var(--err)}
 .order-total{font-size:12px;color:var(--ink-2);margin-top:10px}
 .gift-fields{padding:16px;border:1px solid var(--line);border-radius:16px;margin-bottom:20px;background:#FBEDE8}
 .gift-fields .field{margin-bottom:0}
@@ -986,11 +978,6 @@ ym(113929945,'init',{webvisor:true,clickmap:true,trackLinks:true,accurateTrackBo
               <button type="button" class="quantity-step" id="quantity-plus" aria-label="Увеличить количество билетов" aria-controls="i-quantity">+</button>
             </div><div class="msg" id="quantity-error" aria-live="polite">Укажи целое число билетов от 1 до 16</div></div>
           <p class="order-note" id="quantity-note"><span id="quantity-availability" aria-live="polite">Проверяем доступные места…</span><br>Один билет — один участник. Все билеты придут тебе в Telegram.</p>
-          <div class="promo-box">
-            <p class="promo-title">Есть промокод?</p>
-            <div class="promo-row"><input class="in" id="promo-code" type="text" maxlength="40" placeholder="Введи промокод" autocomplete="off" autocapitalize="characters"><button class="promo-apply" id="promo-apply" type="button">Применить</button></div>
-            <p class="promo-status" id="promo-status" aria-live="polite"></p>
-          </div>
           <div class="field"><span class="fl" id="l-purchase">Для кого билеты</span><div class="opts opts--2" role="radiogroup" aria-labelledby="l-purchase">
             <label class="opt on"><input type="radio" name="purchase" value="self" checked>Для себя и друзей</label>
             <label class="opt"><input type="radio" name="purchase" value="gift">В подарок</label>
@@ -1081,7 +1068,7 @@ var EVENT={club:'stretch',format:'pilates',spot:'klimashkina',date:'2026-11-08',
   url:'https://www.mynika.online/stretch'};
 /* Цена и максимум билетов обновляются с сервера (GET /api/club-signup).
    OUT = все места выкуплены: форма ставит в лист ожидания. */
-var PRICE=1000,OUT=false,QUANTITY=1,IS_GIFT=false,ORDER_TOKEN=null,MAX_TICKETS=null,SUBMITTING=false,AVAILABILITY_VERSION=0,AVAILABILITY_FAILED=false,ADDITIONAL_ORDER=false,PROMO_CODE=null,PROMO_DISCOUNT=0;
+var PRICE=1000,OUT=false,QUANTITY=1,IS_GIFT=false,ORDER_TOKEN=null,MAX_TICKETS=null,SUBMITTING=false,AVAILABILITY_VERSION=0,AVAILABILITY_FAILED=false,ADDITIONAL_ORDER=false;
 /* LEFT — остаток ковриков. Сервер отдает его, только когда мест мало (≤5), иначе null и на странице «ограничено». */
 var LEFT=null;
 /* Прототип: форма показывает шаги без отправки. Превью «мест нет»: ?full или #full */
@@ -1120,9 +1107,8 @@ function renderSeats(){
 }
 function renderOrder(){
   var validQuantity=readQuantity();
-  var base=PRICE*validQuantity,total=Math.round(base*(100-PROMO_DISCOUNT)/100);
-  document.getElementById('order-total').textContent=OUT||validQuantity===null?'—':total.toLocaleString('ru-RU');
-  document.getElementById('order-calculation').textContent=OUT?'Билетов на это занятие нет':validQuantity===null?quantityErrorText():PROMO_CODE?'Скидка '+PROMO_DISCOUNT+'% · было '+base.toLocaleString('ru-RU')+' ₽':validQuantity+' '+plural(validQuantity,'билет','билета','билетов')+' × '+PRICE+' ₽';
+  document.getElementById('order-total').textContent=OUT||validQuantity===null?'—':(PRICE*validQuantity).toLocaleString('ru-RU');
+  document.getElementById('order-calculation').textContent=OUT?'Билетов на это занятие нет':validQuantity===null?quantityErrorText():validQuantity+' '+plural(validQuantity,'билет','билета','билетов')+' × '+PRICE+' ₽';
   renderQuantityButtons();
   document.getElementById('gift-fields').hidden=!IS_GIFT;
   document.getElementById('participant-fields').hidden=IS_GIFT;
@@ -1160,18 +1146,6 @@ function validateQuantity(){
   return valid;
 }
 function changeQuantity(){ORDER_TOKEN=null;validateQuantity();renderOrder()}
-var promoInput=document.getElementById('promo-code'),promoApply=document.getElementById('promo-apply'),promoStatus=document.getElementById('promo-status');
-function clearPromo(message){PROMO_CODE=null;PROMO_DISCOUNT=0;promoStatus.textContent=message||'';promoStatus.classList.remove('err');renderOrder()}
-promoInput.addEventListener('input',function(){clearPromo('');ORDER_TOKEN=null});
-promoApply.addEventListener('click',function(){
-  var code=promoInput.value.trim().toUpperCase();
-  if(!code){clearPromo('Введи промокод');promoStatus.classList.add('err');return}
-  promoApply.disabled=true;promoStatus.classList.remove('err');promoStatus.textContent='Проверяем код…';
-  fetch('/api/club-signup?promo='+encodeURIComponent(code),{cache:'no-store'}).then(function(r){return r.json().then(function(j){if(!r.ok)throw j;return j})})
-    .then(function(j){PROMO_CODE=j.code;PROMO_DISCOUNT=j.discountPercent;ORDER_TOKEN=null;promoStatus.textContent='Скидка '+j.discountPercent+'% применена';renderOrder()})
-    .catch(function(e){clearPromo(e&&e.error?e.error:'Не удалось проверить промокод');promoStatus.classList.add('err')})
-    .then(function(){promoApply.disabled=false});
-});
 function stepQuantity(step){
   if(quantityInput.disabled)return;
   var value=Number(quantityInput.value);
@@ -1275,7 +1249,6 @@ function startAdditionalOrder(){
   document.getElementById('i-recipient').value='';
   document.getElementById('i-ok').checked=false;
   document.getElementById('i-rules-ok').checked=false;
-  promoInput.value='';clearPromo('');
   $$('.field.err',form).forEach(function(field){field.classList.remove('err')});
   quantityInput.setAttribute('aria-invalid','false');
   done.hidden=true;form.hidden=false;
@@ -1327,7 +1300,7 @@ form.addEventListener('submit',function(e){
   form.querySelectorAll('input,select,.quantity-step').forEach(function(input){input.disabled=true});
   fetch('/api/club-signup',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({
     name:document.getElementById('i-name').value.trim(),telegram:document.getElementById('i-tg').value.trim(),
-    email:document.getElementById('i-mail').value.trim(),level:lv,mat:mt,towel:tw,water:wt,consent:true,participation_rules:true,promo_code:PROMO_CODE,
+    email:document.getElementById('i-mail').value.trim(),level:lv,mat:mt,towel:tw,water:wt,consent:true,participation_rules:true,
     quantity:QUANTITY,is_gift:IS_GIFT,gift_recipient:IS_GIFT?document.getElementById('i-recipient').value.trim():null,request_token:ORDER_TOKEN,
     club:EVENT.club,event_date:EVENT.date,source:EVENT.source})})
     .then(function(r){return r.json().then(function(j){if(!r.ok)throw j;return j})})
