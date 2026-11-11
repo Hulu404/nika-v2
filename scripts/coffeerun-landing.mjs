@@ -1,7 +1,7 @@
 /**
  * Распаковка и запаковка лендингов кофе-рана.
  *
- * public/coffeerunluzhniki/index.html — не обычная страница, а самораспаковывающийся
+ * landings/coffeerunluzhniki.html — не обычная страница, а самораспаковывающийся
  * бандл. /coffeerunsurfsport с 12.10.2026 — обычный HTML: правится напрямую, этим
  * скриптом его НЕ упаковывать (бандл показывал «Unpacking...» при загрузке). Бандл: шрифты лежат в <script type="__bundler/manifest">, а вся разметка —
  * одной JSON-строкой в <script type="__bundler/template">. Править файл
@@ -29,7 +29,7 @@ if (!["extract", "pack"].includes(cmd) || !spot || !file) {
   process.exit(1);
 }
 
-const bundlePath = `public/coffeerun${spot}/index.html`;
+const bundlePath = `landings/coffeerun${spot}.html`;
 const bundle = readFileSync(bundlePath, "utf8");
 const match = TEMPLATE_RE.exec(bundle);
 if (!match) throw new Error(`в ${bundlePath} нет <script type="__bundler/template">`);

@@ -1,6 +1,6 @@
 # Кофе-ран NIKA × Surf Coffee Cave
 
-Страница: `/coffeerunsurfcave`, исходник: `public/coffeerunsurfcave/index.html`.
+Страница: `/coffeerunsurfcave`, исходник: `landings/coffeerunsurfcave.html` (дата, время и адрес подставляются из `lib/coffeerun/run.ts`, см. `lib/landings/render.ts`).
 Основа — `/coffeerunsurfsport`: сохранены секции, оформление, анимации и адаптивная вёрстка.
 
 ## Маршрут

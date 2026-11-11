@@ -6,8 +6,8 @@
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
 <meta name="theme-color" content="#0B0B0D">
-<title>Кофе-ран · Surf Coffee® × Cave и NIKA · 15 ноября · Новокузнецкая</title>
-<meta name="description" content="Кофе-ран NIKA и Surf Coffee® × Cave на Новокузнецкой. Встречаемся 15 ноября: сбор с 12:00, старт в 12:30. Бежим 5 км в темпе 6:00, 7:00 или 8:00 мин/км. Дата: 15 ноября 2026 года. Фильтр 0,2 л бесплатно или скидка 10% на напитки. Участие бесплатное.">
+<title>Кофе-ран · Surf Coffee® × Cave и NIKA · {{date_label}} · Новокузнецкая</title>
+<meta name="description" content="Кофе-ран NIKA и Surf Coffee® × Cave на Новокузнецкой. Встречаемся {{date_label}}: сбор с {{gather_time}}, старт в {{start_time}}. Бежим 5 км в темпе 6:00, 7:00 или 8:00 мин/км. Дата: {{date_label}} {{year}} года. Фильтр 0,2 л бесплатно или скидка 10% на напитки. Участие бесплатное.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
 
@@ -862,16 +862,16 @@ html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:n
       </h1>
       <div class="p-low">
         <div class="tk-wrap">
-          <div class="tk" id="ticket" role="group" aria-label="Билет: кофе-ран 15 ноября 2026 года, Surf Coffee® Cave, Новокузнецкая улица, дом 6. Сбор с 12:00, старт в 12:30">
+          <div class="tk" id="ticket" role="group" aria-label="Билет: кофе-ран {{date_label}} {{year}} года, Surf Coffee® Cave, {{address}}. Сбор с {{gather_time}}, старт в {{start_time}}">
             <div class="tk-p tk-a" id="tkA">
               <div class="tk-title"><b>ТВОЙ БИЛЕТ</b><span>на <em>SUNDAY</em> well spent</span></div>
               <dl class="tk-dl">
-                <dt>DATE</dt><dd>15 ноября · ВС</dd>
+                <dt>DATE</dt><dd>{{date_label}} · {{weekday_short}}</dd>
                 <dt>LOCATION</dt><dd>Новокузнецкая, 6</dd>
                 <dt>SPOT</dt><dd class="tk-spot">Surf Coffee<sup>®</sup> × Cave</dd>
-                <dt>TIME</dt><dd>12:00 <small>старт 12:30</small></dd>
+                <dt>TIME</dt><dd>{{gather_time}} <small>старт {{start_time}}</small></dd>
               </dl>
-              <span class="tk-ed">15 NOVEMBER 2026</span>
+              <span class="tk-ed">{{date_en|upper}} {{year}}</span>
               <span class="tk-by">SURF COFFEE<sup>®</sup> × CAVE <b>×</b> NIKA</span>
               <i class="tk-perf"></i>
             </div>
@@ -881,7 +881,7 @@ html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:n
           </div>
         </div>
         <div class="p-cta" id="heroCta">
-          <p class="p-what">Бежим 5 км 15 ноября с Surf Coffee® Cave на Новокузнецкой. Сбор с 12:00, старт в 12:30.</p>
+          <p class="p-what">Бежим 5 км {{date_label}} с Surf Coffee® Cave на Новокузнецкой. Сбор с {{gather_time}}, старт в {{start_time}}.</p>
           <a href="#reg" class="btn btn--brick">Занять место</a>
         </div>
       </div>
@@ -890,9 +890,9 @@ html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:n
   </div>
 
   <!-- 7. бегущая строка вместо карточек и цифр -->
-  <div class="mq r" aria-label="Surf Coffee® × Cave и NIKA зовут на кофе-ран. Бежим разговорным темпом, на финише — кофе. Сбор с 12:00, старт в 12:30. Бежим 5 км в темпе 6:00, 7:00 или 8:00 мин/км. Дата: 15 ноября 2026 года. Участие бесплатное.">
+  <div class="mq r" aria-label="Surf Coffee® × Cave и NIKA зовут на кофе-ран. Бежим разговорным темпом, на финише — кофе. Сбор с {{gather_time}}, старт в {{start_time}}. Бежим 5 км в темпе 6:00, 7:00 или 8:00 мин/км. Дата: {{date_label}} {{year}} года. Участие бесплатное.">
     <div class="mq-row mq-a" aria-hidden="true"><div class="mq-track"><span><span class="sxs mq-surf">Surf Coffee<sup>®</sup><i class="x">×</i>Cave</span> и <span class="nk">NIKA</span> зовут на <em>кофе-ран</em></span><i class="mq-dot"></i><span>бежим <em>разговорным</em> темпом</span><i class="mq-dot"></i><span>на финише <em>кофе</em></span><i class="mq-dot"></i><span><span class="sxs mq-surf">Surf Coffee<sup>®</sup><i class="x">×</i>Cave</span> и <span class="nk">NIKA</span> зовут на <em>кофе-ран</em></span><i class="mq-dot"></i><span>бежим <em>разговорным</em> темпом</span><i class="mq-dot"></i><span>на финише <em>кофе</em></span><i class="mq-dot"></i></div></div>
-    <div class="mq-row mq-b" aria-hidden="true"><div class="mq-track"><span>5 км от Cave на Новокузнецкой</span><i class="mq-dot"></i><span>темп 6:00 · 7:00 · 8:00 мин/км</span><i class="mq-dot"></i><span>пейсеры ведут группу</span><i class="mq-dot"></i><span>участие 0 ₽</span><i class="mq-dot"></i><span>фильтр 0,2 л бесплатно или −10% на напитки</span><i class="mq-dot"></i><span>сбор с 12:00 · старт 12:30</span><i class="mq-dot"></i><span>5 км от Cave на Новокузнецкой</span><i class="mq-dot"></i><span>темп 6:00 · 7:00 · 8:00 мин/км</span><i class="mq-dot"></i><span>пейсеры ведут группу</span><i class="mq-dot"></i><span>участие 0 ₽</span><i class="mq-dot"></i><span>фильтр 0,2 л бесплатно или −10% на напитки</span><i class="mq-dot"></i><span>сбор с 12:00 · старт 12:30</span><i class="mq-dot"></i></div></div>
+    <div class="mq-row mq-b" aria-hidden="true"><div class="mq-track"><span>5 км от Cave на Новокузнецкой</span><i class="mq-dot"></i><span>темп 6:00 · 7:00 · 8:00 мин/км</span><i class="mq-dot"></i><span>пейсеры ведут группу</span><i class="mq-dot"></i><span>участие 0 ₽</span><i class="mq-dot"></i><span>фильтр 0,2 л бесплатно или −10% на напитки</span><i class="mq-dot"></i><span>сбор с {{gather_time}} · старт {{start_time}}</span><i class="mq-dot"></i><span>5 км от Cave на Новокузнецкой</span><i class="mq-dot"></i><span>темп 6:00 · 7:00 · 8:00 мин/км</span><i class="mq-dot"></i><span>пейсеры ведут группу</span><i class="mq-dot"></i><span>участие 0 ₽</span><i class="mq-dot"></i><span>фильтр 0,2 л бесплатно или −10% на напитки</span><i class="mq-dot"></i><span>сбор с {{gather_time}} · старт {{start_time}}</span><i class="mq-dot"></i></div></div>
   </div>
 </section>
 
@@ -915,11 +915,11 @@ html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:n
     <div class="day r">
       <div class="cap">
         <h4>Как пройдёт встреча</h4>
-        <span class="pill pill--ondark">15 ноября · воскресенье</span>
+        <span class="pill pill--ondark">{{date_label}} · {{weekday}}</span>
       </div>
       <div class="steps">
-        <div class="step"><div class="t">12:00</div><div class="d">Сбор с 12:00 у <span class="sxs">Surf Coffee<sup>®</sup><i class="x">×</i>Cave</span>, Новокузнецкая улица, дом 6. Знакомимся с пейсерами</div></div>
-        <div class="step"><div class="t">12:30</div><div class="d">Старт. Бежим группой, никто не остаётся один</div></div>
+        <div class="step"><div class="t">{{gather_time}}</div><div class="d">Сбор с {{gather_time}} у <span class="sxs">Surf Coffee<sup>®</sup><i class="x">×</i>Cave</span>, {{address_short}}. Знакомимся с пейсерами</div></div>
+        <div class="step"><div class="t">{{start_time}}</div><div class="d">Старт. Бежим группой, никто не остаётся один</div></div>
         <div class="step last"><div class="t">Финиш</div><div class="d">Возвращаемся в Surf Coffee® Cave за кофе</div></div>
         <div class="step"><div class="t">После</div><div class="d">Общаемся и делимся впечатлениями от забега</div></div>
       </div>
@@ -943,23 +943,23 @@ html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:n
         <div class="map-card">
           <a href="/coffeerunsurfcave/image.png?v=fa8eaf7298aa" target="_blank" rel="noopener" aria-label="Открыть схему маршрута 5 км в полном размере"><img src="/coffeerunsurfcave/image.png?v=fa8eaf7298aa" width="1438" height="802" loading="lazy" alt="Маршрут кофе-рана 5 км: от Surf Coffee® Cave по Замоскворечью и Болотному острову, затем обратно к споту."></a>
           <div class="map-foot">
-            <span><i></i><span class="mf-t">Старт и финиш: <span class="sxs">Surf Coffee<sup>®</sup><i class="x">×</i>Cave</span>, Новокузнецкая улица, дом 6</span></span>
+            <span><i></i><span class="mf-t">Старт и финиш: <span class="sxs">Surf Coffee<sup>®</sup><i class="x">×</i>Cave</span>, {{address_short}}</span></span>
             <span><i class="blue"></i><span class="mf-t">Маршрут 5 км · нажми на карту, чтобы увеличить</span></span>
           </div>
         </div>
-        <a class="btn btn--line map-btn" href="https://yandex.ru/maps/?text=%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B0%2C%20%D0%9D%D0%BE%D0%B2%D0%BE%D0%BA%D1%83%D0%B7%D0%BD%D0%B5%D1%86%D0%BA%D0%B0%D1%8F%20%D1%83%D0%BB%D0%B8%D1%86%D0%B0%2C%20%D0%B4%D0%BE%D0%BC%206" target="_blank" rel="noopener">
+        <a class="btn btn--line map-btn" href="{{map_url}}" target="_blank" rel="noopener">
           <svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 21s7-6.3 7-11a7 7 0 1 0-14 0c0 4.7 7 11 7 11z" stroke="currentColor" stroke-width="1.8"></path><circle cx="12" cy="10" r="2.6" stroke="currentColor" stroke-width="1.8"></circle></svg>
           Найти Surf Coffee® Cave в Картах
         </a>
       </div>
       <div class="legs">
         <h4>План маршрута</h4>
-        <div class="leg"><span class="n s">S</span><div><b>Встречаемся у Surf Coffee® Cave</b><p>Новокузнецкая улица, дом 6, рядом с метро «Новокузнецкая». Сбор с 12:00, старт в 12:30.</p></div></div>
+        <div class="leg"><span class="n s">S</span><div><b>Встречаемся у Surf Coffee® Cave</b><p>{{address_short}}, рядом с метро «Новокузнецкая». Сбор с {{gather_time}}, старт в {{start_time}}.</p></div></div>
         <div class="leg"><span class="n">1</span><div><b>Бежим вместе</b><p>5 км по маршруту на карте. Три группы с пейсерами: 6:00, 7:00 и 8:00 мин/км.</p></div></div>
         <div class="leg"><span class="n">2</span><div><b>Кофе на финише</b><p>Возвращаемся в Cave, общаемся и делимся впечатлениями от забега.</p></div></div>
       </div>
     </div>
-    <p class="map-note r">Старт и финиш: <span class="sxs">Surf Coffee<sup>®</sup><i class="x">×</i>Cave</span>, Новокузнецкая улица, дом 6. Сбор с 12:00, старт в 12:30. Встречаемся 15 ноября у входа в кофейню.</p>
+    <p class="map-note r">Старт и финиш: <span class="sxs">Surf Coffee<sup>®</sup><i class="x">×</i>Cave</span>, {{address_short}}. Сбор с {{gather_time}}, старт в {{start_time}}. Встречаемся {{date_label}} у входа в кофейню.</p>
   </div>
 </section>
 
@@ -969,10 +969,10 @@ html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:n
     <div class="reg-grid">
       <div class="reg-l r">
         <h2 class="d2">Бежим <span class="brand-accent">вместе</span></h2>
-        <p class="lead">Встречаемся 15 ноября: сбор с 12:00, старт в 12:30. Бежим 5 км в темпе 6:00, 7:00 или 8:00 мин/км. Участие бесплатное.</p>
+        <p class="lead">Встречаемся {{date_label}}: сбор с {{gather_time}}, старт в {{start_time}}. Бежим 5 км в темпе 6:00, 7:00 или 8:00 мин/км. Участие бесплатное.</p>
         <ul>
-          <li><span class="li-t"><b>15 ноября, воскресенье.</b> Сбор с 12:00, старт в 12:30</span></li>
-          <li><span class="li-t"><b>Новокузнецкая улица, дом 6</b>: спот <span class="sxs">Surf Coffee<sup>®</sup><i class="x">×</i>Cave</span>, старт и финиш</span></li>
+          <li><span class="li-t"><b>{{date_label}}, {{weekday}}.</b> Сбор с {{gather_time}}, старт в {{start_time}}</span></li>
+          <li><span class="li-t"><b>{{address_short}}</b>: спот <span class="sxs">Surf Coffee<sup>®</sup><i class="x">×</i>Cave</span>, старт и финиш</span></li>
           <li><span class="li-t"><b>5 км</b> — три группы с пейсерами: 6:00, 7:00 и 8:00 мин/км</span></li>
           <li><span class="li-t"><b>Фильтр 0,2 л бесплатно или скидка 10% на напитки</b> от Surf Coffee® Cave</span></li>
         </ul>
@@ -1024,7 +1024,7 @@ html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:n
       <a href="https://www.mynika.online" class="brand"><span class="wm">NIKA</span><span class="bar"></span><span class="tag">YOU'LL NEVER RUN ALONE</span></a>
       <div class="f-links">
         <a href="https://www.mynika.online" target="_blank" rel="noopener">mynika.online</a>
-        <a href="https://yandex.ru/maps/?text=%D0%9C%D0%BE%D1%81%D0%BA%D0%B2%D0%B0%2C%20%D0%9D%D0%BE%D0%B2%D0%BE%D0%BA%D1%83%D0%B7%D0%BD%D0%B5%D1%86%D0%BA%D0%B0%D1%8F%20%D1%83%D0%BB%D0%B8%D1%86%D0%B0%2C%20%D0%B4%D0%BE%D0%BC%206" target="_blank" rel="noopener">Новокузнецкая улица, дом 6</a>
+        <a href="{{map_url}}" target="_blank" rel="noopener">{{address_short}}</a>
         <a href="#reg">Регистрация</a>
       </div>
     </div>
@@ -1035,11 +1035,12 @@ html.js:not(.ready) .r:not(.card-form){filter:blur(18px);opacity:.55;animation:n
   </div>
 </footer>
 
-<a href="#reg" class="float-cta" id="floatCta" aria-hidden="true" tabindex="-1">Занять место<span>15.11 · 12:30</span></a>
+<a href="#reg" class="float-cta" id="floatCta" aria-hidden="true" tabindex="-1">Занять место<span>{{date_dm}} · {{start_time}}</span></a>
 <div class="toast" id="toast"></div>
 
 <script>
-var RUN_SPOT='cave', RUN_DATE='2026-11-15', RUN_SOURCE='coffeerunsurfcave';
+var EVENT={{event_json}};
+var RUN_SPOT=EVENT.spot, RUN_DATE=EVENT.date, RUN_SOURCE='coffeerunsurfcave';
 /* появление блоков */
 var revealItems=[].slice.call(document.querySelectorAll('.r'));
 function showAll(){revealItems.forEach(function(el){el.classList.add('in')})}
@@ -1066,7 +1067,7 @@ function say(t){toast.textContent=t;toast.classList.add('on');clearTimeout(toast
 /* поделиться */
 document.getElementById('share').addEventListener('click',function(){
   var data={title:'Кофе-ран · Surf Coffee® × Cave и NIKA',
-            text:'Кофе-ран NIKA и Surf Coffee® Cave на Новокузнецкой. Встречаемся 15 ноября! Сбор с 12:00, старт в 12:30. Бежим 5 км в темпе 6:00, 7:00 или 8:00 мин/км. Дата: 15 ноября 2026 года. Участие бесплатное.',
+            text:'Кофе-ран NIKA и Surf Coffee® Cave на Новокузнецкой. Встречаемся '+EVENT.dateLabel+'! Сбор с '+EVENT.gatherTime+', старт в '+EVENT.time+'. Бежим 5 км в темпе 6:00, 7:00 или 8:00 мин/км. Дата: '+EVENT.dateLabel+' '+EVENT.date.slice(0,4)+' года. Участие бесплатное.',
             url:'https://www.mynika.online/coffeerunsurfcave'};
   if(navigator.share){navigator.share(data).catch(function(){})}
   else if(navigator.clipboard){navigator.clipboard.writeText(data.text+' '+data.url).then(function(){say('Ссылка скопирована')}).catch(function(){say('Скопируй ссылку из адресной строки')})}
@@ -1126,7 +1127,7 @@ form.addEventListener('submit',function(e){
         tgBtn.style.display='none';
         done.querySelector('.fine').style.display='none';
         done.querySelector('h4').textContent='Ты в списке';
-        done.querySelector('p').textContent='Ждём тебя 15 ноября: сбор в 12:00, старт в 12:30. Новокузнецкая улица, дом 6, Surf Coffee® Cave.';
+        done.querySelector('p').textContent='Ждём тебя '+EVENT.dateLabel+': сбор в '+EVENT.gatherTime+', старт в '+EVENT.time+'. '+EVENT.addressShort+', Surf Coffee® Cave.';
       }
       form.classList.add('off');
       done.classList.add('on');

@@ -5,8 +5,9 @@
  * из того, что прислал браузер. Иначе закешированная страница или подделанный
  * запрос выставили бы счёт не на ту сумму.
  *
- * Новое занятие — новая запись в SESSIONS; дату в public/stretch/index.html
- * (EVENT.date) надо держать равной `date` здесь.
+ * Новое занятие — новая запись в SESSIONS. Лендинг (/stretch, /read)
+ * подставляет дату, время, адрес и цену отсюда сам при отдаче
+ * (lib/landings/render.ts), руками на странице их менять не нужно.
  */
 export interface ClubSession {
   /** Клуб: 'stretch' — NIKA | YOU'LL NEVER STRETCH ALONE. */
@@ -30,6 +31,8 @@ export interface ClubSession {
   dateLabel: string;
   weekday: string;
   place: string;
+  /** Короткий адрес для билета и карты: «ул. Климашкина, 20». По умолчанию — place. */
+  address?: string;
   metro: string;
   gatherAt: string;
   /** Путь лендинга на сайте, без хвостового слэша. */
@@ -78,6 +81,7 @@ export const SESSIONS: readonly ClubSession[] = [
     dateLabel: "1 ноября",
     weekday: "воскресенье",
     place: "ул. Климашкина, 20, студия йоги «Поток», вход с торца",
+    address: "ул. Климашкина, 20",
     metro: "м. Улица 1905 года",
     gatherAt: "10:10",
     landing: "/stretch",
@@ -98,6 +102,7 @@ export const SESSIONS: readonly ClubSession[] = [
     dateLabel: "8 ноября",
     weekday: "воскресенье",
     place: "ул. Климашкина, 20, студия йоги «Поток», вход с торца",
+    address: "ул. Климашкина, 20",
     metro: "м. Улица 1905 года",
     gatherAt: "11:30",
     landing: "/stretch",
@@ -119,6 +124,7 @@ export const SESSIONS: readonly ClubSession[] = [
     dateLabel: "12 ноября",
     weekday: "четверг",
     place: "Surf Coffee® × Supernova, Новинский бульвар, 7",
+    address: "Новинский бульвар, 7",
     metro: "м. Смоленская",
     gatherAt: "18:45",
     landing: "/read",

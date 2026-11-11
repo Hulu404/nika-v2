@@ -77,18 +77,9 @@ const nextConfig = {
         ],
       },
       { source: "/start", headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }] },
-      // Лендинг Усачёвой: раньше закешированная страница присылала старую дату.
-      // no-cache — браузер и прокси каждый раз сверяются с сервером.
-      ...["/coffeerunsurfsport", "/coffeerunsurfsport/index.html", "/coffeerunsurfcave", "/coffeerunsurfcave/index.html"].map((source) => ({
-        source,
-        headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }],
-      })),
       { source: "/app", headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }, { key: "X-Robots-Tag", value: "noindex, nofollow" }] },
-      // Лендинг клуба NIKA | YOU'LL NEVER STRETCH ALONE: дата и цена занятия меняются — без залежавшегося кеша.
-      ...["/stretch", "/stretch/index.html", "/read", "/read/index.html"].map((source) => ({
-        source,
-        headers: [{ key: "Cache-Control", value: "no-cache, must-revalidate" }],
-      })),
+      // Кэш лендингов событий (кофе-раны, /stretch, /read) ставит их маршрут
+      // app/api/landing/[name]/route.ts: минута, данные подставляются на сервере.
       // Звук практик и иконки меняются только с новым именем файла
       { source: "/app/audio/:path*", headers: [{ key: "Cache-Control", value: "public, max-age=604800" }] },
     ];
@@ -128,25 +119,17 @@ const nextConfig = {
   },
   async rewrites() {
     return [
-      // Лендинги кофе-ранов: /coffeerun<спот> → его index.html, без редиректа.
-      // Кусок пути после «coffeerun» — тот же слаг, что в lib/coffeerun/run.ts
-      // (CoffeeRun.landing): по нему бот собирает ссылку на нужную страницу.
-      {
-        source: "/coffeerunsurfsport",
-        destination: "/coffeerunsurfsport/index.html",
-      },
-      {
-        source: "/coffeerunsurfcave",
-        destination: "/coffeerunsurfcave/index.html",
-      },
-      {
-        source: "/coffeerunluzhniki",
-        destination: "/coffeerunluzhniki/index.html",
-      },
-      // Лендинг клуба стретчинга и пилатеса: /stretch → его index.html.
-      { source: "/stretch", destination: "/stretch/index.html" },
-      // Лендинг книжного клуба NIKA | YOU'LL NEVER READ ALONE: /read → его index.html.
-      { source: "/read", destination: "/read/index.html" },
+      // Лендинги событий собирает сервер: HTML в landings/<имя>.html, дата, время
+      // и адрес — из lib/coffeerun/run.ts и lib/clubs/sessions.ts (lib/landings/
+      // render.ts). Адрес в браузере не меняется, старый /<имя>/index.html тоже
+      // работает. Картинки и прочие файлы рядом остаются в public/<имя>/ и
+      // отдаются по прежним путям: rewrite срабатывает, только если такого
+      // файла в public нет. Путь кофе-рана — тот же CoffeeRun.landing, по нему
+      // бот собирает ссылку на нужную страницу.
+      ...["coffeerunsurfsport", "coffeerunsurfcave", "coffeerunluzhniki", "stretch", "read"].flatMap((name) => [
+        { source: `/${name}`, destination: `/api/landing/${name}` },
+        { source: `/${name}/index.html`, destination: `/api/landing/${name}` },
+      ]),
       { source: "/read/participation-rules", destination: "/read/participation-rules.html" },
       // Юридические страницы: /legal/privacy → /legal/privacy.html, без редиректа
       { source: "/legal/privacy", destination: "/legal/privacy.html" },

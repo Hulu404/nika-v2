@@ -195,9 +195,11 @@ Next.js читает `.env` и `.env.local`. Основной и командн�
 
 ### Редактирование лендингов
 
-`public/coffeerunsurfsport/index.html` (спот `usachevo`) — **обычный самодостаточный HTML**: стили, скрипты и картинки внутри, шрифты с Google Fonts. Правится напрямую; бандлером его не упаковывать — бандл показывал «Unpacking...» и голый текст при загрузке. Отдаётся с `Cache-Control: no-cache` (`next.config.mjs`).
+Лендинги событий (`/coffeerunsurfsport`, `/coffeerunsurfcave`, `/coffeerunluzhniki`, `/stretch`, `/read`) лежат в `landings/<имя>.html` и отдаются маршрутом `app/api/landing/[name]/route.ts` (rewrite в `next.config.mjs`, адрес не меняется). Дата, день недели, время сбора и старта, программа, адрес, ссылка на карту и объект `EVENT` для скрипта — плейсхолдеры `{{…}}`, их сервер подставляет из `COFFEE_RUNS` / `SESSIONS` (`lib/landings/render.ts`, список плейсхолдеров там же). Дату руками в HTML не вписывать: тест `lib/landings/render.test.ts` это ловит. Картинки и прочие файлы рядом остаются в `public/<имя>/`. Кэш страницы — минута.
 
-`public/coffeerunluzhniki/index.html` пока остаётся самораспаковывающимся бандлом с JSON-строкой `__bundler/template`:
+`landings/coffeerunsurfsport.html` (спот `usachevo`) — **обычный самодостаточный HTML**: стили, скрипты и картинки внутри, шрифты с Google Fonts. Правится напрямую; бандлером его не упаковывать — бандл показывал «Unpacking...» и голый текст при загрузке.
+
+`landings/coffeerunluzhniki.html` пока остаётся самораспаковывающимся бандлом с JSON-строкой `__bundler/template`:
 
 ```sh
 node scripts/coffeerun-landing.mjs extract luzhniki page.html
@@ -207,7 +209,7 @@ node scripts/coffeerun-landing.mjs pack luzhniki page.html
 
 `pack` проверяет обратную распаковку. Временный `page.html` не является исходником приложения и не должен случайно попасть в коммит.
 
-При переносе забега синхронно обновляются `COFFEE_RUNS`, видимые тексты, метаданные и `RUN_DATE`/`RUN_SPOT` на странице. Конфиг сам не пересобирает HTML. Поддерживайте хронологический порядок массива и убирайте прошедшие события из активного расписания.
+При переносе забега достаточно поправить `COFFEE_RUNS`: страница подставит новую дату, время и программу сама. Поддерживайте хронологический порядок массива; последний забег каждого лендинга не удаляйте, без будущего страница показывает его.
 
 ```sh
 npm test -- lib/coffeerun/landing.test.ts lib/coffeerun/run.test.ts
@@ -332,7 +334,7 @@ Production требует применённых миграций, окруже�
 | Ритм | `lib/rhythm/`, `lib/rhythm.ts`, `components/rhythm/`, `app/api/rhythm/advice/route.ts` |
 | Онбординг | `components/onboarding/script.ts`, `components/onboarding/ChatOnboarding.tsx`, `lib/profile.ts` |
 | Дизайн и навигация | `app/globals.css`, `tailwind.config.ts`, `components/AppLayout.tsx`, `lib/nav.ts` |
-| Кофе-ран | `lib/coffeerun/run.ts`, `lib/coffeerun/pace.ts`, `public/coffeerun*/index.html` |
+| Кофе-ран | `lib/coffeerun/run.ts`, `lib/coffeerun/pace.ts`, `landings/*.html`, `lib/landings/` |
 | Командные инструменты | `lib/team/`, `lib/databot/`, миграции `035`–`037`, `039`, `040`, `043`–`047` |
 | Оплата и промо | `lib/robokassa.ts`, `app/api/robokassa/`, `app/api/promo/`, `app/s/[code]/route.ts` |
 | Уведомления | `instrumentation.ts`, `lib/notifications.ts`, `lib/telegram/`, `app/api/cron/`, `.github/workflows/`, `vercel.json` |

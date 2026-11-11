@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { runInNewContext } from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 
-const html = readFileSync(new URL("../../public/stretch/index.html", import.meta.url), "utf8");
+const html = readFileSync(new URL("../../landings/stretch.html", import.meta.url), "utf8");
 const controller = html.slice(html.indexOf("function renderOrder(){"), html.indexOf("/* ===== режим покупки ===== */"));
 
 function setup() {
