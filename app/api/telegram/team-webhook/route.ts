@@ -2,6 +2,7 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { getTeamBot } from "@/lib/team/bot";
 import { processInBackground } from "@/lib/telegram/background";
 import { teamBotConfigured } from "@/lib/team/config";
+import { healAfterRejection, noteRejectedSecret } from "@/lib/team/webhook-guard";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -37,7 +38,17 @@ export async function POST(req: Request) {
   const secret = process.env.TEAM_WEBHOOK_SECRET;
   const provided = req.headers.get("x-telegram-bot-api-secret-token");
   if (!secret || provided !== secret) {
-    // Тело не читаем и не обрабатываем.
+    // Тело не читаем и не обрабатываем. Секрет есть, но чужой — вебхук
+    // перерегистрировал другой экземпляр с тем же токеном: возвращаем его
+    // себе сразу, Telegram доставит очередь повторной попыткой (webhook-guard.ts).
+    if (secret && provided) {
+      noteRejectedSecret();
+      if (healAfterRejection(async () => {
+        const { ensureTeamWebhook } = await import("@/lib/team/ensure-webhook");
+        const res = await ensureTeamWebhook();
+        console.error(`[team-webhook] пришёл чужой секрет, вебхук возвращён себе: ${res.status}${res.detail ? ` — ${res.detail}` : ""}`);
+      })) console.error("[team-webhook] чужой секрет: перерегистрирую вебхук");
+    }
     return new Response("Unauthorized", { status: 401 });
   }
 

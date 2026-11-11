@@ -2,6 +2,7 @@ import { getTeamBot, setTeamCommands, TEAM_COMMANDS } from "./bot";
 import { listTeam } from "./access";
 import { teamBotConfigured } from "./config";
 import { publicOriginFromEnv } from "../public-origin";
+import { rejectedRecently } from "./webhook-guard";
 
 /**
  * Регистрация вебхука командного бота при старте приложения — по образцу
@@ -52,6 +53,11 @@ export async function ensureTeamWebhook(checkFirst = false): Promise<EnsureTeamW
       // Telegram хранит последнюю ошибку и после успешной доставки. Старый
       // 401 без очереди не повод регистрировать вебхук заново на каждом тике.
       const unauthorized = info.pending_update_count > 0 && /\b401\b/.test(info.last_error_message ?? "");
+      // 401 возвращаем себе, только если отклонял именно этот экземпляр: иначе
+      // два сервера с одним токеном перетягивают вебхук по кругу (webhook-guard.ts).
+      if (info.url === target && !missingUpdates && unauthorized && !rejectedRecently()) {
+        return { status: "failed", detail: `доставка: ${info.last_error_message}; апдейты приходят не сюда — вебхук не трогаю` };
+      }
       if (info.url === target && !missingUpdates && !unauthorized) {
         if (info.pending_update_count > 0 && info.last_error_message) {
           return { status: "failed", detail: `доставка: ${info.last_error_message}; в очереди: ${info.pending_update_count}` };
