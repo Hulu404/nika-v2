@@ -7,7 +7,7 @@ import { isHoldActive } from "../clubs/payments";
 import { normalizeTelegramUsername } from "../coffeerun/telegram-username";
 import { publicOriginFromEnv } from "../public-origin";
 import { fromRun, fromSession, upcomingEvents, type LandingEvent } from "../landings/events";
-import { placeholderValues } from "../landings/render";
+import { placeholderValues } from "../landings/template";
 import { attendanceLine, countAttendance, datesNeedingRollcallCheck } from "./attendance";
 import { myClubSignups, myCoffeeRuns, rollcallDates, type MyClubRow, type MyCoffeeRunRow } from "./my-signups";
 import { SUPPORT_LABEL, SUPPORT_URL } from "./cta";
