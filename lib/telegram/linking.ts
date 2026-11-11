@@ -10,7 +10,7 @@ import type { BotContext } from "./bot";
 export const CONSENT_VERSION = "2026-07-18";
 
 export const CONSENT_PROMPT =
-  "Можно я буду иногда писать сюда сама, по утрам? Коротко и по делу, без спама. Приостановить можно в любой момент.";
+  "Можно мы будем иногда писать сюда сами, по утрам? Коротко и по делу, без спама. Приостановить можно в любой момент.";
 
 /** Инлайн-кнопки согласия. callback_data — optin_yes / optin_no. */
 export function consentKeyboard(): InlineKeyboard {
@@ -117,7 +117,7 @@ export async function handleStartToken(ctx: BotContext, token: string): Promise<
   trackServer(userId, "tg_linked");
 
   // Приветствие + запрос согласия (opt-in). Без согласия бот сам не пишет.
-  await ctx.reply("Готово, привязала этот чат к твоему аккаунту НИКИ.");
+  await ctx.reply("Готово, привязали этот чат к твоему аккаунту НИКИ.");
   await sendConsentRequest(ctx);
 }
 
@@ -156,8 +156,8 @@ export async function handleOptIn(ctx: BotContext, yes: boolean): Promise<void> 
   await ctx.editMessageReplyMarkup({ reply_markup: new InlineKeyboard() }).catch(() => {});
   await ctx.reply(
     yes
-      ? "Здорово. Буду заглядывать по утрам, и всегда можно приостановить (команда /stop или настройки НИКИ)."
-      : "Поняла, сама писать не буду. Включить можно в настройках НИКИ или командой /start заново.",
+      ? "Здорово. Будем заглядывать по утрам, и всегда можно приостановить (команда /stop или настройки НИКИ)."
+      : "Поняли, сами писать не будем. Включить можно в настройках НИКИ или командой /start заново.",
   );
 }
 
@@ -178,7 +178,7 @@ export async function handleStop(ctx: BotContext): Promise<void> {
     .maybeSingle();
 
   if (!binding) {
-    await ctx.reply("Сейчас я тебе и так не пишу. Чтобы подключить меня, открой настройки НИКИ.");
+    await ctx.reply("Сейчас мы тебе и так не пишем. Чтобы подключить нас, открой настройки НИКИ.");
     return;
   }
 
@@ -188,7 +188,7 @@ export async function handleStop(ctx: BotContext): Promise<void> {
     .eq("id", binding.id);
 
   await ctx.reply(
-    "Приостановила. Сама писать не буду, но связку не разрываю. Включить обратно можно командой /start или в настройках НИКИ.",
+    "Приостановили. Сами писать не будем, но связку не разрываем. Включить обратно можно командой /start или в настройках НИКИ.",
   );
 }
 

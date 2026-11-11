@@ -69,7 +69,7 @@ export async function handlePollAdminCommand(ctx: BotContext): Promise<void> {
   if (!secret) {
     await ctx.reply(
       "Ключ администратора не настроен на сервере (переменная ADMIN_SECRET) — " +
-        "пока она пустая, я никого не пущу.",
+        "пока она пустая, мы никого не пустим.",
     );
     return;
   }
@@ -83,7 +83,7 @@ export async function handlePollAdminCommand(ctx: BotContext): Promise<void> {
   }
   if (entered !== secret) {
     // Не подсказываем, что именно не так: перебирающему знать нечего.
-    await ctx.reply("Не узнала ключ.");
+    await ctx.reply("Не узнали ключ.");
     return;
   }
 
@@ -91,10 +91,10 @@ export async function handlePollAdminCommand(ctx: BotContext): Promise<void> {
   await setAdminCommands(ctx.api, chatId);
   await ctx.reply(
     [
-      "Готово — буду присылать ответы сюда. Команды — в кнопке «Меню».",
+      "Готово — будем присылать ответы сюда. Команды — в кнопке «Меню».",
       "",
       "/say — общее сообщение всем, кто с нами бегал",
-      "/rollcall — перекличка «кто придёт сегодня»; время беру из последнего переноса " +
+      "/rollcall — перекличка «кто придёт сегодня»; время берём из последнего переноса " +
         "(/rollcall 19:00 — своё время)",
       "/moved — перенести старт на 18:00 сегодня (/moved 19:00 дождь — своё время и причина)",
       "/cancel — отменить забег (/cancel гроза — с причиной)",
@@ -118,7 +118,7 @@ export async function handlePollStopCommand(ctx: BotContext): Promise<void> {
   if (chatId === undefined || !isAdminChat(chatId)) return;
   removeAdminChat(chatId);
   await clearAdminCommands(ctx.api, chatId);
-  await ctx.reply("Больше не присылаю сюда ответы. Вернуться — /admin <ключ>.");
+  await ctx.reply("Больше не присылаем сюда ответы. Вернуться — /admin <ключ>.");
 }
 
 /** /poll — сводка. Молчим для всех, кто не прошёл /admin. */
@@ -144,7 +144,7 @@ export async function handlePollSendCommand(ctx: BotContext): Promise<void> {
   const arg = (ctx.match ?? "").toString().trim();
   const run = arg ? runByDate(arg) : nextRun();
   if (!run) {
-    await ctx.reply(`Не знаю забега с датой ${arg}. Забеги задаются в lib/coffeerun/run.ts.`);
+    await ctx.reply(`Не знаем забега с датой ${arg}. Забеги задаются в lib/coffeerun/run.ts.`);
     return;
   }
 
@@ -166,8 +166,8 @@ export async function handlePollSendCommand(ctx: BotContext): Promise<void> {
   }
 
   await ctx.reply(
-    `Рассылаю вопрос про дождь: ${preview.wouldSend} чел. ` +
-      `(${run.spotName}, ${run.dateLabel}). Ответы буду присылать сюда.`,
+    `Рассылаем вопрос про дождь: ${preview.wouldSend} чел. ` +
+      `(${run.spotName}, ${run.dateLabel}). Ответы будем присылать сюда.`,
   );
 
   void dispatchCoffeeRunPoll({ runDate: run.date, limit: SEND_BATCH })
@@ -175,7 +175,7 @@ export async function handlePollSendCommand(ctx: BotContext): Promise<void> {
       const tail = res.hasMore ? " Остались неотправленные — запусти /pollsend ещё раз." : "";
       return sendBotMessage(
         chatId,
-        `Разослала: ${res.sent ?? 0}. Заблокировали бота: ${res.blocked ?? 0}. ` +
+        `Разослали: ${res.sent ?? 0}. Заблокировали бота: ${res.blocked ?? 0}. ` +
           `Не дошло: ${res.failed ?? 0}.${tail}`,
       );
     })
@@ -202,7 +202,7 @@ export async function handleRollcallCommand(ctx: BotContext): Promise<void> {
   const { runDate, startTime } = parseRollcallArgs((ctx.match ?? "").toString());
   const run = runDate ? runByDate(runDate) : nextRun();
   if (!run) {
-    await ctx.reply(`Не знаю забега с датой ${runDate}. Забеги задаются в lib/coffeerun/run.ts.`);
+    await ctx.reply(`Не знаем забега с датой ${runDate}. Забеги задаются в lib/coffeerun/run.ts.`);
     return;
   }
 
@@ -270,14 +270,14 @@ export async function handleRollcallCallback(ctx: BotContext): Promise<void> {
   await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
 
   if (parsed.action === "cancel") {
-    await ctx.answerCallbackQuery({ text: "Отменила" }).catch(() => {});
-    await ctx.reply("Отменила — никому ничего не отправляла.");
+    await ctx.answerCallbackQuery({ text: "Отменили" }).catch(() => {});
+    await ctx.reply("Отменили — никому ничего не отправляли.");
     return;
   }
 
-  await ctx.answerCallbackQuery({ text: "Рассылаю" }).catch(() => {});
+  await ctx.answerCallbackQuery({ text: "Рассылаем" }).catch(() => {});
   await ctx.reply(
-    `Рассылаю перекличку на ${parsed.startTime}. Ответы буду присылать сюда, сводка — /poll.`,
+    `Рассылаем перекличку на ${parsed.startTime}. Ответы будем присылать сюда, сводка — /poll.`,
   );
 
   void dispatchCoffeeRunPoll({
@@ -290,7 +290,7 @@ export async function handleRollcallCallback(ctx: BotContext): Promise<void> {
       const tail = res.hasMore ? " Остались неотправленные — запусти /rollcall ещё раз." : "";
       return sendBotMessage(
         chatId,
-        `Разослала перекличку: ${res.sent ?? 0}. Заблокировали бота: ${res.blocked ?? 0}. ` +
+        `Разослали перекличку: ${res.sent ?? 0}. Заблокировали бота: ${res.blocked ?? 0}. ` +
           `Не дошло: ${res.failed ?? 0}.${tail}`,
       );
     })
@@ -350,7 +350,7 @@ export async function handleCoffeeRunPollAnswer(ctx: BotContext): Promise<void> 
   };
 
   await ctx
-    .answerCallbackQuery({ text: parsed.answer === "yes" ? "Ждём тебя!" : "Записала, спасибо" })
+    .answerCallbackQuery({ text: parsed.answer === "yes" ? "Ждём тебя!" : "Записали, спасибо" })
     .catch(() => {});
 
   if (stale) {
@@ -358,7 +358,7 @@ export async function handleCoffeeRunPollAnswer(ctx: BotContext): Promise<void> 
     const verdict = parsed.answer === "yes" ? "ДА" : "нет";
     await notifyAdmins(
       `${person.username ? `${person.name} (@${person.username})` : person.name} — ${verdict} ` +
-        `(ответ на прошлый вопрос: ${label}, ${parsed.runDate}). В сводку не считаю.`,
+        `(ответ на прошлый вопрос: ${label}, ${parsed.runDate}). В сводку не считаем.`,
     );
   } else {
     const vote = recordVote(chatId, parsed.answer, person);

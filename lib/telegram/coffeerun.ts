@@ -92,7 +92,7 @@ export function confirmationText(
     lines.push("");
     lines.push(
       `В заявке был указан ${formatTelegramUsername(signup.tg_username)} — ` +
-        `оставила актуальный ${formatTelegramUsername(actualUsername)}.`,
+        `оставили актуальный ${formatTelegramUsername(actualUsername)}.`,
     );
   }
 
@@ -272,8 +272,8 @@ export async function handleCoffeeRunStart(ctx: BotContext, payload: string): Pr
 
   if (!signup) {
     await ctx.reply(
-      "Не нашла заявку по этой ссылке — возможно, она устарела. " +
-        "Заполни форму на странице кофе-рана ещё раз, и я подтвержу участие.",
+      "Не нашли заявку по этой ссылке — возможно, она устарела. " +
+        "Заполни форму на странице кофе-рана ещё раз, и мы подтвердим участие.",
       { reply_markup: landingKeyboard() },
     );
     return;

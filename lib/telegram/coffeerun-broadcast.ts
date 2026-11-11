@@ -119,21 +119,21 @@ export async function handleBroadcastCallback(ctx: BotContext): Promise<void> {
   await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
 
   if (parsed.action === "cancel") {
-    await ctx.answerCallbackQuery({ text: "Отменила" }).catch(() => {});
-    await ctx.reply("Отменила — никому ничего не отправляла.");
+    await ctx.answerCallbackQuery({ text: "Отменили" }).catch(() => {});
+    await ctx.reply("Отменили — никому ничего не отправляли.");
     return;
   }
 
   const src = { fromChatId: chatId, messageId: parsed.messageId };
   const key = broadcastKey(src);
   if (inFlight().has(key)) {
-    await ctx.answerCallbackQuery({ text: "Уже рассылаю" }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: "Уже рассылаем" }).catch(() => {});
     return;
   }
   inFlight().add(key);
 
-  await ctx.answerCallbackQuery({ text: "Рассылаю" }).catch(() => {});
-  await ctx.reply("Рассылаю. Итог пришлю сюда.");
+  await ctx.answerCallbackQuery({ text: "Рассылаем" }).catch(() => {});
+  await ctx.reply("Рассылаем. Итог пришлём сюда.");
 
   void dispatchBroadcast(src)
     .then((res) =>

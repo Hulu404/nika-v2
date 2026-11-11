@@ -107,7 +107,7 @@ describe("перекличка → coffee_run_signups.rollcall_answer", () => {
     const { ctx: c } = ctx(buildPollCallback("yes", RUN_DATE, "rollcall"));
     await handleCoffeeRunPollAnswer(c);
     expect(db.updates[0].filters.run_date).toBe(RUN_DATE);
-    expect(admin.lines[0]).toContain("В сводку не считаю");
+    expect(admin.lines[0]).toContain("В сводку не считаем");
   });
 
   it("ошибка базы — только в лог: человек получает ответ, организатор — строку", async () => {

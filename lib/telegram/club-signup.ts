@@ -88,7 +88,7 @@ export function checkoutRefusal(
   today: string,
   soldOut = false,
 ): string | null {
-  if (!signup) return "Не нашла заявку. Заполни форму на странице занятия ещё раз.";
+  if (!signup) return "Не нашли заявку. Заполни форму на странице занятия ещё раз.";
   if (signup.payment_status === "paid") return "Это занятие уже оплачено, коврик твой.";
   if (signup.payment_status === "waitlist") return SOLD_OUT_REFUSAL;
   if (signup.payment_status !== "pending") return "Заявка закрыта. Напиши в поддержку.";
@@ -147,13 +147,13 @@ export function waitlistText(signup: Pick<ClubSignup, "name">, session: ClubSess
     return [
       `${signup.name}, все места на ${session.dateLabel} уже заняты.`,
       "",
-      "Ты в листе ожидания: если кто-то не сможет прийти или откроем следующую встречу, напишу сюда первой.",
+      "Ты в листе ожидания: если кто-то не сможет прийти или откроем следующую встречу, напишем сюда первыми.",
     ].join("\n");
   }
   return [
     `${signup.name}, все коврики на ${session.dateLabel} уже выкуплены.`,
     "",
-    "Ты в листе ожидания следующего занятия клуба: как только откроем запись, напишу сюда первой.",
+    "Ты в листе ожидания следующего занятия клуба: как только откроем запись, напишем сюда первыми.",
   ].join("\n");
 }
 
@@ -269,11 +269,11 @@ export function payLinkText(order: Pick<ClubOrder, "name" | "quantity" | "amount
     `${order.name}, ссылка на оплату готова: ${ticketLabel(order.quantity)}${order.is_gift ? " в подарок" : ""}, ${order.amount_rub} ₽.`,
     `${session.title}: ${whenWhere(session)}.`,
     "",
-    "Места держим 20 минут. После оплаты вернись сюда — пришлю подтверждение.",
+    "Места держим 20 минут. После оплаты вернись сюда — пришлём подтверждение.",
   ].join("\n");
 }
 
-export const NO_SEATS_TEXT = "Мест на это занятие не осталось. Если освободятся, напишу сюда первой.";
+export const NO_SEATS_TEXT = "Мест на это занятие не осталось. Если освободятся, напишем сюда первыми.";
 export const OVERBOOKED_TEXT =
   "Пока шла оплата, последние места выкупили. Деньги вернули автоматически — они придут на карту в течение нескольких дней. Прости, что так вышло.";
 
@@ -297,7 +297,7 @@ export async function openClubOrder(ctx: BotContext, input: ClubOrder, deps: Pay
   const session = sessionOfSignup(input);
   if (!session) {
     console.error(`[club] заказ ${input.id}: занятие ${input.club} ${input.event_date} нет в SESSIONS`);
-    await ctx.reply("Не нашла это занятие в расписании. Напиши, пожалуйста, в поддержку.", {
+    await ctx.reply("Не нашли это занятие в расписании. Напиши, пожалуйста, в поддержку.", {
       reply_markup: new InlineKeyboard().url(SUPPORT_LABEL, SUPPORT_URL),
     });
     return;
@@ -355,7 +355,7 @@ export async function handleClubStart(ctx: BotContext, payload: string, deps: Pa
   const order = token ? await deps.orders.byToken(token).catch(() => null) : null;
   if (!order) {
     await ctx.reply(
-      "Не нашла заказ по этой ссылке — возможно, она устарела. Оформить запись можно на странице занятия.",
+      "Не нашли заказ по этой ссылке — возможно, она устарела. Оформить запись можно на странице занятия.",
       { reply_markup: landingKeyboard() },
     );
     return;
@@ -369,7 +369,7 @@ export async function handleClubCheck(ctx: BotContext, deps: PaymentDeps = clubP
   const token = CLUB_CHECK_CALLBACK_RE.exec(ctx.callbackQuery?.data ?? "")?.[1];
   const order = token ? await deps.orders.byToken(token).catch(() => null) : null;
   if (!order) {
-    await ctx.reply("Не нашла этот заказ. Оформить запись можно на странице занятия.", { reply_markup: landingKeyboard() });
+    await ctx.reply("Не нашли этот заказ. Оформить запись можно на странице занятия.", { reply_markup: landingKeyboard() });
     return;
   }
   await openClubOrder(ctx, order, deps);
@@ -417,7 +417,7 @@ export async function handleClubPreCheckout(ctx: BotContext): Promise<void> {
     return;
   }
   if (!signup || !session) {
-    await ctx.answerPreCheckoutQuery(false, { error_message: "Не нашла занятие. Напиши в поддержку." });
+    await ctx.answerPreCheckoutQuery(false, { error_message: "Не нашли занятие. Напиши в поддержку." });
     return;
   }
   const { data: reserved, error } = await tgAdmin().rpc("reserve_club_tickets", {

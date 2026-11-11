@@ -44,10 +44,10 @@ export const COMMUNITY_URL = "https://t.me/nika_community";
 export const SCHEDULE_LIMIT = 6;
 
 export const BOT_ROLE =
-  "Я бот мероприятий НИКИ: записываю на забеги и занятия клубов и напоминаю о них.";
+  "Это бот мероприятий NIKA: записываем на забеги и занятия клубов и напоминаем о них.";
 
 export const UNKNOWN_INPUT_TEXT =
-  `${BOT_ROLE} Всё, что умею, в кнопках внизу. Нужен живой человек, жми «Служба поддержки».`;
+  `${BOT_ROLE} Всё, что умеем, в кнопках внизу. Нужен живой человек, жми «Служба поддержки».`;
 
 export const HELP_TEXT = [
   BOT_ROLE,

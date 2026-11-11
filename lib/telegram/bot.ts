@@ -164,7 +164,7 @@ export function registerHandlers(bot: Bot<BotContext>): void {
     const name = ctx.from?.first_name ?? "друг";
     await ctx.reply(
       `Привет, ${name}! 👋\n\n${BOT_ROLE}\n\n` +
-        "Заявки на твой ник я не нашла. Ближайшие забеги и занятия — в «📅 Расписание» " +
+        "Заявки на твой ник мы не нашли. Ближайшие забеги и занятия — в «📅 Расписание» " +
         "внизу, там же ссылки на запись.",
       { reply_markup: menuKeyboard() },
     );

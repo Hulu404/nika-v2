@@ -75,7 +75,7 @@ export async function handleOpenCommand(ctx: BotContext): Promise<void> {
 
   if (!run) {
     await ctx.reply(
-      (runDate ? `Не знаю забега с датой ${runDate}.` : `Не знаю спота ${spot}.`) +
+      (runDate ? `Не знаем забега с датой ${runDate}.` : `Не знаем спота ${spot}.`) +
         ` Забеги задаются в lib/coffeerun/run.ts. Известные споты: ${knownSpots().join(", ")}.`,
     );
     return;
@@ -145,13 +145,13 @@ export async function handleOpenCallback(ctx: BotContext): Promise<void> {
   await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
 
   if (parsed.action === "cancel") {
-    await ctx.answerCallbackQuery({ text: "Отменила" }).catch(() => {});
-    await ctx.reply("Отменила — никому ничего не отправляла.");
+    await ctx.answerCallbackQuery({ text: "Отменили" }).catch(() => {});
+    await ctx.reply("Отменили — никому ничего не отправляли.");
     return;
   }
 
-  await ctx.answerCallbackQuery({ text: "Рассылаю" }).catch(() => {});
-  await ctx.reply("Рассылаю приглашение. Итог пришлю сюда.");
+  await ctx.answerCallbackQuery({ text: "Рассылаем" }).catch(() => {});
+  await ctx.reply("Рассылаем приглашение. Итог пришлём сюда.");
 
   void dispatchCoffeeRunInvites({ runDate: parsed.runDate, limit: MAX_SENDS_MANUAL })
     .then((res) => sendBotMessage(chatId, inviteReportText(res)))

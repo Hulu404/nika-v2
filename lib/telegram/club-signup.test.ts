@@ -42,7 +42,7 @@ describe("checkoutRefusal", () => {
     expect(checkoutRefusal(pending, query, "2026-10-27")).toBeNull();
   });
   it("отказывает: нет заявки, уже оплачено, прошло, сумма не та", () => {
-    expect(checkoutRefusal(null, query, "2026-10-27")).toMatch(/Не нашла/);
+    expect(checkoutRefusal(null, query, "2026-10-27")).toMatch(/Не нашли/);
     expect(checkoutRefusal({ ...pending, payment_status: "paid" }, query, "2026-10-27")).toMatch(/уже оплачено/);
     expect(checkoutRefusal(pending, query, "2026-11-02")).toMatch(/прошло/);
     expect(checkoutRefusal(pending, { currency: "RUB", total_amount: 50000 }, "2026-10-27")).toMatch(/Сумма/);

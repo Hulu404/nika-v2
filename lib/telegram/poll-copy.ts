@@ -121,13 +121,13 @@ export function pollReplyText(
     const start = startTime ?? run.startTime;
     if (answer === "yes") {
       return [
-        "Отметила: ты в списке. 🏃",
+        "Отметили: ты в списке. 🏃",
         "",
         `Ждём к ${gatherBefore(start)} — ${run.address}, ${run.place}. Старт в ${start}.`,
       ].join("\n");
     }
     return [
-      "Поняла, сегодня без тебя — спасибо, что отметил(а)сь.",
+      "Поняли, сегодня без тебя — спасибо, что отметил(а)сь.",
       "",
       "Забеги у нас регулярные: увидимся на следующем.",
     ].join("\n");
@@ -135,14 +135,14 @@ export function pollReplyText(
 
   if (answer === "yes") {
     return [
-      "Записала: ты бежишь. ☔️",
+      "Записали: ты бежишь. ☔️",
       "",
       `Ждём в ${run.gatherTime} — ${run.address}, ${run.place}.`,
       "Возьми сухую футболку на после: кофе приятнее пить в сухом.",
     ].join("\n");
   }
   return [
-    "Поняла, завтра без тебя — спасибо, что предупредил(а).",
+    "Поняли, завтра без тебя — спасибо, что предупредил(а).",
     "",
     "Дождь не последний, а забеги у нас регулярные: увидимся на следующем.",
   ].join("\n");
@@ -236,7 +236,7 @@ function nameList(people: Array<{ name: string; username: string | null }>, limi
 export function summaryText(summary: PollSummary, run: CoffeeRun | null): string {
   if (!summary.runDate) {
     return (
-      "Опрос ещё не запускала.\n\n" +
+      "Опрос ещё не запускали.\n\n" +
       "/rollcall — перекличка «кто придёт сегодня»\n" +
       "/pollsend — вопрос про дождь накануне"
     );

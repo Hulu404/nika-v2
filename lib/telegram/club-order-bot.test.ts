@@ -128,7 +128,7 @@ describe("бот мероприятий: /start st_<token> после оплат
     } finally {
       vi.useRealTimers();
     }
-    expect(last().text).toContain("Не нашла заказ по этой ссылке");
+    expect(last().text).toContain("Не нашли заказ по этой ссылке");
     expect(last().buttons[0]).toMatchObject({ url: `https://www.mynika.online${session.landing}` });
   });
 });

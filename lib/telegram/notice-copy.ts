@@ -127,7 +127,7 @@ export function cancelText(
     `${run.spotName}, ${run.dateLabel} — не бежим. Приходить не нужно.`,
     "",
     "Жаль, что так вышло: место за тобой на следующем забеге, ничего заново " +
-      "заполнять не надо — я напишу, как объявим дату.",
+      "заполнять не надо — мы напишем, как объявим дату.",
   );
 
   return lines.join("\n");
@@ -226,7 +226,7 @@ export function noticeReportText(
 ): string {
   const tail = res.hasMore ? " Остались неотправленные — повтори команду." : "";
   return (
-    `Разослала ${label}: ${res.sent ?? 0}. Заблокировали бота: ${res.blocked ?? 0}. ` +
+    `Разослали ${label}: ${res.sent ?? 0}. Заблокировали бота: ${res.blocked ?? 0}. ` +
     `Не дошло: ${res.failed ?? 0}.${tail}`
   );
 }

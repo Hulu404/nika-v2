@@ -135,25 +135,25 @@ describe("/surveysend", () => {
     const second = makeCtx({ data: "cs_yoga_sg" });
     await admin.handleSurveyAdminCallback(second.ctx, YOGA, { type: "send", go: true });
 
-    expect(first.toasts).toEqual(["Рассылаю"]);
-    expect(second.toasts).toEqual(["Уже рассылаю"]);
+    expect(first.toasts).toEqual(["Рассылаем"]);
+    expect(second.toasts).toEqual(["Уже рассылаем"]);
     expect(startCalls.filter((c) => !c.dryRun)).toHaveLength(1);
 
     releaseStart();
     await flush();
     await flush();
-    expect(reports).toEqual([{ chatId: ADMIN, text: "Разослала: 169. Заблокировали бота: 1. Не дошло: 0." }]);
+    expect(reports).toEqual([{ chatId: ADMIN, text: "Разослали: 169. Заблокировали бота: 1. Не дошло: 0." }]);
 
     // После отчёта можно запустить снова («Дослать остальным»).
     const third = makeCtx({ data: "cs_yoga_sg" });
     await admin.handleSurveyAdminCallback(third.ctx, YOGA, { type: "send", go: true });
-    expect(third.toasts).toEqual(["Рассылаю"]);
+    expect(third.toasts).toEqual(["Рассылаем"]);
   });
 
   it("«Отмена» — ничего не шлём", async () => {
     const { ctx, replies } = makeCtx({ data: "cs_yoga_sn" });
     await admin.handleSurveyAdminCallback(ctx, YOGA, { type: "send", go: false });
-    expect(replies[0].text).toContain("Отменила");
+    expect(replies[0].text).toContain("Отменили");
     expect(startCalls).toHaveLength(0);
   });
 });
@@ -173,7 +173,7 @@ describe("тестовый прогон /surveysend", () => {
     const { ctx, replies, toasts } = makeCtx({ data: "cs_yoga_st" });
     await admin.handleSurveyAdminCallback(ctx, YOGA, { type: "test" });
 
-    expect(toasts).toEqual(["Присылаю тебе"]);
+    expect(toasts).toEqual(["Присылаем тебе"]);
     expect(replies[0].text).toContain("Тестовый прогон");
     expect(reports).toHaveLength(1);
     expect(reports[0]).toMatchObject({ chatId: ADMIN, text: expect.stringContaining("Привет! Это команда NIKA.") });
@@ -198,7 +198,7 @@ describe("тестовый прогон /surveysend", () => {
 
     expect(adminRow()).toBeUndefined();
     expect(admin.isSurveyTestRun("yoga", ADMIN)).toBe(false);
-    expect(press.toasts).toEqual(["Рассылаю"]);
+    expect(press.toasts).toEqual(["Рассылаем"]);
     expect(startCalls.filter((c) => !c.dryRun)).toHaveLength(1);
   });
 
@@ -207,7 +207,7 @@ describe("тестовый прогон /surveysend", () => {
     const press = makeCtx({ data: "cs_yoga_rw" });
     await admin.handleSurveyAdminCallback(press.ctx, YOGA, { type: "rework" });
 
-    expect(press.replies[0].text).toContain("Никому не отправила");
+    expect(press.replies[0].text).toContain("Никому не отправили");
     expect(adminRow()).toBeUndefined();
     expect(admin.isSurveyTestRun("yoga", ADMIN)).toBe(false);
     expect(startCalls).toHaveLength(0);
@@ -244,7 +244,7 @@ describe("/surveyresult", () => {
   it("неверный формат — подсказка", async () => {
     const { ctx, replies } = makeCtx({ match: "завтра вечером" });
     await admin.handleSurveyResultCommand(ctx);
-    expect(replies[0].text).toContain("Не разобрала команду");
+    expect(replies[0].text).toContain("Не разобрали команду");
   });
 
   it("черновик → предпросмотр с числами → «Разослать» подтверждает и рассылает", async () => {
@@ -263,7 +263,7 @@ describe("/surveyresult", () => {
 
     expect(db.tables.club_survey_results[0].confirmed_at).not.toBeNull();
     expect(resultCalls.filter((c) => !c.dryRun)).toEqual([{ id: 1 }]);
-    expect(reports[0].text).toBe("Разослала: 10. Заблокировали бота: 0. Не дошло: 0.");
+    expect(reports[0].text).toBe("Разослали: 10. Заблокировали бота: 0. Не дошло: 0.");
   });
 
   it("старый черновик после нового разосланного итога — отказ", async () => {

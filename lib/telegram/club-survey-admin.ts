@@ -188,26 +188,26 @@ function runInBackground(
 async function startSend(ctx: BotContext, chatId: number, survey: ClubSurvey): Promise<void> {
   const key = `start:${survey.key}`;
   if (inFlight().has(key)) {
-    await ctx.answerCallbackQuery({ text: "Уже рассылаю" }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: "Уже рассылаем" }).catch(() => {});
     return;
   }
   inFlight().add(key);
-  await ctx.answerCallbackQuery({ text: "Рассылаю" }).catch(() => {});
-  await ctx.reply("Рассылаю стартовое сообщение опроса. Итог пришлю сюда, ответы — в эту же ленту.");
+  await ctx.answerCallbackQuery({ text: "Рассылаем" }).catch(() => {});
+  await ctx.reply("Рассылаем стартовое сообщение опроса. Итог пришлём сюда, ответы — в эту же ленту.");
   runInBackground(chatId, key, () => dispatchSurveyStart(survey), surveySendRetryKeyboard(survey.key));
 }
 
 async function resultSend(ctx: BotContext, chatId: number, survey: ClubSurvey, resultId: number): Promise<void> {
   const key = `result:${resultId}`;
   if (inFlight().has(key)) {
-    await ctx.answerCallbackQuery({ text: "Уже рассылаю" }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: "Уже рассылаем" }).catch(() => {});
     return;
   }
 
   const [draft, current] = await Promise.all([getResult(resultId), currentResult(survey.key)]);
   if (!draft || draft.survey_key !== survey.key) {
     await ctx.answerCallbackQuery().catch(() => {});
-    await ctx.reply("Не нашла этот итог. Пришли /surveyresult заново.");
+    await ctx.reply("Не нашли этот итог. Пришли /surveyresult заново.");
     return;
   }
   // Старый черновик после рассылки нового итога перепутал бы людям время.
@@ -221,8 +221,8 @@ async function resultSend(ctx: BotContext, chatId: number, survey: ClubSurvey, r
   try {
     const result = await confirmResult(resultId);
     if (!result) throw new Error("result vanished");
-    await ctx.answerCallbackQuery({ text: "Рассылаю" }).catch(() => {});
-    await ctx.reply("Рассылаю итог. Отчёт пришлю сюда, ответы «буду / не приду» — в ленту.");
+    await ctx.answerCallbackQuery({ text: "Рассылаем" }).catch(() => {});
+    await ctx.reply("Рассылаем итог. Отчёт пришлём сюда, ответы «буду / не приду» — в ленту.");
     runInBackground(chatId, key, () => dispatchSurveyResult(survey, result), resultRetryKeyboard(survey.key, resultId));
   } catch (err) {
     inFlight().delete(key);
@@ -241,7 +241,7 @@ async function startTest(ctx: BotContext, adminChat: number, survey: ClubSurvey)
     await ctx.answerCallbackQuery().catch(() => {});
     return;
   }
-  await ctx.answerCallbackQuery({ text: "Присылаю тебе" }).catch(() => {});
+  await ctx.answerCallbackQuery({ text: "Присылаем тебе" }).catch(() => {});
   await ctx.reply(SURVEY_TEST_INTRO);
 
   await deleteResponse(survey.key, userId);
@@ -251,7 +251,7 @@ async function startTest(ctx: BotContext, adminChat: number, survey: ClubSurvey)
   const res = await sendBotMessage(userId, msg.text, msg.keyboard);
   if (!res.ok) {
     testRuns().delete(testRunKey(survey.key, userId));
-    await ctx.reply("Не смогла прислать тебе опрос: напиши боту в личку /start и нажми «Тест» снова.");
+    await ctx.reply("Не смогли прислать тебе опрос: напиши боту в личку /start и нажми «Тест» снова.");
     return;
   }
   await createResponse(survey.key, userId, "broadcast", { last_msg_id: res.messageId ?? null });
@@ -293,8 +293,8 @@ export async function handleSurveyAdminCallback(ctx: BotContext, survey: ClubSur
   await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
 
   if ((action.type === "send" && !action.go) || action.type === "result_cancel") {
-    await ctx.answerCallbackQuery({ text: "Отменила" }).catch(() => {});
-    await ctx.reply("Отменила — никому ничего не отправляла.");
+    await ctx.answerCallbackQuery({ text: "Отменили" }).catch(() => {});
+    await ctx.reply("Отменили — никому ничего не отправляли.");
     return;
   }
 
@@ -306,7 +306,7 @@ export async function handleSurveyAdminCallback(ctx: BotContext, survey: ClubSur
       await startSend(ctx, chatId, survey);
     } else if (action.type === "rework") {
       await finishTests(ctx, chatId, survey);
-      await ctx.answerCallbackQuery({ text: "Не отправляю" }).catch(() => {});
+      await ctx.answerCallbackQuery({ text: "Не отправляем" }).catch(() => {});
       await ctx.reply(SURVEY_TEST_REWORK);
     } else if (action.type === "result_send") await resultSend(ctx, chatId, survey, action.resultId);
   } catch (err) {

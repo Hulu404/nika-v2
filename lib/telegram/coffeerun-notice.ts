@@ -97,7 +97,7 @@ export async function handleMovedCommand(ctx: BotContext): Promise<void> {
   const { runDate, newStart, reason } = parseMovedArgs((ctx.match ?? "").toString());
   const run = runDate ? runByDate(runDate) : nextRun();
   if (!run) {
-    await ctx.reply(`Не знаю забега с датой ${runDate}. Забеги задаются в lib/coffeerun/run.ts.`);
+    await ctx.reply(`Не знаем забега с датой ${runDate}. Забеги задаются в lib/coffeerun/run.ts.`);
     return;
   }
 
@@ -155,8 +155,8 @@ export async function handleMovedCallback(ctx: BotContext): Promise<void> {
 
   if (parsed.action === "cancel") {
     drafts().delete(chatId);
-    await ctx.answerCallbackQuery({ text: "Отменила" }).catch(() => {});
-    await ctx.reply("Отменила — никому ничего не отправляла.");
+    await ctx.answerCallbackQuery({ text: "Отменили" }).catch(() => {});
+    await ctx.reply("Отменили — никому ничего не отправляли.");
     return;
   }
 
@@ -170,10 +170,10 @@ export async function handleMovedCallback(ctx: BotContext): Promise<void> {
       : null;
   drafts().delete(chatId);
 
-  await ctx.answerCallbackQuery({ text: "Рассылаю" }).catch(() => {});
+  await ctx.answerCallbackQuery({ text: "Рассылаем" }).catch(() => {});
   await ctx.reply(
-    `Рассылаю перенос на ${parsed.newStart} (сбор в ${gatherFor(parsed.newStart)}). ` +
-      "Итог пришлю сюда.",
+    `Рассылаем перенос на ${parsed.newStart} (сбор в ${gatherFor(parsed.newStart)}). ` +
+      "Итог пришлём сюда.",
   );
 
   void dispatchCoffeeRunMoved({
@@ -217,7 +217,7 @@ export async function handleCancelCommand(ctx: BotContext): Promise<void> {
   const { runDate, reason } = parseCancelArgs((ctx.match ?? "").toString());
   const run = runDate ? runByDate(runDate) : nextRun();
   if (!run) {
-    await ctx.reply(`Не знаю забега с датой ${runDate}. Забеги задаются в lib/coffeerun/run.ts.`);
+    await ctx.reply(`Не знаем забега с датой ${runDate}. Забеги задаются в lib/coffeerun/run.ts.`);
     return;
   }
 
@@ -257,7 +257,7 @@ export async function handleCancelCallback(ctx: BotContext): Promise<void> {
   if (parsed.action === "cancel") {
     drafts().delete(chatId);
     await ctx.answerCallbackQuery({ text: "Не отменяю" }).catch(() => {});
-    await ctx.reply("Забег в силе — никому ничего не отправляла.");
+    await ctx.reply("Забег в силе — никому ничего не отправляли.");
     return;
   }
 
@@ -265,8 +265,8 @@ export async function handleCancelCallback(ctx: BotContext): Promise<void> {
   const reason = draft && draft.runDate === parsed.runDate ? draft.reason : null;
   drafts().delete(chatId);
 
-  await ctx.answerCallbackQuery({ text: "Рассылаю отмену" }).catch(() => {});
-  await ctx.reply("Рассылаю отмену. Итог пришлю сюда.");
+  await ctx.answerCallbackQuery({ text: "Рассылаем отмену" }).catch(() => {});
+  await ctx.reply("Рассылаем отмену. Итог пришлём сюда.");
 
   void dispatchCoffeeRunCancel({ runDate: parsed.runDate, reason })
     .then((res) => sendBotMessage(chatId, noticeReportText(res, "отмену")))
