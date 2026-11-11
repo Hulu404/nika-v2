@@ -74,14 +74,14 @@ describe("📅 Расписание", () => {
   it("забеги и занятия вместе, по дате; цена клуба; кнопки на лендинги с utm", () => {
     const events = upcomingEvents(NOW);
     const view = scheduleView(events, new Set(), ORIGIN);
-    const order = ["Пилатес на коврике", "Книжный клуб", "Кофе-ран · Surf Coffee® × Cave"].map((t) => view.text.indexOf(t));
+    const order = ["Пилатес на коврике", "Книжный клуб", "Беговой клуб · Кофе-ран · Surf Coffee® × Cave"].map((t) => view.text.indexOf(t));
     expect(order.every((i) => i > 0)).toBe(true);
     expect([...order].sort((a, b) => a - b)).toEqual(order);
     expect(view.text).toContain("🧘 Пилатес на коврике\n8 ноября, вс, сбор 11:30, старт 12:00");
     expect(view.text).toContain("1000 ₽");
     expect(view.text).toContain("📚 Книжный клуб\n12 ноября, чт, сбор 18:45, старт 19:00");
     expect(view.text).toContain("бесплатно");
-    expect(view.text).toContain("🏃 Кофе-ран · Surf Coffee® × Cave\n15 ноября, вс, сбор 12:00, старт 12:30\nНовокузнецкая улица, дом 6");
+    expect(view.text).toContain("🏃 Беговой клуб · Кофе-ран · Surf Coffee® × Cave\n15 ноября, вс, сбор 12:00, старт 12:30\nНовокузнецкая улица, дом 6");
     expect(buttons(view.keyboard)).toContainEqual({
       text: "Записаться: кофе-ран, 15 ноября",
       url: `${ORIGIN}/coffeerunsurfcave?utm_source=bot&utm_medium=menu`,
@@ -162,7 +162,7 @@ describe("🎟 Мои записи", () => {
       now: NOW,
     });
     expect(view.text).toContain("🧘 Пилатес на коврике — оплачено, 2 билета\n8 ноября, вс, сбор 11:30, старт 12:00");
-    expect(view.text).toContain("🏃 Кофе-ран · Surf Coffee® × Cave\n15 ноября, вс, сбор 12:00, старт 12:30");
+    expect(view.text).toContain("🏃 Беговой клуб · Кофе-ран · Surf Coffee® × Cave\n15 ноября, вс, сбор 12:00, старт 12:30");
     expect(view.text.indexOf("Пилатес")).toBeLessThan(view.text.indexOf("Кофе-ран"));
     expect(view.text.trim().split("\n").at(-1)).toBe("Ты был с нами: кофе-ранов 2, занятий клуба 1");
     expect(buttons(view.keyboard)).toEqual([

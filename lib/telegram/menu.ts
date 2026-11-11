@@ -100,7 +100,7 @@ function shortName(event: LandingEvent): string {
 }
 
 function eventTitle(event: LandingEvent): string {
-  return event.kind === "coffeerun" ? `Кофе-ран · ${event.title}` : event.title;
+  return event.kind === "coffeerun" ? `Беговой клуб · Кофе-ран · ${event.title}` : event.title;
 }
 
 /** «15 ноября, вс, сбор 12:00, старт 12:30» — из тех же полей, что лендинг. */
