@@ -11,7 +11,6 @@ import {
   COFFEE_RUN_START_PREFIX,
   handleCoffeeRunStart,
   handleCoffeeRunByUsername,
-  landingKeyboard,
 } from "./coffeerun";
 import { POLL_CALLBACK_RE, ROLLCALL_CALLBACK_RE } from "./poll-copy";
 import { CANCEL_CALLBACK_RE, MOVED_CALLBACK_RE } from "./notice-copy";
@@ -38,7 +37,21 @@ import {
   handlePollStopCommand,
   handlePollSummaryCommand,
 } from "./coffeerun-poll";
-import { siteKeyboard, supportKeyboard, SUPPORT_LABEL, SUPPORT_URL } from "./cta";
+import {
+  BOT_ROLE,
+  HELP_TEXT,
+  MENU_MY_SIGNUPS,
+  MENU_SCHEDULE,
+  MENU_SCHEDULE_CALLBACK,
+  MENU_SUPPORT,
+  UNKNOWN_INPUT_TEXT,
+  handleMySignupsMenu,
+  handleScheduleCallback,
+  handleScheduleMenu,
+  handleSupportMenu,
+  menuKeyboard,
+  sendMenuHint,
+} from "./menu";
 import {
   CLUB_SURVEY_CALLBACK_RE,
   handleSurveyCallback,
@@ -62,32 +75,21 @@ import {
 } from "./club-signup";
 
 /**
- * Бот мероприятий НИКИ. Снаружи он читается ровно как бот забегов:
- *   • подтверждает запись на кофе-ран (deep-link с лендинга или просто /start);
+ * Бот мероприятий НИКИ:
+ *   • подтверждает запись на кофе-ран и занятия клубов (deep-link с лендинга
+ *     или просто /start);
  *   • напоминает о старте накануне;
- *   • даёт кнопку живой поддержки, когда нужен человек, а не бот.
+ *   • постоянное меню внизу (lib/telegram/menu.ts): «📅 Расписание»,
+ *     «🎟 Мои записи», «💬 Служба поддержки».
  *
  * Свободного диалога здесь нет: любой прочий ввод коротко объясняет роль и
- * отдаёт две кнопки — записаться и написать в поддержку.
+ * показывает меню.
  *
  * Привязка аккаунта НИКИ, opt-in и /reset остаются РАБОЧИМИ (приложение ходит
  * тем же токеном), но в текстах бота больше не рекламируются: снаружи это бот
  * мероприятий, а не «служебка» приложения.
  */
 export type BotContext = Context;
-
-const BOT_ROLE =
-  "Я бот мероприятий НИКИ: подтверждаю запись на забеги и напоминаю о них накануне.";
-
-/**
- * Куда идти дальше из любого «не понял тебя» сообщения: записаться на забег и
- * написать живому человеку. Без NEXT_PUBLIC_APP_URL ссылки на лендинг нет —
- * тогда остаётся одна поддержка.
- */
-function eventKeyboard() {
-  const landing = landingKeyboard();
-  return landing ? landing.row().url(SUPPORT_LABEL, SUPPORT_URL) : supportKeyboard();
-}
 
 /** Токен бота. TELEGRAM_BOT_TOKEN — приоритетно, BOT_TOKEN — совместимость. */
 function botToken(): string {
@@ -96,12 +98,11 @@ function botToken(): string {
   return t;
 }
 
-/** Опции reply с клавиатурой, только если она построена (нужен NEXT_PUBLIC_APP_URL). */
-function withKeyboard(kb: ReturnType<typeof siteKeyboard>) {
-  return kb ? { reply_markup: kb } : undefined;
-}
-
-function registerHandlers(bot: Bot<BotContext>): void {
+/**
+ * Все хендлеры бота. Экспортируется для тестов порядка (меню после черновика
+ * рассылки); боевой бот собирает getBot().
+ */
+export function registerHandlers(bot: Bot<BotContext>): void {
   // ── /start ───────────────────────────────────────────────────────────────
   bot.command("start", async (ctx) => {
     const token = (ctx.match ?? "").trim();
@@ -110,32 +111,37 @@ function registerHandlers(bot: Bot<BotContext>): void {
     // Проверяем ПЕРВЫМ: префикс cr_ однозначно отделяет его от токена привязки.
     if (token.startsWith(COFFEE_RUN_START_PREFIX)) {
       await handleCoffeeRunStart(ctx, token);
+      await sendMenuHint(ctx);
       return;
     }
 
     // Deep-link заказа на занятие клуба (/stretch, /paid): /start st_<token> → статус оплаты.
     if (token.startsWith(CLUB_START_PREFIX)) {
       await handleClubStart(ctx, token);
+      await sendMenuHint(ctx);
       return;
     }
 
     // Опрос клуба из поста в чате: /start yoga. Проверяем ДО токена привязки,
     // иначе payload уйдёт в handleStartToken как «устаревшая ссылка». Если по
     // опросу сказать нечего (итог уже разослан), идём обычной веткой без токена.
+    // Меню здесь не шлём: опрос ждёт ответа кнопками и временем, лишнее
+    // сообщение между шагами только мешает.
     const survey = surveyByStartPayload(token);
     if (survey && (await handleSurveyStart(ctx, survey))) return;
 
     // Deep-link из приложения: /start <token> → привязка аккаунта.
     if (token && !survey) {
       await handleStartToken(ctx, token);
+      await sendMenuHint(ctx);
       return;
     }
 
     // Без токена: сначала — неподтверждённая заявка на кофе-ран по нику. Человек
     // мог найти бота поиском вместо кнопки, и для него /start значит именно это.
-    if (await handleCoffeeRunByUsername(ctx)) return;
+    if (await handleCoffeeRunByUsername(ctx)) return sendMenuHint(ctx);
     // Затем — неоплаченная заявка на занятие клуба: пришлём счёт ещё раз.
-    if (await handleClubByUsername(ctx)) return;
+    if (await handleClubByUsername(ctx)) return sendMenuHint(ctx);
 
     // Без токена, но чат уже привязан → статус / повторный запрос согласия.
     const chatId = ctx.from?.id;
@@ -143,12 +149,12 @@ function registerHandlers(bot: Bot<BotContext>): void {
       const binding = await findActiveBinding(chatId);
       if (binding) {
         if (binding.tg_opt_in) {
-          await ctx.reply(
-            "Мы на связи, напоминания включены. Приостановить — командой /stop.",
-            withKeyboard(siteKeyboard()),
-          );
+          await ctx.reply("Мы на связи, напоминания включены. Приостановить — командой /stop.", {
+            reply_markup: menuKeyboard(),
+          });
         } else {
           await sendConsentRequest(ctx);
+          await sendMenuHint(ctx);
         }
         return;
       }
@@ -158,9 +164,9 @@ function registerHandlers(bot: Bot<BotContext>): void {
     const name = ctx.from?.first_name ?? "друг";
     await ctx.reply(
       `Привет, ${name}! 👋\n\n${BOT_ROLE}\n\n` +
-        "Заявки на твой ник я не нашла. Хочешь бежать — оставь её на странице " +
-        "кофе-рана и нажми там «Подтвердить в Telegram».",
-      { reply_markup: eventKeyboard() },
+        "Заявки на твой ник я не нашла. Ближайшие забеги и занятия — в «📅 Расписание» " +
+        "внизу, там же ссылки на запись.",
+      { reply_markup: menuKeyboard() },
     );
   });
 
@@ -195,13 +201,7 @@ function registerHandlers(bot: Bot<BotContext>): void {
   bot.command("surveysend", (ctx) => handleSurveySendCommand(ctx));
   bot.command("surveyresult", (ctx) => handleSurveyResultCommand(ctx));
   bot.command("help", async (ctx) => {
-    await ctx.reply(
-      `${BOT_ROLE}\n\nКоманды:\n` +
-        "/start — подтвердить запись на забег\n" +
-        "/stop — приостановить сообщения\n\n" +
-        "Нужен живой человек — кнопка «Служба поддержки» ниже.",
-      { reply_markup: eventKeyboard() },
-    );
+    await ctx.reply(HELP_TEXT, { reply_markup: menuKeyboard() });
   });
 
   // ── Инлайн-ответы уведомлений ───────────────────────────────────────────────
@@ -220,6 +220,8 @@ function registerHandlers(bot: Bot<BotContext>): void {
   bot.callbackQuery(ROLLCALL_CALLBACK_RE, (ctx) => handleRollcallCallback(ctx));
   // Опрос клуба (docs/club-survey.md): кнопки участника — шаги сценария.
   bot.callbackQuery(CLUB_SURVEY_CALLBACK_RE, (ctx) => handleSurveyCallback(ctx));
+  // «📅 Расписание» под пустыми «Моими записями».
+  bot.callbackQuery(MENU_SCHEDULE_CALLBACK, (ctx) => handleScheduleCallback(ctx));
   // pure-push: интерактивного чек-ина больше нет. Хендлер оставлен пустым
   // «ловцом» — на случай устаревших сообщений с кнопками ans_* в проде: мягко
   // гасим «часик», НИЧЕГО не пишем (никаких answer/answered_at из Telegram).
@@ -236,17 +238,24 @@ function registerHandlers(bot: Bot<BotContext>): void {
     if (!(await handleClubPayment(ctx))) await next();
   });
 
-  // ── Любой прочий ввод: это не чат-бот — объясняем роль и даём кнопки ─────────
-  bot.on("message", async (ctx) => {
-    // После /say следующее сообщение организатора — это текст рассылки.
+  // ── Текст, который ждут сценарии: раньше кнопок меню ────────────────────────
+  // После /say следующее сообщение организатора — это текст рассылки, даже
+  // если это «📅 Расписание». Опрос клуба ждёт ввод времени. Поэтому эти два
+  // смотрят сообщение первыми, а меню — только если они не взяли.
+  bot.on("message", async (ctx, next) => {
     if (await handleBroadcastDraft(ctx)) return;
-    // Опрос клуба: ввод времени и повтор шага с кнопками. Остальное — дальше.
     if (await handleSurveyText(ctx)) return;
-    await ctx.reply(
-      `${BOT_ROLE}\n\nСвободно общаться я не умею — но если нужен живой человек, ` +
-        "нажми «Служба поддержки».",
-      { reply_markup: eventKeyboard() },
-    );
+    await next();
+  });
+
+  // ── Кнопки постоянного меню (lib/telegram/menu.ts) ──────────────────────────
+  bot.hears(MENU_SCHEDULE, (ctx) => handleScheduleMenu(ctx));
+  bot.hears(MENU_MY_SIGNUPS, (ctx) => handleMySignupsMenu(ctx));
+  bot.hears(MENU_SUPPORT, (ctx) => handleSupportMenu(ctx));
+
+  // ── Любой прочий ввод: это не чат-бот — объясняем роль и показываем меню ────
+  bot.on("message", async (ctx) => {
+    await ctx.reply(UNKNOWN_INPUT_TEXT, { reply_markup: menuKeyboard() });
   });
 
   // ── Глобальный обработчик ошибок ─────────────────────────────────────────────

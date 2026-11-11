@@ -119,7 +119,15 @@ describe("бот мероприятий: /start st_<token> после оплат
   });
 
   it("неизвестный токен — вежливо и ссылка на страницу занятия", async () => {
-    await handleClubStart(ctx(), `st_${"d".repeat(32)}`, deps);
+    // Ссылка ведёт на ближайшее занятие по настоящим часам: фиксируем их на дате
+    // теста, иначе после 8 ноября ближайшим становится книжный клуб.
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
+    try {
+      await handleClubStart(ctx(), `st_${"d".repeat(32)}`, deps);
+    } finally {
+      vi.useRealTimers();
+    }
     expect(last().text).toContain("Не нашла заказ по этой ссылке");
     expect(last().buttons[0]).toMatchObject({ url: `https://www.mynika.online${session.landing}` });
   });

@@ -26,6 +26,9 @@ import { cancelledWarning } from "./coffeerun-notice";
 import { runByDate, nextRun } from "../coffeerun/run";
 import { dispatchCoffeeRunPoll } from "../coffeerun/poll-dispatch";
 import { clearAdminCommands, setAdminCommands } from "./admin-menu";
+import { saveRollcallAnswer } from "./my-signups";
+import { tgAdmin } from "./supabase";
+import { normalizeTelegramUsername } from "../coffeerun/telegram-username";
 import type { BotContext } from "./bot";
 
 /**
@@ -320,6 +323,15 @@ export async function handleCoffeeRunPollAnswer(ctx: BotContext): Promise<void> 
     return;
   }
 
+  // Ответ переклички — ещё и в заявку (coffee_run_signups.rollcall_answer): по
+  // нему «Мои записи» считают посещения. В том числе по устаревшей кнопке: на
+  // забег человек ответил всё равно. Запись идёт параллельно и не может
+  // сломать ни ответ человеку, ни строку организатору.
+  const saved =
+    parsed.kind === "rollcall"
+      ? persistRollcallAnswer(chatId, ctx.from?.username ?? null, parsed.runDate, parsed.answer)
+      : Promise.resolve();
+
   // Активного опроса нет — значит процесс перезапускали, а человек нажал кнопку
   // из уже разосланного сообщения. Поднимаем опрос из самой кнопки: потерять
   // ответ хуже, чем начать сводку с середины.
@@ -366,4 +378,25 @@ export async function handleCoffeeRunPollAnswer(ctx: BotContext): Promise<void> 
     .catch((err) => {
       console.error("[coffeerun-poll] reply:", err instanceof Error ? err.message : err);
     });
+  await saved;
+}
+
+/** Записать ответ переклички в заявку. Никогда не бросает: ошибка — только в лог. */
+async function persistRollcallAnswer(
+  chatId: number,
+  username: string | null,
+  runDate: string,
+  answer: "yes" | "no",
+): Promise<void> {
+  try {
+    const rows = await saveRollcallAnswer(
+      tgAdmin(),
+      { chatId, username: normalizeTelegramUsername(username) },
+      runDate,
+      answer,
+    );
+    if (rows === 0) console.error(`[coffeerun-poll] перекличка ${runDate}: заявки чата ${chatId} не нашлось`);
+  } catch (err) {
+    console.error("[coffeerun-poll] перекличка в базу:", err instanceof Error ? err.message : err);
+  }
 }
