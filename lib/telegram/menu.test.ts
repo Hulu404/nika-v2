@@ -164,7 +164,7 @@ describe("🎟 Мои записи", () => {
     expect(view.text).toContain("🧘 Пилатес на коврике — оплачено, 2 билета\n8 ноября, вс, сбор 11:30, старт 12:00");
     expect(view.text).toContain("🏃 Беговой клуб · Кофе-ран · Surf Coffee® × Cave\n15 ноября, вс, сбор 12:00, старт 12:30");
     expect(view.text.indexOf("Пилатес")).toBeLessThan(view.text.indexOf("Кофе-ран"));
-    expect(view.text.trim().split("\n").at(-1)).toBe("Ты был с нами: кофе-ранов 2, занятий клуба 1");
+    expect(view.text.trim().split("\n").at(-1)).toBe("Ты был(а) с нами: кофе-ранов 2, занятий клуба 1");
     expect(buttons(view.keyboard)).toEqual([
       { text: "Маршрут: пилатес, 8 ноября", url: pilates.mapUrl },
       { text: "Маршрут: кофе-ран, 15 ноября", url: cave.mapUrl },
@@ -178,7 +178,19 @@ describe("🎟 Мои записи", () => {
       rollcallDates: new Set(),
       now: NOW,
     });
-    expect(view.text).toContain("📚 Книжный клуб — записан");
+    expect(view.text).toContain("📚 Книжный клуб — записан(а)\n");
+    // Две заявки на бесплатную встречу — не «2 билета».
+    const twice = mySignupsView({
+      coffee: [],
+      club: [
+        clubRow({ club: "read", event_date: read.date, event_time: read.time, amount_rub: 0 }),
+        clubRow({ id: "o2", club: "read", event_date: read.date, event_time: read.time, amount_rub: 0 }),
+      ],
+      rollcallDates: new Set(),
+      now: NOW,
+    });
+    expect(twice.text).toContain("📚 Книжный клуб — записан(а)\n");
+    expect(twice.text).not.toContain("билет");
   });
 
   it("ждёт оплаты с живым холдом — «Оплатить»: ссылка ЮKassa, а без неё тот же путь, что «Проверить ещё раз»", () => {

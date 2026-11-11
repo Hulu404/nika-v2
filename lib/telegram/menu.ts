@@ -228,8 +228,11 @@ function upcomingClub(rows: readonly MyClubRow[], today: string, now: Date): Upc
   const out: Upcoming[] = [];
   for (const g of groups.values()) {
     if (g.paid > 0) {
-      const status = g.free ? "записан" : "оплачено";
-      out.push({ event: g.event, status: g.paid > 1 ? `${status}, ${ticketLabel(g.paid)}` : status, button: routeButton(g.event) });
+      // Рода человека бот не знает — «записан(а)», как в подтверждении записи.
+      // На бесплатной встрече билетов не считаем: две строки там — повторная
+      // заявка, а не докупленные места.
+      const status = g.free ? "записан(а)" : g.paid > 1 ? `оплачено, ${ticketLabel(g.paid)}` : "оплачено";
+      out.push({ event: g.event, status, button: routeButton(g.event) });
     }
     for (const q of g.gifts) out.push({ event: g.event, status: `оплачено, подарок: ${ticketLabel(q)}` });
     for (const row of g.pay) {

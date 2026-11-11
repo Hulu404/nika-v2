@@ -103,9 +103,9 @@ describe("счётчик", () => {
   });
 
   it("строка: без нулей, а при нулях её нет", () => {
-    expect(attendanceLine({ coffeeRuns: 5, clubSessions: 2 })).toBe("Ты был с нами: кофе-ранов 5, занятий клуба 2");
-    expect(attendanceLine({ coffeeRuns: 0, clubSessions: 2 })).toBe("Ты был с нами: занятий клуба 2");
-    expect(attendanceLine({ coffeeRuns: 3, clubSessions: 0 })).toBe("Ты был с нами: кофе-ранов 3");
+    expect(attendanceLine({ coffeeRuns: 5, clubSessions: 2 })).toBe("Ты был(а) с нами: кофе-ранов 5, занятий клуба 2");
+    expect(attendanceLine({ coffeeRuns: 0, clubSessions: 2 })).toBe("Ты был(а) с нами: занятий клуба 2");
+    expect(attendanceLine({ coffeeRuns: 3, clubSessions: 0 })).toBe("Ты был(а) с нами: кофе-ранов 3");
     expect(attendanceLine({ coffeeRuns: 0, clubSessions: 0 })).toBeNull();
   });
 });

@@ -1,6 +1,6 @@
 /**
  * Посещения: сколько раз человек был на кофе-ранах и занятиях клубов. Строка
- * «Ты был с нами: …» внизу экрана «🎟 Мои записи».
+ * «Ты был(а) с нами: …» внизу экрана «🎟 Мои записи».
  *
  * Только чистые функции: строки из базы приходят готовыми
  * (lib/telegram/my-signups.ts), здесь решается, что считать посещением.
@@ -110,14 +110,14 @@ export function countAttendance(
 }
 
 /**
- * «Ты был с нами: кофе-ранов 5, занятий клуба 2». Нули не показываем; если
+ * «Ты был(а) с нами: кофе-ранов 5, занятий клуба 2». Нули не показываем; если
  * всё по нулям — строки нет (null).
  */
 export function attendanceLine(count: AttendanceCount): string | null {
   const parts: string[] = [];
   if (count.coffeeRuns > 0) parts.push(`кофе-ранов ${count.coffeeRuns}`);
   if (count.clubSessions > 0) parts.push(`занятий клуба ${count.clubSessions}`);
-  return parts.length ? `Ты был с нами: ${parts.join(", ")}` : null;
+  return parts.length ? `Ты был(а) с нами: ${parts.join(", ")}` : null;
 }
 
 /** Даты забегов после ATTENDANCE_SINCE, для которых нужно знать, была ли перекличка. */
