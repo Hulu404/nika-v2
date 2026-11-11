@@ -23,6 +23,10 @@ export interface ClubOrder {
   event_date: string;
   event_time: string;
   amount_rub: number;
+  base_amount_rub?: number | null;
+  promo_code?: string | null;
+  promo_discount_percent?: number | null;
+  promo_discount_rub?: number | null;
   quantity: number;
   is_gift: boolean;
   gift_recipient: string | null;
@@ -39,7 +43,8 @@ export interface ClubOrder {
 
 export const ORDER_COLUMNS =
   "id, confirm_token, name, email, tg_username, tg_chat_id, club, event_date, event_time, amount_rub, quantity, is_gift, gift_recipient, " +
-  "payment_status, counts_seat, hold_expires_at, payment_attempt, yk_payment_id, yk_confirmation_url, refund_id, confirmed_at, paid_at";
+  "payment_status, counts_seat, hold_expires_at, payment_attempt, yk_payment_id, yk_confirmation_url, refund_id, confirmed_at, paid_at, " +
+  "base_amount_rub, promo_code, promo_discount_percent, promo_discount_rub";
 
 export type HoldResult = "held" | "no_seats" | "bad_status" | "not_found";
 export type ConfirmResult =
@@ -149,7 +154,8 @@ export class MemoryClubOrders implements ClubOrderStore {
   add(patch: Partial<ClubOrder> & Pick<ClubOrder, "id" | "confirm_token">): ClubOrder {
     const row: ClubOrder = {
       name: "Ника", email: "nika@example.com", tg_username: "nika_test", tg_chat_id: null,
-      club: "stretch", event_date: "2026-11-01", event_time: "10:30", amount_rub: 1000, quantity: 1,
+      club: "stretch", event_date: "2026-11-01", event_time: "10:30", amount_rub: 1000,
+      base_amount_rub: 1000, promo_code: null, promo_discount_percent: null, promo_discount_rub: 0, quantity: 1,
       is_gift: false, gift_recipient: null, payment_status: "pending", counts_seat: true, hold_expires_at: null,
       payment_attempt: 0, yk_payment_id: null, yk_confirmation_url: null, refund_id: null, confirmed_at: null, paid_at: null,
       ...patch,

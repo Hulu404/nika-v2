@@ -46,9 +46,10 @@ export interface SignupDeps {
   /** Заказ по ключу формы (request_token) — или старой формы по нику. */
   findByKey: (session: ClubSession, key: { token: string } | { username: string }) => Promise<ClubOrder | null>;
   /** Та же форма отправлена ещё раз: ждущий оплаты заказ с теми же данными и живым холдом. */
-  findSamePending: (session: ClubSession, q: { username: string; quantity: number; isGift: boolean }) => Promise<ClubOrder | null>;
+  findSamePending: (session: ClubSession, q: { username: string; quantity: number; isGift: boolean; promoCode: string | null }) => Promise<ClubOrder | null>;
+  lookupPromo?: (code: string) => Promise<{ code: string; discountPercent: number } | null>;
   /** Новая строка. duplicate — confirm_token уже есть (гонка двух повторов). */
-  insert: (fields: Record<string, unknown>) => Promise<"ok" | "duplicate">;
+  insert: (fields: Record<string, unknown>) => Promise<"ok" | "duplicate" | "invalid_promo">;
   now?: () => Date;
 }
 
@@ -71,6 +72,7 @@ export async function handleSignup(raw: unknown, deps: SignupDeps): Promise<Sign
   const quantity = body.quantity === undefined ? 1 : body.quantity;
   const isGift = body.is_gift === true;
   const giftRecipient = isGift ? clean(body.gift_recipient) : null;
+  const promoCode = clean(body.promo_code, 40).toUpperCase();
   const requestToken = body.request_token;
 
   // Встреча нужна до проверки полей: от неё зависит, нужны ли анкета и почта.
@@ -99,12 +101,16 @@ export async function handleSignup(raw: unknown, deps: SignupDeps): Promise<Sign
   if (requestToken !== undefined && (typeof requestToken !== "string" || !/^[a-f0-9]{32}$/.test(requestToken))) invalid.push("request_token");
   if (body.consent !== true) invalid.push("consent");
   if (body.participation_rules !== true) invalid.push("participation_rules");
+  if (promoCode && !/^[A-Z0-9_-]{4,40}$/.test(promoCode)) invalid.push("promo_code");
   if (free && (isGift || quantity !== 1)) invalid.push("quantity");
   if (invalid.length) return { status: 422, body: { error: "Invalid fields", fields: invalid } };
 
   if (!session) return { status: 404, body: { error: "No upcoming session" } };
   const ticketCount = quantity as number;
   if (ticketCount > session.capacity) return { status: 422, body: { error: "Invalid fields", fields: ["quantity"] } };
+  const promo = promoCode && deps.lookupPromo ? await deps.lookupPromo(promoCode) : null;
+  if (promoCode && !promo) return { status: 422, body: { error: "Invalid or exhausted promo code", fields: ["promo_code"] } };
+  if (promo && free) return { status: 422, body: { error: "Promo code is not available for this event", fields: ["promo_code"] } };
 
   const respond = (order: Pick<ClubOrder, "confirm_token" | "payment_status" | "quantity" | "amount_rub" | "is_gift">, redirectUrl: string | null = null): SignupResponse => ({
     status: 200,
@@ -137,8 +143,9 @@ export async function handleSignup(raw: unknown, deps: SignupDeps): Promise<Sign
   // Тот же заказ: ключ формы (или ник у старой формы без ключа), затем — те же данные с живым холдом.
   const existing =
     (await deps.findByKey(session, typeof requestToken === "string" ? { token: requestToken } : { username: tgUsername! })) ??
-    (await deps.findSamePending(session, { username: tgUsername!, quantity: ticketCount, isGift }));
+    (await deps.findSamePending(session, { username: tgUsername!, quantity: ticketCount, isGift, promoCode: promo?.code ?? null }));
   if (existing) {
+    if ((existing.promo_code ?? null) !== (promo?.code ?? null)) return { status: 409, body: { error: "An order already exists with a different promo code" } };
     if (existing.payment_status === "paid" || existing.payment_status === "waitlist") return respond(existing);
     return pay(existing);
   }
@@ -146,6 +153,7 @@ export async function handleSignup(raw: unknown, deps: SignupDeps): Promise<Sign
   const taken = await deps.taken(session);
   if (!Number.isFinite(taken)) return { status: 503, body: { error: "Availability unavailable" } };
   const waitlist = isSoldOut(taken, session);
+  if (waitlist && promo) return { status: 422, body: { error: "Промокод нельзя применить к листу ожидания", fields: ["promo_code"] } };
   if (!waitlist && !hasEnoughSeats(taken, session, ticketCount)) {
     return { status: 409, body: { error: "Not enough seats", available: Math.max(0, session.capacity - taken) } };
   }
@@ -158,14 +166,17 @@ export async function handleSignup(raw: unknown, deps: SignupDeps): Promise<Sign
     level: isGift || !askQuestionnaire ? null : level, mat: isGift || !askQuestionnaire ? null : mat,
     towel: isGift || !askQuestionnaire ? null : towel, water: isGift || !askQuestionnaire ? null : water,
     quantity: ticketCount, is_gift: isGift, gift_recipient: giftRecipient,
+    promo_code: promo?.code ?? null, promo_discount_percent: promo?.discountPercent ?? null,
+    base_amount_rub: session.priceRub * ticketCount,
     consent_at: now, participation_rules_accepted_at: now, participation_rules_version: "1",
     confirm_token: token, updated_at: now,
-    amount_rub: session.priceRub * ticketCount,
+    amount_rub: promo ? Math.round(session.priceRub * ticketCount * (100 - promo.discountPercent) / 100) : session.priceRub * ticketCount,
     // Бесплатная встреча: оплачивать нечего, место закреплено сразу.
     payment_status: waitlist ? "waitlist" : free ? "paid" : "pending",
     ...(free && !waitlist ? { paid_at: now } : {}),
   };
   const inserted = await deps.insert(fields);
+  if (inserted === "invalid_promo") return { status: 422, body: { error: "Promo code limit reached", fields: ["promo_code"] } };
   const order = await deps.orders.byToken(token);
   if (!order) {
     console.error(`[club-signup] заказ ${token} не нашёлся после записи (${inserted})`);
