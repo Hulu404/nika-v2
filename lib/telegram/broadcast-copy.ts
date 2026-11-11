@@ -23,7 +23,7 @@ export function broadcastPreviewText(recipients: number, opts: { optedOut: numbe
   const lines = [
     `Это сообщение уйдёт ${recipients} чел. — всем, кто хоть раз подтверждал участие в забеге.`,
   ];
-  if (opts.optedOut) lines.push(`Пропускаю — просили не писать: ${opts.optedOut}.`);
+  if (opts.optedOut) lines.push(`Пропускаем — просили не писать: ${opts.optedOut}.`);
   lines.push("", "Отозвать его после отправки нельзя. Отправляем?");
   return lines.join("\n");
 }
@@ -63,7 +63,7 @@ export function broadcastReportText(res: {
   hasMore?: boolean;
 }): string {
   const tail =
-    res.failed || res.hasMore ? " Кнопка ниже дошлёт тем, кому не дошло — остальных не задену." : "";
+    res.failed || res.hasMore ? " Кнопка ниже дошлёт тем, кому не дошло — остальных не заденем." : "";
   return (
     `Разослали: ${res.sent ?? 0}. Заблокировали бота: ${res.blocked ?? 0}. ` +
     `Не дошло: ${res.failed ?? 0}.${tail}`

@@ -78,7 +78,7 @@ describe("invitePreviewText — что видит организатор до о
       optedOut: 0,
       registered: 0,
     });
-    expect(preview).not.toContain("Пропускаю");
+    expect(preview).not.toContain("Пропускаем");
   });
 });
 

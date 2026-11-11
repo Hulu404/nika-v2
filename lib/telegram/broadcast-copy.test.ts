@@ -14,7 +14,7 @@ describe("broadcastPreviewText — предпросмотр общей расс�
     const text = broadcastPreviewText(171, { optedOut: 0 });
     expect(text).toContain("171");
     expect(text).toContain("Отправляем?");
-    expect(text).not.toContain("Пропускаю");
+    expect(text).not.toContain("Пропускаем");
   });
 
   it("говорит, скольких пропускает по /stop", () => {

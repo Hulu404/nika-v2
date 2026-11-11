@@ -256,7 +256,7 @@ export async function handleCancelCallback(ctx: BotContext): Promise<void> {
 
   if (parsed.action === "cancel") {
     drafts().delete(chatId);
-    await ctx.answerCallbackQuery({ text: "Не отменяю" }).catch(() => {});
+    await ctx.answerCallbackQuery({ text: "Не отменяем" }).catch(() => {});
     await ctx.reply("Забег в силе — никому ничего не отправляли.");
     return;
   }

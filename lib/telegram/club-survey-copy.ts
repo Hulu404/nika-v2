@@ -614,7 +614,7 @@ export function surveySendPreviewText(
   const skipped: string[] = [];
   if (counts.alreadyAsked) skipped.push(`уже спрошены (в том числе по ссылке): ${counts.alreadyAsked}`);
   if (counts.optedOut) skipped.push(`просили не писать: ${counts.optedOut}`);
-  if (skipped.length) lines.push(`Пропускаю — ${skipped.join("; ")}.`);
+  if (skipped.length) lines.push(`Пропускаем — ${skipped.join("; ")}.`);
   if (counts.hasMore) lines.push("Это первая порция: остальным — кнопкой «Дослать остальным» под отчётом.");
   lines.push("", "Текст:", "", firstMessage, "", "Отозвать его после отправки нельзя. Отправляем?");
   return lines.join("\n");

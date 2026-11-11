@@ -89,7 +89,7 @@ export function invitePreviewText(
   if (opts.alreadyInvited) skipped.push(`уже звали: ${opts.alreadyInvited}`);
   if (opts.registered) skipped.push(`уже записаны: ${opts.registered}`);
   if (opts.optedOut) skipped.push(`просили не писать: ${opts.optedOut}`);
-  if (skipped.length > 0) lines.push(`Пропускаю — ${skipped.join(", ")}.`);
+  if (skipped.length > 0) lines.push(`Пропускаем — ${skipped.join(", ")}.`);
 
   if (!landingUrlFor(run)) {
     lines.push("⚠️ NEXT_PUBLIC_APP_URL не задан — кнопки «Записаться» в сообщении не будет.");
