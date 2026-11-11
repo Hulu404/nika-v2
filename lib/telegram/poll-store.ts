@@ -149,8 +149,8 @@ export function movedStartFor(runDate: string): string | null {
  * Забег отменён — объявление разослано. Отменить отмену бот не умеет: сообщение
  * уже у людей, и «мы передумали» решается новым забегом, а не правкой старого.
  */
-export function markCancelled(runDate: string): void {
-  state().cancelled.set(runDate, new Date().toISOString());
+export function markCancelled(runDate: string, at: string = new Date().toISOString()): void {
+  state().cancelled.set(runDate, at);
 }
 
 /** Когда объявили отмену (ISO); null — забег не отменяли. */

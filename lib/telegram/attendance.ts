@@ -62,10 +62,26 @@ export function coffeeRunAttended(
  * Подарок не в счёт покупателю: билеты купили другому человеку.
  */
 export function clubSessionAttended(row: ClubAttendanceRow, today: string): boolean {
-  if (row.payment_status !== "paid" || row.event_date >= today) return false;
+  if (row.event_date >= today) return false;
+  return clubOrderCounts(row);
+}
+
+/** Заказ, по которому человек был (или будет) на занятии, без учёта даты. */
+export function clubOrderCounts(row: Pick<ClubAttendanceRow, "payment_status" | "amount_rub" | "confirmed_at" | "is_gift">): boolean {
+  if (row.payment_status !== "paid") return false;
   if (row.is_gift) return false;
   if (row.amount_rub === 0) return row.confirmed_at !== null;
   return true;
+}
+
+/**
+ * Был ли человек на забеге — для сообщения «спасибо, что сегодня был(а)».
+ * Строже, чем счётчик: только «да» в перекличке. Подтверждённая заявка без
+ * переклички не значит, что человек пришёл, а благодарить того, кого не было,
+ * нельзя («сомнение = молчание»).
+ */
+export function coffeeRunAttendedForFollowup(row: Pick<CoffeeRunAttendanceRow, "confirmed_at" | "rollcall_answer">): boolean {
+  return row.confirmed_at !== null && row.rollcall_answer === "yes";
 }
 
 export interface AttendanceCount {

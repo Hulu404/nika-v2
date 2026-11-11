@@ -24,6 +24,8 @@ import {
 import { parseTime } from "./notice-copy";
 import { cancelledWarning } from "./coffeerun-notice";
 import { runByDate, nextRun } from "../coffeerun/run";
+import { runStatusOrMemory } from "../coffeerun/run-changes";
+import { cancelledAt } from "./poll-store";
 import { dispatchCoffeeRunPoll } from "../coffeerun/poll-dispatch";
 import { clearAdminCommands, setAdminCommands } from "./admin-menu";
 import { saveRollcallAnswer } from "./my-signups";
@@ -206,7 +208,9 @@ export async function handleRollcallCommand(ctx: BotContext): Promise<void> {
     return;
   }
 
-  const moved = movedStartFor(run.date);
+  // Перенос — из базы (coffee_run_changes), он переживает перезапуск; при её
+  // сбое — из памяти процесса.
+  const moved = (await runStatusOrMemory(run, { movedStartFor, cancelledAt })).movedStart;
   const start = startTime ?? moved ?? run.startTime;
 
   const preview = await dispatchCoffeeRunPoll({

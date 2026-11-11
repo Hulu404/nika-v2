@@ -49,6 +49,8 @@ export interface ClubSession {
   closingNote?: string;
   /** Чат сообщества: кнопка «Вступить в чат комьюнити» в подтверждении и листе ожидания. */
   communityUrl?: string;
+  /** Длительность от старта, минут: от окончания считается сообщение после события. */
+  durationMin: number;
 }
 
 /**
@@ -87,6 +89,7 @@ export const SESSIONS: readonly ClubSession[] = [
     landing: "/stretch",
     mapUrl: "https://yandex.ru/maps/?rtext=~55.768024%2C37.568205&rtt=auto",
     questionnaire: "pilates",
+    durationMin: 60,
   },
   {
     club: "stretch",
@@ -108,6 +111,7 @@ export const SESSIONS: readonly ClubSession[] = [
     landing: "/stretch",
     mapUrl: "https://yandex.ru/maps/?rtext=~55.768024%2C37.568205&rtt=auto",
     questionnaire: "pilates",
+    durationMin: 60,
   },
   {
     // NIKA | YOU'LL NEVER READ ALONE — книжный клуб, первая встреча. Бесплатно.
@@ -132,6 +136,7 @@ export const SESSIONS: readonly ClubSession[] = [
     arrivalNote: "Приходи к 18:45, чтобы спокойно взять кофе и занять место. Читаем «Палату № 6» Чехова.",
     closingNote: "Не успел дочитать — всё равно приходи, обсуждение тоже будет интересно.",
     communityUrl: "https://t.me/nika_community",
+    durationMin: 120,
   },
 ];
 

@@ -12,6 +12,8 @@ import { attendanceLine, countAttendance, datesNeedingRollcallCheck } from "./at
 import { myClubSignups, myCoffeeRuns, rollcallDates, type MyClubRow, type MyCoffeeRunRow } from "./my-signups";
 import { SUPPORT_LABEL, SUPPORT_URL } from "./cta";
 import { tgAdmin } from "./supabase";
+import { DONATE_MENU_LABEL, SUPPORTER_LINE } from "./donation-copy";
+import { supabaseDonations } from "../donations/store";
 import { ticketLabel } from "./club-signup";
 import type { BotContext } from "./bot";
 
@@ -19,7 +21,7 @@ import type { BotContext } from "./bot";
  * Постоянное меню бота мероприятий: клавиатура внизу чата и три экрана.
  *
  *   📅 Расписание      🎟 Мои записи
- *   💬 Служба поддержки
+ *   💬 Служба поддержки   🧡 Поддержать
  *
  * Код свой, из «Пятницы» (lib/team) ничего не берём. Тексты дат, времени и
  * места собираются из тех же полей, что и лендинги (lib/landings), поэтому
@@ -29,11 +31,11 @@ import type { BotContext } from "./bot";
 export const MENU_SCHEDULE = "📅 Расписание";
 export const MENU_MY_SIGNUPS = "🎟 Мои записи";
 export const MENU_SUPPORT = "💬 Служба поддержки";
-/** Место под четвёртую кнопку. В клавиатуру пока не добавляется: донатов ещё нет. */
-export const MENU_DONATE = "💛 Поддержать";
+/** Поддержка клуба (lib/telegram/donations.ts). Надпись — из donation-copy.ts. */
+export const MENU_DONATE = DONATE_MENU_LABEL;
 
 /** Все надписи меню — их ловит bot.hears(). */
-export const MENU_LABELS = [MENU_SCHEDULE, MENU_MY_SIGNUPS, MENU_SUPPORT] as const;
+export const MENU_LABELS = [MENU_SCHEDULE, MENU_MY_SIGNUPS, MENU_SUPPORT, MENU_DONATE] as const;
 
 /** Инлайн-кнопка «📅 Расписание» под пустыми «Моими записями». */
 export const MENU_SCHEDULE_CALLBACK = "menu:schedule";
@@ -70,7 +72,14 @@ export const NO_EVENTS_TEXT =
 export const NO_UPCOMING_SIGNUPS_TEXT = "Впереди записей нет.";
 
 export function menuKeyboard(): Keyboard {
-  return new Keyboard().text(MENU_SCHEDULE).text(MENU_MY_SIGNUPS).row().text(MENU_SUPPORT).resized().persistent();
+  return new Keyboard()
+    .text(MENU_SCHEDULE)
+    .text(MENU_MY_SIGNUPS)
+    .row()
+    .text(MENU_SUPPORT)
+    .text(MENU_DONATE)
+    .resized()
+    .persistent();
 }
 
 // ── Строки событий ───────────────────────────────────────────────────────────
@@ -250,6 +259,8 @@ export interface MySignupsInput {
   club: readonly MyClubRow[];
   rollcallDates: ReadonlySet<string>;
   now: Date;
+  /** Хоть один оплаченный донат — последней строкой «🧡 Ты поддерживаешь клуб». */
+  supporter?: boolean;
 }
 
 /** Экран «Мои записи». Чистая функция от строк базы. */
@@ -258,7 +269,9 @@ export function mySignupsView(input: MySignupsInput): ScreenView {
   const upcoming = [...upcomingCoffee(input.coffee, today, input.now), ...upcomingClub(input.club, today, input.now)].sort(
     (a, b) => a.event.date.localeCompare(b.event.date) || minutes(a.event.startTime) - minutes(b.event.startTime),
   );
-  const counter = attendanceLine(countAttendance(input.coffee, input.club, today, input.rollcallDates));
+  const counterLine = attendanceLine(countAttendance(input.coffee, input.club, today, input.rollcallDates));
+  const footer = [counterLine, input.supporter ? SUPPORTER_LINE : null].filter((l): l is string => !!l);
+  const counter = footer.length ? footer.join("\n") : null;
   const keyboard = new InlineKeyboard();
 
   if (upcoming.length === 0) {
@@ -323,15 +336,18 @@ export async function handleMySignupsMenu(ctx: BotContext, deps: MenuDeps = {}):
   let coffee: MyCoffeeRunRow[] = [];
   let club: MyClubRow[] = [];
   let rollcall = new Set<string>();
+  let supporter = false;
   try {
     const db = (deps.db ?? tgAdmin)();
     [coffee, club] = await Promise.all([myCoffeeRuns(db, who), myClubSignups(db, who)]);
     rollcall = await rollcallDates(db, datesNeedingRollcallCheck(coffee, moscowToday(now)));
+    // Без таблицы donations (миграция 073 не применена) строки просто нет.
+    supporter = await supabaseDonations(db).hasPaid(chatId).catch(() => false);
   } catch (err) {
     console.error("[menu] мои записи:", err instanceof Error ? err.message : err);
   }
 
-  const view = mySignupsView({ coffee, club, rollcallDates: rollcall, now });
+  const view = mySignupsView({ coffee, club, rollcallDates: rollcall, now, supporter });
   await ctx.reply(view.text, { reply_markup: view.keyboard, link_preview_options: { is_disabled: true } });
 }
 

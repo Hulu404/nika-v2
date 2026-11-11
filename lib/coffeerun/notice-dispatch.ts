@@ -8,6 +8,7 @@ import {
   markNotified,
 } from "../telegram/poll-store";
 import { runByDate, type CoffeeRun } from "./run";
+import { saveRunChangeSafe } from "./run-changes";
 
 /**
  * Рассылка объявления «старт переносится на другое время сегодня».
@@ -46,6 +47,8 @@ export interface MovedDispatchOptions {
   reason?: string | null;
   /** Только посчитать, ничего не отправляя. */
   dryRun?: boolean;
+  /** Чат организатора, который объявил: уходит в coffee_run_changes.created_by. */
+  by?: number | null;
 }
 
 export interface MovedDispatchResult {
@@ -114,6 +117,9 @@ export async function dispatchCoffeeRunMoved(
   // Запоминаем объявленное время: перекличка (/rollcall) возьмёт его по
   // умолчанию, чтобы не спросить «придёшь в 9:30?» после переноса на 18:00.
   markMoved(run.date, opts.newStart);
+  // И в базу (coffee_run_changes): память не переживает перезапуск, а по
+  // переносу считаются перекличка, напоминания и сообщение после события.
+  await saveRunChangeSafe({ run, kind: "moved", newStart: opts.newStart, by: opts.by });
 
   const reason = opts.reason ?? null;
   let sent = 0;
@@ -151,6 +157,8 @@ export interface CancelDispatchOptions {
   reason?: string | null;
   /** Только посчитать, ничего не отправляя. */
   dryRun?: boolean;
+  /** Чат организатора, который отменил: уходит в coffee_run_changes.created_by. */
+  by?: number | null;
 }
 
 /**
@@ -189,6 +197,7 @@ export async function dispatchCoffeeRunCancel(
   // Помечаем забег отменённым сразу: даже если рассылка оборвётся на середине,
   // /moved и /rollcall уже предупредят организатора, что звать людям некуда.
   markCancelled(run.date);
+  await saveRunChangeSafe({ run, kind: "cancelled", by: opts.by });
 
   const reason = opts.reason ?? null;
   const keyboard = cancelKeyboard(run);

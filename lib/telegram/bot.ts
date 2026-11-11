@@ -44,6 +44,7 @@ import {
   MENU_SCHEDULE,
   MENU_SCHEDULE_CALLBACK,
   MENU_SUPPORT,
+  MENU_DONATE,
   UNKNOWN_INPUT_TEXT,
   handleMySignupsMenu,
   handleScheduleCallback,
@@ -52,6 +53,17 @@ import {
   menuKeyboard,
   sendMenuHint,
 } from "./menu";
+import {
+  DONE_CALLBACK_RE,
+  handleDonateCallback,
+  handleDonateMenu,
+  handleDonateRetry,
+  handleDonationText,
+  handleDonationsCommand,
+  handleDoneCommand,
+  handleDoneCallback,
+} from "./donations";
+import { DONATE_CALLBACK_RE, DONATE_RETRY_CALLBACK_RE } from "./donation-keyboard";
 import {
   CLUB_SURVEY_CALLBACK_RE,
   handleSurveyCallback,
@@ -200,6 +212,10 @@ export function registerHandlers(bot: Bot<BotContext>): void {
   bot.command("survey", (ctx) => handleSurveySummaryCommand(ctx));
   bot.command("surveysend", (ctx) => handleSurveySendCommand(ctx));
   bot.command("surveyresult", (ctx) => handleSurveyResultCommand(ctx));
+  // Поддержка клуба: сводка оплат (только админ-чатам) и «закончили» — спасибо
+  // всем, кто пришёл (только никам из EVENT_DONE_USERNAMES). В /help их нет.
+  bot.command("donations", (ctx) => handleDonationsCommand(ctx));
+  bot.command("done", (ctx) => handleDoneCommand(ctx));
   bot.command("help", async (ctx) => {
     await ctx.reply(HELP_TEXT, { reply_markup: menuKeyboard() });
   });
@@ -222,6 +238,10 @@ export function registerHandlers(bot: Bot<BotContext>): void {
   bot.callbackQuery(CLUB_SURVEY_CALLBACK_RE, (ctx) => handleSurveyCallback(ctx));
   // «📅 Расписание» под пустыми «Моими записями».
   bot.callbackQuery(MENU_SCHEDULE_CALLBACK, (ctx) => handleScheduleCallback(ctx));
+  // Поддержка клуба: суммы, повтор оплаты и кнопки /done организатора.
+  bot.callbackQuery(DONATE_CALLBACK_RE, (ctx) => handleDonateCallback(ctx));
+  bot.callbackQuery(DONATE_RETRY_CALLBACK_RE, (ctx) => handleDonateRetry(ctx));
+  bot.callbackQuery(DONE_CALLBACK_RE, (ctx) => handleDoneCallback(ctx));
   // pure-push: интерактивного чек-ина больше нет. Хендлер оставлен пустым
   // «ловцом» — на случай устаревших сообщений с кнопками ans_* в проде: мягко
   // гасим «часик», НИЧЕГО не пишем (никаких answer/answered_at из Telegram).
@@ -245,6 +265,8 @@ export function registerHandlers(bot: Bot<BotContext>): void {
   bot.on("message", async (ctx, next) => {
     if (await handleBroadcastDraft(ctx)) return;
     if (await handleSurveyText(ctx)) return;
+    // Своя сумма или почта для чека. Кнопка меню ожидание отменяет и идёт дальше.
+    if (await handleDonationText(ctx)) return;
     await next();
   });
 
@@ -252,6 +274,7 @@ export function registerHandlers(bot: Bot<BotContext>): void {
   bot.hears(MENU_SCHEDULE, (ctx) => handleScheduleMenu(ctx));
   bot.hears(MENU_MY_SIGNUPS, (ctx) => handleMySignupsMenu(ctx));
   bot.hears(MENU_SUPPORT, (ctx) => handleSupportMenu(ctx));
+  bot.hears(MENU_DONATE, (ctx) => handleDonateMenu(ctx));
 
   // ── Любой прочий ввод: это не чат-бот — объясняем роль и показываем меню ────
   bot.on("message", async (ctx) => {

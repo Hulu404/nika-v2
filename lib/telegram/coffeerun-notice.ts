@@ -180,6 +180,7 @@ export async function handleMovedCallback(ctx: BotContext): Promise<void> {
     runDate: parsed.runDate,
     newStart: parsed.newStart,
     reason,
+    by: chatId,
   })
     .then((res) => sendBotMessage(chatId, noticeReportText(res, "перенос")))
     .catch((err) => {
@@ -268,7 +269,7 @@ export async function handleCancelCallback(ctx: BotContext): Promise<void> {
   await ctx.answerCallbackQuery({ text: "Рассылаем отмену" }).catch(() => {});
   await ctx.reply("Рассылаем отмену. Итог пришлём сюда.");
 
-  void dispatchCoffeeRunCancel({ runDate: parsed.runDate, reason })
+  void dispatchCoffeeRunCancel({ runDate: parsed.runDate, reason, by: chatId })
     .then((res) => sendBotMessage(chatId, noticeReportText(res, "отмену")))
     .catch((err) => {
       console.error("[coffeerun-cancel] send:", err instanceof Error ? err.message : err);

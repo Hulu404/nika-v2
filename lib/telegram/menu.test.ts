@@ -58,15 +58,15 @@ const pilates = SESSIONS.find((s) => s.club === "stretch" && s.date === "2026-11
 const read = SESSIONS.find((s) => s.club === "read")!;
 
 describe("клавиатура меню", () => {
-  it("три кнопки в две строки, постоянная и компактная; «Поддержать» пока не показываем", () => {
+  it("четыре кнопки в две строки, постоянная и компактная", () => {
     const kb = menuKeyboard();
     expect(kb.keyboard.map((row) => row.map((b) => (typeof b === "string" ? b : b.text)))).toEqual([
       [MENU_SCHEDULE, MENU_MY_SIGNUPS],
-      [MENU_SUPPORT],
+      [MENU_SUPPORT, MENU_DONATE],
     ]);
+    expect(MENU_DONATE).toBe("🧡 Поддержать");
     expect(kb.is_persistent).toBe(true);
     expect(kb.resize_keyboard).toBe(true);
-    expect(JSON.stringify(kb.keyboard)).not.toContain(MENU_DONATE);
   });
 });
 
@@ -221,6 +221,13 @@ describe("🎟 Мои записи", () => {
     expect(view.text).toContain("🧘 Пилатес на коврике — в листе ожидания");
   });
 
+  it("поддерживал клуб — последней строкой «🧡 Ты поддерживаешь клуб»", () => {
+    const view = mySignupsView({ coffee: [], club: [clubRow()], rollcallDates: new Set(), now: NOW, supporter: true });
+    expect(view.text.trim().split("\n").at(-1)).toBe("🧡 Ты поддерживаешь клуб");
+    const none = mySignupsView({ coffee: [], club: [], rollcallDates: new Set(), now: NOW, supporter: true });
+    expect(none.text).toBe(`${NO_UPCOMING_SIGNUPS_TEXT}\n\n🧡 Ты поддерживаешь клуб`);
+  });
+
   it("ничего впереди — «Впереди записей нет» и инлайн-кнопка расписания", () => {
     const view = mySignupsView({ coffee: [], club: [], rollcallDates: new Set(), now: NOW });
     expect(view.text).toBe(NO_UPCOMING_SIGNUPS_TEXT);
@@ -355,7 +362,7 @@ describe("бот: меню, /start, /help и порядок обработчик
   it("/start без заявки — меню внизу", async () => {
     await bot.handleUpdate(update("/start"));
     const last = sent().at(-1)!;
-    expect(menuRows(last.payload)).toEqual([[MENU_SCHEDULE, MENU_MY_SIGNUPS], [MENU_SUPPORT]]);
+    expect(menuRows(last.payload)).toEqual([[MENU_SCHEDULE, MENU_MY_SIGNUPS], [MENU_SUPPORT, MENU_DONATE]]);
   });
 
   it("/help — команды и меню", async () => {

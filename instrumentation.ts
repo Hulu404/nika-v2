@@ -188,6 +188,17 @@ async function tickClubHolds(): Promise<void> {
   }
 }
 
+async function tickAfterEvent(): Promise<void> {
+  // Без флага DONATIONS_AFTER_EVENT=1 модуль даже не грузим.
+  if (process.env.DONATIONS_AFTER_EVENT?.trim() !== "1") return;
+  try {
+    const { dispatchAfterEvent } = await import("./lib/donations/after-event-dispatch");
+    await dispatchAfterEvent();
+  } catch (err) {
+    console.error("[after-event] тик упал:", err instanceof Error ? err.message : String(err));
+  }
+}
+
 async function tickReminders(): Promise<void> {
   try {
     const { dispatchCoffeeRunReminders } = await import("./lib/coffeerun/reminder-dispatch");
@@ -247,6 +258,16 @@ export async function register(): Promise<void> {
     console.error("[databot] webhook: failed —", err instanceof Error ? err.message : String(err));
   }
 
+  // Переносы и отмены забегов — из базы в память процесса: перезапуск не
+  // должен их забывать (coffee_run_changes, миграция 073).
+  try {
+    const { loadRunChangesIntoMemory } = await import("./lib/coffeerun/run-changes");
+    const n = await loadRunChangesIntoMemory();
+    if (n) console.log(`[coffeerun] переносы и отмены из базы: ${n}`);
+  } catch (err) {
+    console.error("[coffeerun] переносы и отмены из базы:", err instanceof Error ? err.message : String(err));
+  }
+
   // Первый проход сразу после старта: если деплой пришёлся на окно рассылки,
   // напоминание уйдёт не через 15 минут, а тут же.
   void tickReminders();
@@ -275,6 +296,8 @@ export async function register(): Promise<void> {
   const minuteTimer = setInterval(() => {
     void tickTeamMinute();
     void tickClubHolds();
+    // Сообщение после события: окно 40–60 минут после окончания, нужен шаг в минуту.
+    void tickAfterEvent();
   }, 60_000);
   minuteTimer.unref?.();
   // Явный след в логах: молчание бота однажды уже прошло незамеченным именно

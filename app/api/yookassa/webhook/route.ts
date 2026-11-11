@@ -1,9 +1,5 @@
 import { NextResponse } from "next/server";
-import { supabaseClubOrders } from "@/lib/clubs/orders";
-import { processPayment, type PaymentDeps } from "@/lib/clubs/payments";
-import { publicOriginFromEnv } from "@/lib/public-origin";
-import { tgAdmin } from "@/lib/telegram/supabase";
-import { notifyClubOrder } from "@/lib/telegram/club-signup";
+import { handleVerifiedPayment } from "@/lib/donations/webhook";
 import { yookassaFromEnv } from "@/lib/yookassa";
 
 export const runtime = "nodejs";
@@ -17,6 +13,9 @@ export const dynamic = "force-dynamic";
  * статус у API ЮKassa (GET /payments/{id}) — подделанный запрос ничего не
  * изменит. Обработка идемпотентна (lib/clubs/payments.ts): повторная доставка
  * того же события ничего не ломает.
+ *
+ * Донаты (metadata.kind = donation, lib/donations) уходят в свой обработчик,
+ * билеты клубов — в processPayment, как раньше.
  *
  * 200 — обработано (или не наше); 500 — временный сбой (база, API, возврат),
  * ЮKassa повторит уведомление.
@@ -40,11 +39,10 @@ export async function POST(req: Request) {
     console.error("[yookassa-webhook] YOOKASSA_SHOP_ID / YOOKASSA_SECRET_KEY не заданы");
     return NextResponse.json({ error: "Not configured" }, { status: 500 });
   }
-  const deps: PaymentDeps = { orders: supabaseClubOrders(tgAdmin()), yk, origin: publicOriginFromEnv(), notify: notifyClubOrder };
   try {
-    const { outcome, order } = await processPayment(deps, paymentId);
-    console.log(`[yookassa-webhook] ${event} ${paymentId} → ${outcome}${order ? ` (заказ ${order.id})` : ""}`);
-    return NextResponse.json({ ok: true, outcome });
+    const result = await handleVerifiedPayment(yk, paymentId);
+    console.log(`[yookassa-webhook] ${event} ${paymentId} → ${result.outcome}${result.ref ? ` (${result.ref})` : ""}`);
+    return NextResponse.json({ ok: true, outcome: result.outcome });
   } catch (err) {
     const status = typeof (err as { status?: unknown })?.status === "number" ? (err as { status: number }).status : 0;
     console.error(`[yookassa-webhook] ${event} ${paymentId}:`, err instanceof Error ? err.message : String(err));
@@ -53,3 +51,4 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Retry" }, { status: 500 });
   }
 }
+

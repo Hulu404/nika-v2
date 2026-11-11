@@ -3,6 +3,9 @@ import { sendBotMessage } from "../telegram/send";
 import { localParts, DEFAULT_TZ } from "../telegram/schedule";
 import { reminderText, runKeyboard } from "../telegram/coffeerun";
 import { runsDueForReminder, runByDate, REMINDER_HOUR_MSK, type CoffeeRun } from "./run";
+import { runStatusOrMemory } from "./run-changes";
+import { cancelledAt, movedStartFor } from "../telegram/poll-store";
+import { gatherFor } from "../telegram/notice-copy";
 
 /**
  * Рассылка напоминаний за сутки до кофе-рана.
@@ -137,14 +140,22 @@ export async function dispatchCoffeeRunReminders(
       break;
     }
 
+    // Отменённому забегу напоминание не шлём, перенесённому — с новым временем.
+    // Статус из базы (coffee_run_changes), при её сбое — из памяти процесса.
+    const status = await runStatusOrMemory(run, { movedStartFor, cancelledAt });
+    if (status.cancelled) continue;
+    const actual = status.movedStart
+      ? { ...run, startTime: status.movedStart, gatherTime: gatherFor(status.movedStart) }
+      : run;
+
     const due = await dueRowsFor(run, budget);
     candidates += due.length;
     if (due.length === budget) hasMore = true;
 
-    const keyboard = runKeyboard(run);
+    const keyboard = runKeyboard(actual);
 
     for (const row of due) {
-      const res = await sendBotMessage(row.tg_chat_id, reminderText(row, run), keyboard);
+      const res = await sendBotMessage(row.tg_chat_id, reminderText(row, actual), keyboard);
       budget--;
 
       if (res.ok) sent++;

@@ -37,7 +37,16 @@ export interface CoffeeRun {
   mapUrl: string;
   /** Номер кофе-рана по счёту — «NIKA EVENTS № 008» на лендинге. */
   edition?: number;
+  /**
+   * Сколько длится событие от старта, минут: забег и кофе до «расходимся».
+   * По умолчанию RUN_DURATION_MIN. От окончания считается сообщение после
+   * события (lib/donations/after-event-dispatch.ts).
+   */
+  durationMin?: number;
 }
+
+/** Длительность кофе-рана по умолчанию: забег и кофе на финише. */
+export const RUN_DURATION_MIN = 90;
 
 /**
  * Хронологически по возрастанию. История забегов живёт в базе
