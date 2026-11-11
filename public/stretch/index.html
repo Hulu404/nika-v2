@@ -478,10 +478,12 @@ html.js .f-fig.on svg *{--draw:0}
 .tix-r{text-align:right;font-size:12px;color:var(--ink-2);line-height:1.6;padding-bottom:4px}
 .tix-r b{color:var(--ink);font-weight:400}
 .order-note{font-size:12px;line-height:1.6;color:var(--ink-2);margin:8px 0 20px}
-.promo-box{margin:0 0 16px;padding:0;border:0;background:transparent}
-.promo-title{display:block;font-size:12px;color:var(--ink-2);margin:0 0 8px}
+.promo-box{margin:0 0 20px;padding:16px;border:1px solid var(--line);border-radius:16px;background:#fff}
+.promo-title{font-size:12px;color:var(--ink-2);margin:0 0 8px}
 .promo-row{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px}
-.promo-apply{padding:0 20px;font-size:13px}
+.promo-row .in{height:48px}
+.promo-apply{height:48px;padding:0 16px;border:1px solid var(--line-2);border-radius:14px;background:#F7F7F5;color:var(--ink);font:inherit;font-size:13px;cursor:pointer}
+.promo-apply:disabled{opacity:.55;cursor:wait}
 .promo-status{min-height:18px;margin:7px 0 0;font-size:12px;color:var(--ink-2)}
 .promo-status.err{color:var(--err)}
 .order-total{font-size:12px;color:var(--ink-2);margin-top:10px}
@@ -984,9 +986,9 @@ ym(113929945,'init',{webvisor:true,clickmap:true,trackLinks:true,accurateTrackBo
               <button type="button" class="quantity-step" id="quantity-plus" aria-label="Увеличить количество билетов" aria-controls="i-quantity">+</button>
             </div><div class="msg" id="quantity-error" aria-live="polite">Укажи целое число билетов от 1 до 16</div></div>
           <p class="order-note" id="quantity-note"><span id="quantity-availability" aria-live="polite">Проверяем доступные места…</span><br>Один билет — один участник. Все билеты придут тебе в Telegram.</p>
-          <div class="field promo-box">
-            <label class="promo-title" for="promo-code">Промокод</label>
-            <div class="promo-row"><input class="in" id="promo-code" type="text" maxlength="40" placeholder="Введи промокод" autocomplete="off" autocapitalize="characters"><button class="btn btn--line promo-apply" id="promo-apply" type="button">Применить</button></div>
+          <div class="promo-box">
+            <p class="promo-title">Есть промокод?</p>
+            <div class="promo-row"><input class="in" id="promo-code" type="text" maxlength="40" placeholder="Введи промокод" autocomplete="off" autocapitalize="characters"><button class="promo-apply" id="promo-apply" type="button">Применить</button></div>
             <p class="promo-status" id="promo-status" aria-live="polite"></p>
           </div>
           <div class="field"><span class="fl" id="l-purchase">Для кого билеты</span><div class="opts opts--2" role="radiogroup" aria-labelledby="l-purchase">
