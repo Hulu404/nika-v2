@@ -58,6 +58,7 @@ import {
   afterEventText,
   dayWord,
   eventPrep,
+  genderFromCode,
   thankPreviewText,
   thankSentText,
   PAYMENT_FAILED_TEXT,
@@ -470,10 +471,12 @@ export async function handleDonationsCommand(ctx: BotContext, deps: DonationBotD
  */
 export const THANK_CALLBACK_RE = /^tk:(go|no)$/;
 
+type Gender = "m" | "f" | null;
+
 interface ThankDraft {
   ref: string;
   kind: "coffee_run" | "club";
-  chats: Array<{ username: string; chatId: number }>;
+  chats: Array<{ username: string; chatId: number; gender: Gender }>;
   at: number;
 }
 
@@ -494,12 +497,19 @@ export function thankEvent(ref: string): FollowupEvent | null {
   return null;
 }
 
-export function parseThankArgs(raw: string): { ref: string; usernames: string[] } | null {
+/** «@teo458:м» → ник и род (м/ж, m/f); без суффикса — род не задан. */
+export function parseThankArgs(raw: string): { ref: string; usernames: string[]; genders: Map<string, Gender> } | null {
   const parts = raw.trim().split(/\s+/).filter(Boolean);
   const ref = parts.shift();
   if (!ref || !/^[a-z0-9_-]{1,32}:\d{4}-\d{2}-\d{2}$/.test(ref)) return null;
-  const usernames = [...new Set(parts.map((p) => normalizeTelegramUsername(p)).filter((u): u is string => !!u))];
-  return usernames.length ? { ref, usernames } : null;
+  const genders = new Map<string, Gender>();
+  for (const part of parts) {
+    const [name, g] = part.split(":");
+    const u = normalizeTelegramUsername(name);
+    if (!u) continue;
+    genders.set(u, genderFromCode(g ?? ""));
+  }
+  return genders.size ? { ref, usernames: [...genders.keys()], genders } : null;
 }
 
 export async function handleThankCommand(ctx: BotContext, deps: DonationBotDeps = defaultDonationDeps()): Promise<void> {
@@ -522,9 +532,14 @@ export async function handleThankCommand(ctx: BotContext, deps: DonationBotDeps 
     const chats = await deps.chatsByUsernames(args.usernames);
     const found = args.usernames.filter((u) => chats.has(u));
     const missing = args.usernames.filter((u) => !chats.has(u));
-    const text = afterEventText(eventPrep(event.format), dayWord(event.date, deps.now()));
-    thankDrafts().set(ctx.from!.id, { ref: event.ref, kind: event.kind, chats: found.map((u) => ({ username: u, chatId: chats.get(u)! })), at: Date.now() });
-    await ctx.reply(thankPreviewText(event.title, found, missing, text), {
+    const when = dayWord(event.date, deps.now());
+    const variants = [...new Set(found.map((u) => args.genders.get(u) ?? null))];
+    const texts = variants.map((g) => afterEventText(eventPrep(event.format), when, g));
+    thankDrafts().set(ctx.from!.id, {
+      ref: event.ref, kind: event.kind, at: Date.now(),
+      chats: found.map((u) => ({ username: u, chatId: chats.get(u)!, gender: args.genders.get(u) ?? null })),
+    });
+    await ctx.reply(thankPreviewText(event.title, found, missing, texts), {
       reply_markup: found.length
         ? new InlineKeyboard().text(DONE_SEND_LABEL, "tk:go").text(DONE_CANCEL_LABEL, "tk:no")
         : undefined,
@@ -556,12 +571,13 @@ export async function handleThankCallback(ctx: BotContext, deps: DonationBotDeps
     return;
   }
   const event = thankEvent(draft.ref)!;
-  const text = afterEventText(eventPrep(event.format), dayWord(event.date, now));
+  const when = dayWord(event.date, now);
   const keyboard = amountsKeyboard({ source: "after_event", event_kind: event.kind, event_ref: event.ref });
   let sent = 0;
   let failed = 0;
   const delivered: number[] = [];
-  for (const { chatId } of draft.chats) {
+  for (const { chatId, gender } of draft.chats) {
+    const text = afterEventText(eventPrep(event.format), when, gender);
     const res = await deps.send(chatId, text, keyboard).catch(() => ({ ok: false }));
     if (res.ok) {
       sent++;

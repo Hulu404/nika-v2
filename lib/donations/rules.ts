@@ -164,6 +164,7 @@ export function afterEventEnabled(env: Record<string, string | undefined> = proc
 
 /** Ники, которым доступна /done (EVENT_DONE_USERNAMES), без @ и регистра. */
 export function doneUsernames(env: Record<string, string | undefined> = process.env): Set<string> {
-  const raw = env.EVENT_DONE_USERNAMES ?? "meine_nika,hulu404,srbrkvss";
-  return new Set(raw.split(",").map((u) => u.trim().replace(/^@/, "").toLowerCase()).filter(Boolean));
+  const raw = env.EVENT_DONE_USERNAMES ?? "meine_nika,hulu404";
+  // srbrkvss — аккаунт Дмитрия: доступ есть всегда, что бы ни стояло в env.
+  return new Set([...raw.split(","), "srbrkvss"].map((u) => u.trim().replace(/^@/, "").toLowerCase()).filter(Boolean));
 }

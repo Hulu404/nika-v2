@@ -55,8 +55,11 @@ export const THANKS_PAGE = {
 export const PAYMENT_FAILED_TEXT = "Оплата не прошла. Можно попробовать ещё раз, кнопка ниже.";
 
 /** 12. Сообщение после события (флаг DONATIONS_AFTER_EVENT=1). Под ним — те же кнопки сумм. */
-export const afterEventText = (eventPrep: string, when: "сегодня" | "вчера" | "" = "сегодня") =>
-  `Спасибо, что ${when ? `${when} ` : ""}был(а) на ${eventPrep} 🧡 Нам важно, что ты пришёл(шла). Если хочешь, чтобы таких встреч было больше, можешь поддержать клуб, это добровольно 🤗`;
+export const afterEventText = (eventPrep: string, when: "сегодня" | "вчера" | "" = "сегодня", gender: "m" | "f" | null = null) => {
+  const was = gender === "m" ? "был" : gender === "f" ? "была" : "был(а)";
+  const came = gender === "m" ? "пришёл" : gender === "f" ? "пришла" : "пришёл(шла)";
+  return `Спасибо, что ${when ? `${when} ` : ""}${was} на ${eventPrep} 🧡 Нам важно, что ты ${came}. Если хочешь, чтобы таких встреч было больше, можешь поддержать клуб, это добровольно 🤗`;
+};
 
 /** «сегодня» / «вчера» / без слова в тексте 12 — по дате события относительно now (МСК). */
 export function dayWord(date: string, now: Date): "сегодня" | "вчера" | "" {
@@ -140,15 +143,20 @@ export function donationsSummaryText(rows: { days: number; total: number; count:
 }
 /** /thank: ручная рассылка «спасибо» по событию списком ников. */
 export const THANK_USAGE =
-  "Формат: /thank cave:2026-11-15 @ник1 @ник2 …\nСобытие — <спот>:<дата> забега или <клуб>:<дата> занятия. Перед отправкой покажем, кому уйдёт.";
+  "Формат: /thank cave:2026-11-15 @ник1:м @ник2:ж …\nСобытие — <спот>:<дата> забега или <клуб>:<дата> занятия. Род после ника: :м или :ж, без него — «был(а)». Перед отправкой покажем, кому уйдёт.";
+/** Суффиксы рода после ника в /thank: @ник:м, @ник:ж. */
+export function genderFromCode(code: string): "m" | "f" | null {
+  const c = code.trim().toLowerCase();
+  return c === "м" || c === "m" ? "m" : c === "ж" || c === "f" ? "f" : null;
+}
 export const THANK_UNKNOWN_EVENT = "Не знаем такого события. Формат: /thank cave:2026-11-15 @ник1 @ник2";
-export const thankPreviewText = (title: string, found: string[], missing: string[], text: string) =>
+export const thankPreviewText = (title: string, found: string[], missing: string[], texts: string[]) =>
   [
     `${title}. Разошлём ${found.length}: ${found.map((u) => `@${u}`).join(", ") || "никому"}.`,
     ...(missing.length ? [`Не нашли чат (человек не открывал бота): ${missing.map((u) => `@${u}`).join(", ")}.`] : []),
     "",
-    "Текст:",
-    text,
+    texts.length > 1 ? "Тексты:" : "Текст:",
+    texts.join("\n\n"),
   ].join("\n");
 export const thankSentText = (sent: number, failed: number) =>
   `Разослали: ${sent}.${failed ? ` Не дошло: ${failed}.` : ""}`;

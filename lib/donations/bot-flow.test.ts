@@ -133,20 +133,32 @@ describe("бот: поддержка клуба", () => {
     deps.now = () => new Date("2026-11-16T11:45:00+03:00");
     const org = (data?: string) => {
       const c = ctx({ username: "meine_nika", data }) as unknown as Record<string, unknown>;
-      c.match = "cave:2026-11-15 @arinand @hulu404 ghost";
+      c.match = "cave:2026-11-15 @arinand:ж @hulu404:м ghost";
       return c as never;
     };
     vi.spyOn(console, "log").mockImplementation(() => {});
     await handleThankCommand(org(), deps);
     expect(out.at(-1)!.text).toContain("Разошлём 2: @arinand, @hulu404");
     expect(out.at(-1)!.text).toContain("Не нашли чат (человек не открывал бота): @ghost");
-    expect(out.at(-1)!.text).toContain("Спасибо, что вчера был(а) на кофе-ране 🧡");
+    expect(out.at(-1)!.text).toContain("Спасибо, что вчера была на кофе-ране 🧡 Нам важно, что ты пришла.");
+    expect(out.at(-1)!.text).toContain("Спасибо, что вчера был на кофе-ране 🧡 Нам важно, что ты пришёл.");
     expect(sentTo).toHaveLength(0);
     await handleThankCallback(org("tk:go"), deps);
     expect(sentTo.map((m) => m.chatId)).toEqual([1000, 1001]);
+    expect(sentTo[0].text).toContain("была на кофе-ране");
+    expect(sentTo[1].text).toContain("был на кофе-ране");
     expect(sentTo[0].buttons).toEqual(["200 ₽", "500 ₽", "1000 ₽", "Своя сумма"]);
     expect(marked).toEqual([1000, 1001]);
     expect(out.at(-1)!.text).toBe("Разослали: 2.");
+  });
+
+  it("/thank в день события — «сегодня»; @srbrkvss проходит при любом EVENT_DONE_USERNAMES", async () => {
+    deps.now = () => new Date("2026-11-15T20:45:00+03:00");
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const c = ctx({ username: "srbrkvss" }) as unknown as Record<string, unknown>;
+    c.match = "cave:2026-11-15 @teo458:м";
+    await handleThankCommand(c as never, deps);
+    expect(out.at(-1)!.text).toContain("Спасибо, что сегодня был на кофе-ране 🧡");
   });
 
   it("/thank от постороннего — как незнакомая команда", async () => {
