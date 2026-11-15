@@ -62,6 +62,9 @@ import {
   handleDonationsCommand,
   handleDoneCommand,
   handleDoneCallback,
+  handleThankCallback,
+  handleThankCommand,
+  THANK_CALLBACK_RE,
 } from "./donations";
 import { DONATE_CALLBACK_RE, DONATE_RETRY_CALLBACK_RE } from "./donation-keyboard";
 import {
@@ -216,6 +219,8 @@ export function registerHandlers(bot: Bot<BotContext>): void {
   // всем, кто пришёл (только никам из EVENT_DONE_USERNAMES). В /help их нет.
   bot.command("donations", (ctx) => handleDonationsCommand(ctx));
   bot.command("done", (ctx) => handleDoneCommand(ctx));
+  // «Спасибо» по прошедшему событию списком ников, если автоматическое не ушло.
+  bot.command("thank", (ctx) => handleThankCommand(ctx));
   bot.command("help", async (ctx) => {
     await ctx.reply(HELP_TEXT, { reply_markup: menuKeyboard() });
   });
@@ -242,6 +247,7 @@ export function registerHandlers(bot: Bot<BotContext>): void {
   bot.callbackQuery(DONATE_CALLBACK_RE, (ctx) => handleDonateCallback(ctx));
   bot.callbackQuery(DONATE_RETRY_CALLBACK_RE, (ctx) => handleDonateRetry(ctx));
   bot.callbackQuery(DONE_CALLBACK_RE, (ctx) => handleDoneCallback(ctx));
+  bot.callbackQuery(THANK_CALLBACK_RE, (ctx) => handleThankCallback(ctx));
   // pure-push: интерактивного чек-ина больше нет. Хендлер оставлен пустым
   // «ловцом» — на случай устаревших сообщений с кнопками ans_* в проде: мягко
   // гасим «часик», НИЧЕГО не пишем (никаких answer/answered_at из Telegram).

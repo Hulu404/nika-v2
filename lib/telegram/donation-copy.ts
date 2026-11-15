@@ -55,8 +55,16 @@ export const THANKS_PAGE = {
 export const PAYMENT_FAILED_TEXT = "Оплата не прошла. Можно попробовать ещё раз, кнопка ниже.";
 
 /** 12. Сообщение после события (флаг DONATIONS_AFTER_EVENT=1). Под ним — те же кнопки сумм. */
-export const afterEventText = (eventPrep: string) =>
-  `Спасибо, что сегодня был(а) на ${eventPrep} 🧡 Нам важно, что ты пришёл(шла). Если хочешь, чтобы таких встреч было больше, можешь поддержать клуб, это добровольно 🤗`;
+export const afterEventText = (eventPrep: string, when: "сегодня" | "вчера" | "" = "сегодня") =>
+  `Спасибо, что ${when ? `${when} ` : ""}был(а) на ${eventPrep} 🧡 Нам важно, что ты пришёл(шла). Если хочешь, чтобы таких встреч было больше, можешь поддержать клуб, это добровольно 🤗`;
+
+/** «сегодня» / «вчера» / без слова в тексте 12 — по дате события относительно now (МСК). */
+export function dayWord(date: string, now: Date): "сегодня" | "вчера" | "" {
+  const today = new Date(now.getTime() + 3 * 3_600_000).toISOString().slice(0, 10);
+  if (date === today) return "сегодня";
+  const yesterday = new Date(Date.parse(`${today}T00:00:00Z`) - 86_400_000).toISOString().slice(0, 10);
+  return date === yesterday ? "вчера" : "";
+}
 
 /** {event_prep}: событие в предложном падеже по формату. */
 export const EVENT_PREP: Record<string, string> = {
@@ -130,6 +138,22 @@ export function donationsSummaryText(rows: { days: number; total: number; count:
   }
   return lines.join("\n");
 }
+/** /thank: ручная рассылка «спасибо» по событию списком ников. */
+export const THANK_USAGE =
+  "Формат: /thank cave:2026-11-15 @ник1 @ник2 …\nСобытие — <спот>:<дата> забега или <клуб>:<дата> занятия. Перед отправкой покажем, кому уйдёт.";
+export const THANK_UNKNOWN_EVENT = "Не знаем такого события. Формат: /thank cave:2026-11-15 @ник1 @ник2";
+export const thankPreviewText = (title: string, found: string[], missing: string[], text: string) =>
+  [
+    `${title}. Разошлём ${found.length}: ${found.map((u) => `@${u}`).join(", ") || "никому"}.`,
+    ...(missing.length ? [`Не нашли чат (человек не открывал бота): ${missing.map((u) => `@${u}`).join(", ")}.`] : []),
+    "",
+    "Текст:",
+    text,
+  ].join("\n");
+export const thankSentText = (sent: number, failed: number) =>
+  `Разослали: ${sent}.${failed ? ` Не дошло: ${failed}.` : ""}`;
+export const THANK_EXPIRED_TEXT = "Черновик устарел. Пришли /thank ещё раз.";
+
 export const DONATIONS_DB_DOWN = "Не получилось собрать сводку — база не ответила. Смотри логи сервера.";
 
 function plural(n: number, one: string, few: string, many: string): string {

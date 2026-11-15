@@ -24,7 +24,19 @@ import {
   todaysEvents,
   type FollowupDeps,
 } from "../donations/after-event-dispatch";
-import { afterEventEnabled, doneUsernames, eventStart, startedToday, type FollowupEvent } from "../donations/rules";
+import {
+  afterEventEnabled,
+  doneUsernames,
+  eventByRef,
+  eventStart,
+  fromRunEvent,
+  fromSessionEvent,
+  isNightMsk,
+  startedToday,
+  type FollowupEvent,
+} from "../donations/rules";
+import { COFFEE_RUNS } from "../coffeerun/run";
+import { sendBotMessage } from "./send";
 import {
   ASK_AMOUNT_TEXT,
   ASK_EMAIL_TEXT,
@@ -40,6 +52,14 @@ import {
   DONE_NIGHT_TEXT,
   DONE_NOTHING_TEXT,
   DONE_SEND_LABEL,
+  THANK_EXPIRED_TEXT,
+  THANK_UNKNOWN_EVENT,
+  THANK_USAGE,
+  afterEventText,
+  dayWord,
+  eventPrep,
+  thankPreviewText,
+  thankSentText,
   PAYMENT_FAILED_TEXT,
   PAYMENT_UNAVAILABLE_TEXT,
   THANKS_TEXT,
@@ -73,6 +93,11 @@ export interface DonationBotDeps {
   now(): Date;
   /** Сводка /donations: оплаченные донаты с даты since. */
   paidSince(since: string): Promise<Array<{ amount_rub: number; source: string; paid_at: string }>>;
+  /** /thank: чаты по никам (нормализованным) из заявок и донатов. */
+  chatsByUsernames(usernames: string[]): Promise<Map<string, number>>;
+  /** /thank: отметить donation_asked_at в заявках события у этих чатов. */
+  markAsked(event: FollowupEvent, chatIds: number[], now: Date): Promise<void>;
+  send(chatId: number, text: string, keyboard: InlineKeyboard): Promise<{ ok: boolean }>;
 }
 
 let _deps: DonationBotDeps | null = null;
@@ -96,6 +121,33 @@ export function defaultDonationDeps(): DonationBotDeps {
       if (error) throw new Error(`donations: ${error.message}`);
       return (data as Array<{ amount_rub: number; source: string; paid_at: string }> | null) ?? [];
     },
+    async chatsByUsernames(usernames) {
+      const found = new Map<string, number>();
+      for (const table of ["coffee_run_signups", "club_signups", "donations"] as const) {
+        const { data, error } = await tgAdmin()
+          .from(table)
+          .select("tg_username, tg_chat_id")
+          .in("tg_username", usernames)
+          .not("tg_chat_id", "is", null);
+        if (error) throw new Error(`${table}: ${error.message}`);
+        for (const r of (data as Array<{ tg_username: string; tg_chat_id: number }> | null) ?? []) {
+          const u = normalizeTelegramUsername(r.tg_username);
+          if (u && !found.has(u)) found.set(u, Number(r.tg_chat_id));
+        }
+      }
+      return found;
+    },
+    async markAsked(event, chatIds, now) {
+      if (!chatIds.length) return;
+      const q = event.run
+        ? tgAdmin().from("coffee_run_signups").update({ donation_asked_at: now.toISOString() })
+            .eq("spot", event.run.spot).eq("run_date", event.run.date)
+        : tgAdmin().from("club_signups").update({ donation_asked_at: now.toISOString() })
+            .eq("club", event.session!.club).eq("event_date", event.session!.date);
+      const { error } = await q.in("tg_chat_id", chatIds);
+      if (error) console.error("[thank] donation_asked_at:", error.message);
+    },
+    send: (chatId, text, keyboard) => sendBotMessage(chatId, text, keyboard),
   };
   return _deps;
 }
@@ -406,4 +458,117 @@ export async function handleDonationsCommand(ctx: BotContext, deps: DonationBotD
     console.error("[donations] сводка:", err instanceof Error ? err.message : err);
     await ctx.reply(DONATIONS_DB_DOWN);
   }
+}
+
+// ── /thank: «спасибо» по событию списком ников ───────────────────────────────
+
+/**
+ * Ручная рассылка, когда автоматическая не сработала (например, перекличку не
+ * запускали): /thank <событие> @ник1 @ник2 … Доступ — как у /done. Два шага:
+ * предпросмотр с найденными чатами и текстом, отправка по кнопке. Ночью не пишем.
+ * Кнопки сумм привязаны к событию (донат с source after_event).
+ */
+export const THANK_CALLBACK_RE = /^tk:(go|no)$/;
+
+interface ThankDraft {
+  ref: string;
+  kind: "coffee_run" | "club";
+  chats: Array<{ username: string; chatId: number }>;
+  at: number;
+}
+
+const THANK_KEY = Symbol.for("nika.events.thank.drafts");
+const THANK_TTL_MS = 30 * 60_000;
+function thankDrafts(): Map<number, ThankDraft> {
+  const g = globalThis as unknown as Record<symbol, Map<number, ThankDraft> | undefined>;
+  return (g[THANK_KEY] ??= new Map());
+}
+
+/** Событие по ключу «cave:2026-11-15» или «read:2026-11-12». */
+export function thankEvent(ref: string): FollowupEvent | null {
+  const [a] = ref.split(":");
+  const kind = COFFEE_RUNS.some((r) => r.spot === a) ? "coffee_run" : "club";
+  const found = eventByRef(kind, ref);
+  if (found?.run) return fromRunEvent(found.run);
+  if (found?.session) return fromSessionEvent(found.session);
+  return null;
+}
+
+export function parseThankArgs(raw: string): { ref: string; usernames: string[] } | null {
+  const parts = raw.trim().split(/\s+/).filter(Boolean);
+  const ref = parts.shift();
+  if (!ref || !/^[a-z0-9_-]{1,32}:\d{4}-\d{2}-\d{2}$/.test(ref)) return null;
+  const usernames = [...new Set(parts.map((p) => normalizeTelegramUsername(p)).filter((u): u is string => !!u))];
+  return usernames.length ? { ref, usernames } : null;
+}
+
+export async function handleThankCommand(ctx: BotContext, deps: DonationBotDeps = defaultDonationDeps()): Promise<void> {
+  console.log(`[thank] /thank от ${ctx.from?.id} @${ctx.from?.username ?? "—"}`);
+  if (!isDoneAllowed(ctx, deps.followup.env)) {
+    await ctx.reply(UNKNOWN_INPUT_TEXT, { reply_markup: menuKeyboard() });
+    return;
+  }
+  const args = parseThankArgs(String(ctx.match ?? ""));
+  if (!args) {
+    await ctx.reply(THANK_USAGE);
+    return;
+  }
+  const event = thankEvent(args.ref);
+  if (!event) {
+    await ctx.reply(THANK_UNKNOWN_EVENT);
+    return;
+  }
+  try {
+    const chats = await deps.chatsByUsernames(args.usernames);
+    const found = args.usernames.filter((u) => chats.has(u));
+    const missing = args.usernames.filter((u) => !chats.has(u));
+    const text = afterEventText(eventPrep(event.format), dayWord(event.date, deps.now()));
+    thankDrafts().set(ctx.from!.id, { ref: event.ref, kind: event.kind, chats: found.map((u) => ({ username: u, chatId: chats.get(u)! })), at: Date.now() });
+    await ctx.reply(thankPreviewText(event.title, found, missing, text), {
+      reply_markup: found.length
+        ? new InlineKeyboard().text(DONE_SEND_LABEL, "tk:go").text(DONE_CANCEL_LABEL, "tk:no")
+        : undefined,
+    });
+  } catch (err) {
+    console.error("[thank] поиск чатов:", err instanceof Error ? err.message : err);
+    await ctx.reply(DONE_FAILED_TEXT);
+  }
+}
+
+export async function handleThankCallback(ctx: BotContext, deps: DonationBotDeps = defaultDonationDeps()): Promise<void> {
+  await ctx.answerCallbackQuery().catch(() => {});
+  if (!isDoneAllowed(ctx, deps.followup.env)) return;
+  await ctx.editMessageReplyMarkup({ reply_markup: undefined }).catch(() => {});
+  const uid = ctx.from!.id;
+  const draft = thankDrafts().get(uid);
+  thankDrafts().delete(uid);
+  if (THANK_CALLBACK_RE.exec(ctx.callbackQuery?.data ?? "")?.[1] !== "go") {
+    await ctx.reply(DONE_CANCELLED_TEXT);
+    return;
+  }
+  if (!draft || Date.now() - draft.at > THANK_TTL_MS) {
+    await ctx.reply(THANK_EXPIRED_TEXT);
+    return;
+  }
+  const now = deps.now();
+  if (isNightMsk(now)) {
+    await ctx.reply(DONE_NIGHT_TEXT);
+    return;
+  }
+  const event = thankEvent(draft.ref)!;
+  const text = afterEventText(eventPrep(event.format), dayWord(event.date, now));
+  const keyboard = amountsKeyboard({ source: "after_event", event_kind: event.kind, event_ref: event.ref });
+  let sent = 0;
+  let failed = 0;
+  const delivered: number[] = [];
+  for (const { chatId } of draft.chats) {
+    const res = await deps.send(chatId, text, keyboard).catch(() => ({ ok: false }));
+    if (res.ok) {
+      sent++;
+      delivered.push(chatId);
+    } else failed++;
+  }
+  await deps.markAsked(event, delivered, now).catch((err) => console.error("[thank] отметка:", err instanceof Error ? err.message : err));
+  console.log(`[thank] ${event.ref}: разослали ${sent}, не дошло ${failed}`);
+  await ctx.reply(thankSentText(sent, failed));
 }

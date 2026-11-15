@@ -7,6 +7,8 @@ import {
   handleDonateMenu,
   handleDonationText,
   handleDoneCommand,
+  handleThankCallback,
+  handleThankCommand,
   type DonationBotDeps,
 } from "../telegram/donations";
 import {
@@ -28,6 +30,8 @@ describe("бот: поддержка клуба", () => {
   let store: MemoryDonations;
   let drafts: MemoryDrafts;
   let email: string | null;
+  let marked: number[];
+  let sentTo: Array<{ chatId: number; text: string; buttons: string[] }>;
 
   const ctx = (opts: { text?: string; data?: string; username?: string } = {}) =>
     ({
@@ -51,6 +55,8 @@ describe("бот: поддержка клуба", () => {
     store = new MemoryDonations();
     drafts = new MemoryDrafts();
     email = "run@example.com";
+    marked = [];
+    sentTo = [];
     deps = {
       store,
       drafts,
@@ -59,6 +65,9 @@ describe("бот: поддержка клуба", () => {
       followup: { env: { DONATIONS_AFTER_EVENT: "1", EVENT_DONE_USERNAMES: "meine_nika,hulu404" } } as unknown as FollowupDeps,
       now: () => new Date("2026-11-15T15:00:00+03:00"),
       paidSince: async () => [],
+      chatsByUsernames: async (us) => new Map(us.filter((u) => u !== "ghost").map((u, i) => [u, 1000 + i])),
+      markAsked: async (_e, ids) => { marked.push(...ids); },
+      send: async (chatId, text, kb) => { sentTo.push({ chatId, text, buttons: kb.inline_keyboard.flat().map((b) => b.text) }); return { ok: true }; },
     };
   });
 
@@ -118,5 +127,34 @@ describe("бот: поддержка клуба", () => {
     expect(out.at(-1)!.text).toBe(UNKNOWN_INPUT_TEXT);
     expect(log).toHaveBeenCalledWith(expect.stringContaining("42 @someone"));
     log.mockRestore();
+  });
+
+  it("/thank: предпросмотр с найденными и ненайденными, рассылка по кнопке, «вчера» в тексте, отметка donation_asked_at", async () => {
+    deps.now = () => new Date("2026-11-16T11:45:00+03:00");
+    const org = (data?: string) => {
+      const c = ctx({ username: "meine_nika", data }) as unknown as Record<string, unknown>;
+      c.match = "cave:2026-11-15 @arinand @hulu404 ghost";
+      return c as never;
+    };
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    await handleThankCommand(org(), deps);
+    expect(out.at(-1)!.text).toContain("Разошлём 2: @arinand, @hulu404");
+    expect(out.at(-1)!.text).toContain("Не нашли чат (человек не открывал бота): @ghost");
+    expect(out.at(-1)!.text).toContain("Спасибо, что вчера был(а) на кофе-ране 🧡");
+    expect(sentTo).toHaveLength(0);
+    await handleThankCallback(org("tk:go"), deps);
+    expect(sentTo.map((m) => m.chatId)).toEqual([1000, 1001]);
+    expect(sentTo[0].buttons).toEqual(["200 ₽", "500 ₽", "1000 ₽", "Своя сумма"]);
+    expect(marked).toEqual([1000, 1001]);
+    expect(out.at(-1)!.text).toBe("Разослали: 2.");
+  });
+
+  it("/thank от постороннего — как незнакомая команда", async () => {
+    vi.spyOn(console, "log").mockImplementation(() => {});
+    const c = ctx({ username: "someone" }) as unknown as Record<string, unknown>;
+    c.match = "cave:2026-11-15 @arinand";
+    await handleThankCommand(c as never, deps);
+    expect(out.at(-1)!.text).toBe(UNKNOWN_INPUT_TEXT);
+    expect(sentTo).toHaveLength(0);
   });
 });
